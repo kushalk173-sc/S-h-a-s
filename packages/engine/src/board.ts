@@ -60,6 +60,11 @@ export function recount(zone: Zone): Zone {
   }
 
   let holder: PlayerID | null = null;
+  // TODO(R4, Phase 3): a simultaneous majority is last-wins by board-scan order.
+  // `north_west` is 6/11 so 6+6 is reachable, and this disagrees with
+  // `gerrymanderRights`, which returns null on a tie. The rulebook does not settle
+  // a majority tie; the ruling must be pinned in a test (audit test 29) before
+  // this is changed. Note it is also the degenerate coalition case (D5).
   for (const [p, n] of counts) if (n >= zone.majority) holder = p;
 
   if (holder === null) {
@@ -128,6 +133,10 @@ export function scores(state: GameState): Record<PlayerID, number> {
 
 export function winners(state: GameState): PlayerID[] {
   const s = scores(state);
+  // TODO(R5, Phase 3): the `0` floor makes an all-zero board report every seat as
+  // a winner. The floor exists only to guard `Math.max(...[]) === -Infinity` for
+  // an empty turn order, which `setup` already makes impossible. Fix is to drop
+  // the floor and return [] when every score is 0.
   const best = Math.max(0, ...Object.values(s));
   return Object.entries(s)
     .filter(([, v]) => v === best)

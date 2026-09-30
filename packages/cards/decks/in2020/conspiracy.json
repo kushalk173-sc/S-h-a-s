@@ -1,0 +1,60 @@
+{
+  "deck": "in2020",
+  "campaign": "India 2020",
+  "cards": [
+    {
+      "id": "ct-in2020-001",
+      "source": "original; register per REF 8.2 rule 5 — the India deck's card NAMES use romanised Hindi/Urdu, chosen because the jargon is itself the joke. The effect is the A Grave Inheritance archetype (REF 4.2.1) with the unexpressible conditional removed.",
+      "provenance": "inferred",
+      "name": "Jumlai Dafaar",
+      "text": "Gain 2 resources of your choice. Then get 1 discount on a purchase this turn.",
+      "cost": 4,
+      "effects": [{ "op": "gain-any", "n": 2 }, { "op": "discount", "n": 1 }]
+    },
+    {
+      "id": "ct-in2020-002",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Chai Aur Files",
+      "text": "Gain 2 Trust and 1 Funds from the Public Reserve. Then gain 1 voter.",
+      "cost": 4,
+      "effects": [{ "op": "gain", "res": { "trust": 2, "funds": 1 } }, { "op": "voters", "n": 1 }]
+    },
+    {
+      "id": "ct-in2020-003",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Budget Hai, Patra Nahi",
+      "text": "Gain 3 Funds from the Public Reserve, then discard 1 resource of your choice to it.",
+      "cost": 5,
+      "effects": [{ "op": "gain", "res": { "funds": 3 } }, { "op": "lose-any", "n": 1 }]
+    },
+    {
+      "id": "ct-in2020-004",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Gumasta Nahi, Salaam Nahi",
+      "text": "Take 1 resource of your choice from a chosen opponent. Then get 2 discounts on purchases this turn.",
+      "cost": 4,
+      "effects": [{ "op": "steal-any", "n": 1 }, { "op": "discount", "n": 2 }]
+    },
+    {
+      "id": "ct-in2020-005",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Khel Adhoora Chhodo",
+      "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 1 Media and 1 Trust.",
+      "cost": 4,
+      "effects": [{ "op": "refresh-market" }, { "op": "gain", "res": { "media": 1, "trust": 1 } }]
+    },
+    {
+      "id": "ct-in2020-006",
+      "source": "original; register per REF 8.2 rule 5. The extra-voter branch of the recovered Singularity (REF 4.2.1).",
+      "provenance": "inferred",
+      "name": "Baap Rekho",
+      "text": "Gain 2 voters, which you may place in different zones. Then gain 1 resource of your choice.",
+      "cost": 5,
+      "effects": [{ "op": "voters", "n": 2 }, { "op": "gain-any", "n": 1 }]
+    }
+  ]
+}

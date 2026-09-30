@@ -1,0 +1,159 @@
+{
+  "deck": "et2040",
+  "campaign": "Earth 2040",
+  "cards": [
+    {
+      "id": "ig-et2040-001",
+      "source": "original; register per REF 8.2. No Ideology Card from the Earth 2040 campaign was recovered at all (REF 2.4), so this entire deck file is authored.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the cure be free and the patent surrendered?",
+      "sides": [
+        {
+          "answer": "Yes. A cure nobody can pay for is a cure that has not arrived.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Nobody invents it again if nobody is allowed to own it.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-002",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the archive be opened to anyone who asks?",
+      "sides": [
+        {
+          "answer": "Yes. An archive that answers to one family is a family album.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Someone has to pay for the humidity control.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-003",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the ration be shared by need or by household?",
+      "advisory": "mature",
+      "sides": [
+        {
+          "answer": "No. Households are countable, and countable things get administered.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Need is harder to count, and harder to count keeps more people in the room.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-004",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the border be drawn on the water or on the families?",
+      "sides": [
+        {
+          "answer": "No. Water moves. Draw it on the families and the map will at least be honest.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. Families move too, and they move slower.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-005",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the school teach the old census or the new one?",
+      "sides": [
+        {
+          "answer": "No. Teach the old one. The new one is still being written by the winners.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. Teach the new one and let anyone who wants examine the old one.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-006",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the seed bank be sold to the highest bidder?",
+      "sides": [
+        {
+          "answer": "Yes. Sell it to the highest bidder and plant the difference where it is visible.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Sell it to the patientest bidder, and be honest that this is what we did.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-007",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the last coal plant close on a published date?",
+      "sides": [
+        {
+          "answer": "No. Close it on a published date. Utilities plan better against a deadline than a promise.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Keep it running until the grid is stable, and publish the figures weekly.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-008",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should every district below the seawall help pay for it?",
+      "sides": [
+        {
+          "answer": "No. Let the districts below the wall pay, and put the story on the evening bulletin.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. Everyone below the wall funds it, including those who plan to be above it.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    }
+  ]
+}

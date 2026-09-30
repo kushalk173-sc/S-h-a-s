@@ -1,0 +1,83 @@
+{
+  "deck": "et2040",
+  "campaign": "Earth 2040",
+  "cards": [
+    {
+      "id": "hl-et2040-001",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. Two clauses are not expressible: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state (REF 5.5), and 'every player' cannot be stated either because `gerrymander` is the one resource-shaped op in cards.ts with NO `target` field — unlike `voters`, `gain` and `lose`. The card as shipped therefore affects you only. See KNOWN-GAPS.md G5 and G8.",
+      "provenance": "adapted",
+      "name": "New Face Who Dis",
+      "text": "Immediately gerrymanders 1 of your majority or non-majority voters, under the normal gerrymandering rules.",
+      "effects": [{ "op": "gerrymander", "n": 1 }]
+    },
+    {
+      "id": "hl-et2040-002",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Red Blooded. The scaling ('Players receive any 2 resources for EACH of their discarded voters') needs a per-unit iteration op — see KNOWN-GAPS.md G4. The fixed pair is represented instead.",
+      "provenance": "adapted",
+      "name": "Red Blooded",
+      "text": "Discard 2 of your own voters from the board, permanently. Every opponent then gains 2 resources of their choice from the Public Reserve.",
+      "effects": [{ "op": "discard-voter", "n": 2 }, { "op": "gain-any", "n": 2, "target": "each-opponent" }]
+    },
+    {
+      "id": "hl-et2040-003",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The OR-branch ('Donate 1 of your voters to the player on your left') needs a DONATE op aimed at a seat-relative neighbour, and the 'if you are unable to do either, ignore this card' clause needs a conditional — see KNOWN-GAPS.md G1.",
+      "provenance": "adapted",
+      "name": "Ain't No Cure For Love",
+      "text": "Discard 2 of your own voters from the board, permanently.",
+      "effects": [{ "op": "discard-voter", "n": 2 }]
+    },
+    {
+      "id": "hl-et2040-004",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "name": "Quietly, The Ceiling Moved",
+      "text": "Every opponent discards 2 Funds to the Public Reserve. You then gain 1 voter.",
+      "effects": [
+        { "op": "lose", "res": { "funds": 2 }, "target": "each-opponent" },
+        { "op": "voters", "n": 1 }
+      ]
+    },
+    {
+      "id": "hl-et2040-005",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "name": "The Second Reading",
+      "text": "Every opponent gains 1 resource of their choice. You then get 2 discounts on purchases this turn.",
+      "effects": [
+        { "op": "gain-any", "n": 1, "target": "each-opponent" },
+        { "op": "discount", "n": 2 }
+      ]
+    },
+    {
+      "id": "hl-et2040-006",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "name": "Long Winter, Short Ledger",
+      "text": "Evict 2 voters from the board. Every opponent then gains 1 resource of their choice.",
+      "effects": [
+        { "op": "evict", "n": 2 },
+        { "op": "gain-any", "n": 1, "target": "each-opponent" }
+      ]
+    },
+    {
+      "id": "hl-et2040-007",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "name": "An Honest Institution",
+      "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 1 resource of your choice.",
+      "effects": [{ "op": "refresh-market" }, { "op": "gain-any", "n": 1 }]
+    },
+    {
+      "id": "hl-et2040-008",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "name": "Filed Under: Weather",
+      "text": "Every opponent discards 1 resource of their choice to the Public Reserve. You gain 2 Media.",
+      "effects": [
+        { "op": "lose-any", "n": 1, "target": "each-opponent" },
+        { "op": "gain", "res": { "media": 2 } }
+      ],
+      "excludeInTwoPlayer": true
+    }
+  ]
+}

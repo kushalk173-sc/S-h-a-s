@@ -1,0 +1,236 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Shasn — design tokens
+   Transcribed from docs/UI-SPEC.md §2 (colour), §3 (typography),
+   Appendix A.1/A.2/A.5 (spacing, radii, shadows, easing, durations).
+
+   Every hex below is the spec's value, not a choice made here. Measured
+   contrast ratios are carried in comments from UI-SPEC Appendix A.6 so that
+   any later edit which changes one is caught in review.
+
+   §2.10 names every token; nothing in this file is invented.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Table (dark surround) ──────────────────────────────────────────────
+     Measured (A.6): --table-text on --table-700 = 12.35, on --table-900 = 15.13.
+     Both well above the 4.5 AA floor for body text. */
+  --table-900: #141110;
+  --table-800: #1e1a16;
+  --table-700: #2a241e;
+  --table-600: #3a322a;
+  --table-text: #ede6d8;
+
+  /* ── Paper / parchment ramp (UI-SPEC §2.2) ─────────────────────────────
+     This ramp is the fixed surface point of the whole design: `rules.ts:75`
+     chose the board colours "for contrast against the parchment board". */
+  --paper-000: #faf6ec; /* Board face. Largest single surface. */
+  --paper-050: #f4efe2;
+  --paper-100: #efe8d6; /* Card face, mat face. */
+  --paper-200: #e4d9c1;
+  --paper-300: #d6c8ab; /* Card/mat edge, empty-slot well fill, shadow source. */
+  --paper-400: #c2b190; /* Printed rules on the board. 1.95 on paper-000. */
+  --paper-500: #a99775; /* Faintest printed rule. Decorative only. */
+
+  /* ── Ink ramp (UI-SPEC §2.3) ───────────────────────────────────────────
+     Measured on --paper-000:  900 = 15.55 (AAA) · 700 = 9.75 (AAA) ·
+     500 = 4.85 (AA) · 300 = 2.80 (non-text decoration only) ·
+     150 = 1.63 (decorative only).
+
+     RULE (§2.3): anything a player must *read* is --ink-900 or --ink-700.
+     --ink-500 is the floor for text and never goes lower. --ink-300/--ink-150
+     are for surfaces and rules, never glyphs. */
+  --ink-900: #241c14;
+  --ink-700: #4a3d2c;
+  --ink-500: #7a6a52;
+  --ink-300: #a3927a;
+  --ink-150: #cfc2a8;
+
+  /* ── Chrome accent (UI-SPEC §2.4) ──────────────────────────────────────
+     --seal on --paper-000 = 6.13 (AA). SEAL is the *only* chroma used for
+     chrome. Chrome is red; ownership is a seat colour; resources are an
+     Ideologue ink. These three never trade jobs. */
+  --seal: #a8341f;
+  --seal-deep: #7a2416; /* ASSUMED ≈8.5 — not measured (B.9). */
+
+  /* ── Seats — RENDER fills (UI-SPEC §2.5) ───────────────────────────────
+     These are the *identity* colours' parallel render set, NOT the engine's
+     PLAYER_COLOURS verbatim. See the block comment below the tokens. */
+  --seat-1: #c9345a; /* crimson  · 4.72 on paper-000 ✅ · paper-000 text 4.72 */
+  --seat-2: #2f7ec2; /* cobalt   · 3.98 on paper-000 ✅ · ink-900 text 3.90 */
+  --seat-3: #b87a0c; /* amber    · 3.34 on paper-000 ✅ · ink-900 text 4.66 */
+  --seat-4: #5f4b9b; /* violet   · 6.56 on paper-000 ✅ · paper-000 text 6.56 */
+  --seat-5: #2b9d78; /* jade     · 3.14 on paper-000 ✅ · ink-900 text 4.95 */
+
+  /* --seat-3 is a DELIBERATE divergence from the engine.
+     `PLAYER_COLOURS[2]` in the engine is the printed amber #E0A020, which
+     measures only 2.11:1 on parchment and therefore FAILS WCAG 1.4.11
+     (Non-text Contrast, ≥3:1) for a peg boundary. The printed amber stays
+     canonical on the server and is used for the seat nameplate on the dark
+     table (6.73 vs --table-700 ✅). Only the light-surface render fill is
+     darkened, to #B87A0C (3.34 ✅). A player who knows the box still
+     recognises their colour; a player with low vision can see their pegs.
+     Do not "fix" this back to #E0A020. UI-SPEC §2.5, §8.3, A.6. */
+
+  /* ── Semantics (UI-SPEC §2.6) ───────────────────────────────────────────
+     Measured on --paper-000: positive 4.93 · negative 6.06 · warn-volatile
+     7.19 (all AA). --unavail-fill 1.69 is NEVER a text colour.
+     --unavail-ink 4.33 on paper-000 is a deliberate near-miss: unavailable
+     content must stay *readable* (the player needs the cost and the
+     shortfall), so it is made unambiguously unavailable BY FORM — hatch
+     fill, cursor:not-allowed, aria-disabled, stated shortfall. Never by
+     low contrast alone (§9.2). */
+  --positive: #1f7a4d;
+  --negative: #b3261e;
+  --warn-volatile: #8a3b00;
+  --unavail-fill: #c8bfae;
+  --unavail-ink: #7c7365;
+
+  /* ── Ideologues — ink family (UI-SPEC §2.7) ─────────────────────────────
+     Deliberately desaturated near-monochrome, so a resource token can never
+     be mistaken for a peg at a glance. Measured on --paper-100 (where tokens
+     actually live): 5.44 / 8.30 / 7.40 / 6.64 — all AA. On --paper-000:
+     6.16 / 9.40 / 7.52 / 8.38.
+
+     These tokens are declared for completeness of the sheet. Per §2.7
+     mitigation 3, no resource token ever renders on the board. */
+  --ideo-capitalist: #6f5a1e; /* Funds */
+  --ideo-supremo: #5b3550; /* Clout */
+  --ideo-showstopper: #2f5560; /* Media */
+  --ideo-idealist: #7a3320; /* Trust */
+
+  /* ── Focus (UI-SPEC §2.10, §8.3) ────────────────────────────────────────
+     Dual-tone ring so it is visible against parchment AND any seat fill.
+     #141110 on paper-000 = 17.41. #FFFFFF against each seat fill:
+     5.09 / 4.30 / 3.60 / 7.08 / 3.39 — all ≥3:1. */
+  --focus-inner: #141110;
+  --focus-outer: #ffffff;
+
+  /* ── Board map tokens ────────────────────────────────────────────────────
+     The REAL Shasn board is a TOPOGRAPHIC CONTOUR MAP, not a choropleth
+     (docs/AUTHENTIC-SHASN-REFERENCE.md §6.1, VERIFIED by inspection of the
+     official `map.png` render). These five values are transcribed from that
+     reference and are the board's *printed map* inks. They are kept separate
+     from the paper ramp above, which remains the parity/UI surface (cards,
+     mat, log) — the two layers never mix.
+
+     Note the paper ramp's own --paper-000 etc. are still used for the
+     printed slot wells and peg interiors, because UI-SPEC §4.3/§4.5's peg
+     state matrix is normative and is expressed in those tokens. */
+  --map-ground: #2a2620; /* near-black olive ground            */
+  --map-ground-edge: #15120e; /* radial vignette to the edges   */
+  --map-land: #f2efe2; /* cream landmass fill                */
+  --map-contour: #dad3bf; /* fine concentric contour lines     */
+  --map-border: #4c5c64; /* thick slate-blue zone borders     */
+  --map-central: #c6c0a4; /* olive-tinted central inset        */
+  --map-landmark: #2e4a3c; /* decorative architectural plans    */
+  --map-rosette: #241f19; /* volatile cog / sunburst rosette   */
+  --map-well: #ededed; /* printed voter-area dot fill        */
+  --map-well-ring: #c4c4c4; /* printed voter-area dot ring      */
+
+  /* ── Typography families (UI-SPEC §3.1) ─────────────────────────────────
+     All three are SIL OFL and self-hostable as WOFF2. The font files are NOT
+     yet vendored (ASSUMED, B.9), so these are the spec's fallback stacks.
+     The fallback is a deliberate, documented state — not a placeholder to
+     be "fixed" by dropping in a webfont without re-checking line-heights
+     (§3.6.2: TYPE_CARD_SCENARIO 1.59 and TYPE_LOG 1.5 are tuned to the
+     display serif's x-height). */
+  --font-display: Bitter, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --font-numeric: 'Roboto Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --font-ui: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* ── Type scale (UI-SPEC §3.2) ──────────────────────────────────────────
+     DOM sizes are the rendered px at the reference display. The three
+     `*-svg` entries are the board's in-viewBox sizes (§3.5): the board is
+     an SVG that scales, so on-screen size = size × (renderedWidth/1000). */
+  --type-display-xl: 800 34px/40px var(--font-display);
+  --type-display-l: 800 26px/32px var(--font-display);
+  --type-display-m: 700 20px/26px var(--font-display);
+  --type-card-scenario: 400 17px/27px var(--font-display);
+  --type-card-side-label: 700 17px/23px var(--font-display);
+  --type-zone-name: 700 15px/18px var(--font-display);
+  --type-zone-fraction: 700 17px/20px var(--font-numeric);
+  --type-zone-holder: 700 12px/15px var(--font-ui);
+  --type-peg-count: 700 13px/16px var(--font-numeric);
+  --type-resource-num: 700 24px/26px var(--font-numeric);
+  --type-resource-cap: 700 12px/14px var(--font-numeric);
+  --type-num-delta-gain: 800 22px/24px var(--font-numeric);
+  --type-num-delta-loss: 800 22px/24px var(--font-numeric);
+  --type-mkt-cost: 700 14px/18px var(--font-numeric);
+  --type-peer-num: 700 15px/18px var(--font-numeric);
+  --type-button: 700 15px/20px var(--font-ui);
+  --type-button-sm: 700 13px/16px var(--font-ui);
+  --type-field-label: 600 13px/16px var(--font-ui);
+  --type-log: 400 14px/21px var(--font-ui);
+  --type-log-meta: 700 11px/14px var(--font-numeric);
+  --type-tooltip: 500 13px/18px var(--font-ui);
+
+  /* Board SVG text sizes (§3.5). Floor is 500px board width (scale 0.5):
+     zone name 24 → 12.0px… the documented floor is 14px at the 620px
+     reference, and the name/fraction/holder below are the sizes the spec
+     tabulates for 620px and 1100px. */
+  --board-type-zone-name: 24px;
+  --board-type-zone-fraction: 28px;
+  --board-type-zone-holder: 19px;
+  --board-type-peg-a11y: 11px; /* never seen; aria-label carries it */
+
+  /* Numeric rules (§3.3): tabular figures everywhere a number changes, so a
+     7 → 8 never shifts layout. */
+  --numeric-features: 'tnum' 1, 'zero' 1;
+
+  /* ── Spacing — 4px base (A.1) ───────────────────────────────────────────*/
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ── Radii, borders, shadows (A.2) ─────────────────────────────────────
+     --shadow-none is the ONLY permitted shadow value on the board (§1.6:
+     "print, don't glow"). No gradients anywhere (§9.9). */
+  --r-sm: 4px; /* chips, pips */
+  --r-md: 6px; /* cards, option panels, tooltips */
+  --r-lg: 10px; /* panels */
+  --r-sheet: 18px; /* the board's own edge */
+  --shadow-card: 0 1px 2px rgb(20 17 16 / 28%);
+  --shadow-panel: 0 2px 8px rgb(20 17 16 / 32%);
+
+  /* ── Motion (A.5, §7) ──────────────────────────────────────────────────
+     Nothing bounces (§9.9): the board easing is decelerating-only. */
+  --ease-board: cubic-bezier(0.2, 0, 0, 1);
+  --ease-panel: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-90: 90ms;
+  --dur-120: 120ms;
+  --dur-140: 140ms;
+  --dur-160: 160ms;
+  --dur-180: 180ms;
+  --dur-200: 200ms;
+  --dur-220: 220ms;
+  --dur-260: 260ms;
+  --dur-280: 280ms;
+  --dur-300: 300ms;
+  --dur-320: 320ms;
+  --dur-520: 520ms;
+
+  /* ── Board geometry (A.3) — MEASURED, not chosen ────────────────────────*/
+  --board-w: 1000;
+  --board-h: 1500;
+  --peg-r: 17; /* peg disc radius */
+  --well-stroke: 1.5; /* slot well stroke; survives the whole scale range */
+  --hit-rect: 48; /* @0.62 = 29.8 CSS px; @0.50 floor = 24.0px (SC 2.5.8) */
+  --hit-rect-coarse: 56; /* @media (pointer: coarse) */
+  --peg-minority-stroke: 3;
+  --peg-majority-stroke: 1.5;
+  --volatile-well: 34; /* rounded square side */
+  --volatile-well-rx: 6;
+  --overlay-ring-r: 21;
+  --zone-gap: 1.5; /* dark seam between neighbouring zones */
+  --board-min-render-w: 500; /* 480 on tablet portrait */
+  --board-max-render-w: 780;
+  /* Measured minimum centre-to-centre distance between slots: 52.84
+     (central-01 ↔ central-05). 48 < 52.84, so hit rects cannot overlap. */
+  --board-min-centre-distance: 52.84;
+}

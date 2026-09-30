@@ -82,6 +82,13 @@ export function overCap(p: Pool, cap: number): number {
  * Deterministic fallback trim, used by bots and by the "auto-discard" convenience.
  * Sheds from the largest pool first so a player never loses their scarcest resource.
  */
+/**
+ * TODO(R11, Phase 3): this breaks ties by `RESOURCES` declaration order, not by
+ * any rule, so it sheds from `funds` first when pools are equal. It is
+ * deterministic and therefore replay-safe, but it is a *rule decision* wearing a
+ * utility function's clothes. Only reachable from bots and the auto-discard
+ * convenience; the real path is the player-chosen `lose-any` choice.
+ */
 export function trimToCap(p: Pool, cap: number): Pool {
   let out = { ...p };
   let excess = overCap(out, cap);

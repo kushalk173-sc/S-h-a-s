@@ -36,8 +36,11 @@ export type SetupOptions = {
    * The *choice* is the player's, so this is supplied by the caller rather than
    * invented here. With `RULES.staggeredStart` on and no entry for a seat, that
    * seat starts empty — the engine does not guess a split.
+   *
+   * Positional, parallel to `players`: `startResources[i]` is seat `i`'s opening
+   * pool. A seat with no entry starts with nothing.
    */
-  readonly startResources?: readonly Readonly<Record<PlayerID, Delta>>[];
+  readonly startResources?: readonly Delta[];
   /** Populate the HQ Mat with face-up Voter Cards. Default true. p10. */
   readonly dealMarket?: boolean;
 };

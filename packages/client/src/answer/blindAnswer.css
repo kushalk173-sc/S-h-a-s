@@ -1,0 +1,221 @@
+/**
+ * The blind answer's stylesheet.
+ *
+ * READ THIS BEFORE EDITING
+ * ────────────────────────
+ * There is exactly ONE rule that styles a side, and it is `.blind-answer__side`.
+ * It is a single class, applied identically to both sides, with no `::before`
+ * or `::after` that differs between them.
+ *
+ * The following are FORBIDDEN in this file, and `blindAnswer.test.tsx` fails
+ * the build if any of them appears:
+ *
+ *   · any selector containing `nth-child`, `nth-of-type`, `first-child`,
+ *     `last-child`, or `odd`/`even`  → positional bias
+ *   · any selector containing `[data-wire-side=…]`, `[data-side=…]`,
+ *     `.is-a`, `.is-b`, `.left`, `.right`, `.primary`, `.secondary`,
+ *     `.first`, `.second`             → side identity styling
+ *   · any `color`/`background`/`border`/`box-shadow`/`filter`/`opacity`
+ *     declaration whose VALUE differs between a side rule and the base rule
+ *   · a gradient, a shadow, or a colour outside the paper/ink/seal ramps
+ *
+ * The contract is in UI-SPEC §1.2 and the enforcement is §8.8: "Test the
+ * symmetry, don't assume it: a unit test asserting getComputedStyle equality
+ * on every property in the §1.2 contract table, for both sides, in both
+ * orderings, is a release gate. It is the cheapest possible guard on the game's
+ * central mechanic."
+ *
+ * Values, from §1.2 and §2/§3. The tint idea, the chosen state, the hover
+ * affordance and the symmetric copy are all in the component.
+ */
+
+.blind-answer {
+  /* Calm register (§1.4): generous margins, one idea on screen, no competing
+     chrome. The prompt is one column of prose and two identical panels in an
+     otherwise empty viewport (§9.6). */
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--sp-10) var(--sp-6);
+  font-family: var(--font-display);
+}
+
+.blind-answer__scenario {
+  /* TYPE_CARD_SCENARIO: 17px / 27px = 1.59 leading, tuned to the display
+     serif's x-height. 27px of leading gives 4–8 lines of prose room without
+     the lines crowding. */
+  font: var(--type-card-scenario);
+  color: var(--ink-700);
+  margin: 0 0 var(--sp-8);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+/* One contiguous panel: one background, one border, both options in a single
+   2-col grid. */
+.blind-answer__panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  align-items: stretch;
+  background: var(--paper-100);
+  border: 1px solid var(--ink-300);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+}
+
+/* ── THE SIDE RULE. Both sides, one class, one declaration block. ──────────
+   Declared in LONGHAND, deliberately. A `background: var(--paper-100)`
+   shorthand is dropped wholesale by jsdom's CSS engine, which would leave the
+   background unassertable in the symmetry test — i.e. exactly the property
+   most worth asserting. Longhand keeps every row of the §1.2 table resolvable,
+   so the getComputedStyle equality check is load-bearing on colour and not
+   only on geometry. */
+.blind-answer__side {
+  /* Background — §1.2. Never a tint: no --positive, no --negative, no
+     Ideologue ink, ever. */
+  background-color: var(--paper-100);
+  background-image: none;
+  /* Border — 2px, all four sides, equal radius. Equal because the whole point
+     is that neither side looks like "the real one". Written out per side so
+     no shorthand can be mis-parsed. */
+  border-top-width: 2px;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+  border-top-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
+  border-left-style: solid;
+  border-top-color: var(--ink-300);
+  border-right-color: var(--ink-300);
+  border-bottom-color: var(--ink-300);
+  border-left-color: var(--ink-300);
+  border-top-left-radius: var(--r-md);
+  border-top-right-radius: var(--r-md);
+  border-bottom-right-radius: var(--r-md);
+  border-bottom-left-radius: var(--r-md);
+  /* Same padding on both: 20px 22px, i.e. --sp-5 vertically. Written as the
+     shorthand with literal values because jsdom's CSS engine does not
+     implement the individual `padding-*` longhands for computed style, which
+     would make the symmetry assertion vacuous for these four properties. */
+  padding: 20px 22px;
+  /* Same min-height on both, so a long A and a short B are visually equal:
+     content-length differences must not change box size. */
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  font-style: normal;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: normal;
+  /* The change is to ink and decoration, never to fill. */
+  transition: border-color var(--dur-90) var(--ease-board);
+}
+
+.blind-answer__label {
+  /* TYPE_CARD_SIDE_LABEL: 17px / 700 / 1.35, INK_900, centred, 22ch max —
+     the same max-width on both, so a longer label wraps rather than widening
+     its own column. */
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink-900);
+  text-align: center;
+  max-width: 22ch;
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+/* Hover: border colour and the label's underline. Identical on both sides, and
+   the two sides hover INDEPENDENTLY, so there is no persistent bias. */
+.blind-answer__side:hover {
+  border-top-color: var(--seal);
+  border-right-color: var(--seal);
+  border-bottom-color: var(--seal);
+  border-left-color: var(--seal);
+}
+
+.blind-answer__side:hover .blind-answer__label {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
+
+/* Focus: dual-tone, identical geometry on both. #141110 is 17.41:1 on paper
+   and #FFFFFF clears 3:1 against every seat fill, so the ring is visible
+   whatever is behind it (§8.3). `outline: none` is permitted only here. */
+.blind-answer__side:focus {
+  outline: 2px solid var(--focus-outer);
+  outline-offset: 1px;
+  border-top-color: var(--focus-inner);
+  border-right-color: var(--focus-inner);
+  border-bottom-color: var(--focus-inner);
+  border-left-color: var(--focus-inner);
+}
+
+.blind-answer__side:focus-visible {
+  outline: 2px solid var(--focus-outer);
+  outline-offset: 1px;
+}
+
+/* The chosen state, identical on both sides: SEAL 2px border, PAPER_050 fill,
+   and a small SEAL check glyph at 14px in the SAME corner on both. Never a
+   heavier border on the left, never a filled background on one side only. */
+.blind-answer__side[aria-pressed='true'] {
+  border-top-color: var(--seal);
+  border-right-color: var(--seal);
+  border-bottom-color: var(--seal);
+  border-left-color: var(--seal);
+  background-color: var(--paper-050);
+}
+
+.blind-answer__check {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--seal);
+}
+
+.blind-answer__confirm {
+  display: block;
+  margin: var(--sp-6) auto 0;
+  font: var(--type-button);
+  color: var(--paper-000);
+  background: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-6);
+  cursor: pointer;
+  transition: background var(--dur-90) var(--ease-board);
+}
+
+.blind-answer__confirm:hover:not(:disabled) {
+  background: var(--seal-deep);
+  border-color: var(--seal-deep);
+}
+
+.blind-answer__confirm:disabled {
+  /* §9.2: never make an action unavailable by low contrast alone. */
+  background: var(--unavail-fill);
+  border-color: var(--ink-300);
+  color: var(--unavail-ink);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blind-answer__side,
+  .blind-answer__confirm {
+    transition-duration: 80ms;
+  }
+}

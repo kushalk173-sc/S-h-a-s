@@ -1,0 +1,78 @@
+/**
+ * Board styles.
+ *
+ * Almost everything on the board is an SVG presentation attribute reading a
+ * token, not a CSS rule, because SVG in a 1000 × 1500 viewBox scales with the
+ * board and CSS px do not. What is left here is what genuinely belongs to CSS:
+ * the two transitions §7 allows on the board, the focus-visible handling, and
+ * the reduced-motion floor.
+ *
+ * §7.2 / §8.6: nothing loops, pulses, shimmers or nags (§9.4). A 129-target
+ * board with pulsing legal targets is a board nobody can read. The only motion
+ * is the zone lift (90ms, colour only) and the peg face swap (240ms flip,
+ * 40ms stagger — reduced to an 80ms opacity with no transform and no stagger).
+ */
+
+.shasn-board {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  /* The board must never look broken while you are waiting for your turn. */
+  transition: opacity var(--dur-200) var(--ease-board);
+}
+
+.shasn-board[aria-disabled='true'] {
+  opacity: 0.92;
+}
+
+/* A zone lifting on hover is the ONLY hover response on a peg: no colour change
+   on the peg itself, because on a 129-target surface 129 simultaneous
+   highlights would be noise while one is a pointer (§4.7.1). */
+.shasn-zone-outline [data-lifted='true'] {
+  transition: stroke var(--dur-90) var(--ease-board), stroke-width var(--dur-90) var(--ease-board);
+}
+
+.shasn-slot {
+  /* The well never changes colour while the board is idle. Colour is spent
+     only once a decision is in progress (§4.3 rule 1). */
+  transition: opacity var(--dur-90) var(--ease-board);
+}
+
+.shasn-slot:focus {
+  /* `outline: none` is permitted ONLY where the dual-tone SVG focus ring is
+     present, and it is — drawn by VoterSlot at r=21 in SVG user space so it
+     scales with the board (§8.3, §8.4 rule 3). */
+  outline: none;
+}
+
+.shasn-slot:focus-visible {
+  outline: none;
+}
+
+/* SVG groups cannot be given a CSS outline, so nothing is lost by suppressing
+   the default: the ring is drawn as geometry. */
+
+.shasn-zone-label text,
+.shasn-zone-label tspan {
+  /* SVG text does not inherit `paint-order` needs, but numerals must be
+     tabular so `6/11` and `11/21` sit on the same optical width. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* §8.6. The duration floor is 80ms, never 0ms, so a state change remains
+     perceptible AS a change rather than appearing as an unexplained
+     discontinuity. */
+  .shasn-board,
+  .shasn-zone-outline [data-lifted='true'],
+  .shasn-slot {
+    transition-duration: 80ms;
+  }
+
+  /* No transform, no stagger — the ring is static and already carries the
+     meaning. */
+  .shasn-slot {
+    transition-property: opacity;
+  }
+}

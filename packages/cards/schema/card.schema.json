@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shasn.invalid/schema/card.schema.json",
+  "$comment": "CARD CORPUS SCHEMA — draft 2020-12.\n\nAuthored against packages/engine/src/cards.ts (IdeologyCard, VoterCard,\nConspiracyCard, HeadlineCard) and packages/engine/src/state.ts (Delta,\nResource, Ideologue) as they stand today. It deliberately does NOT redesign the\nengine types. Where a real card cannot be expressed by the Effect union, the card\nwas not fudged into the schema — it is recorded in packages/cards/KNOWN-GAPS.md.\n\nDELIBERATE DIVERGENCE FROM cards.ts: every card carries two extra envelope fields,\n`source` and `provenance`, which are NOT part of the engine card shapes. They exist\nso a reviewer can tell recovered text from authored text, and packages/cards strips\nthem in toEngine*Card() before handing cards to the engine. See README.md.\n\nSources for every constraint are recorded inline as $comment, keyed to\ndocs/AUTHENTIC-SHASN-REFERENCE.md (REF) and docs/rules-reference.md (RULES).\n\nType test: test/engine-parity.test.ts asserts that the four resource keys in\n$defs.delta are exactly Object.keys(IDEOLOGUE_RESOURCE) and that the effect op\nenum in $defs.effect matches the Effect union in cards.ts. JSON Schema cannot import\na TypeScript type, so that drift guard lives in a test rather than in this file.",
+  "title": "Shasn card corpus",
+  "type": "object",
+  "properties": {
+    "deck": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "$comment": "Deck id. Must equal the directory name under decks/; the loader asserts it."
+    },
+    "campaign": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "$comment": "campaign: string on IdeologyCard in cards.ts. Cards in one deck file share it."
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/card" }
+    }
+  },
+  "required": ["deck", "campaign", "cards"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "card": {
+      "$comment": "A card is exactly one of the four engine card shapes plus the provenance envelope.",
+      "type": "object",
+      "required": ["id", "source", "provenance"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/source" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "oneOf": [
+        { "$ref": "#/$defs/ideologyCard" },
+        { "$ref": "#/$defs/voterCard" },
+        { "$ref": "#/$defs/conspiracyCard" },
+        { "$ref": "#/$defs/headlineCard" }
+      ]
+    },
+
+    "id": {
+      "type": "string",
+      "minLength": 7,
+      "maxLength": 32,
+      "$comment": "Namespaced card id: <type>-<deck>-<index>.\n  ig-*  IdeologyCard      vo-*  VoterCard\n  ct-*  ConspiracyCard    hl-*  HeadlineCard\n\nModelled on the printed card-code convention recovered at REF 5.7\n(IG10.108 = India, print generation 10, card 108; AM10.100 = America).\nThe engine treats CardID as an opaque string (state.ts), so the shape is free to\nchoose, but keeping it stable across editions makes a corpus diff readable.\nscripts/validate.ts additionally checks the type prefix and the deck segment, so a\nmisfiled card is a build failure rather than a confusing lookup miss.",
+      "pattern": "^(ig|vo|ct|hl)-[a-z0-9]+(-[a-z0-9]+)*-[0-9]{3}$"
+    },
+
+    "source": {
+      "type": "string",
+      "minLength": 12,
+      "maxLength": 600,
+      "$comment": "Where this card's material came from. Mandatory on every card.\nFor verbatim/adapted cards this is the document id or URL in\ndocs/AUTHENTIC-SHASN-REFERENCE.md 4 plus the section that yielded it.\nFor inferred cards it is the register source: 'original; register per REF 8.2'.\n\nEnforced as an error because REF 9.2 is explicit that shipping unattributed\nrecovered text is the single highest legal risk in this repository."
+    },
+
+    "provenance": {
+      "enum": ["verbatim", "adapted", "inferred"],
+      "$comment": "verbatim  — card name and rules text reproduced word-for-word from a cited\n            official 'X Cards Explained' document. REF 4.1/4.2.1/4.3.\nadapted   — recovered text, but the card as played here is a reconstruction: an\n            option was dropped, a branch was flattened, or only one side of an\n            Ideology Card was recovered and the other is authored. REF 2.4 records\n            that ZERO ordinary question Ideology Cards were recovered in full, so\n            every Ideology Card in this corpus is at best `adapted`.\ninferred  — authored here. The register is copied from REF 8.2; the content is not\n            Memesys'."
+    },
+
+    "campaign_ref": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "$comment": "campaign: string on IdeologyCard in cards.ts. Cross-checked against the deck file's own `campaign` by scripts/validate.ts."
+    },
+
+    "advisory": {
+      "enum": ["mature", "trigger"],
+      "$comment": "cards.ts Advisory. REF 2.2 confirms a Content Advisory flag exists on Ideology Cards and that the table may vote flagged cards out before play (RULES p14). REF 10 item 4 records that the LEGEND for the two tiers was never recovered — these two tier names are the engine's own invention, not recovered values."
+    },
+
+    "resource": {
+      "enum": ["funds", "clout", "media", "trust"],
+      "$comment": "Resource in state.ts. RULES p11/p33: the four resources map one-to-one onto the four Ideologues (Capitalist->Funds, Supremo->Clout, Showstopper->Media, Idealist->Trust). See $defs.ideologueResourceMap; test/engine-parity.test.ts fails if this enum and IDEOLOGUE_RESOURCE ever disagree."
+    },
+
+    "ideologue": {
+      "enum": ["capitalist", "supremo", "showstopper", "idealist"],
+      "$comment": "Ideologue in state.ts. RULES p13: 'Every answer will yield a different set of resources', and both answers on a card belong to different Ideologues."
+    },
+
+    "ideologueResourceMap": {
+      "$comment": "The one-to-one Ideologue -> Resource map, stated as data so that it is auditable and\nso that the four branches of $defs.ideologySide can be read against it.\nSource: RULES p11 & p33; mirrored in state.ts as IDEOLOGUE_RESOURCE.\n\nThis is the mapping the schema cross-checks `ideologue` against — see\n$defs/ideologySide. A test asserts this object's values equal Object.keys/values of\nIDEOLOGUE_RESOURCE, so a change to the engine's map is a test failure, not a\nsilently-wrong card corpus.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capitalist", "supremo", "showstopper", "idealist"],
+      "properties": {
+        "capitalist": { "const": "funds" },
+        "supremo": { "const": "clout" },
+        "showstopper": { "const": "media" },
+        "idealist": { "const": "trust" }
+      }
+    },
+
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "Delta = Partial<Record<Resource, number>> (state.ts). Sparse on purpose.\n\nmaximum 9: REF 5.2 observes real payouts of 2-5 discs in total and 0-3 of any\nsingle type, printed as one disc per unit and never as a numeral. 9 is a generous\nceiling, not an observed value.\n\nminimum 0: a negative payout is not expressible in the engine. Losing resources is a\n`lose` effect on a Conspiracy/Headline card, not a payout (docs/ARCHITECTURE.md 6.2).\n\nNO minProperties here. `{}` is a schema-valid but design-invalid side; that is\ndeliberately the balance checker's job (D5 EMPTY_SIDE), not the schema's, so that\nshape validation and design judgement stay separately reviewable.\ndocs/ARCHITECTURE.md 6.2 argues for exactly this split.",
+      "properties": {
+        "funds": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "clout": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "media": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "trust": { "type": "integer", "minimum": 0, "maximum": 9 }
+      }
+    },
+
+    "nonEmptyDelta": {
+      "type": "object",
+      "minProperties": 1,
+      "$comment": "A Delta with at least one resource in it. Used for an Effect's `res` payload, where an empty delta would be a silent no-op — unlike an Ideology Card's `pays`, where `{}` is a legitimate (if bad) design statement the balance checker owns."
+    },
+
+    "ideologySide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["answer", "ideologue", "pays"],
+      "properties": {
+        "answer": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 200,
+          "pattern": "^(Yes|No)\\.",
+          "$comment": "The real answer register, enforced rather than merely described.\nREF 8.2 rule 1: 'Answers open with the bare word \"Yes.\" or \"No.\"' — REF\ninspected 20+ recovered answers and not one opens any other way.\nREF 8.2 rule 2 requires deadpan, not jokey, and rule 3 caps the answer at 15\nwords after the Yes/No, hence maxLength 200 rather than a word-count rule.\n\nThis is a real fidelity constraint, not a style preference: an answer that does\nnot open with Yes/No is a card we did not recover correctly."
+        },
+        "ideologue": { "$ref": "#/$defs/ideologue" },
+        "pays": { "$ref": "#/$defs/delta" }
+      },
+      "oneOf": [
+        {
+          "$comment": "Capitalist -> Funds (RULES p11/p33). The side must STATE its own resource explicitly, even when zero.",
+          "type": "object",
+          "properties": { "ideologue": { "const": "capitalist" }, "pays": { "type": "object", "required": ["funds"], "properties": { "funds": { "$ref": "#/$defs/delta/properties/funds" } } } }
+        },
+        {
+          "$comment": "Supremo -> Clout (RULES p11/p33).",
+          "type": "object",
+          "properties": { "ideologue": { "const": "supremo" }, "pays": { "type": "object", "required": ["clout"], "properties": { "clout": { "$ref": "#/$defs/delta/properties/clout" } } } }
+        },
+        {
+          "$comment": "Showstopper -> Media (RULES p11/p33).",
+          "type": "object",
+          "properties": { "ideologue": { "const": "showstopper" }, "pays": { "type": "object", "required": ["media"], "properties": { "media": { "$ref": "#/$defs/delta/properties/media" } } } }
+        },
+        {
+          "$comment": "Idealist -> Trust (RULES p11/p33).",
+          "type": "object",
+          "properties": { "ideologue": { "const": "idealist" }, "pays": { "type": "object", "required": ["trust"], "properties": { "trust": { "$ref": "#/$defs/delta/properties/trust" } } } }
+        }
+      ],
+      "$comment": "THE IDEOLOGUE / RESOURCE CROSS-CHECK. Each branch of `oneOf` pins `ideologue` to a\nconstant and REQUIRES the resource that Ideologue maps to (see\n$defs.ideologueResourceMap) to be named in `pays`.\n\nRequiring the key to be PRESENT does not mean requiring it to be POSITIVE, and that\ndistinction is load-bearing. REF 5.2 verifies from the official 432-card marketing\nrender that the shipped card 'SHOULD WE INVADE NEW SPAIN?' has a CAPITALIST side\npaying 2 Trust + 1 Media and ZERO Funds. A rule of the form 'a Capitalist answer must\npay at least 1 Funds' would reject a real, shipped card. So the schema demands the\nauthor state the zero rather than demanding it not be zero.\n\nREF 5.2 also notes that `{trust: 0}` and `{}` are otherwise indistinguishable in the\ndata, and that the real game avoids the ambiguity by always printing at least one\ndisc. Requiring the key makes the zero explicit at authoring time; the 'at least one\ndisc' half of that rule is enforced as D5 EMPTY_SIDE by scripts/balance.ts."
+    },
+
+    "ideologyCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "provenance", "campaign", "question", "sides"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/source" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "campaign": { "$ref": "#/$defs/campaign_ref" },
+        "question": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 200,
+          "$comment": "REF 8.2 rule 3: the real question is a yes/no policy dilemma of at most ~12 words, never a question about tactics. maxLength 200 leaves room for the longest observed ('SHOULD WOMEN BE FREE TO HAVE CHILDREN SINGLE OR IN A RELATIONSHIP?'). REF 5.1 confirms the engine's {question, sides} model is already an exact match for the printed card."
+        },
+        "advisory": { "$ref": "#/$defs/advisory" },
+        "sides": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/ideologySide" },
+          "$comment": "readonly [IdeologySide, IdeologySide] in cards.ts. A fixed-length array, never a keyed object — docs/ARCHITECTURE.md 6.2 explains why a keyed object would let card.sides[action.side] return undefined at runtime, in a live game, on a card nobody tested."
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "RULES p13: the two answers on a card belong to two DIFFERENT Ideologues.\nFour `contains` clauses with maxContains 1 = at most one side per Ideologue, and\nwith exactly two sides over four Ideologues that is precisely 'two different'.\n\nREF 2.3 [INFERRED] from 14 tournament hands that Idealist and Supremo occupy\nlargely DISJOINT question space (6 of 14 hands are Idealist>0, Supremo=0), i.e.\nthe real corpus is a curated pairing table rather than 6 random pairs of 4. That\nis a corpus-frequency property, not a per-card validity rule, so it is NOT\nenforced here; scripts/balance.ts reports the realised pair distribution instead.",
+          "properties": {
+            "sides": {
+              "type": "array",
+              "allOf": [
+                { "contains": { "type": "object", "required": ["ideologue"], "properties": { "ideologue": { "const": "capitalist" } } }, "minContains": 0, "maxContains": 1 },
+                { "contains": { "type": "object", "required": ["ideologue"], "properties": { "ideologue": { "const": "supremo" } } }, "minContains": 0, "maxContains": 1 },
+                { "contains": { "type": "object", "required": ["ideologue"], "properties": { "ideologue": { "const": "showstopper" } } }, "minContains": 0, "maxContains": 1 },
+                { "contains": { "type": "object", "required": ["ideologue"], "properties": { "ideologue": { "const": "idealist" } } }, "minContains": 0, "maxContains": 1 }
+              ]
+            }
+          }
+        }
+      ]
+    },
+
+    "voterCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "provenance", "cost", "voters"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/source" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "$comment": "cost: Delta, structurally CONFIRMED CORRECT by REF 5.5: 'VoterCard = { cost:\nDelta, voters: number } is structurally correct [VERIFIED votercards.png]'. The\nprinted front is a black field with a column of resource discs and one large\ncream numeral.\n\nminProperties 1, unlike IdeologyCard `pays`: a Voter Card that costs nothing is\nnot a card the physical product has, and an empty cost is almost always a typo'd\nor omitted key rather than a design statement.\n\nEvery key is minimum 1, so a cost of {funds: 0} is rejected here rather than\nsilently paying nothing.\n\nREF 3 and REF 10 item 3: the real 60-card cost distribution was never recovered,\nso no total-cost constraint is asserted. scripts/balance.ts reports the realised\ncost-per-voter curve so the shape is visible.",
+          "properties": {
+            "funds": { "type": "integer", "minimum": 1, "maximum": 9 },
+            "clout": { "type": "integer", "minimum": 1, "maximum": 9 },
+            "media": { "type": "integer", "minimum": 1, "maximum": 9 },
+            "trust": { "type": "integer", "minimum": 1, "maximum": 9 }
+          }
+        },
+        "voters": {
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "$comment": "RULES p10: 'Voter Cards can contain 1, 2 or 3 voters.' REF 3 confirms the 1/2/3 split is load-bearing: several real effects discriminate BY SIZE (Lab-Grown Earworm, Power Trip, Don't Kiss The Babies, Eradicating Germs, Fatality), so this is an enum and not a range."
+        }
+      }
+    },
+
+    "effectTarget": {
+      "enum": ["you", "each-opponent", "everyone", "leader"],
+      "$comment": "EffectTarget in cards.ts. 'leader' = the player holding the most majority voters; ties give nobody. REF 4.4 item 2 records that this four-value enum does not fit several real cards (ON THE \"HIGH\" SEAS attaches to the card, A CALL FROM KARACHI auctions, NEXT BILLION DATA POINTS votes) — see packages/cards/KNOWN-GAPS.md."
+    },
+
+    "count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9,
+      "$comment": "The `n` of a non-resource Effect. minimum 1: every op in the union is a gain or a loss of N, and a zero-N effect is a no-op that deserves to fail review. maximum 9 matches the delta ceiling; no recovered real card exceeds 4."
+    },
+
+    "effect": {
+      "type": "object",
+      "required": ["op"],
+      "$comment": "The Effect union in packages/engine/src/cards.ts.\n\nNOTE FOR REVIEWERS: the task brief calls this a '12-op union'. cards.ts as of this\ncommit declares 13 (gain, lose, gain-any, lose-any, steal-any, voters, evict,\ndiscard-voter, convert-voter, gerrymander, draw-conspiracy, refresh-market,\ndiscount). The schema follows cards.ts, because the engine is the contract. See\nsrc/effect-ops.ts for the compile-time drift guard.\n\nWhat this union CANNOT express is the subject of packages/cards/KNOWN-GAPS.md:\nduration, tokens-on-card, hostages, timed pass, auction, vote, out-of-turn\nreactive block/deflect, triggers, scaling off board state, dynamic cost modifiers,\nset collection, borrowed powers, delayed cross-turn payoffs, and any effect aimed at\nsomething other than you/each-opponent/everyone/leader. REF 5.4 puts that at roughly\n40% of real Conspiracy/Headline effects.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "res"],
+          "properties": {
+            "op": { "const": "gain" },
+            "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
+            "target": { "$ref": "#/$defs/effectTarget" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "res"],
+          "properties": {
+            "op": { "const": "lose" },
+            "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
+            "target": { "$ref": "#/$defs/effectTarget" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "gain-any" },
+            "n": { "$ref": "#/$defs/count" },
+            "target": { "$ref": "#/$defs/effectTarget" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "lose-any" },
+            "n": { "$ref": "#/$defs/count" },
+            "target": { "$ref": "#/$defs/effectTarget" }
+          }
+        },
+        {
+          "$comment": "steal-any has NO target in cards.ts: 'take N resources from a chosen opponent'.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "steal-any" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "voters" },
+            "n": { "$ref": "#/$defs/count" },
+            "target": { "$ref": "#/$defs/effectTarget" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "evict" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "discard-voter" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "convert-voter" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "gerrymander" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "draw-conspiracy" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        },
+        {
+          "$comment": "refresh-market is the only op with no payload.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op"],
+          "properties": {
+            "op": { "const": "refresh-market" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "properties": {
+            "op": { "const": "discount" },
+            "n": { "$ref": "#/$defs/count" }
+          }
+        }
+      ]
+    },
+
+    "conspiracyCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "provenance", "name", "text", "cost", "effects"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/source" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 60,
+          "$comment": "REF 4.4 item 5: real cards name themselves in ALL CAPS, set as a title separate from the body. REF 8.1: the name is a pun, a reference or a throwaway joke, never a label. Case is not asserted because the reference doc transcribes names in title case; the renderer upper-cases."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 1200,
+          "$comment": "cards.ts: 'Player-facing rules text. Must describe exactly what `effects` does.' The 20-word floor is a proxy for that — an effect list with no prose beside it is a card nobody can play. Where an adapted card drops part of the real effect, `text` describes what the effect list actually does and `source` names what was dropped."
+        },
+        "cost": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 5,
+          "$comment": "RULES p19: 'Cost any 4-5 resources, the number printed on the back of the card.' REF 5.5 confirms the cost is printed on the card back (photo shows a magenta back with 5 in the corner). Bounded rather than enum 4|5 so a future edition with a 6 does not need a schema edit."
+        },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/effect" }
+        },
+        "excludeInTwoPlayer": {
+          "type": "boolean",
+          "$comment": "cards.ts: 'p27: cards marked 2x are removed in the two-player game.'"
+        }
+      }
+    },
+
+    "headlineCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "provenance", "name", "text", "effects"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/source" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "text": { "type": "string", "minLength": 20, "maxLength": 1200 },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/effect" }
+        },
+        "excludeInTwoPlayer": { "type": "boolean" }
+      },
+      "$comment": "HeadlineCard = ConspiracyCard minus `cost`. REF 5.5 confirms that is correct:\n'Headline Cards have no cost'.\n\nRULES p18: a Headline is resolved at the end of the turn of the player who placed a\nvoter into a Volatile Area, one per voter, in the order the voters were placed.\n\nREF 4.3 preamble, verified: Headlines are always carried out chronologically and in\nthe post-turn phase unless the card says otherwise; if a headline involves several\nturns or several players a Block must be applied at the very beginning; donated\nvoters must be placed immediately. None of that is representable here — see\npackages/cards/KNOWN-GAPS.md. There is also no `duration` field, which REF 4.4\nitem 1 identifies as the single largest gap in the schema."
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "deck": "core",
+  "campaign": "Common Ground",
+  "cards": [
+    {
+      "id": "vo-core-001",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 2 },
+      "voters": 1
+    },
+    {
+      "id": "vo-core-002",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "clout": 1, "media": 1 },
+      "voters": 1
+    },
+    {
+      "id": "vo-core-003",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "media": 2 },
+      "voters": 1
+    },
+    {
+      "id": "vo-core-004",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 3 },
+      "voters": 1
+    },
+    {
+      "id": "vo-core-005",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 2, "clout": 1 },
+      "voters": 2
+    },
+    {
+      "id": "vo-core-006",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "media": 2, "trust": 1 },
+      "voters": 2
+    },
+    {
+      "id": "vo-core-007",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 1, "media": 2 },
+      "voters": 2
+    },
+    {
+      "id": "vo-core-008",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "clout": 2, "trust": 1 },
+      "voters": 2
+    },
+    {
+      "id": "vo-core-009",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 3, "media": 1 },
+      "voters": 3
+    },
+    {
+      "id": "vo-core-010",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "clout": 2, "media": 1, "trust": 1 },
+      "voters": 3
+    },
+    {
+      "id": "vo-core-011",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 2, "trust": 2 },
+      "voters": 3
+    },
+    {
+      "id": "vo-core-012",
+      "source": "original; structure per REF 5.5 (votercards.png: resource column + one large numeral), costs inferred",
+      "provenance": "inferred",
+      "cost": { "funds": 3, "clout": 2 },
+      "voters": 3
+    }
+  ]
+}

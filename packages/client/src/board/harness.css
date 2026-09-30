@@ -1,0 +1,140 @@
+/* Dev harness chrome. Not product surface — it exists so the board and the
+   blind answer can be looked at side by side at a chosen board width. */
+
+body {
+  margin: 0;
+  background: var(--table-900);
+  color: var(--table-text);
+  font-family: var(--font-ui);
+}
+
+.harness {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--sp-4) var(--sp-6) var(--sp-10);
+}
+
+.harness__bar {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--table-600);
+}
+
+.harness__wordmark {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--paper-000);
+}
+
+.harness__meta {
+  font-family: var(--font-numeric);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--table-text);
+  opacity: 0.72;
+}
+
+.harness__cases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0 var(--sp-3);
+}
+
+.harness__tab {
+  font: var(--type-button-sm);
+  color: var(--table-text);
+  background: var(--table-700);
+  border: 1px solid var(--table-600);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+
+.harness__tab.is-active {
+  background: var(--seal);
+  border-color: var(--seal);
+  color: var(--paper-000);
+}
+
+.harness__tab:focus-visible {
+  outline: 2px solid var(--focus-outer);
+  outline-offset: 2px;
+}
+
+.harness__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  font-size: 13px;
+  color: var(--table-text);
+}
+
+.harness__controls button {
+  font: var(--type-button-sm);
+  color: var(--table-text);
+  background: var(--table-700);
+  border: 1px solid var(--table-600);
+  border-radius: var(--r-sm);
+  padding: var(--sp-1) var(--sp-3);
+  cursor: pointer;
+}
+
+.harness__note {
+  max-width: 70ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--table-text);
+  opacity: 0.8;
+}
+
+.harness__grid {
+  display: grid;
+  grid-template-columns: minmax(320px, auto) minmax(360px, 1fr);
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .harness__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.harness__board {
+  background: var(--table-800);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+}
+
+.harness__answer {
+  background: var(--table-800);
+  border-radius: var(--r-lg);
+  padding: var(--sp-2) 0 var(--sp-6);
+}
+
+.harness__answer h2 {
+  font: var(--type-display-m);
+  color: var(--paper-000);
+  margin: 0 var(--sp-6) 0;
+  padding-top: var(--sp-4);
+}
+
+.harness__answer .harness__note {
+  margin: 0 var(--sp-6) var(--sp-2);
+}
+
+.harness__foot {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--table-600);
+  font-family: var(--font-numeric);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--table-text);
+  opacity: 0.6;
+}

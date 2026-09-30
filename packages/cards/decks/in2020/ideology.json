@@ -1,0 +1,237 @@
+{
+  "deck": "in2020",
+  "campaign": "India 2020",
+  "cards": [
+    {
+      "id": "ig-in2020-001",
+      "source": "REF 5.1 (india_ideology.jpg) recovers the question and the answer 'No. Hit us first and you'll breathe your last.' on the SUPREMO side; the opposite side is authored here because only one face was ever legible. REF 2.4 records that zero ordinary question cards were recovered in full.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Do you condemn the use of surgical strikes as a reactionary tool?",
+      "sides": [
+        {
+          "answer": "No. Hit us first and you'll breathe your last.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. A people who cannot be reached by argument can be reached by theatre.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-002",
+      "source": "REF 5.2 verifies the Capitalist side of the shipped 'SHOULD WE INVADE NEW SPAIN?' card pays 2 Trust + 1 Media and ZERO Funds, and REF 8.1 recovers the 'far more lucrative to invade nearby islands' answer. The Supremo side is authored; the ideologue of the recovered answer is inferred from its reasoning.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should we invade New Spain?",
+      "sides": [
+        {
+          "answer": "No. It would be far more lucrative to invade nearby islands and expand our fishing territories.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 0, "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. The strait was ours before it was theirs, and the story should say so.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-003",
+      "source": "REF 8.1 question 3, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should mistakes be forgiven?",
+      "sides": [
+        {
+          "answer": "No. A queue that does not move is only a queue with better lighting.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Forgive the mistake, publish the method, and let the crowd do the arithmetic.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-004",
+      "source": "REF 8.1 question 4, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should women be free to have children single or in a relationship?",
+      "advisory": "mature",
+      "sides": [
+        {
+          "answer": "Yes. The state has no standing in a bedroom.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. The next decade is a budget line, and the budget line is not neutral.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-005",
+      "source": "REF 8.1 question 5, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should the government spend money on space exploration?",
+      "sides": [
+        {
+          "answer": "Yes. Nothing on this surface has ever been solved by staying on it.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. There is a bus stop on this planet that still has no roof.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-006",
+      "source": "REF 8.1 question 6, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Is providing free food, housing and healthcare to all citizens a good idea?",
+      "sides": [
+        {
+          "answer": "Yes. Give them the floor and they will build the walls themselves.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 2 }
+        },
+        {
+          "answer": "No. Free is not a policy. Free is a queue with a nicer name.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-007",
+      "source": "REF 8.1 question 7, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Do the poor have the right to take wealth from the rich?",
+      "advisory": "mature",
+      "sides": [
+        {
+          "answer": "No. Ownership is the only argument that has ever survived a recession.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. The argument was never about ownership. It was about who was holding it.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-008",
+      "source": "REF 8.1 question 8, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should the rich be taxed to fund free higher education?",
+      "sides": [
+        {
+          "answer": "Yes. A debt forgiven at eighteen is cheaper than a country that is not.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Every free seat is a private school with a public address.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-009",
+      "source": "original; register per REF 8.2 (deadpan, Yes./No. opener, no jokes in the answer). Added because the recovered question pool is eight cards deep and one deck cannot show a fourth of the pairing table.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the corporation fund the festival or should the festival fund the corporation?",
+      "sides": [
+        {
+          "answer": "No. Let them pay for the drums. The logo will still be on the stage.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Make them pay for the road as well. Roads are remembered longer than stages.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-010",
+      "source": "original; register per REF 8.2. REF 2.3 infers from 14 tournament hands that Idealist and Supremo sit in largely disjoint question space; this card tests the seam rather than filling it.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the spokesperson resign before the committee finishes reading?",
+      "advisory": "trigger",
+      "sides": [
+        {
+          "answer": "No. Leaving now is a statement. Staying is a sentence.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. Read the whole file before you answer any part of it.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-011",
+      "source": "original; register per REF 8.2. Added to cover the Showstopper x Supremo pairing, which the recovered question pool never exercises.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the broadcast continue while the repair crew is still in the room?",
+      "sides": [
+        {
+          "answer": "No. Show the room. The audience can decide for itself what a hole is worth.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Show the finished room. Nobody has ever voted for a half-built wall.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-012",
+      "source": "original; register per REF 8.2. Added so the Capitalist x Supremo pair is not carried entirely by the two recovered New Spain / wealth answers.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the old market stay open until the new one is finished?",
+      "sides": [
+        {
+          "answer": "No. The new market needs the old one's footfall for a year before it can stand.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. A city that keeps both pays for both and decides about neither.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    }
+  ]
+}

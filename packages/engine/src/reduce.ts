@@ -412,6 +412,12 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
   s = withPlayer(s, next, { powerUses: NO_POWER_USES });
 
   // p21: draw and read an Ideology Card for the next player.
+  // TODO(R10, Phase 3): `cardId` may be null when the Ideology deck AND its
+  // discard are both empty, and the state is then stuck in `phase: 'answer'` with
+  // no pending card: ANSWER says "no card has been put to you", REDRAW says "no
+  // card to redraw", END_TURN says "answer your Ideology Card first". No legal
+  // move exists. The headline path has this guard (nextHeadlineOrAdvance); the
+  // ideology path needs the same treatment.
   const [drawn, cardId] = draw(s, 'ideology');
   s = drawn;
 
@@ -447,6 +453,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
   // p19: a Conspiracy Card may be played out of turn, right before an opponent
   // answers. Everything else is active-player only.
   const outOfTurnOk = action.type === 'PLAY_CONSPIRACY' && state.phase === 'answer';
+  // TODO(R9, Phase 3): the guard below exempts the ACTIVE player entirely, and
+  // PLAY_CONSPIRACY is the one turn action with no `phase !== 'actions'` check of
+  // its own, so a conspiracy can be resolved mid-headline-queue (rules-reference.md
+  // :282-283 scopes conspiracy play to "during your turn" and the pre-answer
+  // window). Add `state.phase !== 'actions'` to the PLAY_CONSPIRACY case.
   if (playerId !== state.activePlayer && !outOfTurnOk && action.type !== 'RESOLVE_CHOICE') {
     return fail('not your turn');
   }
@@ -813,6 +824,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       // p34: the evicted voter goes back to its owner's mat and may be replaced
       // anywhere on their next turn, or it is discarded.
       s = grantVoters(s, victim, 1, 'Evicted', false);
+      // TODO(R12, Phase 3): the `!` on `s.players[playerId]` defeats the checker
+      // by design. It is safe today because nothing can remove a player, but a
+      // future evict-the-player effect would throw an opaque TypeError instead of
+      // a `fail(...)`. Replace with a guarded lookup. Same at POWER_PAYBACK and
+      // POWER_TOUGH_LOVE.
       s = withPlayer(s, playerId, {
         powerUses: { ...s.players[playerId]!.powerUses, landGrab: self.powerUses.landGrab + 1 },
       });
@@ -947,6 +963,10 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
     case 'END_TURN': {
       if (state.phase === 'answer') return fail('answer your Ideology Card first');
       if (state.phase === 'headlines') return fail('resolve the Headline first');
+      // TODO(R7, Phase 3): this check is global, so a player with no choices of
+      // their own is blocked by an opponent's pending decision. rules-reference.md
+      // :140 freezes only "you". The per-player freeze above is already scoped
+      // correctly; this one should be `state.choices.some(c => c.player === playerId)`.
       if (state.choices.length > 0) return fail('there are unresolved decisions');
       return nextHeadlineOrAdvance({ ...state, phase: 'headlines' }, ctx);
     }

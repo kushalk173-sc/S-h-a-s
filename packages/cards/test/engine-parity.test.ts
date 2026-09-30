@@ -1,0 +1,165 @@
+/**
+ * The drift guards.
+ *
+ * JSON Schema cannot import a TypeScript type, and `packages/cards` and
+ * `packages/engine` are separate packages, so nothing at the language level stops
+ * the schema's hand-written op list and the engine's `Effect` union from drifting
+ * apart. These tests are that missing link, and they are the reason the corpus can
+ * be trusted to typecheck against the engine at all.
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import { DECK_IDS, loadCorpus, toEngineConspiracyCard, toEngineHeadlineCard, toEngineIdeologyCard, toEngineVoterCard } from '../src/corpus.js';
+import { EFFECT_OPS, EFFECT_OP_SET, isKnownEffectOp } from '../src/effect-ops.js';
+import { IDEOLOGUES, IDEOLOGUE_RESOURCE, RESOURCES, type CardIndex } from '../src/engine.js';
+import type { ConspiracyCard, Effect, HeadlineCard, IdeologyCard, VoterCard } from '../src/engine.js';
+import { corpusSchema } from '../src/schema.js';
+
+const root = corpusSchema();
+const defs = root.$defs as Record<string, Record<string, unknown>>;
+
+describe('the Effect union in cards.ts and the schema op list agree', () => {
+  it('EFFECT_OPS lists the same ops, in the same order, as $defs.effect.oneOf', () => {
+    // src/effect-ops.ts already fails to COMPILE if Effect['op'] and EFFECT_OPS
+    // differ (see NO_MISSING_OPS). This test closes the other half of the gap:
+    // that the JSON Schema's oneOf branches are in EFFECT_OPS' order, because
+    // validateEffect() indexes the array by position.
+    const branches = defs.effect?.oneOf as { properties: { op: { const: string } } }[];
+    expect(branches).toHaveLength(EFFECT_OPS.length);
+    expect(branches.map((b) => b.properties.op.const)).toEqual([...EFFECT_OPS]);
+  });
+
+  it('every shipped effect op is one the engine declares', () => {
+    const corpus = loadCorpus();
+    for (const card of [...corpus.conspiracy, ...corpus.headline]) {
+      for (const effect of card.effects) {
+        expect(isKnownEffectOp(effect.op), `${card.id}: ${effect.op}`).toBe(true);
+      }
+    }
+  });
+
+  it('a sample of every op satisfies Effect at compile time', () => {
+    // The exhaustive switch below is the real test: if a variant is added to
+    // Effect, TypeScript makes the `never` case unreachable and this stops
+    // compiling, which is the point.
+    const samples: Effect[] = [
+      { op: 'gain', res: { funds: 1 } },
+      { op: 'lose', res: { funds: 1 }, target: 'each-opponent' },
+      { op: 'gain-any', n: 2 },
+      { op: 'lose-any', n: 2, target: 'leader' },
+      { op: 'steal-any', n: 1 },
+      { op: 'voters', n: 3, target: 'everyone' },
+      { op: 'evict', n: 1 },
+      { op: 'discard-voter', n: 2 },
+      { op: 'convert-voter', n: 2 },
+      { op: 'gerrymander', n: 1 },
+      { op: 'draw-conspiracy', n: 2 },
+      { op: 'refresh-market' },
+      { op: 'discount', n: 1 },
+    ];
+    for (const effect of samples) {
+      switch (effect.op) {
+        case 'gain':
+        case 'lose':
+          expect(effect.res).toBeDefined();
+          break;
+        case 'gain-any':
+        case 'lose-any':
+        case 'voters':
+        case 'evict':
+        case 'discard-voter':
+        case 'convert-voter':
+        case 'gerrymander':
+        case 'draw-conspiracy':
+        case 'discount':
+        case 'steal-any':
+          expect(effect.n).toBeGreaterThan(0);
+          break;
+        case 'refresh-market':
+          break;
+        default: {
+          const never: never = effect;
+          throw new Error(`unhandled Effect variant: ${JSON.stringify(never)}`);
+        }
+      }
+    }
+  });
+});
+
+describe('the Ideologue -> Resource map in the schema matches state.ts', () => {
+  it('the schema resource enum is exactly RESOURCES', () => {
+    expect((defs.resource?.enum as string[]).slice().sort()).toEqual([...RESOURCES].sort());
+  });
+
+  it('$defs.ideologueResourceMap is exactly IDEOLOGUE_RESOURCE', () => {
+    const map = defs.ideologueResourceMap?.properties as Record<string, { const: string }>;
+    const fromSchema = Object.fromEntries(
+      Object.entries(map).map(([k, v]) => [k, v.const]),
+    ) as Record<string, string>;
+    expect(fromSchema).toEqual({ ...IDEOLOGUE_RESOURCE });
+  });
+
+  it('the schema ideologue enum is exactly IDEOLOGUES', () => {
+    expect((defs.ideologue?.enum as string[]).slice().sort()).toEqual([...IDEOLOGUES].sort());
+  });
+});
+
+describe('the shipped corpus satisfies the engine card types', () => {
+  const corpus = loadCorpus(DECK_IDS);
+
+  it('strips the provenance envelope, leaving objects the engine accepts', () => {
+    // `satisfies` is the compile-time half: if a `toEngine*` function drifted from
+    // the engine's type, this file stops compiling.
+    const ideology: IdeologyCard[] = corpus.ideology.map(toEngineIdeologyCard);
+    const voter: VoterCard[] = corpus.voter.map(toEngineVoterCard);
+    const conspiracy: ConspiracyCard[] = corpus.conspiracy.map(toEngineConspiracyCard);
+    const headline: HeadlineCard[] = corpus.headline.map(toEngineHeadlineCard);
+
+    // Runtime half: the envelope fields really are gone, and `advisory` is
+    // ABSENT rather than present-and-undefined, because tsconfig.base.json turns
+    // on exactOptionalPropertyTypes.
+    for (const card of ideology) {
+      expect(Object.keys(card).sort()).toEqual(
+        card.advisory === undefined ? ['campaign', 'id', 'question', 'sides'] : ['advisory', 'campaign', 'id', 'question', 'sides'],
+      );
+      expect(card.sides).toHaveLength(2);
+    }
+    for (const card of voter) {
+      expect(Object.keys(card).sort()).toEqual(['cost', 'id', 'voters']);
+    }
+    for (const card of conspiracy) {
+      expect(Object.keys(card).sort()).toContain('cost');
+      expect(Object.keys(card)).not.toContain('source');
+      expect(Object.keys(card)).not.toContain('provenance');
+    }
+    for (const card of headline) {
+      expect(Object.keys(card)).not.toContain('cost');
+      expect(Object.keys(card)).not.toContain('source');
+    }
+  });
+
+  it('indexes cleanly, with no id collisions', () => {
+    // Reimplemented here rather than importing indexCards, because the engine's
+    // public entry point is mid-repair and does not currently export it. This is
+    // the same Object.fromEntries shape, and it is the thing DUPLICATE_ID guards.
+    const index: CardIndex = {
+      ideology: Object.fromEntries(corpus.ideology.map((c) => [c.id, toEngineIdeologyCard(c)])),
+      voter: Object.fromEntries(corpus.voter.map((c) => [c.id, toEngineVoterCard(c)])),
+      conspiracy: Object.fromEntries(corpus.conspiracy.map((c) => [c.id, toEngineConspiracyCard(c)])),
+      headline: Object.fromEntries(corpus.headline.map((c) => [c.id, toEngineHeadlineCard(c)])),
+    };
+    expect(Object.keys(index.ideology)).toHaveLength(corpus.ideology.length);
+    expect(Object.keys(index.voter)).toHaveLength(corpus.voter.length);
+    expect(Object.keys(index.conspiracy)).toHaveLength(corpus.conspiracy.length);
+    expect(Object.keys(index.headline)).toHaveLength(corpus.headline.length);
+  });
+
+  it('the deck data itself is dependency-free JSON', () => {
+    // The whole point of keeping Ajv in devDependencies: a consumer of the corpus
+    // needs nothing but JSON.parse.
+    for (const card of [...corpus.voter]) {
+      expect(Object.keys(card).sort()).toEqual(['cost', 'id', 'provenance', 'source', 'voters']);
+    }
+  });
+});

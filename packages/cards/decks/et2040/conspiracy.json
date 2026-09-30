@@ -1,0 +1,79 @@
+{
+  "deck": "et2040",
+  "campaign": "Earth 2040",
+  "cards": [
+    {
+      "id": "ct-et2040-001",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union — see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does.",
+      "provenance": "adapted",
+      "name": "A Grave Inheritance",
+      "text": "Take 2 resources of your choice from a chosen opponent. Then evict 2 voters from the board.",
+      "cost": 5,
+      "effects": [{ "op": "steal-any", "n": 2 }, { "op": "evict", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-002",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs, including 'there are two such cards'. The mandatory RECURRING obligation ('Discard an open Voter Card every turn') and the denomination ('for every 1-Voter Card that you discard, get any 1 resource') are not expressible — see KNOWN-GAPS.md G3. Only the single resolution is represented.",
+      "provenance": "adapted",
+      "name": "Eradicating Germs",
+      "text": "Gain 1 resource of your choice, then discard 1 resource of your choice to the Public Reserve.",
+      "cost": 4,
+      "effects": [{ "op": "gain-any", "n": 1 }, { "op": "lose-any", "n": 1 }]
+    },
+    {
+      "id": "ct-et2040-003",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist — see KNOWN-GAPS.md G6.",
+      "provenance": "adapted",
+      "name": "Singularity",
+      "text": "Gain 2 voters. They are not from a Voter Card, so you may place them in different zones.",
+      "cost": 5,
+      "effects": [{ "op": "voters", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-004",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag — see KNOWN-GAPS.md G7.",
+      "provenance": "adapted",
+      "name": "The Psychohistorian",
+      "text": "Gain 1 voter and 2 resources of your choice. The voter is not from a Voter Card.",
+      "cost": 4,
+      "effects": [{ "op": "voters", "n": 1 }, { "op": "gain-any", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-005",
+      "source": "original; register per REF 8.1 (the name puns on the mechanic) and REF 8.2.",
+      "provenance": "inferred",
+      "name": "Confidential Annex",
+      "text": "Gain 2 Funds and 1 Trust from the Public Reserve. Then get 2 discounts on purchases this turn.",
+      "cost": 4,
+      "effects": [{ "op": "gain", "res": { "funds": 2, "trust": 1 } }, { "op": "discount", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-006",
+      "source": "original; register per REF 8.2. The steal-then-voter shape is the same archetype as the recovered A Grave Inheritance (REF 4.2.1) with the conditional clause removed.",
+      "provenance": "inferred",
+      "name": "Quiet Redrafting",
+      "text": "Take 1 resource of your choice from a chosen opponent. Then gain 1 voter.",
+      "cost": 4,
+      "effects": [{ "op": "steal-any", "n": 1 }, { "op": "voters", "n": 1 }]
+    },
+    {
+      "id": "ct-et2040-007",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "name": "The Wet Season Argument",
+      "text": "Evict 2 voters from the board. Then gain 1 resource of your choice.",
+      "cost": 5,
+      "effects": [{ "op": "evict", "n": 2 }, { "op": "gain-any", "n": 1 }]
+    },
+    {
+      "id": "ct-et2040-008",
+      "source": "original; register per REF 8.2. refresh-market is the only op in the union with no payload; the market is never allowed below RULES.marketSize, so dealing three is always legal (RULES p10).",
+      "provenance": "inferred",
+      "name": "Filed Under Normal",
+      "text": "Get 1 discount on a purchase this turn. Then discard every face-up Voter Card and deal three fresh ones.",
+      "cost": 4,
+      "effects": [{ "op": "discount", "n": 1 }, { "op": "refresh-market" }],
+      "excludeInTwoPlayer": true
+    }
+  ]
+}

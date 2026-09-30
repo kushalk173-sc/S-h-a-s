@@ -1,0 +1,57 @@
+{
+  "deck": "in2020",
+  "campaign": "India 2020",
+  "cards": [
+    {
+      "id": "hl-in2020-001",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Bhaag, Koi Nahi Rukega",
+      "text": "Every opponent discards 1 resource of their choice to the Public Reserve. You gain 1 Media and 1 Funds.",
+      "effects": [
+        { "op": "lose-any", "n": 1, "target": "each-opponent" },
+        { "op": "gain", "res": { "media": 1, "funds": 1 } }
+      ]
+    },
+    {
+      "id": "hl-in2020-002",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Chai-Paani, Dobara",
+      "text": "Gain 1 voter and 1 resource of your choice.",
+      "effects": [{ "op": "voters", "n": 1 }, { "op": "gain-any", "n": 1 }]
+    },
+    {
+      "id": "hl-in2020-003",
+      "source": "original; register per REF 8.2 rule 5. The discard-your-own-voters branch of the recovered Ain't No Cure For Love (REF 4.3).",
+      "provenance": "inferred",
+      "name": "Aakhri Pehchaan",
+      "text": "Discard 2 of your own voters from the board, permanently.",
+      "effects": [{ "op": "discard-voter", "n": 2 }]
+    },
+    {
+      "id": "hl-in2020-004",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Ghadi Ka Aakhri Ghanta",
+      "text": "Every opponent discards 2 Trust to the Public Reserve. You then gain 1 voter.",
+      "effects": [{ "op": "lose", "res": { "trust": 2 }, "target": "each-opponent" }, { "op": "voters", "n": 1 }]
+    },
+    {
+      "id": "hl-in2020-005",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Aadha Kisan, Poora Bazaar",
+      "text": "Every opponent gains 2 Funds and 1 Trust from the Public Reserve.",
+      "effects": [{ "op": "gain", "res": { "funds": 2, "trust": 1 }, "target": "each-opponent" }]
+    },
+    {
+      "id": "hl-in2020-006",
+      "source": "original; register per REF 8.2 rule 5.",
+      "provenance": "inferred",
+      "name": "Chuppi Ke Baad",
+      "text": "Take 1 resource of your choice from a chosen opponent.",
+      "effects": [{ "op": "steal-any", "n": 1 }]
+    }
+  ]
+}
