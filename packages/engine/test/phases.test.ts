@@ -231,20 +231,53 @@ describe('headline queue', () => {
     expect(s.players.p1?.pending[0]?.count).toBe(1);
   });
 
-  it('END_TURN is refused while ANY decision is unresolved', () => {
-    // R7, still open. The check is global, so a player with no choices of their
-    // own is blocked by an opponent's. rules-reference.md:140 freezes only "you",
-    // and the per-player freeze at the top of `reduce` is already scoped that way.
-    // Pinned so the divergence is explicit; the fix is Phase 3.
+  it('END_TURN is blocked by YOUR decision, not by an opponent\'s', () => {
+    // R7, ruled and fixed. rules-reference.md:140 (p12) freezes only "you": "You
+    // cannot take any other actions until you do so." The check used to be
+    // `state.choices.length > 0`, so p1 could not end their turn while p2 had
+    // anything pending — and p19 lets any player drop a decision on anyone in the
+    // pre-answer window, so that was a real stall, not a theoretical one.
+    //
+    // The regression is the first assertion: before the fix this returned
+    // `there are unresolved decisions` and the turn never advanced.
     const base = answered(fresh(1), 'p1');
     const s: GameState = {
       ...base,
       choices: [{ id: 'c9', player: 'p2', choice: { kind: 'lose-any', count: 1, reason: 'test' } }],
     };
     const r = act(s, 'p1', { type: 'END_TURN' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // The turn moved on, and p2's decision is still theirs to resolve.
+    expect(r.state.activePlayer).toBe('p2');
+    expect(r.state.phase).toBe('answer');
+    expect(r.state.choices.map((c) => c.player)).toEqual(['p2']);
+  });
+
+  it('a player frozen by their OWN decision still cannot end their turn', () => {
+    // The half of R7 that must not change: the freeze is real, it is just scoped
+    // to the player who is frozen. p1 is blocked by the per-player freeze at the
+    // top of `reduce` before the END_TURN case is even reached.
+    const base = answered(fresh(1), 'p1');
+    const s: GameState = {
+      ...base,
+      choices: [{ id: 'c8', player: 'p1', choice: { kind: 'lose-any', count: 1, reason: 'test' } }],
+    };
+    const r = act(s, 'p1', { type: 'END_TURN' });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe('there are unresolved decisions');
-    // TODO(R7): should be scoped to `c.player === playerId`.
+    if (!r.ok) expect(r.error).toBe('resolve "test" first');
+
+    // Resolving it unblocks the turn.
+    const resolved = reduce(
+      s,
+      'p1',
+      { type: 'RESOLVE_CHOICE', choiceId: 'c8', pick: { kind: 'resources', res: { funds: 1 } } },
+      ctx,
+    );
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    const after = act(resolved.state, 'p1', { type: 'END_TURN' });
+    expect(after.ok).toBe(true);
   });
 });
 

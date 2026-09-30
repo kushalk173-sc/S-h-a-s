@@ -963,11 +963,16 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
     case 'END_TURN': {
       if (state.phase === 'answer') return fail('answer your Ideology Card first');
       if (state.phase === 'headlines') return fail('resolve the Headline first');
-      // TODO(R7, Phase 3): this check is global, so a player with no choices of
-      // their own is blocked by an opponent's pending decision. rules-reference.md
-      // :140 freezes only "you". The per-player freeze above is already scoped
-      // correctly; this one should be `state.choices.some(c => c.player === playerId)`.
-      if (state.choices.length > 0) return fail('there are unresolved decisions');
+      // R7, ruled. rules-reference.md:140 (p12) freezes only "you": "You cannot
+      // take any other actions until you do so." The old check was global, so a
+      // player with no decisions of their own could not end their turn until every
+      // opponent had resolved theirs — and a Conspiracy Card played out of turn
+      // (p19 / rules-reference.md:283) can leave a decision pending for a player
+      // who is not the active one, which stalled the table outright. Scoped to
+      // `playerId`, matching the per-player freeze at the top of `reduce`.
+      if (state.choices.some((c) => c.player === playerId)) {
+        return fail('you have an unresolved decision');
+      }
       return nextHeadlineOrAdvance({ ...state, phase: 'headlines' }, ctx);
     }
   }
