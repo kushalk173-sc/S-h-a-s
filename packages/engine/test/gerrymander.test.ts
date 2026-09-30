@@ -337,11 +337,37 @@ describe('GERRYMANDER scoping', () => {
   });
 
   it('a gerrymandered-into Volatile Area queues exactly one Headline', () => {
-    // D6 / R8: UNVERIFIED against the rulebook. rules-reference.md:259 forbids
-    // moving *out of* a volatile and :271 permits placing into one, but nothing
-    // says a gerrymanded-into volatile triggers a Headline. The code treats it as
-    // a placement. Pinned here so the decision is explicit and a future ruling
-    // changes exactly one assertion.
+    // D6, RULED. The rulebook never names gerrymandering as a placement, so this
+    // is a ruling and the evidence is the rulebook's own card text plus two
+    // structural arguments:
+    //
+    //  - **A real card treats it as a placement.** SUBMERGED / New Face Who Dis
+    //    (one card, printed twice; AUTHENTIC-SHASN-REFERENCE.md:270 and :345) reads
+    //    "every player can Gerrymander 1 majority or non-majority voter
+    //    immediately. **These voters cannot be placed into Volatile Areas.**" A
+    //    gerrymander is legal and unremarkable under the normal rules, so the only
+    //    reason a card would need to forbid it is that placing a voter into a cog
+    //    brings p18's Volatile Area rule with it. The rulebook's own vocabulary
+    //    calls a gerrymandering-into-a-cog a placement.
+    //  - **The trigger is keyed to the board event, not the verb.** Quantum
+    //    Wristband (:299): "When a voter is placed in a Volatile Area, go through
+    //    the Headlines draw pile" — analysed there as *overriding the Headline
+    //    trigger*. An override only has a scope if the trigger has one, and p18's
+    //    scope is "a voter is placed in a Volatile Area".
+    //  - p18 also permits the mover to be anyone: "You may place your own or an
+    //    opponent's voter into a Volatile Area" (rules-reference.md:324). The
+    //    gerrymandering an *opponent's* voter into a cog is therefore not a new
+    //    case at all — it is the same case the placement path already covers.
+    //  - The alternative (no Headline) makes identical board positions — a peg in
+    //    a cog, visible to everyone at the table — carry different consequences
+    //    depending on how the peg got there, which is not information any player
+    //    can observe.
+    //
+    // *** A future ruling for "no Headline" changes exactly ONE assertion here:
+    // `expect(r.state.headlineQueue).toEqual([...])` becomes
+    // `expect(r.state.headlineQueue).toEqual([])`. Everything else in this test,
+    // including the `volatile` event and the permanence of the peg, is
+    // independent of the ruling. ***
     let s = withPegs(fresh(1), 'p1', 'north', 3);
     s = answered(s, 'p1');
     const from = pegsOf(s, 'p1', 'north')[0];
@@ -352,6 +378,36 @@ describe('GERRYMANDER scoping', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.headlineQueue).toEqual([{ areaId: northVol.id, by: 'p1' }]);
+    // The peg lands, and p18's permanence applies to it immediately — a peg in a
+    // Volatile Area can never be gerrymandered, converted, evicted or discarded.
+    expect(areaOf(r.state, northVol.id).peg?.owner).toBe('p1');
+    expect(areaOf(r.state, northVol.id).volatile).toBe(true);
+    expect(r.state.players.p1?.powerUses.gerrymandered).toEqual({ north: 1 });
+  });
+
+  it('the Headline from a gerrymanded-into Volatile Area belongs to the mover, not the voter\'s owner', () => {
+    // Same ruling (see above), on the case p18 explicitly contemplates: the voter
+    // moved in belongs to an opponent. The obligation attaches to the *act* —
+    // "placing a voter in a Volatile Area triggers a Headline", in whose turn it
+    // happened — so it queues against the gerrymandering player and resolves in
+    // their post-turn window, and it does not appear as an obligation on the owner.
+    let s = withPegs(fresh(1), 'p1', 'north', 3);
+    s = withPegs(s, 'p2', 'north', 2);
+    s = answered(s, 'p1');
+    const from = pegsOf(s, 'p2', 'north')[0];
+    const northVol = s.zones.find((z) => z.id === 'north')?.areas.find((a) => a.volatile && a.peg === null);
+    if (!from || !northVol) throw new Error('setup');
+    const r = gerry(s, 'p1', 'north', from, northVol.id);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(areaOf(r.state, northVol.id).peg?.owner).toBe('p2');
+    expect(r.state.headlineQueue).toEqual([{ areaId: northVol.id, by: 'p1' }]);
+
+    // It resolves at the end of p1's turn, like any other volatile placement, and
+    // p2 is not made to wait for it.
+    const ended = step(r.state, 'p1', { type: 'END_TURN' });
+    expect(ended.phase).toBe('headlines');
+    expect(ended.activeHeadline).not.toBeNull();
   });
 
   it('rights gained mid-turn are usable the same turn', () => {

@@ -691,6 +691,30 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       s = edit.state;
       events.push(...edit.events);
 
+      // D6, RULED: a gerrymanded-into Volatile Area queues one Headline, attributed
+      // to the player who performed the move. The rulebook never says gerrymandering
+      // is a placement, so this is a ruling rather than a citation. Evidence, in
+      // order of weight:
+      //   1. A real card calls it a placement. SUBMERGED / New Face Who Dis (one
+      //      card, printed twice; AUTHENTIC-SHASN-REFERENCE.md:270 and :345):
+      //      "every player can Gerrymander 1 majority or non-majority voter
+      //      immediately. These voters cannot be placed into Volatile Areas." A
+      //      gerrymander is otherwise unremarkable, so the prohibition exists only
+      //      because p18's Volatile Area rule attaches to the move.
+      //   2. The trigger is a board event. Quantum Wristband (:299) triggers "when
+      //      a voter is placed in a Volatile Area" and is analysed as *overriding
+      //      the Headline trigger*; the trigger's scope is the placement, not the
+      //      verb that caused it.
+      //   3. p18 already permits moving anyone's voter (rules-reference.md:324,
+      //      "your own or an opponent's"), so this is the same case PLACE_VOTERS
+      //      covers, not a new one — and the placement path already attributes the
+      //      Headline to the acting player.
+      // The rejected reading was that the Headline is the price of drawing from
+      // your own supply, so a moved voter should not pay it twice. Rejected because
+      // it makes an identical, publicly visible board position — a peg in a cog —
+      // carry different consequences depending on how the peg got there, which no
+      // player can observe. A future ruling for the other reading deletes this
+      // block and the single assertion named in gerrymander.test.ts.
       if (to.volatile) {
         s = {
           ...s,
