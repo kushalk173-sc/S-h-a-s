@@ -1,6 +1,6 @@
 /**
- * §3.5 RESOURCE CAP, overCap, trimToCap, and §3.10 test 125 (R3) — the negative
- * Delta. R3 is the single most important security test in the suite.
+ * §3.5 RESOURCE CAP, overCap, botTrimToCap (R11), and §3.10 test 125 (R3) — the
+ * negative Delta. R3 is the single most important security test in the suite.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ import { reduce, type Ctx } from '../src/reduce';
 import {
   add,
   applyDiscounts,
+  botTrimToCap,
   canAfford,
   deltaError,
   discount,
@@ -18,7 +19,6 @@ import {
   pool,
   shortfall,
   subtract,
-  trimToCap,
 } from '../src/resources';
 import { RULES } from '../src/rules';
 import { poolTotal, type Delta, type GameState, type PlayerID, type Pool } from '../src/state';
@@ -49,9 +49,9 @@ describe('overCap', () => {
   });
 });
 
-describe('trimToCap', () => {
+describe('botTrimToCap', () => {
   it('sheds from the largest pool first, deterministically', () => {
-    expect(trimToCap({ funds: 8, clout: 2, media: 2, trust: 2 }, 12)).toEqual({
+    expect(botTrimToCap({ funds: 8, clout: 2, media: 2, trust: 2 }, 12)).toEqual({
       funds: 6,
       clout: 2,
       media: 2,
@@ -61,14 +61,75 @@ describe('trimToCap', () => {
 
   it('is a no-op at or under the cap', () => {
     const at12: Pool = { funds: 3, clout: 3, media: 3, trust: 3 };
-    expect(trimToCap(at12, 12)).toEqual(at12);
+    expect(botTrimToCap(at12, 12)).toEqual(at12);
     const zero: Pool = { funds: 0, clout: 0, media: 0, trust: 0 };
-    expect(trimToCap(zero, 12)).toEqual(zero);
+    expect(botTrimToCap(zero, 12)).toEqual(zero);
   });
 
   it('terminates and never goes negative', () => {
-    const out = trimToCap({ funds: 0, clout: 0, media: 0, trust: 0 }, 12);
+    const out = botTrimToCap({ funds: 0, clout: 0, media: 0, trust: 0 }, 12);
     expect(out).toEqual({ funds: 0, clout: 0, media: 0, trust: 0 });
+  });
+
+  it('R11, pinned: equal pools shed Funds first — a bot heuristic, not a rule', () => {
+    // The decision the audit refused to leave implicit. p12 (rules-reference.md:110)
+    // says the player must *choose* what to discard and settles nothing about how,
+    // so "largest first, then RESOURCES declaration order" is the bot's convention
+    // and the name now says so. A future ruling that made any particular discard
+    // mandatory would change this assertion and the reducer's `lose-any` flow.
+    //
+    // Four pools tied at 4 with one token to shed: the tie goes to Funds, because
+    // `biggest` is seeded as `RESOURCES[0]` and no pool is strictly larger.
+    const flat: Pool = { funds: 4, clout: 4, media: 4, trust: 4 };
+    expect(botTrimToCap(flat, 15)).toEqual({ funds: 3, clout: 4, media: 4, trust: 4 });
+    // Clout, Media and Trust tied for largest with two to shed: they go in
+    // declaration order — Clout, then Media — and Trust is never reached.
+    const ties: Pool = { funds: 0, clout: 6, media: 6, trust: 6 };
+    expect(botTrimToCap(ties, 16)).toEqual({ funds: 0, clout: 5, media: 5, trust: 6 });
+    // With one to shed among the same three, only Clout is touched: declaration
+    // order, not size.
+    expect(botTrimToCap({ funds: 0, clout: 6, media: 6, trust: 6 }, 17)).toEqual({
+      funds: 0,
+      clout: 5,
+      media: 6,
+      trust: 6,
+    });
+    // Trust is last, so a tie it wins nothing on unless it is the largest.
+    const trustLargest: Pool = { funds: 0, clout: 0, media: 0, trust: 8 };
+    expect(botTrimToCap(trustLargest, 4)).toEqual({ funds: 0, clout: 0, media: 0, trust: 4 });
+    // Same input, same output, every time: replay-safe, but arbitrary.
+    expect(botTrimToCap(flat, 12)).toEqual(botTrimToCap(flat, 12));
+  });
+
+  it('the reducer never calls it: a player over the cap is ASKED, not trimmed', () => {
+    // The claim the R11 ruling rests on. p12's discard is the player's choice, so
+    // the engine raises a `lose-any` and freezes them (see 'the cap choice in play'
+    // below) rather than calling a heuristic. If a future change wired
+    // `botTrimToCap` into `enforceCap`, the pool would come back at exactly the cap
+    // and no choice raised — which fails this assertion.
+    let s = answered(fresh(1), 'p1');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          manifesto: Array(3).fill('capitalist'),
+          manifestoCards: ['ide-01', 'ide-02', 'ide-03'],
+          resources: { funds: 9, clout: 6, media: 0, trust: 0 },
+        },
+      },
+    };
+    // Prospecting: 9 + 6 = 15, over the cap, and it gives 1 to take 2 — 16.
+    const r = step(s, 'p1', { type: 'POWER_PROSPECT', give: 'funds', take: ['clout', 'clout'] });
+    expect(funds(r, 'p1')).toEqual({ funds: 8, clout: 8, media: 0, trust: 0 });
+    expect(r.choices).toEqual([
+      {
+        id: expect.any(String),
+        player: 'p1',
+        choice: { kind: 'lose-any', count: 4, reason: 'Resource cap' },
+      },
+    ]);
   });
 });
 

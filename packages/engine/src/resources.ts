@@ -79,17 +79,28 @@ export function overCap(p: Pool, cap: number): number {
 }
 
 /**
- * Deterministic fallback trim, used by bots and by the "auto-discard" convenience.
- * Sheds from the largest pool first so a player never loses their scarcest resource.
+ * A bot's guess at what to discard, down to the cap. NOT a rule.
+ *
+ * p12 (`rules-reference.md:110`): "If at any time you cross your resource cap,
+ * you must **choose** and discard any excess resources down to your current
+ * resource cap. You cannot take any other actions until you do so." The verb is
+ * *choose* — the discard is the player's, which is why the real path is the
+ * `lose-any` choice the reducer raises in `enforceCap` and a human resolves. This
+ * function is the stand-in for a machine that cannot pick: it sheds from the
+ * largest pool first so a bot never throws away its scarcest resource, and it
+ * breaks ties by `RESOURCES` declaration order (`funds`, `clout`, `media`,
+ * `trust`), so equal pools shed Funds first.
+ *
+ * R11, ruled: those two tie-breaks are *decisions*, not rules — the rulebook
+ * settles neither, and neither has any claim to being good play. So the function is
+ * renamed `botTrimToCap` and documented as the heuristic it is. Renaming rather
+ * than deleting keeps it available to the bot and "auto-discard" callers it was
+ * written for while removing the claim that the engine itself would trim this way;
+ * nothing in `reduce` calls it, and a test pins that fact by showing a player over
+ * the cap is *asked* rather than trimmed. Nothing in this repository imported the
+ * old name.
  */
-/**
- * TODO(R11, Phase 3): this breaks ties by `RESOURCES` declaration order, not by
- * any rule, so it sheds from `funds` first when pools are equal. It is
- * deterministic and therefore replay-safe, but it is a *rule decision* wearing a
- * utility function's clothes. Only reachable from bots and the auto-discard
- * convenience; the real path is the player-chosen `lose-any` choice.
- */
-export function trimToCap(p: Pool, cap: number): Pool {
+export function botTrimToCap(p: Pool, cap: number): Pool {
   let out = { ...p };
   let excess = overCap(out, cap);
   while (excess > 0) {
