@@ -1,0 +1,1149 @@
+/**
+ * The application shell's stylesheet.
+ *
+ * EVERY COLOUR, FONT AND DURATION HERE IS A TOKEN. There is no hex literal in
+ * this file, and there is no new token: `theme/tokens.css` is the palette
+ * UI-SPEC §2 defined and Appendix A.6 measured, and adding to it would mean
+ * adding a colour nobody contrast-tested, which is how a palette quietly grows a
+ * second, worse one.
+ *
+ * §9.9 is the constraint that shapes most of this file: this is meant to look
+ * like a well-printed political broadsheet — paper, ink, one stamp red, one
+ * confident coastline. No gradients, no glow, no bounce, no game-y chrome. The
+ * table surround is the dark `--table-*` ramp; every readable surface is paper.
+ *
+ * THE SHELL IS THE §5.0 GRID, AND IT IS NOT OPTIONAL. §9.5: the board must never
+ * push the player's own mat off-screen, because a player cannot deliberate
+ * without their resources, cap, manifesto and pending groups. Hence the
+ * `minmax(360px, 1fr)` mat column and the 780px board ceiling are load-bearing
+ * layout, not styling preferences.
+ */
+
+/* ── The shell ──────────────────────────────────────────────────────────── */
+
+.shell {
+  /* --table-900 behind everything: the dark surround of a table. */
+  background: var(--table-900);
+  color: var(--table-text);
+  min-height: 100vh;
+  font: var(--type-log);
+}
+
+.shell__top {
+  /* 56px per §5.0. */
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-4);
+  background: var(--table-900);
+  border-bottom: 1px solid var(--table-600);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.shell__wordmark {
+  font: var(--type-display-m);
+  color: var(--paper-000);
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+}
+
+.shell__meta {
+  font: var(--type-log-meta);
+  color: var(--table-text);
+  white-space: nowrap;
+}
+
+.shell__spacer {
+  flex: 1 1 auto;
+}
+
+.shell__body {
+  display: grid;
+  /* §5.0: the board track is capped at 780px so it cannot starve the mat. */
+  grid-template-columns: minmax(320px, 780px) minmax(360px, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  align-items: start;
+}
+
+.shell__board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.shell__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  position: sticky;
+  top: var(--sp-3);
+  max-height: calc(100vh - 68px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.shell__log {
+  /* 132px per §5.0. */
+  height: 132px;
+  background: var(--table-900);
+  border-top: 1px solid var(--table-600);
+  padding: var(--sp-2) var(--sp-4);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* ── The connection dot ─────────────────────────────────────────────────────
+   §5.2: an 8px dot, POSITIVE when live, amber when retrying, NEVER negative —
+   a red dot reads as "you are in trouble" rather than "the network is". The
+   attempt count rides beside it in TYPE_LOG_META, so the state is legible
+   without colour, and the dot's SHAPE carries it too (filled vs ring). */
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--type-log-meta);
+  white-space: nowrap;
+}
+
+.link__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.link--live .link__dot {
+  background: var(--positive);
+}
+
+.link--connecting .link__dot {
+  background: var(--unavail-fill);
+}
+
+.link--reconnecting .link__dot,
+.link--lost .link__dot {
+  background: var(--warn-volatile);
+}
+
+.link--reconnecting .link__dot {
+  /* A ring, not a filled circle: the non-colour channel for "retrying". */
+  background: transparent;
+  border: 2px solid var(--warn-volatile);
+  box-sizing: border-box;
+}
+
+/* ── Panels ────────────────────────────────────────────────────────────────
+   One paper surface treatment for every panel on the mat side. `--paper-100`
+   with a `--paper-300` edge, per §5.1. */
+
+.panel {
+  background: var(--paper-100);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-md);
+  color: var(--ink-900);
+  padding: var(--sp-3);
+  box-shadow: var(--shadow-panel);
+}
+
+.panel--framed {
+  /* The ONE region allowed a SEAL frame at a time (§5.0). */
+  border: 2px solid var(--seal);
+}
+
+.panel__title {
+  font: var(--type-button);
+  color: var(--ink-900);
+  margin: 0 0 var(--sp-2);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.panel__note {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+  margin: var(--sp-1) 0 0;
+}
+
+.panel__note--quiet {
+  color: var(--ink-500);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────
+   TYPE_BUTTON on paper, SEAL for the primary. Unavailable is
+   `--unavail-fill` + hatch + `--unavail-ink` text, which is 4.33:1 and so
+   still READABLE: the player needs the cost and the shortfall to plan (§9.2). */
+
+.btn {
+  font: var(--type-button);
+  color: var(--ink-900);
+  background: var(--paper-000);
+  border: 1px solid var(--paper-400);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 44px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-90) var(--ease-board);
+}
+
+.btn:hover:not(:disabled):not([aria-disabled='true']) {
+  background: var(--paper-050);
+}
+
+.btn--primary {
+  background: var(--seal);
+  border-color: var(--seal);
+  color: var(--paper-000);
+  text-align: center;
+}
+
+.btn--primary:hover:not(:disabled):not([aria-disabled='true']) {
+  background: var(--seal-deep);
+  border-color: var(--seal-deep);
+}
+
+.btn--sm {
+  font: var(--type-button-sm);
+  padding: var(--sp-1) var(--sp-3);
+  min-height: 32px;
+}
+
+.btn--wide {
+  width: 100%;
+  text-align: center;
+}
+
+/* §9.2: unavailability is FORM (hatch) + a still-readable label, never a fade.
+   The hatch is a 45° repeating gradient, which is the one sanctioned exception
+   to "no gradients" — it is a texture, carries no tone, and is the established
+   unavailability channel in this design (see the board's `#shasn-hatch`). */
+.btn--unavail,
+.btn:disabled {
+  background-color: var(--unavail-fill);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    var(--table-900) 4px 6px
+  );
+  background-blend-mode: normal;
+  color: var(--unavail-ink);
+  border-color: var(--ink-300);
+  cursor: not-allowed;
+}
+
+.btn:focus-visible,
+.link:focus-visible,
+.field:focus-visible {
+  /* Dual-tone: --focus-inner is 17.41:1 on paper, --focus-outer clears 3:1
+     against every seat fill (§8.3). */
+  outline: 2px solid var(--focus-outer);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--focus-inner);
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+
+.field {
+  font: var(--type-field-label);
+  color: var(--ink-900);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 44px;
+  background: var(--paper-000);
+  border: 1px solid var(--ink-300);
+  border-radius: var(--r-sm);
+}
+
+.field__label {
+  font: var(--type-field-label);
+  color: var(--ink-700);
+  display: block;
+  margin-bottom: var(--sp-1);
+}
+
+.row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row--tight {
+  gap: var(--sp-1);
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* ── The resource strip ─────────────────────────────────────────────────────
+   Four numerals at TYPE_RESOURCE_NUM over a SINGLE combined cap meter. One
+   meter, not four: RULES.resourceCap is a COMBINED cap, and four meters would
+   imply four caps that do not exist. */
+
+.res {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+}
+
+.res__cell {
+  text-align: center;
+  padding: var(--sp-1) 0;
+  border-radius: var(--r-sm);
+  background: var(--paper-050);
+}
+
+.res__num {
+  font: var(--type-resource-num);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-900);
+  display: block;
+}
+
+.res__name {
+  font: var(--type-resource-cap);
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.meter {
+  height: 8px;
+  background: var(--paper-300);
+  border-radius: var(--r-sm);
+  margin-top: var(--sp-2);
+  position: relative;
+  overflow: hidden;
+}
+
+.meter__fill {
+  height: 100%;
+  background: var(--seal);
+}
+
+.meter__fill--warn {
+  /* §5.4: at 10/12 the fill turns WARN_VOLATILE. A WARNING, not a block — the
+     discard is only forced on crossing 12. */
+  background: var(--warn-volatile);
+}
+
+.meter__caption {
+  font: var(--type-resource-cap);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-700);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+/* ── The manifesto strip ────────────────────────────────────────────────────
+   The Ideologue ink as a 4px underline, the count in TYPE_RESOURCE_NUM, and a
+   filled L3/L5 chip. §5.4. */
+
+.mani {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+}
+
+.mani__cell {
+  text-align: center;
+  padding: var(--sp-2) var(--sp-1);
+  border-bottom: 4px solid var(--paper-300);
+  background: var(--paper-050);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+
+.mani__cell[data-level='L3'] {
+  border-bottom-color: var(--ideo-capitalist);
+}
+
+.mani__cell[data-level='L5'] {
+  border-bottom-color: var(--ideo-idealist);
+}
+
+.mani__count {
+  font: var(--type-resource-num);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-900);
+  display: block;
+}
+
+.mani__name {
+  font: var(--type-resource-cap);
+  color: var(--ink-500);
+  text-transform: uppercase;
+}
+
+.chip {
+  display: inline-block;
+  font: var(--type-resource-cap);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--ink-300);
+  color: var(--ink-700);
+  background: var(--paper-000);
+}
+
+.chip--l3,
+.chip--l5 {
+  /* A FILLED chip at the unlock, so "you have it" is not a subtle tint. */
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--paper-000);
+}
+
+.chip--positive {
+  border-color: var(--positive);
+  color: var(--positive);
+  background: var(--paper-000);
+}
+
+.chip--warn {
+  border-color: var(--warn-volatile);
+  color: var(--warn-volatile);
+}
+
+/* ── Seats ──────────────────────────────────────────────────────────────────
+   §5.1 rule 2: the seat colour is a 6px LEFT SPINE on a paper row, never a
+   background fill, so the name is always INK_900 on paper and a crimson seat
+   never has to carry white text it cannot pass contrast with. */
+
+.seat {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--paper-100);
+  border-left: 6px solid var(--paper-300);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+.seat--1 { border-left-color: var(--seat-1); }
+.seat--2 { border-left-color: var(--seat-2); }
+.seat--3 { border-left-color: var(--seat-3); }
+.seat--4 { border-left-color: var(--seat-4); }
+.seat--5 { border-left-color: var(--seat-5); }
+
+.seat__name {
+  font: var(--type-zone-holder);
+  color: var(--ink-900);
+}
+
+.seat__meta {
+  font: var(--type-log-meta);
+  color: var(--ink-500);
+  margin-left: auto;
+}
+
+.seat--active {
+  outline: 2px solid var(--seal);
+  outline-offset: 1px;
+}
+
+/* ── The market ─────────────────────────────────────────────────────────────
+   Three MarketSlots, always three. Each shows the printed cost and the voter
+   count. Unaffordable is hatch + a still-readable `--unavail-ink` cost and a
+   stated shortfall line, because the player needs both numbers to plan (§9.2). */
+
+.market {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+}
+
+.mkt {
+  background: var(--paper-100);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.mkt--unavail {
+  background-color: var(--unavail-fill);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    var(--table-900) 4px 6px
+  );
+  color: var(--unavail-ink);
+  cursor: not-allowed;
+}
+
+.mkt__cost {
+  font: var(--type-mkt-cost);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-700);
+}
+
+.mkt--unavail .mkt__cost {
+  color: var(--unavail-ink);
+}
+
+.mkt__voters {
+  font: var(--type-resource-num);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-900);
+  margin-top: auto;
+}
+
+.mkt__short {
+  font: var(--type-tooltip);
+  color: var(--negative);
+}
+
+/* ── The log rail ───────────────────────────────────────────────────────────
+   §5.12 and §9.11: a SENTENCE, at TYPE_LOG in INK_700, with a 4px seat spine.
+   Never an icon-delta feed — players learn this game by reading the log. */
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.log__row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  border-left: 4px solid transparent;
+  padding-left: var(--sp-2);
+}
+
+.log__row[data-seat='1'] { border-left-color: var(--seat-1); }
+.log__row[data-seat='2'] { border-left-color: var(--seat-2); }
+.log__row[data-seat='3'] { border-left-color: var(--seat-3); }
+.log__row[data-seat='4'] { border-left-color: var(--seat-4); }
+.log__row[data-seat='5'] { border-left-color: var(--seat-5); }
+.log__row[data-seat='system'] { border-left-color: var(--ink-300); }
+
+.log__meta {
+  font: var(--type-log-meta);
+  color: var(--ink-300);
+  font-variant-numeric: var(--numeric-features);
+  white-space: nowrap;
+}
+
+.log__text {
+  font: var(--type-log);
+  color: var(--table-text);
+}
+
+/* ── The placement / gerry bars ─────────────────────────────────────────────
+   §5.5: a bar docked at the bottom of the board column, PAPER_100 with a 2px
+   SEAL top edge, holding the group, the counter, the constraint, and the
+   confirm/undo pair. It sits with the board, not the mat, because the decision
+   it narrates is a board decision. */
+
+.bar {
+  background: var(--paper-100);
+  border-top: 2px solid var(--seal);
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  color: var(--ink-900);
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.bar__head {
+  font: var(--type-button);
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bar__constraint {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+}
+
+.bar__constraint--refused {
+  /* A refusal always names its reason, in NEGATIVE, for 1.2s (§6.1.2 step 4).
+     Never a silent no-op (§9.10). */
+  color: var(--negative);
+  font-weight: 700;
+}
+
+.bar__actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* The 9-cell free-slot strip, so the same-zone rule is legible as ARITHMETIC
+   before it is legible as a rule (§5.5). */
+.zones-strip {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 2px;
+}
+
+.zones-strip__cell {
+  font: var(--type-log-meta);
+  text-align: center;
+  background: var(--paper-300);
+  color: var(--ink-900);
+  padding: 2px 0;
+  border-radius: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.zones-strip__cell--picked {
+  background: var(--seal);
+  color: var(--paper-000);
+}
+
+.zones-strip__cell--locked {
+  outline: 2px solid var(--positive);
+  outline-offset: -2px;
+}
+
+/* ── Modals ─────────────────────────────────────────────────────────────────
+   A headline or a choice takes the viewport (§5.9b) because it is the only thing
+   the player can legally do. `role="dialog"` + `aria-modal`, focus moved in,
+   Escape refused while a decision is owed. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--table-900);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  z-index: 20;
+  overflow-y: auto;
+}
+
+.scrim--answer {
+  /* §5.3: a full-viewport overlay, and the board is REPLACED rather than dimmed.
+     Reading a political scenario while glancing at opponents' pegs is a
+     distraction from the deliberation this game is about. */
+  padding: 0;
+}
+
+.sheet {
+  background: var(--paper-100);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-lg);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-panel);
+  padding: var(--sp-5);
+  max-width: 720px;
+  width: 100%;
+}
+
+.sheet--wide {
+  max-width: 860px;
+}
+
+.sheet__title {
+  font: var(--type-display-m);
+  color: var(--ink-900);
+  margin: 0 0 var(--sp-2);
+}
+
+.sheet__body {
+  font: var(--type-card-scenario);
+  color: var(--ink-700);
+  margin: 0 0 var(--sp-4);
+}
+
+.eyebrow {
+  font: var(--type-display-m);
+  color: var(--ink-500);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 var(--sp-1);
+}
+
+/* ── The answer's one frame ──────────────────────────────────────────────────
+   §9.3 and §7.3: the payout is ONE readable moment. A single 300ms frame that
+   fades in fully formed. NO count-up, NO card flip, NO reel, NO delay, and NO
+   counterfactual — nothing that compares the two sides, because a comparison
+   animates on a length that leaks. The one rule below is a 300ms FADE IN and
+   nothing else; the numbers are present at full value on the first painted
+   frame, because a number that counts up is a number whose rate reveals it. */
+
+.reveal {
+  /* Deliberately minimal: opacity only, 300ms, decelerating. If this ever grows
+     a transform or a delay it has stopped being the one-frame reveal. */
+  animation: reveal-in var(--dur-300) var(--ease-panel) both;
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reveal__delta {
+  font: var(--type-num-delta-gain);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--positive);
+}
+
+.reveal__summary {
+  font: var(--type-card-side-label);
+  color: var(--ink-900);
+  display: block;
+  margin: var(--sp-1) 0;
+}
+
+/* ── Lobby ──────────────────────────────────────────────────────────────────
+   §5.1: a sheet of paper on the table, centre column max-width 720px. */
+
+.lobby {
+  min-height: 100vh;
+  background: var(--table-900);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--sp-6) var(--sp-4);
+  overflow-y: auto;
+}
+
+.lobby__sheet {
+  background: var(--paper-100);
+  border: 1.5px solid var(--paper-300);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  color: var(--ink-900);
+  padding: var(--sp-6);
+  max-width: 720px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.lobby__h1 {
+  font: var(--type-display-l);
+  color: var(--ink-900);
+  margin: 0;
+}
+
+.lobby__sub {
+  font: var(--type-card-scenario);
+  color: var(--ink-700);
+  margin: 0;
+}
+
+/* ── Error toast ────────────────────────────────────────────────────────────
+   The server's own words, because they are written for humans, and nothing
+   else: no action name, no card id, no state field. §9.10 — a refusal always
+   names its reason. */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-6);
+  transform: translateX(-50%);
+  background: var(--paper-100);
+  border: 1px solid var(--ink-300);
+  border-left: 4px solid var(--negative);
+  border-radius: var(--r-md);
+  color: var(--ink-900);
+  padding: var(--sp-2) var(--sp-4);
+  font: var(--type-tooltip);
+  box-shadow: var(--shadow-panel);
+  z-index: 40;
+  max-width: min(560px, calc(100vw - 32px));
+}
+
+.toast__code {
+  font: var(--type-log-meta);
+  color: var(--ink-500);
+  display: block;
+}
+
+/* ── The reconnect screen ────────────────────────────────────────────────────
+   §5.2: match identity + seat, what phase you were in, REJOIN and LEAVE, all
+   without scrolling. And the honest-failure case: after the stall threshold the
+   copy says the table has not answered and offers a manual retry, because a
+   spinner that never resolves is worse than a stated failure. */
+
+.reconnect {
+  min-height: 100vh;
+  background: var(--table-900);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6) var(--sp-4);
+}
+
+.reconnect__sheet {
+  background: var(--paper-100);
+  border: 1.5px solid var(--paper-300);
+  border-radius: var(--r-lg);
+  color: var(--ink-900);
+  padding: var(--sp-6);
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.reconnect__status {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+}
+
+.reconnect__status--bad {
+  color: var(--negative);
+  font-weight: 700;
+}
+
+/* ── Scoreboard ─────────────────────────────────────────────────────────────
+   §5.10: a single 12px rule per seat, with the winning score's tick, so ties
+   are visible as EQUAL BARS rather than as a number with no context. No crown,
+   no confetti (§9.9). */
+
+.score__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--paper-300);
+}
+
+.score__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.score__name {
+  font: var(--type-display-m);
+  color: var(--ink-900);
+}
+
+.score__value {
+  font: var(--type-resource-num);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-900);
+  margin-left: auto;
+}
+
+.score__bar {
+  height: 12px;
+  background: var(--paper-300);
+  border-radius: var(--r-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.score__bar-fill {
+  height: 100%;
+  background: var(--ink-700);
+}
+
+.score__zones {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+}
+
+/* ── The resource picker ────────────────────────────────────────────────────
+   Four denominations, all-or-nothing, with the shortfall stated next to the
+   control. This is the player's OWN pool, so resource glyphs are correct here —
+   §5.3.5 says so explicitly, and the distinction from the answer prompt is the
+   whole reason §9.6's ban does not apply. */
+
+.picker__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+}
+
+.picker__cell {
+  text-align: center;
+  padding: var(--sp-2) var(--sp-1);
+  border: 1px solid var(--paper-400);
+  border-radius: var(--r-sm);
+  background: var(--paper-000);
+  cursor: pointer;
+  min-height: 64px;
+}
+
+.picker__cell--max {
+  outline: 2px solid var(--seal);
+  outline-offset: -2px;
+}
+
+.picker__count {
+  font: var(--type-resource-num);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-900);
+  display: block;
+}
+
+.picker__name {
+  font: var(--type-resource-cap);
+  color: var(--ink-500);
+  text-transform: uppercase;
+}
+
+.picker__status {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+}
+
+.picker__status--short {
+  color: var(--negative);
+  font-weight: 700;
+}
+
+/* ── Powers ─────────────────────────────────────────────────────────────────
+   A locked power is HATCHED and LABELLED, never merely faded (§9.2): "Unlocks at
+   3 Capitalist cards" must be readable, because a player needs to know what to
+   aim for. */
+
+.powers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.power {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  text-align: left;
+}
+
+.power--locked {
+  background-color: var(--unavail-fill);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    var(--table-900) 4px 6px
+  );
+  color: var(--unavail-ink);
+  border-color: var(--ink-300);
+  cursor: not-allowed;
+}
+
+.power__uses {
+  font: var(--type-log-meta);
+  font-variant-numeric: var(--numeric-features);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ── Pending voter group chips (§6.1.1) ───────────────────────────────────── */
+
+.groups {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.group {
+  min-width: 96px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--sp-2);
+}
+
+.group--active {
+  outline: 2px solid var(--seal);
+  outline-offset: 1px;
+}
+
+.group__count {
+  font: var(--type-resource-num);
+  font-variant-numeric: var(--numeric-features);
+  color: var(--ink-900);
+}
+
+.group__source {
+  font: var(--type-log-meta);
+  color: var(--ink-500);
+}
+
+/* ── The phone tab bar (§5.13) ──────────────────────────────────────────────
+   56px, TABLE_900, PAPER_300 top edge, four 44x44 items. `END TURN` is a
+   persistent bar pinned above it: it is the one control that must never require
+   a scroll on a phone. */
+
+.tabs {
+  display: none;
+}
+
+.tabbar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56px;
+  background: var(--table-900);
+  border-top: 1px solid var(--paper-300);
+  z-index: 15;
+}
+
+.tabbar__btn {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--table-text);
+  font: var(--type-button-sm);
+  cursor: pointer;
+}
+
+.tabbar__btn[aria-pressed='true'] {
+  background: var(--table-700);
+  border-top: 2px solid var(--seal);
+}
+
+.endturn-dock {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 56px;
+  padding: var(--sp-2);
+  background: var(--table-800);
+  border-top: 1px solid var(--table-600);
+  z-index: 14;
+}
+
+/* ── Spectator (§5.11) ──────────────────────────────────────────────────────
+   The distinguishing treatment is ABSENCE: no seat chip, no "YOUR MAT" heading,
+   no SEAL frame anywhere in the spectator view. §5.11 is explicit that the
+   absence of a red frame is the signal, so nothing here is red. */
+
+.spectator-note {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+  border-left: 4px solid var(--ink-300);
+  padding-left: var(--sp-2);
+}
+
+/* ── Responsive (§5.13) ──────────────────────────────────────────────────────
+   A physical game is passed around a table, so the phone case is not an
+   afterthought. Below 1200px the right column narrows; below 900px the layout
+   stacks; below 600px the mat becomes a tab and END TURN pins above the bar. */
+
+@media (max-width: 1199px) {
+  .shell__body {
+    grid-template-columns: minmax(280px, 1fr) 340px;
+  }
+}
+
+@media (max-width: 899px) {
+  .shell__body {
+    /* Single column, stacked. The 500px board floor is WAIVED to 480px here
+       (§3.6): a tablet held in portrait cannot show 500px plus a mat. */
+    grid-template-columns: 1fr;
+  }
+
+  .shell__side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 599px) {
+  .shell__top {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .shell__log {
+    display: none;
+  }
+
+  /* Only the selected tab's region is shown. The board tab is the default so a
+     cold load shows the board rather than a wall of numbers. */
+  .tabs [data-tabpanel]:not([data-active='true']) {
+    display: none;
+  }
+
+  .tabbar {
+    display: flex;
+  }
+
+  .shell__body {
+    padding-bottom: 120px;
+  }
+
+  .endturn-dock {
+    display: block;
+  }
+
+  .picker__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Reduced motion (§7.5) ───────────────────────────────────────────────────
+   Every duration has a counterpart that changes the TRANSFORM, never the
+   information. The one-frame reveal becomes an instant one: it carries no
+   meaning in its motion, so removing it removes nothing. */
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+
+  .btn {
+    transition-duration: 80ms;
+  }
+}
+
+/* ── Forced colours ──────────────────────────────────────────────────────────
+   §8: in forced-colours mode every `background-color` is discarded, so the seat
+   spine, the meter fill and the score bar must be able to carry their meaning
+   through `border` and `forced-color-adjust` alone. */
+
+@media (forced-colors: active) {
+  .seat,
+  .log__row,
+  .meter__fill,
+  .score__bar-fill,
+  .chip {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+  }
+}
