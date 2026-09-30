@@ -131,16 +131,42 @@ export function scores(state: GameState): Record<PlayerID, number> {
   return out;
 }
 
+/**
+ * Who won. R5, ruled.
+ *
+ * p7/p20 (`rules-reference.md` §1): "The player with the highest number of
+ * majority voters wins the game." Two things follow from that sentence and are
+ * decided here:
+ *
+ *  1. **A tie is a genuine draw, reported as one.** p20's tie-breaker is the
+ *     "privilege" rule, which §1 records as explicitly non-binding, social, and
+ *     out of scope for a digital implementation, and it says "The engine reports
+ *     a tie". So every player tied at the top score is returned. Neither total
+ *     voters on the board nor manifesto size is used as a tie-breaker: p20 names
+ *     only majority voters, and `totalVoters` is a number the rules never ask
+ *     for. This closes `rules-reference.md` §16 #8.
+ *
+ *  2. **A game in which nobody holds a majority voter has no winner.** Before the
+ *     fix the best score was floored at 0, so on an all-zero board `best === 0`
+ *     matched every seat and the `game-over` event named the whole table as
+ *     winners. The floor existed only to keep `Math.max(...[]) === -Infinity` off
+ *     an empty turn order, which `setup` (2..5 players) already makes impossible.
+ *
+ * Is case 2 reachable in a real game? No, and that is deliberate rather than
+ * accidental. `endOfGame` is reached either when every zone has a majority holder
+ * (so the 69 majority voters exist and someone has them) or when the board is
+ * full — and every zone has `capacity === 2 * majority - 1` areas, so a full
+ * zone always contains a majority by pigeonhole. The guard is here so that a
+ * *direct* call to `winners()` on a scoreless board reports "nobody" instead of
+ * "everybody", and so that a future board with `capacity >= 2 * majority` (where
+ * a full zone genuinely could have no majority) is already handled.
+ */
 export function winners(state: GameState): PlayerID[] {
-  const s = scores(state);
-  // TODO(R5, Phase 3): the `0` floor makes an all-zero board report every seat as
-  // a winner. The floor exists only to guard `Math.max(...[]) === -Infinity` for
-  // an empty turn order, which `setup` already makes impossible. Fix is to drop
-  // the floor and return [] when every score is 0.
-  const best = Math.max(0, ...Object.values(s));
-  return Object.entries(s)
-    .filter(([, v]) => v === best)
-    .map(([k]) => k);
+  const entries = Object.entries(scores(state));
+  if (entries.length === 0) return [];
+  const best = Math.max(...entries.map(([, v]) => v));
+  if (best <= 0) return [];
+  return entries.filter(([, v]) => v === best).map(([k]) => k);
 }
 
 /** Total voters on the board for a player, majority or not. */

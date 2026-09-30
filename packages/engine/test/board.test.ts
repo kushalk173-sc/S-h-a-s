@@ -178,16 +178,61 @@ describe('majority formation', () => {
     }
   });
 
-  it('winners does not declare every player the winner when all scores are zero', () => {
-    // R5, still open. `winners` floors `best` at 0 to guard Math.max(...[]) on an
-    // empty turn order, so an empty board reports every seat. The rulebook does
-    // not settle a zero-score game, and fixing it needs a ruling on scoring ties
-    // (audit §6d item 5), so the current behaviour is pinned here rather than
-    // left to drift. This test documents the bug; it does not bless it.
+  it('winners names the clear leader, and only the leader', () => {
+    // R5, ruled. p7/p20 (rules-reference.md §1): "the player with the highest
+    // number of majority voters wins the game."
+    let s = fill(fill(fresh(1), 'p1', 'north_west', 6), 'p2', 'central', 5);
+    s = fill(s, 'p3', 'central', 0);
+    expect(scores(s)).toEqual({ p1: 6, p2: 5, p3: 0 });
+    expect(winners(s)).toEqual(['p1']);
+  });
+
+  it('winners reports a genuine tie as a draw — every player at the top score', () => {
+    // R5, ruling 1. §1 records p20's tie-breaker as the social "privilege" rule,
+    // "explicitly non-binding, social, and out of scope for a digital
+    // implementation. The engine reports a tie." So the tie is reported, not broken.
+    // 6 + 6 in two different zones — north_west and north_east are both 6/11.
+    let s = fill(fill(fresh(1), 'p1', 'north_west', 6), 'p2', 'north_east', 6);
+    // p1 takes a seventh, non-majority peg in north_west. It is worth nothing.
+    s = fill(s, 'p1', 'north_west', 7);
+    expect(scores(s).p1).toBe(scores(s).p2);
+    expect(scores(s).p1).toBe(6);
+    expect(winners(s).sort()).toEqual(['p1', 'p2']);
+    // And the tie is NOT broken by total voters on the board, nor by manifesto
+    // size: p1 is ahead on both and it changes nothing, because p20 names only
+    // majority voters.
+    expect(totalVoters(s, 'p1')).toBe(7);
+    expect(totalVoters(s, 'p2')).toBe(6);
+    expect((s.players.p1?.manifesto.length ?? 0) >= (s.players.p2?.manifesto.length ?? 0)).toBe(true);
+  });
+
+  it('winners names nobody when nobody holds a majority voter', () => {
+    // R5, ruling 2 — the defect itself. The old `Math.max(0, ...)` floor made
+    // `best === 0` match every seat, so an empty board reported the whole table
+    // as winners. Unreachable through `endOfGame` (see the docstring on
+    // `winners`: every zone is 2*majority-1 areas, so a full board always has a
+    // majority somewhere), which is exactly why it survived the audit's play
+    // tests: it is only visible by calling `winners()` directly.
     const empty = fresh(1);
-    const w = winners(empty);
-    expect(w.length).toBeGreaterThan(0);
-    expect(w.length).toBe(empty.turnOrder.length);
+    expect(scores(empty)).toEqual({ p1: 0, p2: 0, p3: 0 });
+    expect(winners(empty)).toEqual([]);
+
+    // Pegs that are not majority voters score nothing, so they change nothing.
+    const s = fill(fresh(1), 'p1', 'north_west', 5);
+    expect(scores(s)).toEqual({ p1: 0, p2: 0, p3: 0 });
+    expect(winners(s)).toEqual([]);
+
+    // The boundary: one majority voter is a winner, not a draw.
+    const won = fill(fresh(1), 'p1', 'central', 5);
+    expect(winners(won)).toEqual(['p1']);
+  });
+
+  it('winners is empty, not a crash, for an empty seat list', () => {
+    // The `Math.max(...[]) === -Infinity` case the `0` floor was really guarding.
+    // `setup` validates 2..5 players so this cannot occur in a real game, but the
+    // function must not depend on that.
+    const s = fresh(1);
+    expect(winners({ ...s, turnOrder: [] })).toEqual([]);
   });
 
   it('boardFull is true only when all 129 areas are filled', () => {
