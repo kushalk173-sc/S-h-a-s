@@ -36,10 +36,10 @@ export const PLAYERS_3: readonly PlayerID[] = ['p1', 'p2', 'p3'];
 
 const IDEOLOGUES: readonly Ideologue[] = ['capitalist', 'supremo', 'showstopper', 'idealist'];
 
-function ideologyCard(i: number): IdeologyCard {
+function ideologyCard(i: number, width = 2): IdeologyCard {
   const a = IDEOLOGUES[i % 4] as Ideologue;
   const b = IDEOLOGUES[(i + 1) % 4] as Ideologue;
-  const n = String(i + 1).padStart(3, '0');
+  const n = String(i + 1).padStart(width, '0');
   return {
     id: `ide-${n}`,
     campaign: `campaign ${n}`,
@@ -169,7 +169,7 @@ let bigIndex: CardIndex | null = null;
  */
 export function bigCards(): CardIndex {
   if (bigIndex) return bigIndex;
-  const ideology = Array.from({ length: BIG_IDEOLOGY }, (_, i) => ideologyCard(i));
+  const ideology = Array.from({ length: BIG_IDEOLOGY }, (_, i) => ideologyCard(i, 4));
   const voter: VoterCard[] = Array.from({ length: BIG_VOTER }, (_, i) => ({
     id: `bvot-${String(i + 1).padStart(3, '0')}`,
     // p10: "Voter Cards can contain 1, 2 or 3 voters." The mix matters — a
