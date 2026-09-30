@@ -29,12 +29,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Action, ClientState, PlayerID, ZoneID } from '@shasn/engine';
+import type {
+  Action,
+  ClientState,
+  Delta,
+  GameEvent,
+  LogEntry,
+  PlayerID,
+  Resource,
+  ZoneID,
+} from '@shasn/engine';
 
 import { BoardSvg } from '../board/BoardSvg.tsx';
 import type { BlindPrompt, ClientStore } from '../net/index.ts';
 
-import { AnswerScreen } from './AnswerScreen.tsx';
+import { AnswerReveal, AnswerScreen } from './AnswerScreen.tsx';
 import { ChoiceResolver } from './ChoiceResolver.tsx';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
@@ -46,6 +55,8 @@ import {
   applyConnectionStatus,
   beginPlacement,
   clearPowerTarget,
+  clearMarketModifier,
+  clearMarketPower,
   clearToughLove,
   clearTurnInteraction,
   closePicker,
@@ -55,18 +66,25 @@ import {
   openGerry,
   openPicker,
   openTrade,
+  powerAreaCount,
+  powerTargetsArea,
   removePick,
   removeToughLovePick,
   setGerrySource,
   setGerryTarget,
+  setMarketModifier,
+  setMarketPower,
   setPowerTarget,
   setRefusal,
   setTradeGive,
   setTradeReceive,
   useApp,
+  type AppState,
+  type PowerFlow,
 } from './store.ts';
 import { connection, send } from './session.ts';
 import { clearError } from '../net/index.ts';
+import { MarketModifierDialog, PowerDialog, type PowerSubmit } from './PowerDialog.tsx';
 import {
   IDLE_INTERACTION,
   RESOURCE_ORDER,
@@ -184,8 +202,23 @@ export function GameScreen({ store }: GameScreenProps) {
       }
     }
 
+    // A power that targets slots puts the board in the same `place` mode with the
+    // slots it has collected so far. It is checked AFTER placement because a player
+    // mid-placement has already committed to a group, and yanking the board out from
+    // under them to answer a power would be worse than making them cancel first.
+    if (powerTargetsArea(app.powerTarget) && isMyTurn) {
+      return {
+        mode: 'place',
+        pickedAreaIds: app.pickedAreaIds,
+        lockedZoneId: null,
+        gerrySourceAreaId: null,
+        resolveGerrySources: false,
+        disabled: false,
+      };
+    }
+
     return { ...IDLE_INTERACTION, disabled: !isMyTurn };
-  }, [state, app.placingGroupId, app.pickedAreaIds, app.gerryZoneId, app.gerrySourceAreaId, app.toughLovePicks, isMyTurn, me, you]);
+  }, [state, app.placingGroupId, app.pickedAreaIds, app.gerryZoneId, app.gerrySourceAreaId, app.toughLovePicks, app.powerTarget, isMyTurn, me, you]);
 
   // ─────────────────────────── board interaction ───────────────────────────
 
@@ -258,6 +291,25 @@ export function GameScreen({ store }: GameScreenProps) {
           return;
         }
         addPick(areaId);
+        return;
+      }
+
+      // 4. A power that targets slots. Deliberately LAST: placement and an owed
+      //    choice both outrank a power, because both are commitments the engine is
+      //    already blocking on, while a power can always be cancelled.
+      if (powerTargetsArea(app.powerTarget) && isMyTurn) {
+        const flow = app.powerTarget;
+        if (flow === null) return;
+        if (app.pickedAreaIds.includes(areaId)) {
+          removePick();
+          return;
+        }
+        const refusal = powerAreaRefusal(state, you, flow, areaId, app.pickedAreaIds);
+        if (refusal !== null) {
+          setRefusal(refusal);
+          return;
+        }
+        addPick(areaId);
       }
     },
     [state, you, app, me, isMyTurn],
@@ -277,7 +329,65 @@ export function GameScreen({ store }: GameScreenProps) {
     send((c) => c.dispatch(action));
   }, []);
 
+  /**
+   * Turn a power dialog's answer into the engine's action, and close the flow.
+   *
+   * Every branch dispatches and then clears. The clears are not tidiness: `clearTurnInteraction`
+   * on the next `match:state` would do it eventually, but between the dispatch and that
+   * state the dialog would still be on screen over a board the server has already changed,
+   * which is the one frame where a player could double-submit against a stale legal set.
+   */
+  const commitPower = useCallback(
+    (submit: PowerSubmit) => {
+      switch (submit.kind) {
+        case 'prospect':
+          dispatch(actions.prospecting(submit.give, submit.take));
+          break;
+        case 'land-grab':
+          dispatch(actions.landGrab(submit.areaId));
+          break;
+        case 'donations':
+          dispatch(actions.donations(submit.from, submit.res));
+          break;
+        case 'payback':
+          dispatch(actions.payback(submit.areaId, submit.pay));
+          break;
+        case 'tough-love':
+          dispatch(actions.toughLove(submit.areaIds, submit.pay));
+          break;
+      }
+      clearPowerTarget();
+      endPlacement();
+    },
+    [dispatch],
+  );
+
   const live = app.link === 'live';
+
+  // ─────────────────────────── the payout frame (§9.3) ───────────────────────────
+  //
+  // ONE frame, then it is gone. It is driven by the engine's own PUBLIC `answered`
+  // event, so there is nothing here that could know the payout before the answer —
+  // the reveal renders the pool the server has already credited and the label the
+  // server has already written to the public log. Nothing counts up, nothing flips,
+  // and there is no "you would have got" line, because every one of those animates
+  // on a length that leaks to whoever watched it.
+  //
+  // The window is bounded rather than cleared by the next action: a player reading
+  // their own numbers while they plan is not a leak (it is their own hand), and a
+  // dialog that vanished the instant they clicked would be unreadable.
+  const answeredEvent = lastAnswerFor(store.recentEvents, you);
+  const [revealKey, setRevealKey] = useState<string | null>(null);
+  const [revealLive, setRevealLive] = useState(false);
+  useEffect(() => {
+    if (answeredEvent === null) return;
+    setRevealKey(answeredEvent.key);
+    setRevealLive(true);
+    const t = window.setTimeout(() => setRevealLive(false), REVEAL_MS);
+    return () => window.clearTimeout(t);
+  }, [answeredEvent?.key]);
+  const showReveal = revealLive && you !== null && me !== null && state !== null && state.phase === 'actions';
+  const answeredLabel = showReveal && state !== null && you !== null ? lastAnswerText(state.log, you) : null;
 
   const commitPlacement = useCallback(() => {
     if (me === null || app.placingGroupId === null) return;
@@ -344,6 +454,10 @@ export function GameScreen({ store }: GameScreenProps) {
     <div className="shell" data-testid="game-shell">
       <TopBar state={state} store={store} you={you} role={role} />
 
+      {showReveal ? (
+        <AnswerReveal state={state} you={you as PlayerID} answeredLabel={answeredLabel} />
+      ) : null}
+
       <div className="shell__body">
         <div className="shell__board tabs" data-tabpanel="board" data-active={tab === 'board'}>
           <BoardSvg
@@ -394,8 +508,18 @@ export function GameScreen({ store }: GameScreenProps) {
               framed={isMyTurn && state.phase === 'actions'}
               showControls={role === 'player' && you !== null}
               onSelectGroup={(id) => beginPlacement(id)}
-              onBuyMarket={(index) => onBuyMarket(state, you, index, dispatch)}
+              onBuyMarket={(index) => buyMarketCard(state, you as PlayerID, index, app, dispatch)}
               onRedraw={() => openPicker({ forKind: 'redraw', total: UI_RULES.redrawCost, pick: {} })}
+              onTradeWith={(other) => openTrade(other)}
+              onBuyConspiracy={() => {
+                const cost = state.conspiracyTopCost;
+                if (cost === null) {
+                  setRefusal('no Conspiracy Card is purchasable');
+                  return;
+                }
+                openPicker({ forKind: 'conspiracy', total: cost, pick: {} });
+              }}
+              armedSlot={app.marketModifier?.slot ?? null}
               onGerry={() => {
                 if (you === null) return;
                 const zones = rightsZones(state, you);
@@ -525,6 +649,50 @@ export function GameScreen({ store }: GameScreenProps) {
             dispatch(actions.buyConspiracy(pay as Record<string, number>));
           }}
           onCancel={closePicker}
+        />
+      ) : null}
+
+      {/* The power dialogs sit ABOVE the choice resolver's scrim in the DOM because
+          they are opened BY the player from the mat; a Headline that raises a choice
+          while a power is mid-targeting is handled by the choice resolver taking the
+          viewport, which is the same precedence rule §5.9b states. */}
+      {app.powerTarget !== null && me !== null && you !== null && owedChoice === null ? (
+        <PowerDialog
+          state={state}
+          you={you}
+          flow={app.powerTarget}
+          pickedAreaIds={app.pickedAreaIds}
+          onPickSlot={onSlotActivate}
+          onRemovePick={removePick}
+          onCancel={() => {
+            clearPowerTarget();
+            endPlacement();
+          }}
+          onSubmit={commitPower}
+        />
+      ) : null}
+
+      {app.pendingMarketPower !== null && me !== null ? (
+        <MarketModifierDialog
+          state={state}
+          power={app.pendingMarketPower}
+          left={
+            app.pendingMarketPower === 'going-viral'
+              ? UI_RULES.goingViralPerTurn - me.powerUses.goingViral
+              : UI_RULES.helpingHandsPerTurn - me.powerUses.helpingHands
+          }
+          onArm={(slot, discounts) => {
+            const power = app.pendingMarketPower;
+            if (power === null) return;
+            setMarketModifier({
+              power,
+              slot,
+              viral: power === 'going-viral',
+              discounts,
+            });
+            clearMarketPower();
+          }}
+          onCancel={clearMarketPower}
         />
       ) : null}
 
@@ -807,35 +975,118 @@ function onBuyMarket(state: ClientState, you: PlayerID | null, index: number, di
 }
 
 /**
- * Powers that need a target open a second step; the ones that do not dispatch
- * straight away. Both paths go through `setPowerTarget` so a player who cancels
- * a targeting flow is left in exactly the state they were in before.
+ * Powers that need a target open a second step; the two market-modifier powers
+ * arm a modifier against a slot instead; everything else is a refusal by name.
+ *
+ * There is no `default: 'not implemented'` left. Seven powers, seven branches, and
+ * the two that are folded into `INFLUENCE` are the two that arm a market modifier —
+ * a shape that is the engine's, not a gap in this client.
  */
 function onPower(
   state: ClientState,
   you: PlayerID | null,
   power: string,
-  app: ReturnType<typeof useApp>,
+  app: AppState,
   dispatch: Dispatch,
 ): void {
   if (you === null) return;
   const me = state.players[you];
   if (me === undefined) return;
 
+  const flow = POWER_FLOWS[power];
+  if (flow !== undefined) {
+    setPowerTarget(flow);
+    return;
+  }
+
   switch (power) {
-    case 'prospecting':
-      openPicker({ forKind: 'prospecting', total: 0, pick: {} });
-      return;
-    case 'donations':
-      setPowerTarget('donations', null);
-      return;
-    case 'land-grab':
-    case 'payback':
-      setPowerTarget(power, null);
+    case 'going-viral':
+    case 'helping-hands':
+      // These two ride on a market BUY rather than being actions of their own, so
+      // what the player chooses first is WHICH CARD to spend them on. Arming a
+      // pending power opens that chooser; nothing is spent until the buy lands.
+      if (power === 'going-viral' && me.powerUses.goingViral >= UI_RULES.goingViralPerTurn) {
+        setRefusal('Going Viral is spent for this turn.');
+        return;
+      }
+      if (
+        power === 'helping-hands' &&
+        me.powerUses.helpingHands >= UI_RULES.helpingHandsPerTurn
+      ) {
+        setRefusal('Helping Hands is spent for this turn.');
+        return;
+      }
+      if (app.pendingMarketPower === power) {
+        clearMarketPower();
+        return;
+      }
+      setMarketPower(power);
       return;
     default:
-      setRefusal(`${power} has no client flow yet`);
+      // §9.10: a control that cannot do anything says so and names itself, rather
+      // than being a button that swallows a press.
+      setRefusal(`${power} is not available to you yet.`);
   }
+}
+
+/** The five powers with a dialog of their own. */
+const POWER_FLOWS: Readonly<Record<string, PowerFlow>> = {
+  prospecting: { power: 'prospecting' },
+  'land-grab': { power: 'land-grab' },
+  donations: { power: 'donations' },
+  payback: { power: 'payback' },
+  'tough-love': { power: 'tough-love' },
+};
+
+/**
+ * Build the `INFLUENCE` action, folding in whatever modifier is armed.
+ *
+ * The modifier is cleared AFTER the dispatch and not before, so a refused buy
+ * (unaffordable, engine rejects) leaves the player's intent intact to retry. The
+ * server is the only thing that decides whether it was spent.
+ */
+function buyMarketCard(
+  state: ClientState,
+  you: PlayerID,
+  index: number,
+  app: AppState,
+  dispatch: Dispatch,
+): void {
+  const me = state.players[you];
+  const slot = state.market[index];
+  if (me === undefined || slot === undefined) return;
+
+  const mod = app.marketModifier?.slot === index ? app.marketModifier : null;
+
+  // Affordability is checked against the DISCOUNTED cost, because that is what the
+  // engine charges (`applyDiscounts`). Checking the undiscounted cost would refuse a
+  // buy the Helping Hands discount has already made legal.
+  const cost = mod === null ? slot.cost : discounted(slot.cost, mod.discounts);
+  if (!canAfford(me.resources, cost)) {
+    setRefusal('you cannot afford that Voter Card');
+    return;
+  }
+  dispatch(
+    actions.influence(
+      index,
+      mod === null ? undefined : { viral: mod.viral, discounts: mod.discounts },
+    ),
+  );
+  clearMarketModifier();
+  closePicker();
+}
+
+/** `reduce.ts:applyDiscounts`, mirrored so the client can refuse before sending. */
+function discounted(cost: Delta, discounts: readonly Resource[]): Delta {
+  const out: Record<string, number> = {};
+  for (const r of RESOURCE_ORDER) {
+    const n = cost[r] ?? 0;
+    if (n === 0) continue;
+    const waived = discounts.includes(r) ? 1 : 0;
+    const left = n - waived;
+    if (left > 0) out[r] = left;
+  }
+  return out as Delta;
 }
 
 // ─────────────────────────── small pure helpers ───────────────────────────
@@ -870,6 +1121,89 @@ function gerrySourceRefusal(
     return null;
   }
   return 'that slot does not exist';
+}
+
+/**
+ * Is this slot a legal target for the power being aimed?
+ *
+ * The same three conditions `PowerDialog` shows and `reduce.ts` enforces, so the
+ * refusal is consistent whichever of the two the player happens to press. Land Grab
+ * takes anybody's peg; Payback and Tough Love take an opponent's, and Tough Love
+ * additionally needs both in one zone — checked here on the SECOND pick, because
+ * that is the frame the player can still change it on.
+ */
+function powerAreaRefusal(
+  state: ClientState,
+  you: PlayerID | null,
+  flow: PowerFlow,
+  areaId: string,
+  picks: readonly string[],
+): string | null {
+  if (you === null) return 'that slot does not exist';
+  let area: { readonly id: string; readonly zone: string; readonly volatile: boolean; readonly peg: { readonly owner: string; readonly majority: boolean } | null } | null = null;
+  for (const z of state.zones) {
+    const a = z.areas.find((x) => x.id === areaId);
+    if (a !== undefined) {
+      area = { id: a.id, zone: z.id, volatile: a.volatile, peg: a.peg };
+      break;
+    }
+  }
+  if (area === null) return 'that slot does not exist';
+  if (area.peg === null) return 'there is no voter there';
+  if (area.volatile) return 'voters in a Volatile Area cannot be moved';
+  if (flow.power !== 'land-grab' && area.peg.owner === you) {
+    return 'that is your own voter — this power targets an opponent';
+  }
+  if (flow.power === 'tough-love') {
+    for (const picked of picks) {
+      for (const z of state.zones) {
+        const p = z.areas.find((x) => x.id === picked);
+        if (p !== undefined && p.id !== areaId && z.id !== area.zone) {
+          return 'both voters must be in the same constituency';
+        }
+        if (p !== undefined && p.id !== areaId && p.peg !== null && p.peg.owner !== area.peg.owner) {
+          return 'both voters must belong to the same player';
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** How long the payout frame stays up before it retires. §9.3: one readable frame. */
+const REVEAL_MS = 4_000;
+
+/** The newest public `answered` event belonging to this player, if it is the newest. */
+function lastAnswerFor(
+  events: readonly GameEvent[],
+  you: PlayerID | null,
+): { readonly key: string } | null {
+  if (you === null) return null;
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const e = events[i];
+    if (e === undefined) continue;
+    if (e.type === 'answered' && e.player === you) {
+      return { key: `${e.cardId}:${e.side}:${i}` };
+    }
+    return null;
+  }
+  return null;
+}
+
+/**
+ * The answer the player committed, from the PUBLIC log.
+ *
+ * `reduce.ts` writes `"${side.answer}"` on the `ANSWER` branch, and the log is in
+ * `ClientState` for every player — so once the answer is committed this text is
+ * public by rule, and reading it here leaks nothing that the other three players
+ * cannot already read.
+ */
+function lastAnswerText(log: readonly LogEntry[], you: PlayerID): string | null {
+  for (let i = log.length - 1; i >= 0; i -= 1) {
+    const e = log[i];
+    if (e !== undefined && e.kind === 'answer' && e.player === you) return e.text;
+  }
+  return null;
 }
 
 /**

@@ -38,9 +38,11 @@
 
 import { useSyncExternalStore } from 'react';
 
-import type { Delta, PlayerID, ZoneID } from '@shasn/engine';
+import type { Delta, PlayerID, Resource, ZoneID } from '@shasn/engine';
 
 import type { ConnectionStatus } from '../net/index.ts';
+
+import { UI_RULES } from './derive.ts';
 
 /** UI-SPEC §5.2. `lost` is a state, not a message: it is what "still trying" becomes. */
 export type Link = 'connecting' | 'live' | 'reconnecting' | 'lost';
@@ -61,6 +63,61 @@ export type TradeDraft = {
   /** What this player asks for. */
   readonly receive: Delta;
 };
+
+/**
+ * An Ideologue Power that is mid-targeting.
+ *
+ * Only the powers that need something the client cannot infer enter this. It is a
+ * tagged union rather than a bag of nullable fields because the four shapes have
+ * genuinely different targets, and a bag would let `power: 'land-grab'` with a
+ * `from` set — a state that is not a state the game has.
+ *
+ * `prospecting` needs no target at all: give one resource, take two. It is here
+ * because the dialog that collects the other four is the same dialog.
+ */
+export type PowerFlow =
+  | { readonly power: 'prospecting' }
+  /** Evict any voter from the board. The target is a board slot. */
+  | { readonly power: 'land-grab' }
+  /** Take one resource from another player. */
+  | { readonly power: 'donations' }
+  /** Strike one opponent's voter, paying a resource. */
+  | { readonly power: 'payback' }
+  /** Convert two of one opponent's voters in one zone, paying 2 Trust + 2 any. */
+  | { readonly power: 'tough-love' };
+
+/** The powers whose target is a board slot, so the board can enter `place` mode. */
+export function powerTargetsArea(flow: PowerFlow | null): boolean {
+  return (
+    flow !== null &&
+    (flow.power === 'land-grab' || flow.power === 'payback' || flow.power === 'tough-love')
+  );
+}
+
+/** How many slots this flow needs picked. Mirrors the engine's exact-count checks. */
+export function powerAreaCount(flow: PowerFlow | null): number {
+  if (flow === null) return 0;
+  if (flow.power === 'tough-love') return UI_RULES.toughLoveConverts;
+  return powerTargetsArea(flow) ? 1 : 0;
+}
+
+/** Which resources to waive, and whether to add a voter, on one market slot. */
+export type MarketModifier = {
+  readonly power: MarketPower;
+  readonly slot: number;
+  /** Going Viral: +1 voter on this card. */
+  readonly viral: boolean;
+  /** Helping Hands: each entry is one resource this buy costs nothing. */
+  readonly discounts: readonly Resource[];
+};
+
+/**
+ * The two powers `reduce.ts` folds into `INFLUENCE` rather than giving an action.
+ *
+ * They are modifiers on a BUY, so the player's first decision is which of the three
+ * face-up Voter Cards to spend them on, and only the second is the power itself.
+ */
+export type MarketPower = 'going-viral' | 'helping-hands';
 
 /** The resource picker: a target count and the draft against it. */
 export type PickerDraft = {
@@ -97,8 +154,21 @@ export type AppState = {
   readonly picker: PickerDraft | null;
   /** The open trade composer, if any. */
   readonly trade: TradeDraft | null;
-  /** The player a power is waiting on a target from (donations, land grab…). */
-  readonly powerTarget: { readonly power: string; readonly from: PlayerID | null } | null;
+  /** The power being targeted, if any. */
+  readonly powerTarget: PowerFlow | null;
+
+  /**
+   * A Going Viral / Helping Hands modifier armed against one market slot.
+   *
+   * These two are not separate engine actions: `reduce.ts` folds them into
+   * `INFLUENCE` as `viral` and `discounts`. So the player picks a CARD first and a
+   * modifier second, and this holds the pairing until the buy. It is local intent,
+   * not applied state — the modifier is spent only when the server says so.
+   */
+  readonly marketModifier: MarketModifier | null;
+
+  /** A market power waiting for the player to name the CARD it applies to. */
+  readonly pendingMarketPower: MarketPower | null;
   /** The two areas Tough Love has collected so far. */
   readonly toughLovePicks: readonly string[];
 };
@@ -121,6 +191,8 @@ const INITIAL: AppState = {
   picker: null,
   trade: null,
   powerTarget: null,
+  marketModifier: null,
+  pendingMarketPower: null,
   toughLovePicks: [],
 };
 
@@ -260,7 +332,9 @@ export function clearTurnInteraction(): void {
     gerryTargetAreaId: null,
     picker: null,
     trade: null,
-    powerTarget: null,
+powerTarget: null,
+    marketModifier: null,
+    pendingMarketPower: null,
     toughLovePicks: [],
   });
 }
@@ -351,12 +425,41 @@ export function closeTrade(): void {
   set({ trade: null });
 }
 
-export function setPowerTarget(power: string, from: PlayerID | null): void {
-  set({ powerTarget: from === null ? { power, from: null } : { power, from } });
+/**
+ * Begin targeting with a power.
+ *
+ * Resets the area picks, because a power that needs slots and a stale pick from a
+ * previous one would silently target the wrong voter. `clearPowerTarget` is what
+ * a player gets from CANCEL, and the two leave the store in the same state.
+ */
+export function setPowerTarget(flow: PowerFlow): void {
+  set({ powerTarget: flow, pickedAreaIds: [], refusal: null });
 }
 
 export function clearPowerTarget(): void {
-  set({ powerTarget: null });
+  if (state.powerTarget === null) return;
+  set({ powerTarget: null, pickedAreaIds: [], refusal: null });
+}
+
+/** Arm a market modifier against a slot, or replace the one already armed there. */
+export function setMarketModifier(modifier: MarketModifier): void {
+  set({ marketModifier: modifier });
+}
+
+/** Used when the armed slot leaves the market — a buy, or another player's turn. */
+export function clearMarketModifier(): void {
+  if (state.marketModifier === null) return;
+  set({ marketModifier: null });
+}
+
+/** Open the "which card do you spend this on" chooser. */
+export function setMarketPower(power: MarketPower): void {
+  set({ pendingMarketPower: power, marketModifier: null, refusal: null });
+}
+
+export function clearMarketPower(): void {
+  if (state.pendingMarketPower === null) return;
+  set({ pendingMarketPower: null });
 }
 
 export function addToughLovePick(areaId: string): void {

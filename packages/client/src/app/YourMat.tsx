@@ -64,6 +64,16 @@ export type YourMatProps = {
   readonly onGerry: () => void;
   readonly onPower: (power: string) => void;
   readonly onEndTurn: () => void;
+  /**
+   * Open the trade composer. §5.7 is a two-party screen, so the mat needs one
+   * button per OTHER player rather than a "trade" command that opens a picker —
+   * a player proposing to nobody is not a state the game has.
+   */
+  readonly onTradeWith: (player: PlayerID) => void;
+  /** Buy the top Conspiracy Card. The cost is printed on its back, so it is public. */
+  readonly onBuyConspiracy: () => void;
+  /** Which player is holding an armed market modifier, if any. Shown, not hidden. */
+  readonly armedSlot: number | null;
 };
 
 /** Resource strip + the single combined cap meter. */
@@ -392,6 +402,49 @@ export function YourMat(props: YourMatProps) {
               ? 'No Conspiracy Card is purchasable.'
               : `Top Conspiracy Card: any ${state.conspiracyTopCost} resources · ${state.conspiracyRemaining} left.`}
           </p>
+
+          {state.conspiracyTopCost === null ? null : (
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={props.onBuyConspiracy}
+              disabled={!actionable}
+              aria-disabled={!actionable}
+              data-testid="buy-conspiracy"
+            >
+              BUY THE TOP CONSPIRACY CARD — ANY {state.conspiracyTopCost}
+            </button>
+          )}
+
+          {/* §5.7: a trade is with a NAMED person. One button per opponent, and a
+              spectator or a solo player gets the reason rather than no buttons. */}
+          {state.turnOrder.filter((id) => id !== you).length === 0 ? null : (
+            <div className="row" style={{ marginTop: 'var(--sp-2)' }}>
+              <span className="field__label">TRADE</span>
+              {state.turnOrder
+                .filter((id) => id !== you)
+                .map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={() => props.onTradeWith(id)}
+                    disabled={!actionable}
+                    aria-disabled={!actionable}
+                    data-testid="trade-with"
+                  >
+                    {state.players[id]?.name ?? '—'}
+                  </button>
+                ))}
+            </div>
+          )}
+
+          {props.armedSlot === null ? null : (
+            <p className="panel__note" data-testid="armed-modifier">
+              A power is armed on market card {props.armedSlot + 1}. Buy that card to spend it, or
+              press the power again to cancel.
+            </p>
+          )}
 
           <div className="row" style={{ marginTop: 'var(--sp-3)' }}>
             <button
