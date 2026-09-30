@@ -370,6 +370,45 @@ describe('phase and turn ordering', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('an exhausted Ideology deck ends the game rather than soft-locking the turn', () => {
+    // R10, ruled and fixed. The headline path has always handled an empty deck
+    // (`nextHeadlineOrAdvance` drops the queue and advances); the ideology path
+    // did not, and had no way to: a turn that begins with no card has no legal
+    // first move. Before the fix this state ended up in `phase: 'answer'` with
+    // `_pendingCard: null`, where ANSWER fails "no card has been put to you",
+    // REDRAW_IDEOLOGY fails "no card to redraw", and END_TURN fails "answer your
+    // Ideology Card first" — a permanent stall, which is the regression.
+    const base = answered(fresh(1), 'p1');
+    const s: GameState = { ...base, _ideologyDraw: [], _ideologyDiscard: [] };
+
+    const r = act(s, 'p1', { type: 'END_TURN' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Play ends and the board's standing is the result, as at p20's timer ending.
+    expect(r.state.finished).toBe(true);
+    expect(r.state.phase).toBe('finished');
+    expect(r.state._pendingCard).toBeNull();
+    expect(r.events.map((e) => e.type)).toEqual(['turn-ended', 'game-over']);
+    expect(r.state.log.some((l) => l.text === 'The Ideology deck is exhausted.')).toBe(true);
+    // Over is over: nothing is legal, and nothing is stuck.
+    expect(act(r.state, 'p1', { type: 'END_TURN' }).ok).toBe(false);
+    expect(act(r.state, 'p2', { type: 'ANSWER', side: 0 }).ok).toBe(false);
+
+    // The guard fires only when there is genuinely nothing left: a non-empty
+    // discard reshuffles (p10) and the turn starts normally.
+    const withDiscards: GameState = {
+      ...base,
+      _ideologyDraw: [],
+      _ideologyDiscard: ['ide-05', 'ide-06'],
+    };
+    const ok = act(withDiscards, 'p1', { type: 'END_TURN' });
+    expect(ok.ok).toBe(true);
+    if (!ok.ok) return;
+    expect(ok.state.finished).toBe(false);
+    expect(ok.state.phase).toBe('answer');
+    expect(['ide-05', 'ide-06']).toContain(ok.state._pendingCard);
+  });
+
   it('advanceTurn increments round only when the outgoing player was last in turn order', () => {
     let s = step(answered(fresh(1), 'p1'), 'p1', { type: 'END_TURN' });
     expect(s.round).toBe(1);

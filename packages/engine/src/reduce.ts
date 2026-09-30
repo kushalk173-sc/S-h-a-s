@@ -359,7 +359,7 @@ function gerrymanderAllowance(state: GameState, player: PlayerID, rules: Rules, 
 
 // ─────────────────────────── turn advance ───────────────────────────
 
-function endOfGame(state: GameState): Result {
+function endOfGame(state: GameState, events: GameEvent[] = []): Result {
   const w = winners(state);
   return {
     ok: true,
@@ -369,7 +369,7 @@ function endOfGame(state: GameState): Result {
       phase: 'finished',
       log: [...state.log, { turn: state.turn, player: null, text: 'The election is decided.', kind: 'system' }],
     },
-    events: [{ type: 'game-over', winners: w }],
+    events: [...events, { type: 'game-over', winners: w }],
   };
 }
 
@@ -412,14 +412,30 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
   s = withPlayer(s, next, { powerUses: NO_POWER_USES });
 
   // p21: draw and read an Ideology Card for the next player.
-  // TODO(R10, Phase 3): `cardId` may be null when the Ideology deck AND its
-  // discard are both empty, and the state is then stuck in `phase: 'answer'` with
-  // no pending card: ANSWER says "no card has been put to you", REDRAW says "no
-  // card to redraw", END_TURN says "answer your Ideology Card first". No legal
-  // move exists. The headline path has this guard (nextHeadlineOrAdvance); the
-  // ideology path needs the same treatment.
   const [drawn, cardId] = draw(s, 'ideology');
   s = drawn;
+
+  // R10, ruled. The Ideology deck AND its discard are both empty, so there is no
+  // card to put to the next player. The headline path already handles exactly
+  // this (`nextHeadlineOrAdvance`: drop the queue, advance the turn) — the
+  // ideology path could not, because a turn that starts with no card has no legal
+  // first move: ANSWER says "no card has been put to you", REDRAW_IDEOLOGY says
+  // "no card to redraw", and END_TURN says "answer your Ideology Card first". The
+  // old code entered `phase: 'answer'` with `_pendingCard: null` and the game was
+  // over with no way to end it.
+  //
+  // There is no rulebook provision for running out of Ideology Cards [NOT IN
+  // RULEBOOK]. The rule is that play continues; here it cannot, so the game ends
+  // and the standing on the board is the result — the same shape as p20's timer
+  // ending, which also stops play and scores the board as it stands. With a real
+  // 108- (or 432-) card deck and a 129-area board this is unreachable in play; it
+  // is reachable in any partial-deck fixture, and the alternative — a fail that
+  // leaves the outgoing player unable to end their turn — is the soft-lock this
+  // replaces.
+  if (cardId === null) {
+    s = log(s, { player: null, text: 'The Ideology deck is exhausted.', kind: 'system' });
+    return endOfGame(s, events);
+  }
 
   s = {
     ...s,
