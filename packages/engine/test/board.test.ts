@@ -142,11 +142,19 @@ describe('majority formation', () => {
     // means `recount` and `gerrymanderRights` cannot actually disagree about a
     // majority tie, because no majority tie is reachable. If a future board has
     // capacity >= 2 * majority, R4 becomes a real bug and this test fails.
+    //
+    // Checked three ways per zone, because the argument needs all three: the
+    // *areas* must be the capacity (a board could declare a capacity it does not
+    // have), the capacity must be `2 * majority - 1`, and the areas must
+    // therefore be one short of what a tie would need.
     for (const z of fresh(1).zones) {
-      expect(z.capacity, `${z.id} is ${z.capacity} for a majority of ${z.majority}`).toBe(
-        2 * z.majority - 1,
+      const where = `${z.id} declares ${z.majority}/${z.capacity}`;
+      expect(z.areas.length, `${where} but has ${z.areas.length} areas`).toBe(z.capacity);
+      expect(z.capacity, where).toBe(2 * z.majority - 1);
+      // A tie needs 2 * majority pegs; the zone has capacity.
+      expect(2 * z.majority, `${where}: a tie would need 2 * ${z.majority} pegs`).toBeGreaterThan(
+        z.areas.length,
       );
-      expect(2 * z.majority).toBeGreaterThan(z.capacity);
     }
   });
 

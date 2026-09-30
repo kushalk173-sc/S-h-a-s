@@ -60,11 +60,24 @@ export function recount(zone: Zone): Zone {
   }
 
   let holder: PlayerID | null = null;
-  // TODO(R4, Phase 3): a simultaneous majority is last-wins by board-scan order.
-  // `north_west` is 6/11 so 6+6 is reachable, and this disagrees with
-  // `gerrymanderRights`, which returns null on a tie. The rulebook does not settle
-  // a majority tie; the ruling must be pinned in a test (audit test 29) before
-  // this is changed. Note it is also the degenerate coalition case (D5).
+  // R4 — VERIFIED DEAD ON THIS BOARD, independently of the audit. The audit (R4)
+  // claimed "north_west is 6/11 so 6+6 is reachable"; it is not. Every one of the
+  // nine zones has `capacity === 2 * majority - 1` (6/11, 11/21, 6/11, 9/17, 5/9,
+  // 9/17, 6/11, 11/21, 6/11 — `board.generated.ts`), so two players would need
+  // `2 * majority === capacity + 1` pegs in a zone that has `capacity` areas. No
+  // arrangement of pegs reaches that, so at most one player can ever satisfy
+  // `n >= zone.majority` and the last-write-wins below can never actually pick a
+  // winner over an equal one. The tie is unreachable, so it needs no tie handling
+  // today, and `recount` cannot disagree with `gerrymanderRights` — which does
+  // handle ties, returning null (rules-reference.md:311) — because there is never
+  // a majority tie to disagree about.
+  //
+  // This is a latent-defect record, not a fix. If a future board (or the 7-zone
+  // 2-player board, 6/11 through 9/17, PLAN.md §6 row 7) has
+  // `capacity >= 2 * majority` in any zone, this becomes a live bug and needs the
+  // ruling that `rules-reference.md` §16 #7 still records as unsettled. The
+  // geometry is pinned by a test in board.test.ts ("a simultaneous majority is
+  // geometrically impossible on this board") so that change fails loudly.
   for (const [p, n] of counts) if (n >= zone.majority) holder = p;
 
   if (holder === null) {
