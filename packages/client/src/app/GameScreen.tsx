@@ -627,7 +627,7 @@ export function GameScreen({ store }: GameScreenProps) {
           onResolveAreas={(choiceId, areaIds) => {
             dispatch(actions.resolveChoice(choiceId, { kind: 'areas', areaIds }));
             clearPowerTarget();
-            import('./store.ts').then((m) => m.clearToughLove());
+            clearToughLove();
           }}
           draft={app.picker?.pick ?? {}}
           onDraft={(next) => {
@@ -718,7 +718,7 @@ export function GameScreen({ store }: GameScreenProps) {
         <ErrorToast
           code={store.error.code}
           message={store.error.message}
-          onDismiss={() => import('../net/index.ts').then((m) => m.clearError())}
+          onDismiss={clearError}
         />
       ) : null}
     </div>
