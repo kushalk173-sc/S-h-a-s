@@ -847,13 +847,15 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       // p34: the evicted voter goes back to its owner's mat and may be replaced
       // anywhere on their next turn, or it is discarded.
       s = grantVoters(s, victim, 1, 'Evicted', false);
-      // TODO(R12, Phase 3): the `!` on `s.players[playerId]` defeats the checker
-      // by design. It is safe today because nothing can remove a player, but a
-      // future evict-the-player effect would throw an opaque TypeError instead of
-      // a `fail(...)`. Replace with a guarded lookup. Same at POWER_PAYBACK and
-      // POWER_TOUGH_LOVE.
+      // R12: the acting player is re-read after the board mutation rather than
+      // assumed present. `self` was captured before, and nothing in the reducer can
+      // remove a player today — but a future evict-the-player effect would make a
+      // non-null assertion here throw an opaque TypeError from inside `reduce`
+      // instead of returning the `fail(...)` every other bad state produces.
+      const me = s.players[playerId];
+      if (!me) return fail(`unknown player ${playerId}`);
       s = withPlayer(s, playerId, {
-        powerUses: { ...s.players[playerId]!.powerUses, landGrab: self.powerUses.landGrab + 1 },
+        powerUses: { ...me.powerUses, landGrab: self.powerUses.landGrab + 1 },
       });
       s = log(s, {
         player: playerId,
@@ -895,8 +897,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       [s] = takeResources(s, playerId, { [action.pay]: 1 });
       const edit = setArea(s, { ...area, peg: null });
       s = edit.state;
+      // R12: see POWER_LAND_GRAB. A `fail(...)`, not a TypeError.
+      const me = s.players[playerId];
+      if (!me) return fail(`unknown player ${playerId}`);
       s = withPlayer(s, playerId, {
-        powerUses: { ...s.players[playerId]!.powerUses, payback: self.powerUses.payback + 1 },
+        powerUses: { ...me.powerUses, payback: self.powerUses.payback + 1 },
       });
       s = log(s, { player: playerId, text: 'Payback: a voter is struck from the roll.', kind: 'power' });
       return { ok: true, state: s, events: edit.events };
@@ -949,9 +954,12 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
         s = edit.state;
         events.push(...edit.events);
       }
+      // R12: see POWER_LAND_GRAB. A `fail(...)`, not a TypeError.
+      const me = s.players[playerId];
+      if (!me) return fail(`unknown player ${playerId}`);
       s = withPlayer(s, playerId, {
         powerUses: {
-          ...s.players[playerId]!.powerUses,
+          ...me.powerUses,
           toughLove: self.powerUses.toughLove + 1,
           helpingHands: self.powerUses.helpingHands + discounts.length,
         },

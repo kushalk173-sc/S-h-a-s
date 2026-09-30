@@ -424,3 +424,108 @@ describe('per-turn limits', () => {
     expect(prospect.ok).toBe(true);
   });
 });
+
+/**
+ * R12: the three guarded lookups in POWER_LAND_GRAB, POWER_PAYBACK and
+ * POWER_TOUGH_LOVE.
+ *
+ * Each of those cases read `s.players[playerId]!` after mutating the board. `!`
+ * defeats the checker by design, and it is safe today only because nothing in the
+ * reducer can remove a player. If a future evict-the-player effect existed, those
+ * three would throw an opaque `TypeError` out of `reduce` — no `Result`, no error
+ * code, and a server crash instead of a refusal.
+ *
+ * The state needed to reach that guard cannot be built through the public surface,
+ * because no action produces it. So it is built here directly: `players` becomes a
+ * `Proxy` that forgets the acting player from the *second* read onward. Read #1 is
+ * `reduce`'s own existence check at the top of the function, which passes exactly as
+ * it does in a real game; every read after it misses, which is the shape a removal
+ * would leave behind.
+ */
+function actingPlayerVanishes(s: GameState, p: PlayerID): GameState {
+  const real = s.players;
+  const reads = new Map<string, number>();
+  const wrapped = new Proxy(real, {
+    get(target, key) {
+      if (typeof key !== 'string') return Reflect.get(target, key);
+      const n = (reads.get(key) ?? 0) + 1;
+      reads.set(key, n);
+      if (key === p && n > 1) return undefined;
+      return Reflect.get(target, key);
+    },
+  });
+  return { ...s, players: wrapped };
+}
+
+describe('R12 — the acting player is re-read after the board mutation, not assumed', () => {
+  it('Land Grab, Payback and Tough Love all return fail(...) instead of throwing', () => {
+    // Each case is built to be otherwise legal: the power unlocked, the target a
+    // real peg, the cost payable. Only the vanished player is wrong.
+    const landGrab: GameState = setAreaState(
+      withManifesto(fresh(1), 'p1', 'capitalist', 5),
+      'central-01',
+      { owner: 'p2', majority: false },
+    );
+    const payback: GameState = setAreaState(
+      withManifesto(fresh(1), 'p1', 'supremo', 5),
+      'central-01',
+      { owner: 'p2', majority: false },
+    );
+    const tlBase = withPegs(
+      setAreaState(withManifesto(fresh(1), 'p1', 'idealist', 5), 'central-01', {
+        owner: 'p2',
+        majority: false,
+      }),
+      'p2',
+      'central',
+      2,
+    );
+    const toughLove: GameState = {
+      ...tlBase,
+      players: {
+        ...tlBase.players,
+        p1: { ...tlBase.players.p1!, resources: { funds: 2, clout: 0, media: 0, trust: 2 } },
+      },
+    };
+    const tlIds =
+      toughLove.zones.find((z) => z.id === 'central')?.areas.filter((a) => a.peg !== null).map((a) => a.id) ?? [];
+    expect(tlIds).toHaveLength(2);
+
+    const cases: readonly { readonly label: string; readonly state: GameState; readonly action: Action }[] = [
+      { label: 'POWER_LAND_GRAB', state: landGrab, action: { type: 'POWER_LAND_GRAB', areaId: 'central-01' } },
+      {
+        label: 'POWER_PAYBACK',
+        state: payback,
+        action: { type: 'POWER_PAYBACK', areaId: 'central-01', pay: 'funds' },
+      },
+      {
+        label: 'POWER_TOUGH_LOVE',
+        state: toughLove,
+        action: { type: 'POWER_TOUGH_LOVE', areaIds: tlIds, pay: { trust: 2, funds: 2 } },
+      },
+    ];
+
+    for (const c of cases) {
+      // Control: with the player present, the same action succeeds.
+      const control = act(c.state, 'p1', c.action);
+      expect(control.ok, `${c.label} should succeed on a whole state`).toBe(true);
+
+      // The regression: before the fix this threw a TypeError, so the call below
+      // never returned and this test failed with the exception rather than an
+      // assertion.
+      const r = act(actingPlayerVanishes(c.state, 'p1'), 'p1', c.action);
+      expect(r.ok, `${c.label} must refuse, not throw`).toBe(false);
+      if (!r.ok) expect(r.error).toBe('unknown player p1');
+    }
+  });
+
+  it('a player who never vanishes is unaffected', () => {
+    // The proxy only ever hides the acting player, and only after the first read:
+    // every other seat reads through untouched, so this is the same state as far
+    // as the rest of the reducer is concerned.
+    const s = withManifesto(fresh(1), 'p1', 'capitalist', 5);
+    const intact = actingPlayerVanishes(s, 'p2');
+    expect(Object.keys(intact.players).sort()).toEqual(['p1', 'p2', 'p3']);
+    expect(intact.players.p1).toEqual(s.players.p1);
+  });
+});
