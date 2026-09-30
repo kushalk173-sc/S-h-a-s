@@ -450,14 +450,10 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
     return fail(`resolve "${blocker.choice.reason}" first`);
   }
 
-  // p19: a Conspiracy Card may be played out of turn, right before an opponent
-  // answers. Everything else is active-player only.
+  // p19 / rules-reference.md:283: a Conspiracy Card may be played out of turn,
+  // right before an opponent answers. Everything else is active-player only.
+  // The phase windows themselves are checked in the PLAY_CONSPIRACY case.
   const outOfTurnOk = action.type === 'PLAY_CONSPIRACY' && state.phase === 'answer';
-  // TODO(R9, Phase 3): the guard below exempts the ACTIVE player entirely, and
-  // PLAY_CONSPIRACY is the one turn action with no `phase !== 'actions'` check of
-  // its own, so a conspiracy can be resolved mid-headline-queue (rules-reference.md
-  // :282-283 scopes conspiracy play to "during your turn" and the pre-answer
-  // window). Add `state.phase !== 'actions'` to the PLAY_CONSPIRACY case.
   if (playerId !== state.activePlayer && !outOfTurnOk && action.type !== 'RESOLVE_CHOICE') {
     return fail('not your turn');
   }
@@ -775,6 +771,17 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
     }
 
     case 'PLAY_CONSPIRACY': {
+      // p19 / rules-reference.md:282-283: playable "at any point during your turn"
+      // — the `actions` phase — "and also immediately before an opponent answers
+      // their Ideology Card", which is the `answer` phase. It is scoped to those
+      // two windows, and neither of them is open while the post-turn Headline queue
+      // is draining. R9: this case had no phase check of its own, and the turn
+      // guard above exempts the ACTIVE player entirely, so a conspiracy could
+      // resolve mid-queue, mutate the board and push new choices while Headlines
+      // were still pending.
+      if (state.phase !== 'actions' && state.phase !== 'answer') {
+        return fail('resolve the Headline first');
+      }
       if (!self.conspiracies.includes(action.cardId)) return fail('you do not hold that card');
       const card = cards.conspiracy[action.cardId];
       if (!card) return fail('unknown conspiracy card');

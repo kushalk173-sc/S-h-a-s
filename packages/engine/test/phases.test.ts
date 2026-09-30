@@ -324,21 +324,36 @@ describe('phase and turn ordering', () => {
     }
   });
 
-  it('the active player CAN play a Conspiracy Card during the headlines phase', () => {
-    // R9, still open. PLAY_CONSPIRACY is the one turn action with no
-    // `phase !== 'actions'` check of its own, so the turn guard never fires for
-    // the active player. rules-reference.md:282-283 scopes conspiracy play to
-    // "during your turn" and the pre-answer window, not post-turn headline
-    // resolution. Pinned so the hole is explicit; the fix is Phase 3.
+  it('the active player CANNOT play a Conspiracy Card during the headlines phase', () => {
+    // R9, ruled and fixed. rules-reference.md:282-283 scopes conspiracy play to
+    // "at any point during your turn" and "immediately before an opponent
+    // answers" — two windows, and neither is open while the post-turn Headline
+    // queue drains. PLAY_CONSPIRACY was the only turn action with no
+    // `phase !== 'actions'` check of its own, and the turn guard exempts the
+    // ACTIVE player, so a conspiracy could resolve mid-queue: mutating the board
+    // and pushing new choices while Headlines were still pending.
+    //
+    // The first assertion is the regression — before the fix `during.ok` was true.
     let s = answered(fresh(1), 'p1');
     s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, conspiracies: ['con-01'] } } };
+
+    // During your own turn: legal.
     const inActions = act(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId: 'con-01' });
     expect(inActions.ok).toBe(true);
 
-    const headlinePhase: GameState = { ...s, phase: 'headlines', activeHeadline: 'hed-01' };
-    const during = act(headlinePhase, 'p1', { type: 'PLAY_CONSPIRACY', cardId: 'con-01' });
-    expect(during.ok).toBe(true);
-    // TODO(R9): add `state.phase !== 'actions'` to the PLAY_CONSPIRACY case.
+    // Mid-Headline-queue: refused, card still in hand, board untouched.
+    const midQueue: GameState = {
+      ...s,
+      phase: 'headlines',
+      activeHeadline: 'hed-01',
+      headlineQueue: [{ areaId: 'central-01', by: 'p1' }],
+      _pendingCard: null,
+    };
+    const during = act(midQueue, 'p1', { type: 'PLAY_CONSPIRACY', cardId: 'con-01' });
+    expect(during.ok).toBe(false);
+    if (!during.ok) expect(during.error).toBe('resolve the Headline first');
+    expect(midQueue.players.p1?.conspiracies).toEqual(['con-01']);
+    expect(midQueue.zones.flatMap((z) => z.areas).filter((a) => a.peg !== null)).toHaveLength(0);
   });
 
   it('any player may play a Conspiracy Card in the pre-answer window', () => {
