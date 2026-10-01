@@ -205,18 +205,22 @@ describe('schema: the effect union', () => {
     expect(found[0]?.message).toContain('steal-any');
   });
 
-  it('rejects a payload field the op does not have (evict has no target)', () => {
-    // The schema follows cards.ts, and cards.ts gives `target` only to the five ops
-    // that take one. `evict` pushes its decision to the card's own player, so a
-    // target would be a promise the engine cannot keep.
-    const found = validateEffect(FILE, { op: 'evict', n: 1, target: 'each-opponent' }, EFFECT_OP_SET);
-    expect(found.some((p) => p.message.includes('unknown property "target"'))).toBe(true);
+  it('still rejects a payload field NO op has', () => {
+    // `target` used to be the example, because `evict` was one of the ops without
+    // it. Every op that takes a target now does, so the honest test of the schema's
+    // `additionalProperties: false` uses a field no op declares. Whether the ENGINE
+    // does what a declared field says is `test/reducer-parity.test.ts`'s question.
+    const found = validateEffect(FILE, { op: 'evict', n: 1, each: 2 }, EFFECT_OP_SET);
+    expect(found.some((p) => p.message.includes('unknown property "each"'))).toBe(true);
   });
 
-  it('accepts a target on gerrymander, which cards.ts gained for G8', () => {
+  it('accepts a target on every op whose case reads one', () => {
     // Shape only. Whether the ENGINE does it is the validator's question, and it is
     // asked in test/reducer-parity.test.ts.
-    expect(validateEffect(FILE, { op: 'gerrymander', n: 1, target: 'everyone' }, EFFECT_OP_SET)).toEqual([]);
+    for (const op of ['steal-any', 'evict', 'discard-voter', 'convert-voter', 'draw-conspiracy', 'discount'] as const) {
+      expect(validateEffect(FILE, { op, n: 1, target: 'everyone' }, EFFECT_OP_SET), op).toEqual([]);
+    }
+    expect(validateEffect(FILE, { op: 'refresh-market', n: 1 }, EFFECT_OP_SET).length).toBeGreaterThan(0);
   });
 
   it('rejects an n of zero, which would be a silent no-op', () => {

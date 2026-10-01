@@ -11,7 +11,7 @@
 
 import type { Action, ChoicePick, GameEvent, Result } from './actions';
 import { allMajoritiesFormed, boardFull, recount, scores, winners } from './board';
-import type { CardIndex, Effect, EffectTarget } from './cards';
+import type { CardIndex, Effect, EffectTarget, EffectTrigger } from './cards';
 import { hasPower, passiveBonus, usesLeft } from './powers';
 import { applyDiscounts, canAfford, deltaError, overCap, subtract } from './resources';
 import { shuffle } from './rng';
@@ -28,7 +28,9 @@ import {
   pegsOf,
   poolTotal,
   type Area,
+  type AreaID,
   type CardID,
+  type ChoiceScope,
   type Delta,
   type GameState,
   type LogEntry,
@@ -255,7 +257,68 @@ function grantVoters(
   };
 }
 
-function applyEffect(state: GameState, source: PlayerID, effect: Effect, ctx: Ctx): GameState {
+/**
+ * The event that woke a live effect, threaded into `applyEffect`.
+ *
+ * It is an ARGUMENT and never state: `reduce()` is a pure function of
+ * `(state, action, ctx)`, and a fire context that lived in `GameState` would be one
+ * more thing a replay from seed + action log has to reproduce. Passing it down means
+ * a hook's effects can read "who just did this" without the reducer carrying a
+ * mutable cursor.
+ *
+ * Only two ops read it today, and each for one card:
+ *  - `steal-any` takes its victim from `actor`, which is LAB-GROWN EARWORM's
+ *    "every time THEY influence a Voter Card, they will give you 1 of their
+ *    resources" (REF 4.2.1);
+ *  - the `condition` check on the hook itself, which is POWER TRIP's "every time
+ *    you influence a 3-Voter Card".
+ */
+export type FireContext = {
+  readonly trigger: EffectTrigger;
+  readonly actor: PlayerID;
+  /** Voters on the purchased card. 0 for an event that is not a purchase. */
+  readonly voters: number;
+  /** The voter a board event moved, where the event has one. */
+  readonly areaId: AreaID | null;
+};
+
+const NO_FIRE: FireContext | undefined = undefined;
+
+/**
+ * Raise the voter-targeting decision for `kind`, one per player the card names.
+ *
+ * `target` says who is asked to decide, and the SCOPE follows from that: a player
+ * the card named chooses among their own pegs, the caster keeps the reach it has
+ * always had. See `ChoiceScope` in state.ts for why the corpus needs both.
+ *
+ * Three `case` arms call this rather than sharing one fallthrough block, and that is
+ * deliberate: `packages/cards/test/reducer-parity.test.ts` re-derives the op list and
+ * each op's read fields from THIS FILE'S TEXT by slicing between `case '…':` marks,
+ * so a fallthrough group would attribute the shared body to whichever op happened to
+ * be last and the registry would then claim the other two read nothing.
+ */
+function raiseVoterDecision(
+  state: GameState,
+  source: PlayerID,
+  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  n: number,
+  target: EffectTarget,
+): GameState {
+  let s = state;
+  for (const p of resolveTargets(s, source, target)) {
+    const scope: ChoiceScope = p === source ? (kind === 'evict-voter' ? 'any' : 'others') : 'own';
+    s = pushChoice(s, { kind, count: n, scope, reason: 'Card effect' }, p);
+  }
+  return s;
+}
+
+function applyEffect(
+  state: GameState,
+  source: PlayerID,
+  effect: Effect,
+  ctx: Ctx,
+  fire: FireContext | undefined = NO_FIRE,
+): GameState {
   let s = state;
   const target = 'target' in effect ? (effect.target ?? 'you') : 'you';
 
@@ -286,8 +349,24 @@ function applyEffect(state: GameState, source: PlayerID, effect: Effect, ctx: Ct
       }
       return s;
     }
-    case 'steal-any':
-      return pushChoice(s, { kind: 'steal-any', count: effect.n, from: null, reason: 'Card effect' }, source);
+    case 'steal-any': {
+      // `target` is the SET OF VICTIMS. With no target the thief picks one
+      // (`from: null`, today's behaviour); with a target there is one theft
+      // decision per resolved player and the victim is already fixed, which is what
+      // makes "take N from EVERY opponent" writable at all. `resolveChoice` then
+      // requires the pick to name exactly that player.
+      const named = target !== 'you' ? resolveTargets(s, source, target) : [];
+      if (named.length === 0) {
+        return pushChoice(s, { kind: 'steal-any', count: effect.n, from: null, reason: 'Card effect' }, source);
+      }
+      for (const victim of named) {
+        if (victim === source) continue; // nobody snatches from themselves
+        // A live effect that fires on somebody's purchase names them, not a field.
+        const from = fire?.actor ?? victim;
+        s = pushChoice(s, { kind: 'steal-any', count: effect.n, from, reason: 'Card effect' }, source);
+      }
+      return s;
+    }
     case 'voters': {
       for (const p of resolveTargets(s, source, target)) {
         s = grantVoters(s, p, effect.n, 'Card effect', false);
@@ -295,11 +374,11 @@ function applyEffect(state: GameState, source: PlayerID, effect: Effect, ctx: Ct
       return s;
     }
     case 'evict':
-      return pushChoice(s, { kind: 'evict-voter', count: effect.n, reason: 'Card effect' }, source);
+      return raiseVoterDecision(s, source, 'evict-voter', effect.n, target);
     case 'discard-voter':
-      return pushChoice(s, { kind: 'discard-voter', count: effect.n, reason: 'Card effect' }, source);
+      return raiseVoterDecision(s, source, 'discard-voter', effect.n, target);
     case 'convert-voter':
-      return pushChoice(s, { kind: 'convert-voter', count: effect.n, reason: 'Card effect' }, source);
+      return raiseVoterDecision(s, source, 'convert-voter', effect.n, target);
     case 'gerrymander': {
       // G8, closed on the REDUCER (KNOWN-GAPS.md G8). The bonus used to be credited
       // to `source` alone, which is why "starting with you, EVERY player can
@@ -323,12 +402,14 @@ function applyEffect(state: GameState, source: PlayerID, effect: Effect, ctx: Ct
       return s;
     }
     case 'draw-conspiracy': {
-      for (let i = 0; i < effect.n; i++) {
-        const [next, id] = draw(s, 'conspiracy');
-        s = next;
-        if (id === null) break;
-        const p = s.players[source];
-        if (p) s = withPlayer(s, source, { conspiracies: [...p.conspiracies, id] });
+      for (const p of resolveTargets(s, source, target)) {
+        for (let i = 0; i < effect.n; i++) {
+          const [next, id] = draw(s, 'conspiracy');
+          s = next;
+          if (id === null) break;
+          const player = s.players[p];
+          if (player) s = withPlayer(s, p, { conspiracies: [...player.conspiracies, id] });
+        }
       }
       return syncConspiracyTop(s, ctx);
     }
@@ -337,14 +418,21 @@ function applyEffect(state: GameState, source: PlayerID, effect: Effect, ctx: Ct
       return refillMarket({ ...s, market: [] }, ctx);
     }
     case 'discount': {
-      const p = s.players[source];
-      if (!p) return s;
-      return withPlayer(s, source, {
-        powerUses: {
-          ...p.powerUses,
-          helpingHands: p.powerUses.helpingHands - effect.n,
-        },
-      });
+      // Helping Hands' uses are stored as a NEGATIVE number (see gerrymanderAllowance's
+      // sibling, the allowance check), so a discount is a subtraction from a negative
+      // count. `target` writes another player's counter, which is the only write of
+      // somebody else's `powerUses` in the effect vocabulary.
+      for (const p of resolveTargets(s, source, target)) {
+        const player = s.players[p];
+        if (!player) continue;
+        s = withPlayer(s, p, {
+          powerUses: {
+            ...player.powerUses,
+            helpingHands: player.powerUses.helpingHands - effect.n,
+          },
+        });
+      }
+      return s;
     }
   }
 }
@@ -354,8 +442,9 @@ function applyEffects(
   source: PlayerID,
   effects: readonly Effect[],
   ctx: Ctx,
+  fire?: FireContext,
 ): GameState {
-  return effects.reduce((s, e) => applyEffect(s, source, e, ctx), state);
+  return effects.reduce((s, e) => applyEffect(s, source, e, ctx, fire), state);
 }
 
 // ─────────────────────────── gerrymander allowance ───────────────────────────
@@ -1117,6 +1206,11 @@ function resolveChoice(
       const victim = state.players[pick.from];
       if (!victim) return fail('unknown player');
       if (victim.id === playerId) return fail('steal from someone else');
+      // When the card fixed the victim (`target`, or a live effect firing on this
+      // player's purchase), a pick naming anybody else is a redirect of the theft
+      // and is refused. `from: null` is the card saying "the thief picks", which is
+      // the only case where the pick chooses the victim at all.
+      if (c.from !== null && pick.from !== c.from) return fail('that is not the player you may take from');
       const want = Math.min(c.count, poolTotal(victim.resources));
       if (deltaTotal(pick.res) !== want) return fail(`take exactly ${want}`);
       if (!canAfford(victim.resources, pick.res)) return fail('they do not hold those');
@@ -1131,8 +1225,9 @@ function resolveChoice(
     case 'discard-voter':
     case 'convert-voter': {
       if (pick.kind !== 'areas') return fail('choose areas');
-      const wanted = Math.min(c.count, targetableCount(state, playerId, c.kind));
+      const wanted = Math.min(c.count, targetableCount(state, playerId, c.kind, c.scope));
       if (pick.areaIds.length !== wanted) return fail(`choose exactly ${wanted}`);
+      if (new Set(pick.areaIds).size !== pick.areaIds.length) return fail('duplicate area');
 
       let s = state;
       const events: GameEvent[] = [];
@@ -1140,9 +1235,13 @@ function resolveChoice(
         const area = findArea(s, id);
         if (!area?.peg) return fail('there is no voter there');
         if (area.volatile) return fail('voters in a Volatile Area cannot be affected');
-        if (c.kind !== 'evict-voter' && area.peg.owner === playerId) {
-          return fail('that targets an opponent');
-        }
+        // The scope is the card's, not the pick's: a card that named this player as
+        // its victim asks them about their OWN voters, and a card that did not
+        // leaves them unable to reach their own. See `ChoiceScope`.
+        if (c.scope === 'own' && area.peg.owner !== playerId) return fail('that voter is not yours');
+        if (c.scope === 'others' && area.peg.owner === playerId) return fail('that targets an opponent');
+        // Converting your own voter into your own voter is not a conversion.
+        if (c.kind === 'convert-voter' && area.peg.owner === playerId) return fail('that voter is already yours');
         const owner = area.peg.owner;
         const edit = setArea(
           s,
@@ -1159,13 +1258,22 @@ function resolveChoice(
   }
 }
 
-/** How many legal targets exist — a card cannot demand more than the board offers. */
-function targetableCount(state: GameState, playerId: PlayerID, kind: string): number {
+/**
+ * How many legal targets exist — a card cannot demand more than the board offers.
+ *
+ * `scope` is the card's, for the reason `ChoiceScope` documents: `'own'` counts only
+ * the chooser's pegs, `'others'` only theirs opponents', `'any'` everything. The
+ * default `'others'` is byte-for-byte the rule this function had before scopes
+ * existed, which is what keeps the client's own copy of it in agreement.
+ */
+function targetableCount(state: GameState, playerId: PlayerID, kind: string, scope: ChoiceScope): number {
   let n = 0;
   for (const z of state.zones) {
     for (const a of z.areas) {
       if (!a.peg || a.volatile) continue;
-      if (kind !== 'evict-voter' && a.peg.owner === playerId) continue;
+      if (scope === 'own' && a.peg.owner !== playerId) continue;
+      if (scope === 'others' && a.peg.owner === playerId) continue;
+      if (kind === 'convert-voter' && a.peg.owner === playerId) continue;
       n += 1;
     }
   }

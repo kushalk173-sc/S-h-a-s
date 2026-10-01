@@ -126,16 +126,35 @@ export type Effect = (
   | { readonly op: 'gain-any'; readonly n: number; readonly target?: EffectTarget }
   /** Discard N resources of the recipient's choice. */
   | { readonly op: 'lose-any'; readonly n: number; readonly target?: EffectTarget }
-  /** p34 Snatch: take N resources from a chosen opponent, nothing in return. */
-  | { readonly op: 'steal-any'; readonly n: number }
+  /**
+   * p34 Snatch: take N resources from a chosen opponent, nothing in return.
+   *
+   * `target` is the SET OF VICTIMS, not the thief: with no target the thief picks
+   * the victim (`from: null` on the choice) and with a target one theft decision is
+   * raised per resolved player, so `'each-opponent'` reads "take N from every
+   * opponent" and nothing else. It cannot mean "donate to a chosen player" — that
+   * is G1, and it needs a different op.
+   */
+  | { readonly op: 'steal-any'; readonly n: number; readonly target?: EffectTarget }
   /** Gain N voters to place. Splittable across zones (they are not from a Voter Card). */
   | { readonly op: 'voters'; readonly n: number; readonly target?: EffectTarget }
-  /** p34 Evict: back to the owner's mat, replaceable next turn. */
-  | { readonly op: 'evict'; readonly n: number }
-  /** p34 Discard: off the board permanently. */
-  | { readonly op: 'discard-voter'; readonly n: number }
-  /** p34 Convert: replace an opponent's voter in the same area with your own. */
-  | { readonly op: 'convert-voter'; readonly n: number }
+  /**
+   * p34 Evict: back to the owner's mat, replaceable next turn.
+   *
+   * `target` names who is asked to make the eviction. A player named by the card
+   * chooses among their OWN voters; the caster chooses from the whole board.
+   */
+  | { readonly op: 'evict'; readonly n: number; readonly target?: EffectTarget }
+  /**
+   * p34 Discard: off the board permanently. `target` as for `evict`.
+   *
+   * With no target the caster picks from every peg on the board that is not their
+   * own — the reading three shipped cards state in their text. See
+   * `ChoiceScope` for why "your own voters" needs the target rather than a flag.
+   */
+  | { readonly op: 'discard-voter'; readonly n: number; readonly target?: EffectTarget }
+  /** p34 Convert: replace an opponent's voter in the same area with your own. `target` as for `evict`. */
+  | { readonly op: 'convert-voter'; readonly n: number; readonly target?: EffectTarget }
   /**
    * Extra gerrymander moves this turn, above the normal per-zone allowance.
    *
@@ -147,12 +166,21 @@ export type Effect = (
    * and an absent `target` are equivalent and both fine.
    */
   | { readonly op: 'gerrymander'; readonly n: number; readonly target?: EffectTarget }
-  /** Draw the top Conspiracy Card(s) for free. */
-  | { readonly op: 'draw-conspiracy'; readonly n: number }
+  /**
+   * Draw the top Conspiracy Card(s). `target` says who receives them, so
+   * `'each-opponent'` is GOOD GIG WELL PLAYED's gift. Hands are hidden from every
+   * viewer including their owner (`playerView`), so handing a card to an opponent
+   * leaks nothing the caster's own play did not.
+   */
+  | { readonly op: 'draw-conspiracy'; readonly n: number; readonly target?: EffectTarget }
   /** Discard all face-up Voter Cards and deal fresh ones. */
   | { readonly op: 'refresh-market' }
-  /** Additional purchase discounts this turn. */
-  | { readonly op: 'discount'; readonly n: number }
+  /**
+   * Additional purchase discounts this turn. `target` grants them to somebody else,
+   * which is a write to another player's `powerUses` — the only such write in the
+   * effect vocabulary, and the reason it is a card field rather than a resource.
+   */
+  | { readonly op: 'discount'; readonly n: number; readonly target?: EffectTarget }
 ) &
   EffectScope;
 

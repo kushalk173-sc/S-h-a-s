@@ -338,13 +338,14 @@
           }
         },
         {
-          "$comment": "steal-any has NO target in cards.ts: 'take N resources from a chosen opponent'.",
+          "$comment": "steal-any's `target` is the SET OF VICTIMS: with no target the thief picks the victim (Choice.from = null), with a target one theft decision is raised per resolved player and Choice.from is fixed, which is what makes 'take N from EVERY opponent' writable. It cannot mean 'donate to a chosen player' — that is G1.",
           "type": "object",
           "additionalProperties": false,
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "steal-any" },
             "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }
@@ -368,6 +369,7 @@
           "properties": {
             "op": { "const": "evict" },
             "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }
@@ -379,6 +381,7 @@
           "properties": {
             "op": { "const": "discard-voter" },
             "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }
@@ -390,12 +393,13 @@
           "properties": {
             "op": { "const": "convert-voter" },
             "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
-          "$comment": "G8, closed on the type and NOT on the reducer. gerrymander was the only resource-shaped op in cards.ts with no `target`, which is why \"every player can Gerrymander 1\" (SUBMERGED / NEW FACE WHO DIS, REF 4.3) could not be written at all — the validator caught the attempt on the real corpus. `target` is now on the op and accepted here. applyEffect still credits the bonus to `source` alone, so packages/cards/src/validate.ts REJECTS any card that sets target other than 'you' (finding EFFECT_FIELD_NOT_EXECUTED) until reduce.ts wraps the case in resolveTargets(). See KNOWN-GAPS.md G8.",
+          "$comment": "G8, closed on BOTH the type and the reducer. gerrymander was the only resource-shaped op in cards.ts with no `target`, which is why \"starting with you, every player can Gerrymander 1\" (SUBMERGED / NEW FACE WHO DIS, REF 4.3) could not be written at all. applyEffect now loops resolveTargets(), so any EffectTarget is honoured. NOTE the grant lands in PlayerState.powerUses, which advanceTurn resets at the start of each player's own turn — so a cross-player grant is only spendable by the player whose turn the card resolved on. See KNOWN-GAPS.md G8 and G9.",
           "type": "object",
           "additionalProperties": false,
           "required": ["op", "n"],
@@ -414,6 +418,7 @@
           "properties": {
             "op": { "const": "draw-conspiracy" },
             "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }
@@ -436,6 +441,7 @@
           "properties": {
             "op": { "const": "discount" },
             "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }

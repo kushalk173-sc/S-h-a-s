@@ -214,23 +214,18 @@ describe('G8 — target on gerrymander, closed on the reducer', () => {
 });
 
 describe('a field the reducer ignores is rejected however it is spelled', () => {
-  it('rejects target on evict, naming the choice push it would need', () => {
-    const report = findingsForEffect({ op: 'evict', n: 1, target: 'each-opponent' });
-    // Two findings, both true: the schema says the type has no such field, and the
-    // executable registry says what the engine would do even if the schema were
-    // relaxed to allow it.
-    expect(codes(report)).toContain('EFFECT_FIELD_NOT_EXECUTED');
-    expect(report.errors.find((e) => e.code === 'EFFECT_FIELD_NOT_EXECUTED')?.message).toContain(
-      'resolveTargets',
-    );
-  });
-
-  it('rejects target on steal-any, whose victim is chosen by the thief', () => {
-    const report = findingsForEffect({ op: 'steal-any', n: 1, target: 'everyone' });
-    expect(codes(report)).toContain('EFFECT_FIELD_NOT_EXECUTED');
-    expect(report.errors.find((e) => e.code === 'EFFECT_FIELD_NOT_EXECUTED')?.message).toContain(
-      'Choice kind',
-    );
+  it('every op that reads `target` accepts every EffectTarget', () => {
+    // The six ops below used to be the registry's whole list of "field the type
+    // carries and the reducer ignores". Each now loops resolveTargets, so a card
+    // naming a target is held to it.
+    for (const op of ['steal-any', 'evict', 'discard-voter', 'convert-voter', 'draw-conspiracy', 'discount'] as const) {
+      for (const target of ['you', 'each-opponent', 'everyone', 'leader'] as const) {
+        expect(
+          codes(findingsForEffect({ op, n: 1, target })),
+          `${op} target ${target}`,
+        ).toEqual([]);
+      }
+    }
   });
 
   it('rejects a computed n, which reduce() would push into a Choice.count', () => {

@@ -166,6 +166,32 @@ export type PlayerState = {
 };
 
 /**
+ * Which pegs a voter-targeting decision may name.
+ *
+ * THE RULING, and it is a ruling because the corpus needs two different answers.
+ * RED BLOODED (REF 4.3) says *"You must discard any 2 voters"* — any peg on the
+ * board. AIN'T NO CURE FOR LOVE (REF 4.3) says *"Discard 2 of your own voters"* —
+ * only the chooser's own. Both are real cards, both land on `discard-voter`, and
+ * the engine cannot tell them apart without a second field on the op.
+ *
+ * So the scope is derived from WHO is being asked, which is the one thing the card
+ * always states and the one thing that reads correctly either way:
+ *
+ * | who resolves it | scope | why |
+ * |---|---|---|
+ * | the caster, no `target` | `'others'` | the card did not say "your own"; the three shipped cards say "your opponents'" |
+ * | a player the card named | `'own'` | *"All your opponents evict 1 voter"* — they choose which of theirs, exactly as a victim of a theft picks the denomination |
+ * | the caster, evicting | `'any'` | eviction already allowed any peg before this field existed, and `evict` is the one op whose real text says "any voter" |
+ *
+ * `'others'` is the default and it is deliberately unchanged from what `resolveChoice`
+ * did before this type existed, so no shipped card's behaviour moves and the client's
+ * own copy of this rule (`packages/client/src/app/derive.ts`) keeps agreeing with it.
+ * `'own'` is reachable only by naming the victim with `target`, which is what makes
+ * "discard 2 of your own voters" expressible at all.
+ */
+export type ChoiceScope = 'any' | 'others' | 'own';
+
+/**
  * A decision the engine is waiting on. Conspiracies and Headlines are data, and
  * some of their effects need a target the engine cannot pick for the player.
  */
@@ -175,12 +201,20 @@ export type Choice =
   | {
       readonly kind: 'steal-any';
       readonly count: number;
+      /**
+       * The fixed victim, or null when the thief picks one.
+       *
+       * Set when the card named its victims (`target`), and also when a live effect
+       * fires on somebody's purchase — LAB-GROWN EARWORM's victim is whoever just
+       * bought, which is event context rather than a card field. `resolveChoice`
+       * REQUIRES a pick to name this player, so a client cannot redirect the theft.
+       */
       readonly from: PlayerID | null;
       readonly reason: string;
     }
-  | { readonly kind: 'evict-voter'; readonly count: number; readonly reason: string }
-  | { readonly kind: 'discard-voter'; readonly count: number; readonly reason: string }
-  | { readonly kind: 'convert-voter'; readonly count: number; readonly reason: string };
+  | { readonly kind: 'evict-voter'; readonly count: number; readonly scope: ChoiceScope; readonly reason: string }
+  | { readonly kind: 'discard-voter'; readonly count: number; readonly scope: ChoiceScope; readonly reason: string }
+  | { readonly kind: 'convert-voter'; readonly count: number; readonly scope: ChoiceScope; readonly reason: string };
 
 /** Whose decision it is. Headlines can penalise a player who is not the active one. */
 export type PendingChoice = {

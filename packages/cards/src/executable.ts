@@ -55,15 +55,15 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   lose: ['res', 'target'],
   'gain-any': ['n', 'target'],
   'lose-any': ['n', 'target'],
-  'steal-any': ['n'],
+  'steal-any': ['n', 'target'],
   voters: ['n', 'target'],
-  evict: ['n'],
-  'discard-voter': ['n'],
-  'convert-voter': ['n'],
+  evict: ['n', 'target'],
+  'discard-voter': ['n', 'target'],
+  'convert-voter': ['n', 'target'],
   gerrymander: ['n', 'target'],
-  'draw-conspiracy': ['n'],
+  'draw-conspiracy': ['n', 'target'],
   'refresh-market': [],
-  discount: ['n'],
+  discount: ['n', 'target'],
 };
 
 export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(EXECUTED_OPS));
@@ -93,33 +93,10 @@ export const EFFECT_INTRINSIC_FIELDS: readonly string[] = ['op'];
  * likely to reach for, written out so the message is actionable on its own.
  */
 const IGNORED_FIELD_FIX: Readonly<Record<string, string>> = {
-  'evict.target':
-    'reduce.ts applyEffect, case "evict" pushes the eviction decision to `source` as a single ' +
-    "'evict-voter' choice, so an opponent cannot be made to evict. Targeting it means looping the " +
-    "choice push over resolveTargets() (KNOWN-GAPS G13/G5).",
-
-  'discard-voter.target':
-    "reduce.ts applyEffect, case 'discard-voter' pushes one 'discard-voter' choice to `source`, " +
-    'and resolveChoice rejects any area the chooser owns. Targeting it means both a loop over ' +
-    'resolveTargets() and lifting the "that targets an opponent" guard for the self case.',
-
-  'convert-voter.target':
-    "reduce.ts applyEffect, case 'convert-voter' pushes one 'convert-voter' choice to `source`, " +
-    'and resolveChoice rejects any area the chooser owns. Same fix as discard-voter.target.',
-
-  'steal-any.target':
-    'reduce.ts applyEffect, case "steal-any" pushes the theft decision to `source` with ' +
-    '`from: null`, so the victim is chosen by the thief and cannot be addressed by the card. ' +
-    'A target needs a new Choice kind in state.ts (KNOWN-GAPS G2).',
-
-  'draw-conspiracy.target':
-    'reduce.ts applyEffect, case "draw-conspiracy" adds every drawn card to `source`\'s hand. ' +
-    'A target needs `PlayerState.conspiracies` to be writable for another player, which G20 flags ' +
-    'as a card-moving gap.',
-
-  'discount.target':
-    'reduce.ts applyEffect, case "discount" subtracts from `source`\'s Helping Hands uses. A ' +
-    'target means writing to another player\'s `powerUses`, which no other action does.',
+  // Empty today. It is kept as a mechanism, not as a table: an op whose case reads
+  // `target` only for one value would be listed here with a validator message
+  // naming the fix, and that is how the six ops below stopped needing one.
+  // G8 (gerrymander) was the last entry and its case now loops `resolveTargets`.
 };
 
 // ─────────────────────────── the reserved (inert) shapes ───────────────────────────
