@@ -134,6 +134,9 @@ export function ResourcePicker({
     .join(' · ');
   const valid = chosen === total && shortText === '';
 
+  /** What the player holds in total. Only a cost is measured against it. */
+  const held = RESOURCE_ORDER.reduce((n, r) => n + pool[r], 0);
+
   /**
    * THE CEILING FOR ONE DENOMINATION.
    *
@@ -174,6 +177,13 @@ export function ResourcePicker({
                 type="button"
                 className={`picker__cell ${want > 0 ? 'picker__cell--max' : ''}`}
                 onClick={() => bump(r, 1)}
+                /* The cell and its `+` are the SAME action, so they carry the SAME
+                 * state. A cell that stayed live at the ceiling was a button that
+                 * silently did nothing — which is, in miniature, the dead-control
+                 * failure this widget was just repaired for, and it lies to a screen
+                 * reader that is told the control is available. */
+                disabled={want >= max}
+                aria-disabled={want >= max}
                 aria-label={
                   isGain
                     ? `Take one more ${r}. You hold ${have}, ${want} of ${total} chosen.`
@@ -224,6 +234,15 @@ export function ResourcePicker({
         {chosen} of {total} chosen.
         {shortText !== '' ? ` Short ${shortText} — you do not hold those.` : ''}
         {chosen !== total && shortText === '' ? ` ${remaining} still to choose.` : ''}
+        {/* THE ASK IS BIGGER THAN THE POOL. `shortfall` above compares the pick
+            against the pool, which on a zero draft is always satisfied — so a
+            payment larger than everything held would say nothing at all, and the
+            player would click a `+` that goes dead the moment it is pressed, with
+            no reason anywhere. The engine never raises such an ask (`applyEffect`
+            and `enforceCap` both clamp to what is held), but a widget that can
+            only report a shortfall by way of a pick the player cannot complete is
+            a widget that hides one when it happens. State it outright. */}
+        {!isGain && held < total ? ` You hold ${held} of the ${total} this needs.` : ''}
       </p>
 
       <div className="row">
