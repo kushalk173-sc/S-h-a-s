@@ -163,7 +163,29 @@ Structural cross-checks the schema cannot express:
 | `QUESTION_DUPLICATE` | duplicate prompts — the classic symptom of a copy-paste corpus, and they feel like a broken game. |
 | `SOURCE_NOT_CITED` | provenance laundering: an `adapted`/`verbatim` card with no citation, or an `inferred` card that does not declare itself original. |
 | `EFFECT_OP_UNKNOWN` | an `op` the engine's union does not declare. |
+| `EFFECT_NOT_EXECUTED` | a shape the schema accepts and `reduce()` does not perform: a lasting `duration`, any `timing`, any `interrupt`, or an op with no `case` in `applyEffect`. |
+| `EFFECT_FIELD_NOT_EXECUTED` | a field on an op whose `case` does not read it — `target` on `gerrymander` (other than `'you'`), `target` on `evict` / `discard-voter` / `convert-voter` / `steal-any`, a computed `n`, `when`, `until`. |
 | `SCHEMA` | everything above that is shape. |
+
+### The one that is not about shape at all
+
+Everything else in this list asks *"is this card well formed?"*. The last two ask
+*"is this card **true**?"*
+
+A schema that parses a card the engine cannot execute is worse than no schema: the
+game accepts the card, the player reads the text, and the effect never happens.
+Nothing in the type system catches that — `Effect` declares what a card may say, not
+what the interpreter will do — so `src/executable.ts` states what `applyEffect`
+really does, per op and per field, and the validator refuses anything else with the
+reducer change named in the message. `test/reducer-parity.test.ts` re-derives that
+registry by reading `reduce.ts` itself and re-asserts it over every shipped card, so
+the promise cannot drift from the code.
+
+Two shapes are deliberately schema-valid but validator-refused (`duration`,
+`timing`, `interrupt`, `when`, `until`, a computed `n`): an author who reaches for
+one gets the engine explanation instead of `unknown property` printed once per card
+branch. `KNOWN-GAPS.md` records every gap and which of the three states it is in —
+expressible and executed, expressible and refused, or not expressible.
 
 Two narrowings make the report readable rather than merely correct. Because a deck file
 fixes its kind by construction, the validator narrows `cards.items` to the matching
@@ -211,6 +233,24 @@ totals-only checker is wrong in two opposite directions:
 | `IDEOLOGUE_SKEW` | an Ideologue on card sides more than 20 points off an even quarter. | warn |
 | `VOTER_COST_NON_MONOTONIC` | more voters is not more expensive on average. | warn |
 | `VOTER_VALUE_UNDERREPRESENTED` | a size the deck barely offers. | warn |
+| `X_EFFECT_MAGNITUDE` | a Conspiracy/Headline Card worth more than `X_EFFECT_MAGNITUDE_BUDGET` (half the resource cap) to the player who resolves it. | warn |
+
+### X-card magnitude
+
+Every rule above compares two sides of an Ideology Card. A Conspiracy or Headline
+Card has one effect and no second side, so before this check the whole class the
+recovered corpus is made of (REF §4: 50 real X-cards) had **no** balance rule at
+all — a card that handed its player a dozen resources passed against a cap of 12.
+
+`xCardMagnitude` sums what a card is worth to the player who resolves it, pricing a
+voter at what the voter deck actually charges (`voterValue`, derived from the corpus
+rather than assumed) and a drawn Conspiracy Card at its printed minimum (`RULES`
+p19: 4). Effects aimed at `each-opponent`, `everyone` or `leader` score 0 for the
+caster; that asymmetry is a real limit of the measure and is documented at the
+function.
+
+A warning, like every other tilt: the argument about a flagged card is the design
+review, and it belongs in a pull request with a human in it.
 
 ### The tolerance band
 
@@ -326,15 +366,15 @@ Every card carries two fields the engine types do not have:
 | | count |
 |---|---:|
 | `verbatim` | 0 |
-| `adapted` | 15 |
+| `adapted` | 19 |
 | `inferred` | 45 |
-| **total** | **60** |
+| **total** | **64** |
 
 **Zero cards are `verbatim`, and that is deliberate.** A `verbatim` card would have to
 reproduce Memesys' published rules text word-for-word in a competing product, which
 `docs/AUTHENTIC-SHASN-REFERENCE.md` §9.1–§9.2 identifies as the primary legal exposure in
 this repository (DMCA is the realistic risk, not a lawsuit; card names alone are the
-most-searchable item). The 15 `adapted` cards are here because the task brief asked for
+most-searchable item). The 19 `adapted` cards are here because the task brief asked for
 recovered material and they are useful as *fidelity evidence* — the `source` field on each
 names the exact clause that could not be represented, and those clauses are the substance
 of `KNOWN-GAPS.md`.
@@ -350,15 +390,24 @@ archetypes are mechanics, and mechanics are not copyrightable (REF §9.1).
 
 ## Known limitations
 
-- **`KNOWN-GAPS.md` is the important one.** 43 of the 50 real X-cards recovered in REF §4
-  cannot be represented without a schema change, because the 13-op `Effect` union has no
-  duration, no trigger, no restriction, no per-unit scaling, no zone scope, no dynamic
-  value, no card movement — and because five **phase-changing** ops (`block`, `deflect`,
-  `auction`, `vote`, `pass-card`) do not belong in an `Effect[]` at all. Each gap there
-  names the card, the clause, and the minimal schema change, and the affected cards
-  reference their gap by id in `source`.
+- **`KNOWN-GAPS.md` is the important one**, and it has been re-measured against
+  `reduce()` rather than against the schema. **11 of the 50 real X-cards recovered in
+  REF §4 now ship and are playable; 39 still do not.** The finding behind that number is
+  that for the 39, the binding constraint is `reduce()` and `state.ts`, not the schema:
+  the shapes they need (`duration`, `timing`, `interrupt`, `when`/`until`, a computed
+  `n`) are now *in* the schema and are refused by the validator with the engine change
+  named, so they are specified rather than unauthorable. Five **phase-changing** ops
+  (`block`, `deflect`, `auction`, `vote`, `pass-card`) are modelled as a sibling card
+  field rather than inside `Effect[]`, because they change which phase of play is
+  running and no parameterisation of an effect list expresses them. `KNOWN-GAPS.md` §3
+  is the costed engine handoff, ordered by cards unblocked.
+- **No card may ship in state (b).** Expressible-but-unexecuted is a real state in this
+  schema and it is enforced: `src/executable.ts` + `test/reducer-parity.test.ts` read
+  `reduce.ts` and refuse any card the reducer would not act on. Three cards that had
+  already shipped in that state — three `discard-voter` cards whose text said *"your own
+  voters"*, which the reducer's choice cannot reach — had their text corrected.
 - **Voter Card costs are invented.** REF §3 and §10 item 3 record that the real 60-card
   cost distribution was never recovered. The structure is verified (REF §5.5); the numbers
   are ours.
-- **The corpus is small.** 60 cards against the real 108 per campaign. `PLAN.md` §9
+- **The corpus is small.** 64 cards against the real 108 per campaign. `PLAN.md` §9
   names the corpus as risk #1 and calls it writing, not engineering.

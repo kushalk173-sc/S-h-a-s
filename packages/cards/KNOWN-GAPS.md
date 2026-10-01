@@ -1,496 +1,473 @@
-# KNOWN GAPS — what the current card schema cannot express
+# KNOWN GAPS — what the card schema still cannot do, and what the engine owes it
 
-**Written while authoring the first corpus, not as speculation.** Every gap below was
-found by trying to write a real card and failing, or by writing a weaker card and
-having to record in its `source` field what had been dropped. Each entry names the
-real card, quotes the clause that does not fit, and states the *minimal* schema change
-it implies. The gap ids are referenced from the `source` field of the affected cards in
-`decks/`, so a diff of the corpus points back at the line of this file that explains it.
+**Two revisions in one file.** Everything above §3 is the *state after this
+iteration*: each gap says which of the three states it landed in, what changed, and
+what `reduce()` / `state.ts` would have to do to move it. §5 and §6 are older notes,
+kept because they are still true. §3 is the handoff.
 
 `REF n` = `docs/AUTHENTIC-SHASN-REFERENCE.md` section n. `RULES pn` =
 `docs/rules-reference.md`, Collectors Edition rulebook page n.
 
-**Architect decision honoured:** the schema was NOT changed to make these go away. The
-corpus is authored against `packages/engine/src/cards.ts` as it stands. This file is the
-evidence for the next iteration.
-
 ---
 
-## 0. The numbers
+## 0. The three states, and the number that matters
 
-| | count |
-|---|---:|
-| Recovered X-cards with complete official rules text (REF §4) | **50** |
-| …shipped here, with the dropped clause named in `source` (`provenance: adapted`) | **7** |
-| …**not shipped at all**, because nothing faithful can be written | **43** |
-| Shipped as `inferred` (authored here, register per REF §8.2) | 45 |
-| Total cards shipped | 60 |
+A card can be **expressible** without being **playable**, and those are not the same
+thing. A schema that parses a card the reducer cannot execute is worse than no
+schema: the game accepts the card, the player reads the text, and the effect never
+happens. Every capability in this schema is therefore in exactly one of three states,
+and the state is enforced, not asserted:
 
-43 of 50 — **86%** — of the real cards recovered cannot be represented without a schema
-change. REF §5.4 predicted "roughly 40%"; the true figure is worse than that, because
-the *headline* and *conspiracy* decks are where the exotic effects live and those are the
-only two decks we have recovered text for. REF §2.4 records that **zero** ordinary
-question Ideology Cards were recovered in full, so the Ideology deck is the one place
-where the schema is not the blocker.
-
-Which gaps cost the most cards:
-
-| gap | cards lost |
-|---|---:|
-| G14 trigger / `when` | 6 |
-| G9 `duration` | 6 |
-| G5 player restriction | 5 |
-| G13 phase-changing ops | 5 |
-| G17 deck search | 4 |
-| G22 "next turn" scope | 5 |
-| G15 dynamic value off own state | 5 |
-| G16 zone-scoped operation | 3 |
-
----
-
-## G0 — the provenance envelope has no home in the engine types
-
-**Card:** every one of the 60.
-**Clause:** `"source": "REF 5.1 …"`, `"provenance": "adapted"`.
-**Why it doesn't fit:** `IdeologyCard`, `VoterCard`, `ConspiracyCard` and `HeadlineCard`
-in `cards.ts` have no `source` or `provenance` field, and the schema sets
-`additionalProperties: false` everywhere.
-**Minimal change:** add `readonly source?: string; readonly provenance?: Provenance` to
-each of the four card types — or, better, hoist them into a shared `CardMeta` the four
-types extend. Then `toEngine*Card()` in `src/corpus.ts` becomes a no-op and the
-provenance lives where the engine can log it.
-**Why it matters:** without it, provenance exists only in the JSON and is stripped
-before the engine sees the card, so a runtime bug report cannot say whether the card in
-front of a player was recovered or authored.
-
----
-
-## G1 — no DONATE-to-a-named-player, and no conditional
-
-**Cards:** AIN'T NO CURE FOR LOVE (REF §4.3), MARRIED WITH BITS, ON THE "HIGH" SEAS.
-**Clause:** *"Donate 1 of your voters to the player on your left. If you are unable to do
-either, ignore this card."*
-**Why it doesn't fit:** `EffectTarget` is `'you' | 'each-opponent' | 'everyone' |
-'leader'`. There is no "a chosen player", and no "the player whose seat is next to
-mine" — which is what `to the player on your left` means, and it is a *seat-relative*
-target that changes if the table order changes. Separately, `if you are unable to …,
-ignore this card` is a conditional over the whole effect, and `Effect` is a flat list
-with no `if`.
-**Minimal change:** extend `EffectTarget` with `'chosen-player'` and `'left-of-me'`, and
-give the card an optional `condition?: 'if-possible' | 'must'` wrapper rather than
-expressing it as a data field.
-**Shipped as:** `hl-et2040-003`, first branch only, `provenance: adapted`.
-
----
-
-## G2 — no iteration per opponent, and no conditional-on-payment
-
-**Card:** A GRAVE INHERITANCE (REF §4.2.1).
-**Clause:** *"Every opponent must pay you any 2 resources. Evict 2 voters belonging to
-every player who fails to pay you."*
-**Why it doesn't fit:** two problems. (a) `steal-any` has no `target` in `cards.ts` — it
-is the one op with no target field, so it can only ever hit a single chosen opponent,
-never "every opponent". (b) The eviction is **conditional on each opponent's failure to
-pay**, which is per-opponent state the reducer has to evaluate. `Effect` has no `if`.
-**Minimal change:** give `steal-any` the same `target?: EffectTarget` the other ops have,
-and add an `on: 'success' | 'failure'` to the effect so a second effect can be gated on
-the first one's outcome.
-**Shipped as:** `ct-et2040-001`, reduced to one chosen opponent with the eviction
-unconditional. `provenance: adapted`.
-
----
-
-## G3 — no recurring obligation on a named player
-
-**Cards:** ERADICATING GERMS (REF §4.2.1), THE BIG FREEZE, THE PSYCHOHISTORIAN.
-**Clause:** *"Discard an open Voter Card every turn (mandatory)."*
-**Why it doesn't fit:** this is a **standing obligation that re-arms every turn**, on a
-player, forever. `Effect` is a list resolved once, at resolution time. There is no
-`duration` (G9), no `repeat` and no `owner`. `PlayerState` has no field for "must do X at
-the start of each turn".
-**Minimal change:** `PlayerState` needs an `obligations: readonly Obligation[]` field
-where `Obligation = { id, cardId, text, perTurn: 'once' | 'mandatory', scope }`, and the
-turn state machine has to check it. This is a `PlayerState` change, not a card change.
-**Shipped as:** `ct-et2040-002`, single resolution only. `provenance: adapted`.
-
----
-
-## G4 — no per-unit scaling (`forEach`)
-
-**Cards:** RED BLOODED, THOUGHTS AND PRAYERS, JUST BREATHE (REF §4.2.1, §4.3).
-**Clause:** *"Players receive any 2 resources **for each of their** discarded voters."*
-and *"get any 2 resources **for each of their voters inside a Volatile Area**."*
-**Why it doesn't fit:** the multiplier is a **quantity of board state belonging to a
-specific player in a specific place**, read at resolution time. `Effect` carries a
-literal `n`; there is no way to write "2 per X" where X is computed.
-**Minimal change:** an optional `per?: { count: 'your-voters' | 'opponent-voters' |
-'volatile-voters' | 'voters-in-zone', zone?: ZoneID, multiplyBy: number }` on the op, or a
-`forEach` combinator wrapper around an existing op. ARCHITECTURE §6.4.2 step 2 already
-proposes generalising `Effect` to `{ op, n?, res?, target?, when?, until?, forEach? }`;
-this gap is the concrete reason that `forEach` is not optional.
-**Shipped as:** `hl-et2040-002`, fixed pair instead of scaling. `provenance: adapted`.
-
----
-
-## G5 — no player RESTRICTION (this is a `PlayerState` gap, not a card gap)
-
-**Cards:** KHAKI TERROR, THE FOUR HORSEMEN, THE BIG FREEZE, GENDER TROUBLE, DON'T KISS
-THE BABIES, NEW FACE WHO DIS (REF §4.1, §4.3).
-**Clause:** *"You cannot make any purchases until you do so."* · *"You cannot use one of
-your unlocked Level 3 Ideologue Powers in your next turn."* · *"These voters cannot be
-placed into Volatile Areas."*
-**Why it doesn't fit:** these do not change a player's **resources**; they remove
-**actions** from a player. Every op in the union is a resource or peg delta. The
-restriction is a property of the *player*, not of the card, and it may be imposed by an
-opponent — so it cannot live on the card either.
-**Minimal change:** `PlayerState` needs something like
-`restrictions: readonly { kind: 'no-purchases' | 'no-power' | 'no-volatile-placement' |
-'surcharge', until: 'this-turn' | 'next-turn' | 'resolved', value?: number, sourceCardId: CardID }[]`,
-and every action the reducer exposes has to consult it. This is the single largest piece
-of engine work the corpus exposes and it is **not** a schema tweak.
-**Shipped as:** `hl-et2040-001`, volatile-exclusion clause dropped entirely.
-
----
-
-## G6 — no set collection
-
-**Card:** SINGULARITY (REF §4.2.1).
-**Clause:** *"Collect and use 3 Singularity cards to permanently unlock any Level 5
-Ideologue Power. Singularity ×3 cannot be affected by Reverse/Ditto/Deflect/Block.
-There are 4 such cards in the deck."*
-**Why it doesn't fit:** the card is a **component of a set**, and the set is a stateful
-object (3 of 4 copies held, un-immune, self-deleting on completion). A card is
-consumed-and-discarded on play; there is no "kept face-up on the mat as a component",
-and no permanent unlock that outlives the card.
-**Minimal change:** a `PlayerState.trophies` collection plus a `permanents` list of
-unlocked powers, and a card kind that is *not* discarded on play. Non-trivial, but the
-minimal version is: `Effect[]` gains `{ op: 'collect'; cardId: CardID; n: number;
-then: Effect }` and the reducer moves the card rather than discarding it.
-**Shipped as:** `ct-et2040-003`, first branch only (`voters: 2`). `provenance: adapted`.
-
----
-
-## G7 / G19 — no hidden, unrevealed combo detection
-
-**Card:** THE PSYCHOHISTORIAN (REF §4.2.1).
-**Clause:** *"Complete all the following actions in the same turn in any order to get 4
-voters … You may reveal this card at any time in your turn. You do not need to announce
-this card before taking the actions."*
-**Why it doesn't fit:** two distinct gaps. (G7) The card is a **detector** watching the
-player's own turn for a 3-action pattern in any order; there is no "if you do A and B
-and C this turn" construct. (G19) The card must exist on the table while being
-**unrevealed to every other player**, including to the UI — and `state.ts`'s `_`
-server-only convention (documented in `playerView.ts`) is the right mechanism but there
-is no card-level `secret: true` flag, and the card is in the player's hand where hands
-are not currently private.
-**Minimal change:** `{ op: 'watch'; for: 'your-turn'; pattern: readonly Op[]; reward: Effect }`
-plus `secret?: boolean` on `ConspiracyCard`, and a `_` field on the hand.
-**Shipped as:** `ct-et2040-004`, first branch only. `provenance: adapted`.
-
----
-
-## G8 — `gerrymander` is the one op with no `target`
-
-**Cards:** NEW FACE WHO DIS, SUBMERGED (REF §4.3, §4.1).
-**Clause:** *"Starting with you, **every player** can Gerrymander 1 majority or
-non-majority voter immediately."*
-**Why it doesn't fit:** `voters`, `gain`, `lose`, `gain-any`, `lose-any` all carry
-`target?: EffectTarget`. `gerrymander` does not — it is structurally forced onto the
-active player. This one was **caught by the validator on the real corpus**, not
-predicted: `hl-et2040-001` was written with `target: 'everyone'` and the schema rejected
-it with `must NOT have additional properties (unknown property "target")`.
-**Minimal change:** add `readonly target?: EffectTarget` to the `gerrymander` variant of
-`Effect`. One line.
-**Shipped as:** `hl-et2040-001`, affecting the active player only — a materially weaker
-card than the real one. `provenance: adapted`.
-
----
-
-## G9 — no `duration`. **The single highest-value fix.**
-
-**Cards:** PYTHONPOST, SNOOP B-O-DOUBLE-T, THE BIG FREEZE, GROWING DISSENT, DON'T KISS
-THE BABIES, KHAKI TERROR, ON THE "HIGH" SEAS (REF §4.1, §4.3).
-**Clause:** *"**For the rest of the game**, you have to pay an extra resource for every
-Conspiracy Card that you buy."*
-**Why it doesn't fit:** `ConspiracyCard` and `HeadlineCard` are resolved once and
-discarded. A persistent effect has nowhere to live: no expiry, no re-application, no
-"rest of game" scope. REF §4.4 item 1 identifies this as the largest single gap and the
-analysis agrees — it is also the cheapest.
-**Minimal change:** `ConspiracyCard` and `HeadlineCard` both gain
-`readonly duration?: 'this-turn' | 'round' | 'rest-of-game'` (default `'this-turn'`), and
-`PlayerState` gains a list of active persistent effects that the reducer re-applies on
-each relevant event. ARCHITECTURE §6.4.2 step 1 already proposes exactly this.
-**Cost: 6 cards.**
-
----
-
-## G10 — no tokens-on-a-card counter
-
-**Cards:** KHAKI TERROR, THE FOUR HORSEMEN, HIGGS MORON (REF §4.1, §4.3).
-**Clause:** *"Donate 1 resource of each type to the Public Reserve. You cannot make any
-purchases until you do so."* (resources are physically placed **on the card**) ·
-*"As soon as **8 resources have been discarded on this card** … the holder must discard 2
-of their own voters."*
-**Why it doesn't fit:** the card is a **physical token holder**. Nothing in `Effect` is
-"place a token on an object" and nothing in `GameState` is a token pile. The card is
-discarded on resolution, so the pile would have to survive the discard.
-**Minimal change:** a `counters: Readonly<Record<string, number>>` keyed by
-`cardId:ownerId`, mutated by a `{ op: 'add-tokens'; to: 'this-card' | 'opponent-card'; n: number }`
-op, plus a `when: 'tokens-reach'` trigger (G14). The counter has to outlive the card's
-resolution, so it belongs on `GameState` rather than the card.
-**Cost: 3 cards.**
-
----
-
-## G11 — no `hostage`: voters removed from the board onto a card
-
-**Card:** ON THE "HIGH" SEAS (REF §4.1).
-**Clause:** *"Place 4 of your voters from the board **on this card**. They are held
-hostage. You may pay a resource to buy a voter back."*
-**Why it doesn't fit:** REF §4.4 item 1 calls this out directly. It is not a resolve and
-discard — it is a **persistent board-resident object that holds pegs**, ransomable
-repeatedly. `PendingVoters` in `state.ts` is a per-turn mat group that is discarded at
-the end of that player's turn, so it is the wrong container: a hostage must survive
-turns, and it must be visible to everyone.
-**Minimal change:** a `Hostage` type on `GameState`
-(`{ cardId, owner, pegs: Peg[] }`) with a place/ransom op pair. Needs the same
-persistence plumbing as G9.
-**Cost: 1 card, but it is the clearest proof that `Effect` is the wrong shape for X-cards.**
-
----
-
-## G12 — no `timed-pass`: a card handed round the table
-
-**Cards:** HIGHS MORON, CARD GAMES, A COWARD OR A JOURNALIST?, BLESSINGS OF PARENTS PAST
-(REF §4.1, §4.3).
-**Clause:** *"Discard up to 2 resources on this card to pass it on to the next player. As
-soon as 8 resources have been discarded on this card, **or if a player fails to pass it
-on in their turn**, the holder must discard 2 of their own voters."*
-**Why it doesn't fit:** the card has a **holder**, a **position in the turn order**, and
-a **turn-boundary deadline**. The engine's turn loop goes player → phase → player; there
-is no concept of an object moving between players mid-round.
-**Minimal change:** the card needs an owner and a `GameState`-level queue of in-flight
-cards, and the turn state machine needs a "does this player have a card to pass?" gate.
-This is a turn-loop change.
-**Cost: 3 cards.**
-
----
-
-## G13 — five PHASE-CHANGING ops that do not belong in `Effect[]` at all
-
-REF §5.4 is emphatic and the authoring bears it out: no amount of parameterisation of
-`Effect` will express these, because they change **which phase of play is running**, not
-how many resources someone has.
-
-| op | real card | clause |
+| state | meaning | who enforces it |
 |---|---|---|
-| `block` | BLOCK | *"Play this immediately out of turn when an opponent plays a Conspiracy Card to negate its effect … A block may be used to cleanse an already-active card."* |
-| `deflect` | DEFLECT | *"you may play this immediately to redirect its effect on any player other than them. If the action card has a partial effect on you, only that partial effect is deflected."* |
-| `auction` | A CALL FROM KARACHI, QUANTUM WRISTBAND | *"You must now auction the card off, starting at 2 resources."* |
-| `vote` | NEXT BILLION DATA POINTS | *"All players must vote for who should receive it. They cannot vote for themselves. In case of a tie, vote again."* |
-| `pass-card` | HIGHS MORON, CARD GAMES | see G12 |
+| **(a)** | expressible AND executed by `reduce()` | `src/executable.ts` + `test/reducer-parity.test.ts` |
+| **(b)** | expressible and validated, but NOT executed — **the card is refused** | `src/validate.ts`, codes `EFFECT_NOT_EXECUTED` / `EFFECT_FIELD_NOT_EXECUTED` |
+| **(c)** | not expressible at all | nothing; it is not in the schema |
 
-**Minimal change:** add a second, non-`Effect` field to the two X-card types —
-`readonly interrupt?: Interrupt` where
-`Interrupt = { op: 'block' | 'deflect' | 'auction' | 'vote' | 'pass-card'; window: 'out-of-turn' | 'pre-answer' | 'always'; target?: 'any-card' | 'card-affecting-you' | 'any-player' }` —
-plus the reducer changes to honour it. **Partial-effect granularity** (DEFLECT) additionally
-requires every `Effect` to be individually addressable, which is a deeper change and is
-the strongest argument for ARCHITECTURE §6.4.2 step 2's parameterised-op refactor.
-**Cost: 5 cards, and BLOCK/DEFLECT are the two most-replayed cards in the real product.**
+**No card ships in state (b).** `src/executable.ts` states what `applyEffect` really
+does — which ops have a `case`, and which fields each case reads — and
+`validate.ts` rejects any card that strays, naming the reducer line to change.
+`test/reducer-parity.test.ts` re-derives that registry from `reduce.ts`'s own source
+text and re-asserts it over every shipped card, so the promise cannot drift.
 
----
+### 0.1 The counts
 
-## G14 — no `when`: effects that trigger on other events
+| | before | after |
+|---|---:|---:|
+| Recovered X-cards with complete official rules text (REF §4) | 50 | 50 |
+| …shipped, with the dropped clause named in `source` (`adapted`) | **7** | **11** |
+| …**not shipped at all** | **43** | **39** |
+| Shipped as `inferred` | 45 | 45 |
+| Total cards shipped | 60 | 64 |
 
-**Cards:** LAB-GROWN EARWORM, POWER TRIP, GREAT LEADER BAD ECONOMY, QUANTUM WRISTBAND,
-WHY THE LONG FACE?, THE GRETA EFFECT (REF §4.1).
-**Clause:** *"Every time they influence a Voter Card, they will choose and give you 1 of
-their spent resources."* · *"Every time you influence a 3-Voter Card, you can discard 1
-non-majority voter belonging to an opponent."* · *"**When a voter is placed in a Volatile
-Area**, go through the Headlines draw pile and select a card to be resolved."*
-**Why it doesn't fit:** these are **hooks on other players' actions**, installed
-persistently. `Effect` is a list of things that happen *now*. There is no `when` and no
-way for a card to say "on the next purchase, instead of …".
-**Minimal change:** an optional `when?: 'on-voter-influenced' | 'on-volatile-placement' |
-'on-purchase' | 'on-gerrymander' | 'on-majority-formed'` on each op, plus a persistent
-trigger list on `PlayerState` (same plumbing as G9/G10). The 3-Voter-card variant also
-needs a condition on *which* card was influenced, which is a `forEach`-shaped guard.
-**Cost: 6 cards. Combined with G9 this unlocks the largest family of real cards.**
+### 0.2 The finding, stated plainly
 
----
+**No new expressiveness produced a new playable card, and that is not a failure of
+the schema work — it is the shape of the problem.**
 
-## G15 — no value computed from your own current state
+Everything landed in this iteration is state (b): `target` on `gerrymander` (G8),
+`duration` / `timing` (G9 / G22), `interrupt` (G13), `when` / `until` (G14) and a
+computed `n` (G15) are all now writable in the schema and all refused by the
+validator, because `reduce()` performs none of them. A card that used any of them
+would be a card that lies.
 
-**Cards:** JUMLA, HOLO SAPIENS, IF YOU LIKE PIÑA COLADA, DOSTI BANI RAHE, THE BIG FREEZE
-(REF §4.2.1, §4.2.2, §4.1).
-**Clause:** *"Opponents can take this card by paying you **as many resources as the
-Ideologue level this card is on**."* · *"**Double all the resources on your player mat.**
-Your current resource cap still applies."* · *"Pick an opponent. In their next turn, they
-may use **all your Gerrymandering Rights**."*
-**Why it doesn't fit:** the `n` of every op is a literal in the JSON. A price that is a
-function of the seller's own board state, or an operation on a player's *entire pool*,
-cannot be written as a constant. "Double all my resources" is not `gain`; it is
-`pool := pool × 2`, subject to the cap.
-**Minimal change:** allow `n` to be a small tagged union —
-`n?: number | { of: 'ideologue-level' | 'your-pool' | 'opponent-volatile-voters' | 'your-gerrymander-rights' }` —
-and add `{ op: 'scale-pool'; by: number }`.
-**Cost: 5 cards.** Note this is a *union widening* in the type, which is backwards
-compatible: existing cards keep their literal `n`.
+The four real cards that *did* become playable were unlocked by something else
+entirely: by re-reading `applyEffect` closely enough to see which recovered cards
+were already expressible in the shipped op vocabulary, and accepting a smaller card
+rather than a bigger lie. Their dropped clauses are named in their `source` fields
+and counted per gap in §2.
 
----
+So the honest reading of the old "86% cannot be expressed" figure is: **it is not
+86% of a schema problem.** For the 39 cards still unshipped, the binding constraint
+is `reduce()` and `state.ts`, not the schema. Their specifications are now written
+down, quarantined, and each one names the engine change it waits on — which is
+what makes the next iteration a matter of implementing rather than inventing.
 
-## G16 — no zone-scoped operation
+### 0.3 What the previous revision got wrong, in the corpus itself
 
-**Cards:** JUST BREATHE, NERO'S GUESTS, CUT COPY AND PASTE (REF §4.3, §4.1, §4.2.1).
-**Clause:** *"Select **the zone where you have the most voters**. Move 2 voters from that
-zone into an adjacent zone."* · *"Move any 3 voters **in this zone**. OR Move any 3
-voters out of **this zone**."* · *"At the end of your turn, select 1 of your majorities.
-Discard all your voters in that zone. **If any empty area is left in this zone at the
-start of your next turn**, convert all its voters into yours."*
-**Why it doesn't fit:** three separate needs. (a) A **zone selector computed from board
-state** ("the zone where you have the most voters"). (b) A **zone passed in by the
-trigger** — "this zone" means the Volatile Area that triggered the Headline, so the zone is
-context, not data. (c) **Board mutation scoped to one zone**: convert-ALL-in-zone and
-fill-to-capacity, which no single op does.
-**Minimal change:** a `zone?: ZoneID | 'this-zone' | 'your-strongest'` on the affected
-ops, plus a `GameState` context field for the zone that triggered the current resolution,
-plus one `{ op: 'fill-zone'; to: 'yours' }` op.
-**Cost: 3 cards.**
+Three shipped cards said *"Discard 2 of your own voters"* over `discard-voter`.
+`reduce.ts` `resolveChoice` rejects any area the chooser owns, and `targetableCount`
+does not count them either, so the op reaches **opponents'** voters only. Three
+cards were telling the player one thing and doing another — state (b), shipped.
+Their `text` now states what the engine does (`hl-et2040-002`, `hl-et2040-003`,
+`hl-in2020-003`), and the fix is named in their `source`: one condition in
+`resolveChoice`, plus a `target` on the op.
+
+`ct-et2040-002` was worse: ERADICATING GERMS read *"Gain 1 resource, discard 1
+resource"*, which is not that card at all. It is now the market refresh plus the
+resource, which is the real card's single resolution.
 
 ---
 
-## G17 — no deck search, and no rewind from the discard pile
+## 1. What landed, and how it is kept honest
 
-**Cards:** SELECTIVE ACCESS MEMORY, AS CLEAR AS WATER, GOOD GIG WELL PLAYED, FUELLING
-THE NEWS (REF §4.2.1, §4.3).
-**Clause:** *"Pick **any** Conspiracy Card **from the discard pile**. It can be in any
-order from the discard pile."* · *"Draw 3 … Keep one for yourself and give 1 card each to
-2 opponents. **If there are fewer than 3 cards in the draw pile, draw the remaining from
-the discard pile at random.**"*
-**Why it doesn't fit:** `draw-conspiracy: { n }` draws from the **top** of the draw pile
-and nothing else. There is no `from: 'draw' | 'discard'`, no `where: 'top' | 'any' | 'random'`,
-and no "keep 1 of N, distribute the rest".
-**Minimal change:** `{ op: 'draw-card'; kind: CardKind; n: number; from: 'draw' | 'discard'; pick: 'top' | 'random' | 'choose' }` — and `choose` needs the `Choice` machinery in `state.ts` to grow a `'choose-card'` variant.
-**Cost: 4 cards.**
+**`packages/engine/src/cards.ts`** — one new capability, plus a fenced block of
+shapes that are declared and inert:
 
----
+- `gerrymander` gains `target?: EffectTarget` (G8). It was the only resource-shaped
+  op without one, which is why *"every player can Gerrymander 1"* could not be
+  written at all. `reduce()` credits the bonus to `source` only, so any value other
+  than `'you'` is refused by the validator. **G8 is (b).**
+- `EffectDuration`, `EffectTiming`, `EffectTrigger`, `Interrupt`, `EffectScope`,
+  `XCardScope` — declared so the engine owner can see the work, and marked RESERVED
+  in the file itself. **G9 / G13 / G14 / G22 are (b).**
 
-## G18 — no control over the draw-and-answer phase
+**`packages/cards/schema/card.schema.json`** — `duration`, `timing`, `interrupt`,
+`when`, `until` and a computed `n` are **schema-valid**. That is deliberate: an
+author who reaches for one gets *"reduce() does not do this, here is the change it
+needs"* instead of `unknown property` reported once per card branch. The validator
+is what refuses the card.
 
-**Cards:** 404, BRAVE NEW WORLDS, CARD GAMES (REF §4.3).
-**Clause:** *"Choose 2 players. They will answer **each other's** Ideology Cards in their
-next turn."* · *"Every player answers an Ideology Card immediately, in order of turn.
-Players will not receive any resources (active & passive) for doing so."*
-**Why it doesn't fit:** these change **who gets which card** and **suppress the passive
-income**, i.e. they modify the `answer` phase. `Effect` is a list applied inside one
-player's turn; there is no way to address the draw pile assignment or the `manifesto`
-passive computation.
-**Minimal change:** a card-level `answerPhase?: { redirect?: 'cross' | 'immediate'; suppressPassive?: boolean; skipResources?: boolean }`, and the `answer` phase in the reducer has to read it.
-**Cost: 3 cards.**
+**`packages/cards/src/executable.ts`** — the registry. Per op, the fields the `case`
+reads: `target` is read in five cases and ignored in eight, which is invisible from
+the type and is exactly how a card ends up reading as though it hit every player
+while hitting one.
 
----
-
-## G20 — no card-destroying or card-moving effects between players
-
-**Cards:** A CALL FROM KARACHI, DEFLECT, CARD GAMES, A COWARD OR A JOURNALIST?,
-BLESSINGS OF PARENTS PAST, ON THE "HIGH" SEAS (REF §4.1, §4.3).
-**Clause:** *"Draw the top 3 Conspiracy Cards. Keep 1 and shuffle the other 2 back into
-the deck."* · *"each player can **donate 1 of their Ideology Cards** to the opponent on
-their left. They will receive 6 resources of their choice for doing so."*
-**Why it doesn't fit:** `PlayerState.conspiracies: readonly CardID[]` exists, but no op
-moves a card between players or back into a pile. A Headline that reassigns Ideology
-Cards also breaks the blind-answer invariant that `playerView.ts` tests for.
-**Minimal change:** `{ op: 'move-card'; kind: CardKind; n: number; to: 'self' | 'chosen-player' | 'draw-pile' | 'discard-pile' }` and a `PlayerState.ideologyCards` list (Ideology Cards are currently only tracked as `manifestoCards` of *answered* cards).
-**Cost: 5 cards.**
+**`packages/cards/src/balance.ts`** — `X_EFFECT_MAGNITUDE`. Every dominance rule
+here is about two sides of an Ideology Card; a Conspiracy or Headline Card has one
+effect and had no check at all, so a card worth a dozen resources passed against a
+cap of 12. A voter is priced at what the voter deck actually charges (derived from
+the corpus, not assumed) and a drawn Conspiracy Card at its printed minimum.
 
 ---
 
-## G22 — no "during your next turn" scope
+## 2. Every gap, with its state
 
-**Cards:** DON'T KISS THE BABIES, GENDER TROUBLE, SNOOP B-O-DOUBLE-T, DOSTI BANI RAHE,
-THE BIG FREEZE, MOVEMENT ANXIETY DISORDER (REF §4.1, §4.3).
-**Clause:** *"All Voter Cards cost any 1 extra resource **in your next turn**."* · *"You
-cannot use one of your unlocked Level 3 Ideologue Powers **in your next turn**."* ·
-*"**Starting this turn, for 1 round**, gain 1 voter every time any opponent Gerrymanders
-your voters."*
-**Why it doesn't fit:** an effect whose lifetime is measured in **turns of a player who
-may not be the one resolving the card**, plus one whose clock starts "this turn" (so it
-must not apply to the resolving turn). There is no turn counter attached to a card, and
-"1 round" (until everyone has played one turn) is a different clock again.
-**Minimal change:** this is the `duration` field of G9 plus a `startAt: 'now' | 'next-turn' | 'after-this-turn'` and a `duration: 'this-turn' | 'next-turn' | 'round' | 'rest-of-game'` on the effect. **G9 and G22 are the same change** and should be specified together.
-**Cost: 6 cards.**
+### G0 — the provenance envelope has no home in the engine types
+
+**State: (c).** Not done, and it is the one gap on this list that is purely a
+`PlayerState`-free type change — `source` / `provenance` are stripped by
+`toEngine*Card()` before the engine sees a card, so a runtime bug report cannot say
+whether the card in front of a player was recovered or authored. One `CardMeta` the
+four types extend would close it. Left alone because it touches every consumer of
+the card types, including the server and client another agent owns.
+
+### G1 — no DONATE-to-a-named-player, and no conditional
+
+**State: (c).** Cards: AIN'T NO CURE FOR LOVE, MARRIED WITH BITS, ON THE "HIGH" SEAS.
+`EffectTarget` has no *"a chosen player"* and no seat-relative neighbour, and there
+is no `if` over a whole effect.
+
+**What this iteration bought:** MARRIED WITH BITS (`hl-et2040-010`) now ships, with
+*"to 2 opponents"* dropped for `each-opponent` and the opt-out dropped entirely. The
+opt-out is the part that matters — a granted voter is a pending group the opponent
+places, and there is no way to decline it. **+1 real card, adapted.**
+
+**Reducer/state ask:** `EffectTarget` gains `'chosen-player'` (resolve through the
+existing `Choice` machinery with `from: null`, which `steal-any` already does) and
+`'left-of-me'` (one index into `turnOrder`).
+
+### G2 — no iteration per opponent, and no conditional-on-payment
+
+**State: (c).** Card: A GRAVE INHERITANCE, already shipped reduced to one chosen
+opponent. `steal-any` has no `target`, so it can never mean "every opponent", and
+the eviction is conditional on each opponent's failure to pay.
+
+**Reducer ask:** give `steal-any` a `target`, and add an
+`on: 'success' | 'failure'` gate — which needs a per-opponent outcome record, not
+just a state.
+
+### G3 — no recurring obligation on a named player
+
+**State: (c).** Cards: ERADICATING GERMS (shipped, single resolution only), THE BIG
+FREEZE, THE PSYCHOHISTORIAN. A duty that re-arms every turn, forever, on a player.
+
+**What this iteration bought:** ERADICATING GERMS' single resolution is now the real
+one — the market refresh (which *is* discarding open Voter Cards) plus the resource.
+Previously the card said something that was not it.
+
+**State ask:** `PlayerState.obligations: readonly Obligation[]`, and a check in the
+turn state machine.
+
+### G4 — no per-unit scaling (`forEach`)
+
+**State: (c).** Cards: RED BLOODED (shipped as a fixed pair), THOUGHTS AND PRAYERS,
+JUST BREATHE. *"2 resources for each of their discarded voters"* reads board state at
+resolution time.
+
+**Reducer ask:** resolve the multiplier in `applyEffect` before pushing anything, and
+push N choices rather than one — the same read-the-player-state plumbing G14 needs.
+
+### G5 — no player RESTRICTION
+
+**State: (c), and it is a `state.ts` change, not a card change.** Full specification
+in §4. Cards: KHAKI TERROR, THE FOUR HORSEMEN, THE BIG FREEZE, GENDER TROUBLE, DON'T
+KISS THE BABIES, NEW FACE WHO DIS.
+
+**What this iteration bought:** the *other* clause of two of these cards now ships —
+KHAKI TERROR's donation of one resource of each type (`hl-in2020-007`, **+1 real
+card, adapted**) and THE FOUR HORSEMEN's choice of denomination, which is exactly one
+`lose-any` of 2 because any two of a kind and one of each are both in the real card's
+set (`hl-et2040-009`, **+1 real card, adapted**). In both cases the lock clause is
+dropped, so what ships is a plain tax rather than a soft-lock. That is stated in each
+`source`.
+
+### G6 — no set collection
+
+**State: (c).** Card: SINGULARITY, shipped on its first branch (*get 2 voters*),
+which is faithful. The 3-of-4 collection, the permanent Level 5 unlock and the
+self-deleting set are not expressible.
+
+**State ask:** `PlayerState.trophies`, a `permanents` list, and a card kind that is
+not discarded on play.
+
+### G7 / G19 — no hidden, unrevealed combo detection, and no secret card
+
+**State: (c).** Card: THE PSYCHOHISTORIAN, shipped on its first branch (*1 voter and
+any 2 resources*), which is faithful. The three-action-in-one-turn detector, and
+existing on the table unrevealed to the UI, are not expressible.
+
+**Ask:** `{ op: 'watch'; for: 'your-turn'; pattern; reward }` plus `secret?: boolean`
+and a `_`-prefixed hand, using the convention `playerView.ts` already documents.
+
+### G8 — `gerrymander` is the one op with no `target`
+
+**State: (b). CLOSED ON THE TYPE, NOT ON THE REDUCER — the cheapest win, taken.**
+
+`target?: EffectTarget` is now on the op, in `cards.ts` and in the schema. A card may
+therefore *say* *"every player can Gerrymander 1"* (NEW FACE WHO DIS / SUBMERGED).
+`applyEffect` credits the bonus to `source` alone, so the validator refuses any target
+but `'you'`, with the one-line fix in the message:
+
+> `applyEffect` case `"gerrymander"` credits the bonus to `source` only. It needs
+> `for (const p of resolveTargets(s, source, target))` in place of the single
+> `s.players[source]` write (KNOWN-GAPS G8) — `target` is already computed above the
+> switch.
+
+**Cards gained: 0.** The existing `hl-et2040-001` already shipped the `you` reading;
+this gap was never a card-count gap, it was a schema gap, and it is now closed on the
+type and specified on the reducer. `NEW FACE WHO DIS` additionally needs G5 for its
+Volatile-Area prohibition.
+
+### G9 — no `duration`
+
+**State: (b).** Cards: PYTHONPOST, SNOOP B-O-DOUBLE-T, THE BIG FREEZE, GROWING
+DISSENT, DON'T KISS THE BABIES, KHAKI TERROR, ON THE "HIGH" SEAS — 6 cards, and the
+single largest engine change the corpus exposes. `'this-turn'` is accepted by the
+validator, because that is what the engine already does (resolve once, discard); the
+other three values are refused.
+
+**Ask:** a live-effects list on `GameState`, re-applied on each event, with expiry
+ticked in `advanceTurn()`. §3.
+
+### G10 — no tokens-on-a-card counter
+
+**State: (c).** Cards: KHAKI TERROR, THE FOUR HORSEMEN, HIGGS MORON. The card is a
+physical token holder, and the pile has to outlive its resolution.
+
+**Ask:** `GameState.counters` keyed by `cardId:ownerId`, an `add-tokens` op, and a
+`when: 'tokens-reach'` trigger (G14). Same persistence plumbing as G9.
+
+### G11 — no `hostage`
+
+**State: (c).** Card: ON THE "HIGH" SEAS. A board-resident object that holds pegs and
+is ransomable repeatedly. `PendingVoters` is the wrong container: it is discarded at
+the end of that player's turn.
+
+**Ask:** a `Hostage` type on `GameState` with a place/ransom op pair.
+
+### G12 — no `timed-pass`
+
+**State: (c).** Cards: HIGGS MORON, CARD GAMES, A COWARD OR A JOURNALIST?, BLESSINGS
+OF PARENTS PAST. The card has a holder, a position in the turn order and a
+turn-boundary deadline. The turn loop goes player → phase → player; there is no
+concept of an object moving between players mid-round.
+
+**Ask:** an owner on the card, a `GameState` queue of in-flight cards, and a
+"does this player have a card to pass?" gate in the turn state machine.
+
+### G13 — five PHASE-CHANGING ops that do not belong in `Effect[]`
+
+**State: (b), and the design call is made: they are not effects.**
+`block` / `deflect` / `auction` / `vote` / `pass-card` are modelled as a **sibling
+card-level field**, `Interrupt`, deliberately outside `Effect[]` — REF §5.4 is
+emphatic that they change *which phase of play is running*, not how many resources
+anyone holds, so no parameterisation of the effect list will express them. They are
+schema-valid and refused by the validator with the reason.
+
+**Cards gained: 0, and BLOCK and DEFLECT remain the two most-replayed cards in the
+real product.** This is the largest remaining gap by reach.
+
+**Ask:** the phase machine, not `applyEffect`. §3.
+
+### G14 — no `when`: effects that trigger on other events
+
+**State: (b).** Cards: LAB-GROWN EARWORM, POWER TRIP, GREAT LEADER BAD ECONOMY,
+QUANTUM WRISTBAND, WHY THE LONG FACE?, THE GRETA EFFECT — 6 cards, and it composes
+with G9 because both need the same live-effects list.
+
+**Ask:** a trigger registry on `GameState` that `INFLUENCE`, `BUY_CONSPIRACY`,
+`GERRYMANDER`, `PLACE_VOTERS` and `setArea` consult. §3.
+
+### G15 — no value computed from your own current state
+
+**State: (b).** Cards: JUMLA, HOLO SAPIENS, IF YOU LIKE PIÑA COLADA, DOSTI BANI RAHE,
+THE BIG FREEZE. The `n` of every op is a literal; a price that is a function of the
+seller's own board cannot be one.
+
+**Ask:** resolve `n` before `applyEffect` pushes anything — which is why it shares
+G14's plumbing. Note the type deliberately does **not** widen `n` to a union:
+`reduce.ts` pushes `effect.n` straight into a `Choice.count` typed `number`, and
+widening the type would let a computed count into the engine where TypeScript would
+otherwise have stopped it. The schema accepts the computed form; the validator
+refuses the card.
+
+### G16 — no zone-scoped operation
+
+**State: (c).** Cards: JUST BREATHE, NERO'S GUESTS, CUT COPY AND PASTE. Three
+needs: a zone selector computed from board state, a zone passed in by the trigger as
+context, and board mutation scoped to one zone.
+
+**Ask:** a `zone?: ZoneID | 'this-zone' | 'your-strongest'` on the affected ops, a
+`GameState` field carrying the zone that triggered the current resolution, and a
+`fill-zone` op.
+
+### G17 — no deck search, and no rewind from the discard pile
+
+**State: (c).** Cards: SELECTIVE ACCESS MEMORY, AS CLEAR AS WATER, GOOD GIG WELL
+PLAYED, FUELLING THE NEWS.
+
+**What this iteration bought:** GOOD GIG WELL PLAYED (`hl-et2040-011`) ships on its
+*keep one for yourself* branch — `draw-conspiracy` of 1, which is exactly that branch.
+The two gifts to opponents (G20) and the discard-pile fallback are dropped, so it is
+roughly a third of the real card's swing: a Conspiracy Card is worth its printed 4-5
+resources and the opponents get none of it. **+1 real card, adapted.**
+
+**Ask:** `{ op: 'draw-card'; kind; n; from; pick }` plus a `'choose-card'` Choice.
+
+### G18 — no control over the draw-and-answer phase
+
+**State: (c).** Cards: 404, BRAVE NEW WORLDS, CARD GAMES. These change who gets which
+card and suppress passive income; `Effect` is a list applied inside one turn.
+
+**Ask:** a card-level `answerPhase` the `answer` branch of `reduce()` reads.
+
+### G20 — no card-destroying or card-moving effects between players
+
+**State: (c).** Cards: A CALL FROM KARACHI, DEFLECT, CARD GAMES, A COWARD OR A
+JOURNALIST?, BLESSINGS OF PARENTS PAST, ON THE "HIGH" SEAS.
+`PlayerState.conspiracies` exists, but no op moves a card between players or back into
+a pile, and reassigning Ideology Cards breaks the blind-answer invariant
+`playerView.ts` tests for.
+
+**Ask:** a `move-card` op and a `PlayerState.ideologyCards` list — and a decision about
+the blind-answer invariant before it.
+
+### G22 — no "during your next turn" scope
+
+**State: (b).** Cards: DON'T KISS THE BABIES, GENDER TROUBLE, SNOOP B-O-DOUBLE-T,
+DOSTI BANI RAHE, THE BIG FREEZE, MOVEMENT ANXIETY DISORDER. **G9 and G22 are one
+change** and are specified together.
+
+**Ask:** the same live-effects list as G9, each entry carrying the owning player, a
+start turn and an expiry turn, evaluated at the top of that player's turn.
+
+### G23 — `IdeologyCard` has no notion of the card's second face
+
+**State: (c), and deliberately not a schema change.** `sides` is an unordered pair,
+which is sufficient for play; a stable reading order is a client concern and the `_`
+convention already supports a one-sided view. The client is another agent's.
+
+### G24 — `IdeologyCard` has no card code
+
+**State: (c).** No field for the printed code. Only needed for deck diffing and bug
+reports, not for play. `readonly code?: string` matching `^[A-Z]{2}\d{2}\.\d{3}$`
+would close it.
+
+### G-new — `discard-voter` / `convert-voter` cannot reach your own voters
+
+**State: (c), found while writing the honesty test, not predicted by the gap
+analysis.** `targetableCount` skips the chooser's own pegs for both ops and
+`resolveChoice` rejects them, so *"discard 2 of your own voters"* — which RED BLOODED
+and AIN'T NO CURE FOR LOVE both say — is not expressible, and neither is any
+self-targeted discard or conversion. Three shipped cards were affected and their text
+is corrected.
+
+**Ask:** let the choice take the chooser's own pegs when the card targets `you`, which
+is a `target` on the two ops plus one condition in `resolveChoice`.
 
 ---
 
-## G23 — `IdeologyCard` has no notion of the card's second face
+## 3. The engine work this needs, in the order that buys the most cards
 
-**Cards:** every Ideology Card.
-**Why it doesn't fit:** REF §5.3 establishes from product photography that the physical
-card is **printed on both sides** — question band and ▼ marker on both, a different
-answer + payout + nameplate on each. `sides: readonly [IdeologySide, IdeologySide]` is an
-unordered pair, which is *sufficient for the game* but has no stable reading order, so a
-UI cannot render a single flipping card without inventing one.
-**Minimal change:** a stable `faceOrder` is unnecessary if the loader simply fixes
-`sides[0]` as the "front"; the real gap is presentational. If the client is to animate
-the flip, either add `readonly face: 0 | 1` to `IdeologySide`, or have the server send a
-one-sided view with the ▼ on the side being read (REF §5.3's recommendation, which the
-`_` convention already supports).
-**Priority: low for the engine, high for fidelity.**
+This is the handoff. `state.ts` and `reduce.ts` are not this package's to change.
 
----
+| # | change | where | unblocks | cost |
+|---|---|---|---|---|
+| 1 | loop `resolveTargets` in the `gerrymander` case | `reduce.ts` `applyEffect` | G8 — NEW FACE WHO DIS / SUBMERGED | one line |
+| 2 | live-effects list on `GameState` + expiry ticked in `advanceTurn` | `state.ts`, `reduce.ts` | **G9 + G22 (12 cards)**, and the substrate for 3 and 4 | large |
+| 3 | trigger registry consulted by `INFLUENCE` / `BUY_CONSPIRACY` / `GERRYMANDER` / `PLACE_VOTERS` / `setArea` | `reduce.ts` | **G14 (6 cards)** on top of 2 | medium |
+| 4 | resolve `n` (and `per` multipliers) against player state before pushing | `reduce.ts` | **G15 (5 cards)** and **G4 (3)** | medium |
+| 5 | `PlayerState.restrictions` + every action consults it | `state.ts`, `reduce.ts` | **G5 (5 cards)** — §4 | large |
+| 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **G13 (5 cards)**, incl. BLOCK and DEFLECT | largest |
+| 7 | `target` on `steal-any`, `evict`, `discard-voter`, `convert-voter`, `draw-conspiracy`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G1, G2, **G-new (3 cards)** | small |
+| 8 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **G20 (5 cards)** | medium |
+| 9 | `draw-card` with `from: 'draw' \| 'discard'` and a `'choose-card'` Choice | `state.ts`, `reduce.ts` | **G17 (4 cards)** | small |
 
-## G24 — `IdeologyCard` has no card code
-
-**Cards:** every Ideology Card.
-**Clause:** `IG10.108` printed bottom-right (REF §5.7).
-**Why it doesn't fit:** no field. `CardID` exists but is the internal key, and it does
-not follow the printed convention.
-**Minimal change:** `readonly code?: string` on `IdeologyCard`, unique per card, matching
-`^[A-Z]{2}\d{2}\.\d{3}$`. Only needed for deck diffing and bug reports; not for play.
+Order 1, 7 and 9 are each under a day and together are worth about 8 cards. Order 2
+is the one that unblocks the most (12 cards, and it is the substrate for two more
+gaps). Order 6 is the most valuable per card and the most expensive.
 
 ---
 
-## 1. Recommended order for the next schema iteration
+## 4. G5 in full: `PlayerState.restrictions`
 
-Ordered by cards-unlocked per unit of engine work, using the table in §0.
+The five cards lost to G5 are five of the best-known cards in the product, and this
+is the only gap on the list that is not a card-schema change at all. The specification,
+in the shape the corpus would need:
 
-1. **`target` on `gerrymander`** (G8) — one line in `cards.ts`, one real card back. Do it
-   first because it is trivial and because the validator found it, not me.
-2. **`duration` + `startAt` on the X-card types** (G9 + G22 together) — 12 cards. The
-   single biggest win, and the cheapest per card, because it needs a list of active
-   effects on `PlayerState` and nothing else.
-3. **`when` on effects + persistent trigger list** (G14) — 6 more cards, and it composes
-   with #2 (both need the same "active effects" plumbing).
-4. **`PlayerState.restrictions`** (G5) — 5 cards, and it is the only gap that is *not* a
-   card-schema change. It gates KHAKI TERROR, THE FOUR HORSEMEN, THE BIG FREEZE, GENDER
-   TROUBLE, DON'T KISS THE BABIES — five of the game's best-known cards. It is also the
-   largest piece of work.
-5. **`Interrupt` outside `Effect[]`** (G13) — 5 cards, and BLOCK/DEFLECT need a
-   partial-effect model that probably wants #7 first.
-6. **`n` as a tagged union + `scale-pool`** (G15) — 5 cards, backwards compatible.
-7. **Parameterise `Effect` per ARCHITECTURE §6.4.2 step 2** — this is the enabling change
-   for G4, G7, G16, G17 and partial-effect DEFLECT. Doing it earlier makes the rest
-   cheaper; doing it later means doing it twice.
-8. **Everything else** — G0, G1, G2, G3, G6, G10, G11, G12, G17, G18, G20, G23, G24.
+```ts
+export type RestrictionKind =
+  | 'no-purchases'        // "You cannot make any purchases until you do so."
+  | 'no-power'            // "You cannot use one of your unlocked Level 3 Powers…"
+  | 'no-volatile-placement' // "These voters cannot be placed into Volatile Areas."
+  | 'surcharge';          // "All Voter Cards cost any 1 extra resource in your turn."
+
+export type Restriction = {
+  readonly id: string;
+  readonly kind: RestrictionKind;
+  /** 0 while the resource in `value` is still owed. */
+  readonly remaining: number;
+  /** `value` is the amount still owed, or the power tier for 'no-power'. */
+  readonly value: number;
+  readonly expires: 'resolved' | 'this-turn' | 'next-turn' | 'round' | 'rest-of-game';
+  readonly sourceCardId: CardID;
+  readonly sourcePlayer: PlayerID;
+};
+
+export type PlayerState = {
+  // …
+  readonly restrictions: readonly Restriction[];
+};
+```
+
+Then the consult points, all in `reduce()`:
+
+| action | consult |
+|---|---|
+| `INFLUENCE` | `no-purchases`; `surcharge` adds to the computed cost (and Helping Hands may discount it, which is a ruling worth making explicitly) |
+| `BUY_CONSPIRACY` | `no-purchases`; `surcharge` |
+| `PLACE_VOTERS`, `GERRYMANDER` | `no-volatile-placement` on any destination area that is volatile |
+| `POWER_*` | `no-power` against `usesLeft(self, rules, …)` |
+
+And the two design decisions this forces, which are rulings rather than
+implementations:
+
+1. **KHAKI TERROR's condition.** *"You cannot make any purchases until you do so"* is
+   satisfied by donating one resource of each type. `lose` caps at what the player
+   holds, so the restriction must decrement by what was actually donated, not by 4 —
+   and a player holding no Media must be able to satisfy it. `remaining` above is the
+   mechanism; without it the card is a soft-lock, which is the real card's punchline
+   and also its worst failure mode.
+2. **Who clears a restriction.** On donation (the condition is met), on expiry, or
+   manually? All three occur in the corpus, so the type needs all three and the rules
+   text has to say which.
+
+`restrictions` is public information in every real card that imposes it — the whole
+point of KHAKI TERROR is that everyone can see you cannot buy — so it needs no `_`
+prefix, and it must appear in the `playerView` secret-key inventory
+(`packages/server/test/secret-inventory.ts`) as a deliberate non-secret.
 
 ---
 
-## 2. A defect found in `docs/ARCHITECTURE.md` §6.4.3, not in the code
+## 5. A defect found in `docs/ARCHITECTURE.md` §6.4.3, not in the code
 
-ARCHITECTURE §6.4.3 presents a worked "bad card" and says of it: *"`funds: 4 ≥ funds: 2`
-strictly, `trust: 2 ≥ trust: 0`, so **D1 `PURE_UPGRADE`** — the second side is a free
-upgrade for anyone"* on a card whose sides are `{funds: 2, trust: 2}` and `{funds: 4}`.
+ARCHITECTURE §6.4.3 presents a worked "bad card" and says of it: *"`funds: 4 ≥ funds:
+2` strictly, `trust: 2 ≥ trust: 0`, so **D1 `PURE_UPGRADE`** — the second side is a
+free upgrade for anyone"* on a card whose sides are `{funds: 2, trust: 2}` and
+`{funds: 4}`.
 
-That comparison mixes sides: `trust: 2` is on the *first* side and `trust: 0` is on the
-second, so the second side is **not** ≥ the first — it is short one Trust. As card it is
-a clean trade-off, not an upgrade.
+That comparison mixes sides: `trust: 2` is on the *first* side and `trust: 0` is the
+second, so the second side is **not** ≥ the first — it is short one Trust. As card it
+is a clean trade-off, not an upgrade.
 
 More usefully, the arithmetic cannot be rescued: **if X ≥ Y componentwise and X ≠ Y
 then ΣX > ΣY strictly, so a pure upgrade can never be 0-sum.** There is no zero-sum
-pure upgrade. The argument the section is making survives intact once the gap is stated
-honestly as **1 resource** — and 1 resource is *exactly* what `BALANCE_TOLERANCE_TOTAL = 1`
-swallows. So the real demonstration is the pair of tests in `test/balance.test.ts`:
-a 1-resource pure upgrade is an **error**, and a 1-resource trade-off is **clean**.
+pure upgrade. The argument the section makes survives intact once the gap is stated
+honestly as **1 resource** — and 1 resource is *exactly* what
+`BALANCE_TOLERANCE_TOTAL = 1` swallows. So the real demonstration is the pair of
+tests in `test/balance.test.ts`: a 1-resource pure upgrade is an **error**, and a
+1-resource trade-off is **clean**.
 
 The implementation in `src/balance.ts` follows the corrected reading. §6.4.3's example
 should be rewritten to match; it is the one place in the design docs that would mislead
@@ -498,7 +475,7 @@ the next person who implements from it.
 
 ---
 
-## 3. D3 models a resource PROXY, not the engine's power-unlock rule
+## 6. D3 models a resource PROXY, not the engine's power-unlock rule
 
 `POWER_THRESHOLD_CLIFF` in `src/balance.ts` is the check that makes the file worth more
 than a totals comparison, so its fidelity is worth stating plainly.
@@ -510,12 +487,13 @@ Ideologue's answers *feed* (the passive bonus, `passiveBonus()`), but it is not 
 unlocks a power. Nothing about a card's `pays` block changes which powers a player
 holds.
 
-**What D3 actually measures.** The balance checker runs on one card in isolation, with
-no manifestos, so it cannot count cards. It uses the resource proxy the rules supply
-for that ladder: a side paying `RULES.level3` of its own Ideologue resource is treated
-as buying the Level 3 unlock, `RULES.level5` the Level 5.
+**What D3 actually measures.** The balance checker runs on one card in isolation,
+with no manifestos, so it cannot count cards. It uses the resource proxy the rules
+supply for that ladder: a side paying `RULES.level3` of its own Ideologue resource is
+treated as buying the Level 3 unlock, `RULES.level5` the Level 5.
 
 **Consequences, both deliberate.**
+
 - The crossing is scoped to `IDEOLOGUE_RESOURCE[side.ideologue]`. An earlier version
   counted *every* resource a side touched, so a Capitalist side paying `{funds:3,
   media:3}` scored two unlocks it does not own. A count is gameable by padding, and
@@ -534,27 +512,29 @@ actually on that threshold*. That is a manifest-relative check, so it cannot run
 card in isolation and it moves this check out of `src/balance.ts` into wherever a
 player state is in scope.
 
-**Status:** none of the 20 shipped Ideology Cards pays 3 or more of any resource, so
-the shipped decks produce zero crossings under either the scoped or the unscoped
-version, and the checker result is unchanged. The fix is a correctness fix with no
-effect on the corpus as shipped.
+**Status:** none of the shipped Ideology Cards pays 3 or more of any resource, so the
+shipped decks produce zero crossings under either version, and the checker result is
+unchanged.
 
 ---
 
-## 4. What is NOT a gap
+## 7. What is NOT a gap
 
 Recorded so the next iteration does not waste time on them.
 
 - **`pays` need not contain the answerer's own resource.** REF §5.2 verifies from the
-  official 432-card render that a real Capitalist side pays 2 Trust + 1 Media and **zero
-  Funds**. A validator rule of the form "a Capitalist answer must pay ≥1 Funds" would
-  reject a shipped card. The schema requires the key to be *stated* and the value to be
-  *non-negative*, and nothing more. `ig-in2020-002` is the corpus's proof.
+  official 432-card render that a real Capitalist side pays 2 Trust + 1 Media and
+  **zero** Funds. A validator rule of the form "a Capitalist answer must pay ≥1 Funds"
+  would reject a shipped card. The schema requires the key to be *stated* and the
+  value to be *non-negative*, and nothing more. `ig-in2020-002` is the corpus's proof.
 - **`{}` as a payout is a design failure, not a schema failure.** The schema sets no
   `minProperties` on `pays`; the balance checker's D5 `EMPTY_SIDE` owns it. Shape
   validation and design judgement stay separately reviewable.
 - **The Ideology Card schema is essentially correct.** REF §5.1's field-by-field
-  comparison finds the engine's `{question, sides[2], campaign, advisory}` an exact match
-  for the printed card, and *more* austere than reality. Only G23/G24 are missing, and
-  neither affects play. The corpus is blocked on **content**, not on schema: REF §2.4
-  recovered zero ordinary question cards in full.
+  comparison finds the engine's `{question, sides[2], campaign, advisory}` an exact
+  match for the printed card, and *more* austere than reality. Only G23/G24 are
+  missing, and neither affects play. The corpus is blocked on **content**, not on
+  schema: REF §2.4 recovered zero ordinary question cards in full.
+- **`target` on `gain`, `lose`, `gain-any`, `lose-any` and `voters` is done.** It is
+  the only target the engine reads, and `EXECUTED_OPS` now proves it per op rather
+  than assuming it.
