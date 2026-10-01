@@ -259,7 +259,7 @@ excluded.
 | Lab-Grown Earworm | not representable | G14 trigger on *another* player's purchase; plus self-limiting copies |
 | Power Trip | not representable | G14 trigger |
 | Quantum Wristband | not representable | G14 + G13 (auction of 3 headlines, self-immunity, IOU bids) |
-| Selective Access Memory | not representable | G17 — arbitrary rewind from the discard pile |
+| Selective Access Memory | **now partially playable** — see §4.7 | the remaining clause, *"in any order"*, needs a decision over the pile's contents, which is a new `Choice` kind and therefore a wire-format change the client owns (G17 half-closed by `draw-conspiracy.from: 'discard'`) |
 | Singularity | **ships** `adapted` as `ct-et2040-003` (branch 1 of 2) | G6 |
 | The Greta Effect | not representable | G14 persistent debuff, N-target |
 | The Psychohistorian | **ships** `adapted` as `ct-et2040-004` (branch 1 of 2) | G7/G19 |
@@ -297,7 +297,7 @@ excluded.
 | NEXT BILLION DATA POINTS | not representable | G13 vote (no self-votes, re-vote on tie) |
 | PYTHONPOST | not representable | G9 rest-of-game purchase surcharge + G5 |
 | SUBMERGED | ships as `hl-et2040-001` | same card as NEW FACE WHO DIS (REF §4.3); **not double-counted** |
-| COUGH IT UP | not representable | G2 — `evict` has no `target` (`src/executable.ts`), plus a conditional bonus |
+| COUGH IT UP | **now partially playable** — see §4.7 | `evict` carries `target` since commit `9d1326c`, so *"All your opponents evict 1 voter"* plays. The conditional bonus — *"if a player breaks a majority using this action, all other players gain 1 resource of their choice"* — is still G2: no op reads board state to decide a payout |
 | NERO'S GUESTS | not representable | G16 — zone-scoped, all-or-nothing, *"this zone"* context |
 | ON THE "HIGH" SEAS | not representable | G11 hostage — a persistent board-resident object holding 4 pegs |
 | A COWARD OR A JOURNALIST? | not representable | G12 + G20 — donate an Ideology Card down the seat order |
@@ -339,6 +339,57 @@ excluded.
 | §8.1 item 9, aerial bombing | ships as `ig-in2020-031`, `adapted`. Stem legible, **verb occluded**; REF §8.1 says do not treat as verbatim |
 | §8.1 item 10, Kashmiri farmers | ships as `ig-in2020-032`, `adapted`. Stem legible only to "FLY"; **object occluded**; REF §8.1 says do not treat as verbatim |
 | Any printed Ideology payout | not recovered. REF §10 item 2: payouts are icon discs, not numerals, and were never published in a crawlable text source |
+
+---
+
+## 4.7. Playability, measured by playing — `npm run playable`
+
+The disposition above answers *"is there an effect list for this card?"*. It does not
+answer *"can a player reach a position from which that list resolves?"*, and those are
+different questions — `npm run validate` only ever asks the first.
+
+`scripts/playable.ts` takes every recovered card in §4, writes the largest honest
+effect list today's vocabulary can carry, and **drives it through the real `reduce()`**
+— Headlines through `ACK_HEADLINE` in the post-turn queue, Conspiracies through
+`PLAY_CONSPIRACY` from a hand — then answers every decision the card raises. A card
+counts as playable only if the reducer accepts it *and* the state it leaves differs
+from a control card's.
+
+**14 of 54 probed cards are playable.** 40 are not expressible at all. **0 are refused
+at play time** and **0 are expressible-but-unexecutable** — which is the finding worth
+stating: `src/executable.ts` has no remaining hole between "the validator will accept
+this card" and "the reducer will perform it". Every unshipped recovered card is
+unshipped because there is no op for it, not because a card slipped past a check.
+
+### What the measurement changed in this ledger
+
+Two rows above were written before three engine commits landed, and playing them found
+the difference:
+
+| card | ledger said | measured |
+|---|---|---|
+| SELECTIVE ACCESS MEMORY | not representable, G17 | **plays.** `draw-conspiracy.from: 'discard'` takes the top of the discard pile. *"in any order"* still needs a new `Choice` kind — G17 half-closed, not closed |
+| COUGH IT UP | not representable, G2 (`evict` had no `target`) | **plays its first branch.** `evict` carries `target` since `9d1326c`, so *"all your opponents evict 1 voter"* resolves. The majority-conditional bonus is still G2 |
+
+Two harness artifacts were also found and fixed while building the measurement, and
+they are recorded because either would have inflated the count: resolving a Headline
+draws the next one off the headline pile, and that pile was inside the state
+fingerprint. No op draws a Headline — which is exactly why FUELLING THE NEWS is G17 —
+so it is now excluded, and *"did the card do anything"* is decided differentially
+against a control card that must come back NO-OP or the script exits 1.
+
+### Two findings that are the engine's, not the corpus's
+
+1. **`convert-voter` cannot resolve for any target other than `you`.**
+   `raiseVoterDecision` gives a non-source target scope `'own'`, so the *opponent* is
+   asked to convert; `resolveChoice` then refuses with *"that voter is already yours"*.
+   The decision is raised to a player who cannot answer it, every time. No shipped card
+   uses it — `hl-et2040-003` was written as a `discard-voter` — which is why this has
+   never surfaced. It is in `reduce.ts`, not here.
+2. **REF §4.3 reads AIN'T NO CURE FOR LOVE as *"Discard 2 of your own voters"*, which
+   does not play** (G-new). What ships as `hl-et2040-003` is the **opponents'**
+   reading, which `discard-voter` with no target does perform. The card and its
+   printed text are two different cards, and the shipped text says so.
 
 ---
 
