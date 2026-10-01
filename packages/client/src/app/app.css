@@ -1203,7 +1203,6 @@
   .picker__grid {
     grid-template-columns: repeat(2, 1fr);
   }
-}
 
   /*
    * THE LOG IS A TAB BELOW 600px, SO IT MUST NOT BE `display: none` HERE.

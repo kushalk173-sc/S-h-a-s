@@ -67,22 +67,32 @@ function rulesFor(selector: string): string[] {
   let selStart = 0;
   let i = 0;
   while (i < RULES.length) {
-    const ch = RULES[i];
-    if (ch === '{') {
-      const end = RULES.indexOf('}', i);
-      if (end === -1) break;
-      if (selRe.test(RULES.slice(selStart, i))) {
-        out.push(RULES.slice(i + 1, end));
-        // Skip the whole rule, including its selector, so the next scan starts
-        // at the rule AFTER it.
-        selStart = end + 1;
-        i = end + 1;
-        continue;
+    if (RULES[i] === '{') {
+      // Brace-aware, not `indexOf('}')`: inside an `@media` block the first `}`
+      // belongs to the rule, but a nested at-rule closes later. Using the first
+      // `}` makes the parser read a media block's declarations as if they were
+      // top-level rules — which is exactly the class of confusion this whole file
+      // exists to prevent.
+      let depth = 0;
+      let end = -1;
+      for (let j = i; j < RULES.length; j += 1) {
+        if (RULES[j] === '{') depth += 1;
+        else if (RULES[j] === '}') {
+          depth -= 1;
+          if (depth === 0) { end = j; break; }
+        }
       }
-      i = end + 1;
-      // A rule we did not match: keep scanning for the next selector, but do not
-      // treat its declarations as part of the next rule's selector text.
+      if (end === -1) break;
+
+      // An at-rule (`@media`, `@keyframes`) is never a selector we match on, and
+      // skipping its ENTIRE body is what keeps "top level only" true.
+      const selectorText = RULES.slice(selStart, i).trim();
+      const isAtRule = selectorText.startsWith('@');
+      if (!isAtRule && selRe.test(selectorText)) {
+        out.push(RULES.slice(i + 1, end));
+      }
       selStart = end + 1;
+      i = end + 1;
       continue;
     }
     i += 1;
@@ -191,6 +201,182 @@ describe('the cap-discard dialog fits its container at phone widths', () => {
     expect(scrim).toMatch(/overflow-y:\s*auto/);
     // The picker reflows to two columns rather than overflowing four.
     expect(mediaRule('max-width: 599px', '.picker__grid')).toMatch(/repeat\(2,\s*1fr\)/);
+  });
+});
+
+/**
+ * THE TOP-LEVEL STRUCTURE OF THE STYLESHEET.
+ *
+ * Each entry is a rule with the media condition it sits inside, or `null` for a
+ * top-level rule. This is the shape that actually matters, and it is not the
+ * same as "are the braces balanced".
+ *
+ * WHY THAT IS THE DISTINCTION — a real defect I introduced
+ * ------------------------------------------------------
+ * Adding the phone rules for the cap-discard dialog, I closed the
+ * `@media (max-width: 599px)` block one rule too early. Every rule after that
+ * point — including `[data-tabpanel]:not([data-active='true']) { display: none }`
+ * — became UNCONDITIONAL.
+ *
+ * The consequence on a 1440px desktop was not cosmetic: the mat, the market and
+ * the log were all `display: none` and 0×0. A player had no resources, no cap
+ * meter, no manifesto and no market.
+ *
+ * IT SURVIVED 84 PASSING TESTS AND A TYPECHECK, and the reason is the useful
+ * part: **brace counting does not catch it.** Removing one `}` does not unbalance
+ * the file — the rules after it are simply re-parented into the media block, and
+ * the depth still returns to zero at EOF. A gate that counts braces would have
+ * passed this bug forever.
+ *
+ * So the load-bearing assertion is not balance. It is: *which media condition is
+ * this rule inside?* A rule that belongs to the phone must report the phone.
+ */
+type TopRule = {
+  readonly selector: string;
+  readonly declarations: string;
+  /** The `@media` condition this rule is inside, or null at the top level. */
+  readonly inMedia: string | null;
+};
+
+function topLevelRules(): TopRule[] {
+  const out: TopRule[] = [];
+  // Only at-rules open a scope that later rules belong to, and this stylesheet
+  // does not nest one media query inside another — so a plain depth counter is
+  // enough and much easier to reason about than a stack.
+  let media: string | null = null;
+  let selStart = 0;
+  let i = 0;
+  while (i < RULES.length) {
+    if (RULES[i] === '{') {
+      const selectorText = RULES.slice(selStart, i).trim();
+      let depth = 0;
+      let end = -1;
+      for (let j = i; j < RULES.length; j += 1) {
+        if (RULES[j] === '{') depth += 1;
+        else if (RULES[j] === '}') {
+          depth -= 1;
+          if (depth === 0) { end = j; break; }
+        }
+      }
+      if (end === -1) break;
+
+      if (selectorText.startsWith('@media')) {
+        // Entering a media query: everything until its closing brace is inside it.
+        const inner = topLevelRulesFrom(RULES.slice(i + 1, end), selectorText);
+        for (const r of inner) out.push(r);
+        selStart = end + 1;
+        i = end + 1;
+        // Skip past the query's own closing brace without treating it as content.
+        continue;
+      }
+      if (selectorText.startsWith('@')) {
+        // @keyframes / @supports: a scope, but not a media condition.
+        selStart = end + 1;
+        i = end + 1;
+        continue;
+      }
+      out.push({
+        selector: selectorText,
+        declarations: RULES.slice(i + 1, end),
+        inMedia: media,
+      });
+      selStart = end + 1;
+      i = end + 1;
+      continue;
+    }
+    i += 1;
+  }
+  void media;
+  return out;
+}
+
+/** Rules inside a media query's body, all attributed to `condition`. */
+function topLevelRulesFrom(body: string, condition: string): TopRule[] {
+  const out: TopRule[] = [];
+  let selStart = 0;
+  let i = 0;
+  while (i < body.length) {
+    if (body[i] === '{') {
+      const sel = body.slice(selStart, i).trim();
+      let depth = 0;
+      let end = -1;
+      for (let j = i; j < body.length; j += 1) {
+        if (body[j] === '{') depth += 1;
+        else if (body[j] === '}') {
+          depth -= 1;
+          if (depth === 0) { end = j; break; }
+        }
+      }
+      if (end === -1) break;
+      if (!sel.startsWith('@')) {
+        out.push({ selector: sel, declarations: body.slice(i + 1, end), inMedia: condition });
+      }
+      selStart = end + 1;
+      i = end + 1;
+      continue;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+describe('every rule sits in the media query it is meant to be in', () => {
+  it('the tab-panel rule that hides the mat, market and log is PHONE-ONLY', () => {
+    /*
+     * This is the assertion that would have caught the defect above, and it is
+     * structural rather than stylistic: on a desktop the mat, market and log are
+     * COLUMNS in the side rail, not tabs. Hiding them unconditionally leaves a
+     * player with a board and nothing else.
+     */
+    const rules = topLevelRules();
+    const hidden = rules.filter(
+      (r) =>
+        r.selector.includes('[data-tabpanel]') &&
+        /display:\s*none/.test(r.declarations),
+    );
+    expect(hidden.length, 'the tab-panel hide rule must exist').toBeGreaterThan(0);
+    for (const r of hidden) {
+      expect(
+        r.inMedia,
+        `"${r.selector}" must be inside a @media query, not global`,
+      ).not.toBeNull();
+      expect(r.inMedia).toMatch(/max-width:\s*599px/);
+    }
+  });
+
+  it('the phone dialog rules are inside the phone query and nowhere else', () => {
+    // If `max-height: 100dvh` escapes its media query, every dialog on a desktop
+    // becomes a phone sheet. Same class of bug, asserted on the rules I added.
+    const rules = topLevelRules();
+    const phoneSheets = rules.filter(
+      (r) => r.selector === '.sheet' && /100dvh/.test(r.declarations),
+    );
+    expect(phoneSheets.length, 'exactly one .sheet rule may carry 100dvh').toBe(1);
+    expect(phoneSheets[0]?.inMedia).toMatch(/max-width:\s*599px/);
+
+    // The tab bar and the END TURN dock are phone chrome: hidden by DEFAULT and
+    // switched on inside the phone query. That is the correct direction, and the
+    // bug to catch is the reverse — a rule that HIDES something globally which
+    // should be a desktop column. So assert the intended pair exists.
+    for (const selector of ['.tabbar', '.endturn-dock']) {
+      const rules = topLevelRules().filter((r) => r.selector === selector);
+      expect(rules.length, `${selector} must exist`).toBeGreaterThan(0);
+      const base = rules.find((r) => r.inMedia === null);
+      expect(base, `${selector} must have a base rule`).toBeDefined();
+      expect(base?.declarations, `${selector} is hidden by default on desktop`).toMatch(
+        /display:\s*none/,
+      );
+      const phone = rules.find((r) => r.inMedia !== null);
+      expect(phone, `${selector} must be switched on inside the phone query`).toBeDefined();
+      expect(phone?.declarations).toMatch(/display:\s*flex|display:\s*block/);
+    }
+  });
+
+  it('the base .sheet rule is the desktop one: border-box, no phone max-height', () => {
+    const base = topLevelRules().find((r) => r.selector === '.sheet' && r.inMedia === null);
+    expect(base, 'the base .sheet rule must exist').toBeDefined();
+    expect(base?.declarations).toMatch(/box-sizing:\s*border-box/);
+    expect(base?.declarations).not.toContain('100dvh');
   });
 });
 
