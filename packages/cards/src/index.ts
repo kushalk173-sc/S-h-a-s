@@ -20,3 +20,6 @@ export * from './corpus.js';
 export * from './schema.js';
 export * from './balance.js';
 export * from './validate.js';
+// What `reduce()` can actually do, exported because a server that builds a card index
+// by hand needs the same answer the validator enforces — see the header comment.
+export * from './executable.js';
