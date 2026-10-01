@@ -21,7 +21,7 @@ import {
 import { RULES } from '../src/rules';
 import type { GameState, Ideologue, PlayerID, PlayerState, ZoneID } from '../src/state';
 import { plainFreeIn, setAreaState, withPegs } from './boardkit';
-import { fresh, makeCtx } from './helpers';
+import { PLAYERS_3, fresh, makeCtx } from './helpers';
 
 const ctx: Ctx = makeCtx();
 
@@ -129,7 +129,7 @@ describe('passiveBonus', () => {
   it('the threshold bonus applies in the very turn it is reached', () => {
     // rules-reference.md:198, reduce.ts:476-478 — the bonus is computed AFTER the
     // card is added, so the second Capitalist pays out immediately.
-    let s = fresh(1);
+    let s = fresh(1, PLAYERS_3, { startResources: [{}, {}, {}] });
     s = {
       ...s,
       players: { ...s.players, p1: { ...s.players.p1!, manifesto: ['capitalist'], manifestoCards: ['ide-01'] } },
@@ -138,7 +138,9 @@ describe('passiveBonus', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     // ide-01 side 0 pays {funds: 1}; the manifesto is now 2 Capitalists so the
-    // bonus is another 1 Funds.
+    // bonus is another 1 Funds. Seats are pinned to a zero start here so the
+    // assertion measures the bonus and nothing else — p7's staggered start
+    // (implemented, see `setup.ts`) otherwise hands p1 a starting Fund.
     expect(r.state.players.p1?.manifesto).toHaveLength(2);
     expect(r.state.players.p1?.resources.funds).toBe(2);
   });

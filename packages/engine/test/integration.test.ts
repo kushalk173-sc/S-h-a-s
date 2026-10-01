@@ -23,8 +23,13 @@ const PLAYERS_3 = ['p1', 'p2', 'p3'] as const;
 // every game does: p20 gives everyone one final turn once the board fills, so a
 // game can also end with the board full and a zone still contested. Both endings
 // are legal, so the tests below pin the one they are about rather than assuming.
+//
+// Which ending a seed produces depends on the whole opening position, so these
+// two are re-verified together: when the staggered start (p7, `setup.ts`) was
+// implemented, seed 7 stopped being a timer ending and had to be re-picked. The
+// point of the constant is to pin a *reachable* ending, not a specific one.
 const MAJORITY_SEED = 3;
-const BOARD_FULL_SEED = 7;
+const BOARD_FULL_SEED = 13;
 
 function run(seed = 3, players: readonly PlayerID[] = PLAYERS_3) {
   const { state, steps, refusals } = playFullGame(freshFull(seed, players), ctx);

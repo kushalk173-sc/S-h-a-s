@@ -32,13 +32,34 @@ export type SetupOptions = {
   /** Mandatory entropy. 32-bit int. Same seed + same inputs = same game. */
   readonly seed: number;
   /**
-   * Player n starts with n resources of their choice (rules-reference.md:92-93).
-   * The *choice* is the player's, so this is supplied by the caller rather than
-   * invented here. With `RULES.staggeredStart` on and no entry for a seat, that
-   * seat starts empty — the engine does not guess a split.
+   * Player n starts with n resources of their choice (p7 / rules-reference.md:111-112).
    *
    * Positional, parallel to `players`: `startResources[i]` is seat `i`'s opening
-   * pool. A seat with no entry starts with nothing.
+   * pool. THE CONTRACT, ruled 2026-10-01 after a real 5-player browser playtest
+   * found every seat sitting on 0/0/0/0:
+   *
+   *  - **Omitted entirely** -> the rulebook rule applies. Seat `i` receives
+   *    `i + 1` Campaign Funds, because `RULES.staggeredStart` is `true` and a
+   *    declared-but-unapplied rule is worse than no rule: it makes every seat
+   *    empty-handed, which is not a neutral default but an undeclared rule of its
+   *    own ("nobody starts with anything"). It is also what manufactures the
+   *    empty-handed players that hit a client's dead `gain-any` dialog.
+   *  - **Supplied** -> the caller's array is authoritative, verbatim, for every
+   *    seat. A seat with no entry in a supplied array starts empty.
+   *
+   * Why the default is Funds and not a spread: p7 makes the split the PLAYER's
+   * choice, and a digital table cannot ask. Funds is the deterministic stand-in
+   * because the Mat is priced in it (p11: "Campaign Funds - business-friendly
+   * policy, market demand"; the shipped Voter Cards are 12/18 funds-bearing), so
+   * the grant actually buys something on turn 1 rather than sitting under the cap.
+   * A caller that cares asks its players and passes the result.
+   *
+   * The engine does NOT validate that a supplied total equals `i + 1`. The
+   * `Delta` IS the player's choice, and the engine has no way to tell a deliberate
+   * 8 Funds from a mistake — while the replay path (`store.ts` rebuilding a match
+   * from its log) cannot ask anybody at all, so a validating `setup` would make
+   * every recorded match un-replayable. `RULES.staggeredStart` is the default,
+   * not an invariant.
    */
   readonly startResources?: readonly Delta[];
   /** Populate the HQ Mat with face-up Voter Cards. Default true. p10. */
@@ -95,10 +116,18 @@ export function setup(opts: SetupOptions): GameState {
   const conspiracyDiscard: readonly CardID[] = [];
   const headlineDiscard: readonly CardID[] = [];
 
-  const stagger = opts.startResources ?? [];
+  // p7: "Player n receives n resources of their choice." Omitting `startResources`
+  // no longer means "nobody starts with anything" — it means "nobody chose", so
+  // the rulebook quantity applies. See the `startResources` docstring for the full
+  // contract, including why the total is not validated.
+  const stagger = opts.startResources;
   const players: Record<PlayerID, PlayerState> = {};
   ids.forEach((id, i) => {
-    const start: Delta = stagger[i] ?? {};
+    const start: Delta = stagger
+      ? (stagger[i] ?? {})
+      : rules.staggeredStart
+        ? { funds: i + 1 }
+        : {};
     const resources: Pool = {
       funds: start.funds ?? 0,
       clout: start.clout ?? 0,

@@ -544,11 +544,24 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
   // There is no rulebook provision for running out of Ideology Cards [NOT IN
   // RULEBOOK]. The rule is that play continues; here it cannot, so the game ends
   // and the standing on the board is the result — the same shape as p20's timer
-  // ending, which also stops play and scores the board as it stands. With a real
-  // 108- (or 432-) card deck and a 129-area board this is unreachable in play; it
-  // is reachable in any partial-deck fixture, and the alternative — a fail that
-  // leaves the outgoing player unable to end their turn — is the soft-lock this
-  // replaces.
+  // ending, which also stops play and scores the board as it stands.
+  //
+  // REACHABLE, AND THAT WAS THE BUG (2026-10-01, real 5-player browser playtest).
+  // The old comment here claimed this branch was "unreachable in play" because it
+  // assumed a 108- (or 432-) card deck, and reasoned that a turn starting with no
+  // card has no legal first move — which is a true statement about a *soft-lock*
+  // and a false one about a *game-over*. The escape hatch meant to prevent the
+  // soft-lock WAS the game-over condition, and the shipped deck is 52 cards
+  // (`loadCorpus`: 20 + 32), one drawn per turn. So every game ended at turn 52
+  // with 0 of 9 majorities formed and 45 pegs on the board: unwinnable at every
+  // seat count. The trigger was upstream of this branch — `ANSWER` never put the
+  // answered card on the discard pile, so the pile `draw` recycles from was always
+  // empty and the reshuffle could never fire. `ANSWER` now discards, so the
+  // recycle this branch was written to survive actually happens.
+  //
+  // What remains here is a genuinely partial-deck case (a fixture that deals fewer
+  // cards than the number of turns played), and ending the game is the right call
+  // for it: a `fail` would leave the outgoing player unable to end their turn.
   if (cardId === null) {
     s = log(s, { player: null, text: 'The Ideology deck is exhausted.', kind: 'system' });
     return endOfGame(s, events);
@@ -630,6 +643,10 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
         manifesto: [...self.manifesto, side.ideologue],
         manifestoCards: [...self.manifestoCards, cardId],
       });
+      // The answered card joins the Ideology discard pile, which is what makes the
+      // deck recycle. This one line is the difference between a game that ends on
+      // a rule and a game that ends on turn 52. Rationale in `advanceTurn`.
+      s = discardTo(s, 'ideology', cardId);
       // p13: receive the answer's resources…
       s = addResources(s, playerId, side.pays);
       // …p28: …plus the passive bonus, counting the card just added.

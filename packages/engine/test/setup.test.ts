@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { freshZones } from '../src/board';
 import { PLAYER_COLOURS, RULES } from '../src/rules';
 import { setup } from '../src/setup';
-import { NO_POWER_USES, pegsFilled, type Delta, type GameState } from '../src/state';
+import { NO_POWER_USES, pegsFilled, poolTotal, type Delta, type GameState } from '../src/state';
 import { allKeys, playerView } from '../src/playerView';
 import {
   CARDS,
@@ -135,14 +135,31 @@ describe('seats', () => {
     }
   });
 
-  it('for n in 2..5: every player starts with a FULL zero Pool, not a partial one', () => {
+  it('for n in 2..5: every player starts with a FULL Pool, not a partial one', () => {
     // state.ts:72 "Never partial" — a partial `{}` silently breaks `poolTotal` and
-    // `canAfford`, neither of which guards for missing keys.
+    // `canAfford`, neither of which guards for missing keys. All four keys must be
+    // present on every seat whatever the staggered start hands out.
     for (let n = 2; n <= 5; n++) {
       const s = setup(at(seats(n)));
       for (const p of s.turnOrder) {
-        expect(s.players[p]?.resources).toEqual({ funds: 0, clout: 0, media: 0, trust: 0 });
+        expect(s.players[p]?.resources).toEqual({
+          funds: expect.any(Number),
+          clout: expect.any(Number),
+          media: expect.any(Number),
+          trust: expect.any(Number),
+        });
       }
+    }
+  });
+
+  it('for n in 2..5: the start reaches the cap only as a full Pool of one type', () => {
+    // The companion invariant to the one above: p7's grant is a *count*, so the
+    // other three pools must stay exactly 0 rather than picking up a stray value.
+    for (let n = 2; n <= 5; n++) {
+      const s = setup(at(seats(n)));
+      s.turnOrder.forEach((p, i) => {
+        expect(s.players[p]?.resources).toEqual({ funds: i + 1, clout: 0, media: 0, trust: 0 });
+      });
     }
   });
 
@@ -189,10 +206,104 @@ describe('the staggered start', () => {
     expect(s.players.p3?.resources.funds).toBe(1);
   });
 
-  it('a seat with no entry starts empty, not partially filled', () => {
+  it('a seat with no entry in a SUPPLIED array starts empty, not partially filled', () => {
+    // The `startResources` contract is two-sided: omitted => p7 applies, supplied =>
+    // the caller is authoritative for every seat. Once a caller has spoken, a
+    // missing entry means "nothing for that seat", NOT "fall back to i+1" — a
+    // half-filled array that silently topped the rest up would be worse than
+    // either reading.
     const s = setup({ ...at(PLAYERS_3), startResources: [{ funds: 1 }] });
+    expect(s.players.p1?.resources).toEqual({ funds: 1, clout: 0, media: 0, trust: 0 });
     expect(s.players.p2?.resources).toEqual({ funds: 0, clout: 0, media: 0, trust: 0 });
     expect(s.players.p3?.resources).toEqual({ funds: 0, clout: 0, media: 0, trust: 0 });
+  });
+
+  // ─────────────── the omitted-array default, RULED 2026-10-01 ───────────────
+  //
+  // `RULES.staggeredStart` is `true` and p7 (rules-reference.md:111-112) says
+  // player n receives n resources. Before this ruling `setup` read a missing
+  // `startResources` as `[]`, so the rule was declared in rules.ts, spec'd in the
+  // rulebook transcription, documented in UI-SPEC, and NEVER APPLIED: every seat
+  // sat on 0/0/0/0 at every seat count. Real 5-player browser playtest, 2026-10-01.
+  //
+  // A declared-but-unapplied rule is not a neutral default. "Nobody starts with
+  // anything" is itself a rule, and an undeclared one — it hands Player 5 a worse
+  // position than Player 1 in a game whose first-turn economy is one Voter Card
+  // wide, and it is what manufactures the empty-handed players that reach a
+  // client's dead `gain-any` dialog with nothing to add from.
+
+  it('RULED: omitting startResources gives seat n exactly n resources, 2 seats', () => {
+    expect(RULES.staggeredStart).toBe(true);
+    const s = setup(at(seats(2)));
+    expect(s.players.p1?.resources.funds).toBe(1);
+    expect(s.players.p2?.resources.funds).toBe(2);
+    expect(poolTotal(s.players.p1!.resources) + poolTotal(s.players.p2!.resources)).toBe(3);
+  });
+
+  it('RULED: omitting startResources gives seat n exactly n resources, 3 seats', () => {
+    const s = setup(at(seats(3)));
+    expect(s.turnOrder.map((p) => s.players[p]?.resources.funds)).toEqual([1, 2, 3]);
+    expect(poolTotal(s.players.p1!.resources) + poolTotal(s.players.p2!.resources) +
+      poolTotal(s.players.p3!.resources)).toBe(6);
+  });
+
+  it('RULED: omitting startResources gives seat n exactly n resources, 4 seats', () => {
+    const s = setup(at(seats(4)));
+    expect(s.turnOrder.map((p) => s.players[p]?.resources.funds)).toEqual([1, 2, 3, 4]);
+    expect(poolTotal(s.players.p1!.resources) + poolTotal(s.players.p2!.resources) +
+      poolTotal(s.players.p3!.resources) + poolTotal(s.players.p4!.resources)).toBe(10);
+  });
+
+  it('RULED: omitting startResources gives seat n exactly n resources, 5 seats', () => {
+    const s = setup(at(seats(5)));
+    expect(s.turnOrder.map((p) => s.players[p]?.resources.funds)).toEqual([1, 2, 3, 4, 5]);
+    expect(poolTotal(s.players.p1!.resources) + poolTotal(s.players.p2!.resources) +
+      poolTotal(s.players.p3!.resources) + poolTotal(s.players.p4!.resources) +
+      poolTotal(s.players.p5!.resources)).toBe(15);
+  });
+
+  it('RULED: the grant is seat-1-relative, so a 2-player game still opens 1 vs 2', () => {
+    // p7 counts from Player 1, not from the seat count. A 2-player game hands out
+    // 1 and 2, not 0 and 1 — a "fair 1 each" reading would hand the last seat of a
+    // 5-player game more than the first, which is the opposite of the designer's
+    // note ("offsets first-player advantage", rules-reference.md:113).
+    const two = setup(at(seats(2)));
+    expect(poolTotal(two.players.p1!.resources)).toBe(1);
+    expect(poolTotal(two.players.p2!.resources)).toBe(2);
+  });
+
+  it('RULED: the default never pushes a seat over the resource cap', () => {
+    // The largest default is seat 5's 5, and the cap is 12 — so no seat opens over
+    // cap, which matters because an over-cap seat must open with a `lose-any`
+    // decision (p12) and that is a choice the player never made.
+    for (let n = 2; n <= 5; n++) {
+      const s = setup(at(seats(n)));
+      for (const p of s.turnOrder) {
+        expect(poolTotal(s.players[p]!.resources)).toBeLessThanOrEqual(RULES.resourceCap);
+      }
+    }
+  });
+
+  it('RULED: a supplied array overrides the default entirely, wrong totals included', () => {
+    // The engine does not validate that a supplied total equals n, because the
+    // Delta IS the player's choice (p7: "of their choice") and the replay path in
+    // `store.ts` rebuilds a match from its log without anyone to ask. The grant is
+    // a default, not an invariant.
+    const s = setup({ ...at(PLAYERS_3), startResources: [{ funds: 8 }, { funds: 6, clout: 2 }, { funds: 5, media: 3 }] });
+    expect(s.players.p1?.resources).toEqual({ funds: 8, clout: 0, media: 0, trust: 0 });
+    expect(s.players.p2?.resources).toEqual({ funds: 6, clout: 2, media: 0, trust: 0 });
+    expect(s.players.p3?.resources).toEqual({ funds: 5, clout: 0, media: 3, trust: 0 });
+  });
+
+  it('RULED: with staggeredStart off, omitting startResources really does mean zero', () => {
+    // The default is driven by the rule, not hardcoded — so a house-rules table
+    // that switches the toggle off gets a genuinely empty-handed start, which is
+    // the old behaviour and remains reachable.
+    const off = { ...RULES, staggeredStart: false };
+    const s = setup({ ...at(seats(5)), rules: off });
+    for (const p of s.turnOrder) {
+      expect(s.players[p]?.resources).toEqual({ funds: 0, clout: 0, media: 0, trust: 0 });
+    }
   });
 });
 
