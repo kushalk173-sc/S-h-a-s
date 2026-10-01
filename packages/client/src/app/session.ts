@@ -77,17 +77,24 @@ export function isLive(): boolean {
  * The message is deliberately terse and names no game concept: a player whose
  * socket dropped mid-turn needs to know the press did not register, not which
  * rule they appear to have violated.
+ *
+ * THE CALLBACK'S OWN BOOLEAN IS THE SIGNAL, NOT THE TRANSPORT'S STATUS. This used
+ * to ask `c.status === 'closed'`, which is the wrong question in both directions:
+ * a socket that is CONNECTING or RECONNECTING is just as unable to carry a frame,
+ * and a status of `open` proves only that SOME socket was open. `Connection.send`
+ * already knows whether the frame actually went out — it returns `false` when the
+ * socket is null or not `OPEN` — so that is what is read here. Every existing
+ * caller returns `void`, which is why the type is the union and why nothing at
+ * any call site had to change.
  */
-export function send(fn: (c: Connection) => void): boolean {
-  const c = connection();
-  const before = c.status;
-  let landed = true;
+export function send(fn: (c: Connection) => boolean | void): boolean {
+  let landed: boolean | void;
   try {
-    fn(c);
+    landed = fn(connection());
   } catch {
     landed = false;
   }
-  if (!landed || before === 'closed') {
+  if (landed === false) {
     setRefusal('That did not reach the table. The connection is down — reconnecting.');
     return false;
   }
@@ -101,6 +108,34 @@ export function send(fn: (c: Connection) => void): boolean {
  */
 export function requestSync(): void {
   send((c) => c.sync());
+}
+
+/**
+ * REACQUIRE THE SEAT AFTER A PAGE RELOAD.
+ *
+ * WHY THIS IS NOT ALREADY THE TRANSPORT'S JOB. `Connection#resume` is gated behind
+ * its own in-memory `#hadSession` flag, which is set when a `session:granted` arrives
+ * during THIS page's lifetime. A refresh destroys the `Connection` and the flag with
+ * it, so `onopen` never sends `session:resume` — even though the token is sitting in
+ * `sessionStorage` precisely so it survives. The result is that a player who refreshes
+ * mid-turn comes back to the LOBBY, looking at their own match listed as "in progress"
+ * with a disabled JOIN button. The seat is still held; the client just never asks.
+ *
+ * `net/connection.ts` is not this file's to change, and the right fix there is a real
+ * design question (when is a held token authoritative?). What IS this file's is the
+ * decision — *should* we try to resume — and that is answerable here from public state.
+ *
+ * GUARDED ON `lastMatchId`. A token with no remembered match is either a stale one or a
+ * fresh session, and asking anyway would earn an `RESUME_INVALID` toast on every cold
+ * load. A refresh mid-game is the only case where the seat is known to be worth
+ * reclaiming, and that is exactly what `shasn.matchId` records.
+ */
+export function resumeIfHeld(): boolean {
+  const c = connection();
+  const token = c.resumeToken;
+  if (token === null || token === '') return false;
+  if (c.lastMatchId === null) return false;
+  return send(() => c.send({ t: 'session:resume', resumeToken: token }));
 }
 
 /** Drop the credential and every cached thing. The "start over" path. */

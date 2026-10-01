@@ -166,6 +166,33 @@ export class Connection {
 
   connect(): void {
     this.#wanted = true;
+    // IDEMPOTENT — AND THIS IS THE LINE THAT MAKES IT TRUE.
+    //
+    // The file header claims `connect` is idempotent, and it is not. React 18
+    // StrictMode double-mounts effects in development, `App` calls
+    // `connection().connect()` from a mount effect, so on a cold load this ran
+    // TWICE. The second call did not notice the first and opened a SECOND
+    // WebSocket, then overwrote `#socket` with it — orphaning the first, still
+    // CONNECTING socket while holding a reference to the second.
+    //
+    // The failure that produced is silent and total, which is why it survived a
+    // passing test suite and two code audits:
+    //
+    //   - socket #1 opens first  -> `#setStatus('open')` -> the link goes `live`
+    //   - the lobby's `[link]` effect fires and calls `listLobbies()`
+    //   - `Connection.send` reads `this.#socket`, which is socket #2, whose
+    //     `readyState` is still CONNECTING, so it returns `false` and drops the frame
+    //   - socket #2 opens -> `#setStatus('open')` -> THE STATUS IS UNCHANGED, so the
+    //     early return at the top of `#setStatus` swallows the callback
+    //   - the link never changes again, so the effect never re-fires
+    //
+    // Net effect: the lobby renders, the OPEN ROOMS list is permanently empty, and
+    // nothing is logged — because in production the same page never sees a second
+    // `connect()`, and the audit that never opened a browser saw a green suite.
+    //
+    // One socket at a time. A reconnect is already scheduled by `#onclose`, which
+    // nulls `#socket` first, so this guard does not block recovery.
+    if (this.#socket !== null) return;
     this.#open();
   }
 
