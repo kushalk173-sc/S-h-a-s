@@ -272,6 +272,14 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
  * concentrating is what turns a majority of individual pegs into a majority of
  * zones, and p10 forbids splitting one card's voters across zones so the
  * concentration has to happen one card at a time.
+ *
+ * There is deliberately NO "any zone with room" fallback here. Relaxing the "can win
+ * it" test to "has room" was measured and it is much worse: across 20 seeds at each
+ * seat count it took 4 seats from 20/20 nine-majority endings to 12/20 and 5 seats
+ * from 20/20 to 6/20, because a seat with no winnable zone spends its voters filling
+ * a board that will then hit p20's board-full ending before the last two zones are
+ * ever decided. It was also measured as a fix for the one seed that stalls
+ * (3 seats, seed 11) and it did not fix it. See `test/winnable.test.ts`.
  */
 export function targetZone(s: ClientState, me: PlayerID, need: number): string | null {
   let best: string | null = null;
@@ -494,7 +502,9 @@ export function playInProcess(
         const r = reduce(state, p, { type: 'INFLUENCE', slot: cheap.i }, ctx);
         if (r.ok) {
           // p10: a card that cannot be placed is discarded at end of turn, which
-          // is what cycles the Mat. Place it if it fits anywhere winnable first.
+          // is what cycles the Mat. Place it if it fits anywhere first — and in the
+          // squeeze "anywhere" really does mean anywhere, because the point of the
+          // squeeze is to drive the board to p20's board-full ending.
           const after = playerView(r.state, p);
           const group = after.players[p]?.pending.at(-1);
           const zone = group === undefined ? null : targetZone(after, p, group.count);
