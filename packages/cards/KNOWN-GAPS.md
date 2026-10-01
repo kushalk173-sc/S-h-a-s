@@ -529,8 +529,10 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 | ~~1~~ | ~~loop `resolveTargets` in the `gerrymander` case~~ | — | **DONE** | — |
 | ~~2~~ | ~~live-effects list on `GameState` + expiry ticked in `advanceTurn`~~ | — | **DONE** — G9 + G22, the substrate for 3 and 4 | — |
 | ~~3~~ | ~~trigger registry consulted by `INFLUENCE` / `BUY_CONSPIRACY` / `GERRYMANDER` / `PLACE_VOTERS` / `setArea`~~ | — | **DONE** — G14 | — |
-| ~~4~~ | ~~resolve `n` (and `per` multipliers) against player state before pushing~~ | — | **DONE** — G15 + G4 | — |
+| **G4 + G5** | `n: number \| ComputedCount` and `per` on `gain`/`lose`; `PlayerState.restrictions` | **DONE** — G15, G4, and 3 of G5's 5 | — |
+| 5 | ~~`PlayerState.restrictions` + every action consults it~~ | — | **DONE for the purchase locks** (G5, 3 cards). `no-power` and `no-volatile-placement` still need their own consult points | — |
 | 5 | `PlayerState.restrictions` + every action consults it | `state.ts`, `reduce.ts` | **G5 (5 cards)** — §4. **The largest remaining lever: 3 of the 5 (PYTHONPOST, SNOOP B-O-DOUBLE-T, DON'T KISS THE BABIES) are surcharges, and a surcharge is a *cost* modifier, which no amount of `Effect` work can express.** | large |
+| **G5** | `PlayerState.restrictions` + a `restrict` op, consulted by `INFLUENCE` and `BUY_CONSPIRACY` | **DONE for the purchase locks.** 3 more cards | — |
 | 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **G13 (5 cards)**, incl. BLOCK and DEFLECT | largest |
 | 7 | `'chosen-player'` on `EffectTarget`, via a new `Choice` kind | `cards.ts`, `state.ts`, `reduce.ts`, **client** | G1 (2), G-new (1), and it is the last thing standing between 3 more trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM) | small, but a **wire-format change the client owns** |
 | 8 | `target` on `evict`, `discard-voter`, `convert-voter`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G-new (3 cards) | small |
@@ -553,65 +555,56 @@ THOUGHTS AND PRAYERS faithful rather than approximate.
 
 ---
 
-## 4. G5 in full: `PlayerState.restrictions`
+## 4. G5 in full: `PlayerState.restrictions` — **PARTLY LANDED, and the two rulings are made**
 
-The five cards lost to G5 are five of the best-known cards in the product, and this
-is the only gap on the list that is not a card-schema change at all. The specification,
-in the shape the corpus would need:
+`Restriction` and the `restrict` op are in the engine. `INFLUENCE` and
+`BUY_CONSPIRACY` consult them. The two rulings §4 asked for are decided, and both are
+argued on the type in `state.ts` rather than only here:
 
-```ts
-export type RestrictionKind =
-  | 'no-purchases'        // "You cannot make any purchases until you do so."
-  | 'no-power'            // "You cannot use one of your unlocked Level 3 Powers…"
-  | 'no-volatile-placement' // "These voters cannot be placed into Volatile Areas."
-  | 'surcharge';          // "All Voter Cards cost any 1 extra resource in your turn."
+1. **KHAKI TERROR's condition decrements by what was ACTUALLY donated.** `lose` caps
+   at what the player holds, so a player with no Media can still satisfy *"you
+   cannot make any purchases until you do so"*. `remaining` is decremented by the
+   `Delta` that was actually removed. **The safe direction is deliberate:**
+   under-decrementing leaves the player locked and able to donate again;
+   over-decrementing hands out a free Voter Card. A satisfied lock is REMOVED rather
+   than left at zero, so "do they have any restrictions?" stays one predicate.
+2. **`restrictions` is PUBLIC and must appear in
+   `packages/server/test/secret-inventory.ts` as a deliberate non-secret.** That file
+   is not this repository's engine owner's and **has not been changed** — it is
+   flagged in three places so the omission cannot read as an oversight. The argument
+   is that every real card imposing a restriction announces it, and KHAKI TERROR's
+   punchline is that everyone can see you cannot buy.
 
-export type Restriction = {
-  readonly id: string;
-  readonly kind: RestrictionKind;
-  /** 0 while the resource in `value` is still owed. */
-  readonly remaining: number;
-  /** `value` is the amount still owed, or the power tier for 'no-power'. */
-  readonly value: number;
-  readonly expires: 'resolved' | 'this-turn' | 'next-turn' | 'round' | 'rest-of-game';
-  readonly sourceCardId: CardID;
-  readonly sourcePlayer: PlayerID;
-};
+**A third ruling the spec did not force:** a surcharge stacks **on top of** a Helping
+Hands discount. p32 lets Helping Hands reduce "the cost of any purchase"; read
+literally that lets the Idealist's own power erase another player's tax. PYTHONPOST
+says "an EXTRA resource", not "one resource less than usual".
 
-export type PlayerState = {
-  // …
-  readonly restrictions: readonly Restriction[];
-};
-```
+### Two deviations from the spec above, both argued in `state.ts`
 
-Then the consult points, all in `reduce()`:
+- `expires` is an absolute `expiresTurn: number | null`, not the
+  `'resolved' | 'this-turn' | 'next-turn' | 'round' | 'rest-of-game'` enum proposed
+  here. That enum mixes a condition with a deadline in one field; an absolute turn
+  number reuses `ownerNextTurn` / `roundEndTurn`, so all four durations work with no
+  special case and a replay reproduces it from the state.
+- `PlayerState.restrictions` is **optional**, because a required new field breaks
+  every hand-built `PlayerState` literal in `packages/client` and `packages/server`.
+  It is never absent in a state the engine produced. This is coordination debt with a
+  named one-line fix, not a design choice.
 
-| action | consult |
-|---|---|
-| `INFLUENCE` | `no-purchases`; `surcharge` adds to the computed cost (and Helping Hands may discount it, which is a ruling worth making explicitly) |
-| `BUY_CONSPIRACY` | `no-purchases`; `surcharge` |
-| `PLACE_VOTERS`, `GERRYMANDER` | `no-volatile-placement` on any destination area that is volatile |
-| `POWER_*` | `no-power` against `usesLeft(self, rules, …)` |
+### What G5 still owes
 
-And the two design decisions this forces, which are rulings rather than
-implementations:
-
-1. **KHAKI TERROR's condition.** *"You cannot make any purchases until you do so"* is
-   satisfied by donating one resource of each type. `lose` caps at what the player
-   holds, so the restriction must decrement by what was actually donated, not by 4 —
-   and a player holding no Media must be able to satisfy it. `remaining` above is the
-   mechanism; without it the card is a soft-lock, which is the real card's punchline
-   and also its worst failure mode.
-2. **Who clears a restriction.** On donation (the condition is met), on expiry, or
-   manually? All three occur in the corpus, so the type needs all three and the rules
-   text has to say which.
-
-`restrictions` is public information in every real card that imposes it — the whole
-point of KHAKI TERROR is that everyone can see you cannot buy — so it needs no `_`
-prefix, and it must appear in the `playerView` secret-key inventory
-(`packages/server/test/secret-inventory.ts`) as a deliberate non-secret.
+`no-power` (GENDER TROUBLE) and `no-volatile-placement` (NEW FACE WHO DIS) are
+declared in the type's history but not in the current `RestrictionKind`, and their
+consult points — `POWER_*` against `usesLeft`, and `PLACE_VOTERS` /
+`GERRYMANDER` against a volatile destination — do not exist. Those are the last two
+cards, and both are small now that the mechanism is there. THE BIG FREEZE's *"reduce
+your resource cap to 10"* is not a restriction at all: it is a `PlayerState` cap
+field, and a card that changes a number every other rule reads from is a different
+mechanism again.
 
 ---
+
 
 ## 5. A defect found in `docs/ARCHITECTURE.md` §6.4.3, not in the code
 
