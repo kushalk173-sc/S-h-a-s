@@ -211,6 +211,132 @@ export const VOTER_DECK: readonly string[] = VOTER_CARDS.map((c) => c.id);
 export const CONSPIRACY_DECK: readonly string[] = CONSPIRACY_CARDS.map((c) => c.id);
 export const HEADLINE_DECK: readonly string[] = HEADLINE_CARDS.map((c) => c.id);
 
+// ─────────────────────── the SHIPPED set ───────────────────────
+
+/**
+ * Deck sizes and payouts that match what the server actually deals, so a test can
+ * play a real game rather than a game with room to spare.
+ *
+ * These are the dimensions of the in-repo JSON corpus as `loadCorpus` assembles it
+ * (measured 2026-10-01): **52 Ideology Cards** (20 in `decks/et2040/ideology.json`
+ * + 32 in `decks/in2020/ideology.json`), 18 Voter Cards carrying 36 voters between
+ * them, 22 Conspiracy Cards and 26 Headline Cards. The card *bodies* are generated
+ * rather than transcribed because the engine must not depend on `@shasn/cards`, but
+ * the three numbers that decide whether a game is winnable are the real ones:
+ *
+ *  - **52 Ideology Cards, one per turn.** This is the number that ended every
+ *    shipped game on turn 52. `bigCards()` deliberately hides it behind 4000 cards,
+ *    which is why the whole suite passed while the shipped game was unwinnable.
+ *  - **36 voters across 18 Voter Cards.** A Voter Card recycles (`INFLUENCE`
+ *    discards it and `refillMarket` reshuffles), so this bounds a *turn*, not a
+ *    game: the same 36 voters can be bought and placed over and over. The board
+ *    needs 69 pegs for nine majorities and 129 to fill.
+ *  - **3 resources per answer**, matching the corpus (`pays: {trust: 2, funds: 1}`
+ *    and friends) against a 2-3 resource card price. This is the economy that has
+ *    to work: roughly one Voter Card purchasable per turn.
+ */
+const SHIPPED_IDEOLOGY = 52;
+const SHIPPED_VOTER = 18;
+const SHIPPED_CONSPIRACY = 22;
+const SHIPPED_HEADLINE = 26;
+
+/** The 4-3-1-2-5 voter mix of the real corpus: 6 one-voter, 7 two, 5 three. */
+const SHIPPED_VOTER_MIX: readonly number[] = [
+  1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
+];
+
+/** The real corpus prices 12 of its 18 Voter Cards with Funds, all in 2-3. */
+const SHIPPED_VOTER_COSTS: readonly Readonly<Record<string, number>>[] = [
+  { funds: 2 },
+  { clout: 1, media: 1 },
+  { media: 2 },
+  { funds: 3 },
+  { funds: 2, clout: 1 },
+  { media: 2, trust: 1 },
+  { funds: 1, media: 2 },
+  { clout: 2, trust: 1 },
+  { funds: 3, media: 1 },
+  { clout: 2, media: 1, trust: 1 },
+  { funds: 2, trust: 2 },
+  { funds: 3, clout: 2 },
+  { trust: 2 },
+  { clout: 2 },
+  { media: 3 },
+  { trust: 2, funds: 1 },
+  { funds: 2, media: 2 },
+  { clout: 3, funds: 1 },
+];
+
+let shippedIndex: CardIndex | null = null;
+
+export function shippedCards(): CardIndex {
+  if (shippedIndex) return shippedIndex;
+  const ideology = Array.from({ length: SHIPPED_IDEOLOGY }, (_, i) => {
+    // 3 resources a side, 2 of the Ideologue's own type + 1 of the next, which is
+    // the shape the corpus actually uses. The two sides are different Ideologues
+    // (rules-reference.md:188-189).
+    const a = IDEOLOGUES[i % 4] as Ideologue;
+    const b = IDEOLOGUES[(i + 1) % 4] as Ideologue;
+    const n = String(i + 1).padStart(3, '0');
+    return {
+      id: `side-ide-${n}`,
+      campaign: `shipped ${n}`,
+      question: `shipped question ${n}`,
+      sides: [
+        { answer: `shipped answer ${n}a`, ideologue: a, pays: { [a]: 2, [b]: 1 } as Delta },
+        { answer: `shipped answer ${n}b`, ideologue: b, pays: { [b]: 2, [a]: 1 } as Delta },
+      ],
+    } satisfies IdeologyCard;
+  });
+  const voter: VoterCard[] = SHIPPED_VOTER_MIX.map((voters, i) => ({
+    id: `side-vot-${String(i + 1).padStart(3, '0')}`,
+    cost: SHIPPED_VOTER_COSTS[i] ?? { funds: 2 },
+    voters,
+  }));
+  const conspiracy: ConspiracyCard[] = Array.from({ length: SHIPPED_CONSPIRACY }, (_, i) => ({
+    id: `side-con-${String(i + 1).padStart(3, '0')}`,
+    name: `Shipped Conspiracy ${i + 1}`,
+    text: 'Gain 2 resources.',
+    cost: 4,
+    effects: [{ op: 'gain', res: { funds: 2 } } as const],
+  }));
+  const headline: HeadlineCard[] = Array.from({ length: SHIPPED_HEADLINE }, (_, i) => ({
+    id: `side-hed-${String(i + 1).padStart(3, '0')}`,
+    name: `Shipped Headline ${i + 1}`,
+    text: 'Everyone gains 1 resource.',
+    effects: [{ op: 'gain', res: { funds: 1 }, target: 'everyone' as const }],
+  }));
+  shippedIndex = indexCards({ ideology, voter, conspiracy, headline });
+  return shippedIndex;
+}
+
+const SIDE_IDEOLOGY_DECK: readonly string[] = Object.keys(shippedCards().ideology);
+const SIDE_VOTER_DECK: readonly string[] = Object.keys(shippedCards().voter);
+const SIDE_CONSPIRACY_DECK: readonly string[] = Object.keys(shippedCards().conspiracy);
+const SIDE_HEADLINE_DECK: readonly string[] = Object.keys(shippedCards().headline);
+
+export function shippedCtx(): Ctx {
+  return { rules: RULES, cards: shippedCards() };
+}
+
+/** A starting position with the SHIPPED deck sizes. */
+export function freshShipped(
+  seed = 1,
+  players: readonly PlayerID[] = PLAYERS_3,
+  startResources?: readonly Delta[],
+): GameState {
+  return setup({
+    players,
+    cards: shippedCards(),
+    seed,
+    ideologyDeck: SIDE_IDEOLOGY_DECK,
+    voterDeck: SIDE_VOTER_DECK,
+    conspiracyDeck: SIDE_CONSPIRACY_DECK,
+    headlineDeck: SIDE_HEADLINE_DECK,
+    ...(startResources ? { startResources } : {}),
+  });
+}
+
 export function fresh(
   seed = 1,
   players: readonly PlayerID[] = PLAYERS_3,
