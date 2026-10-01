@@ -44,6 +44,7 @@ import type { BlindPrompt, ClientStore } from '../net/index.ts';
 
 import { AnswerReveal, AnswerScreen } from './AnswerScreen.tsx';
 import { ChoiceResolver } from './ChoiceResolver.tsx';
+import { ConspiracyPicker, type PlayableConspiracy } from './ConspiracyPicker.tsx';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
 import { ResourcePicker } from './ResourcePicker.tsx';
@@ -143,6 +144,23 @@ export function GameScreen({ store }: GameScreenProps) {
   }, [store.viewId, state?.turn]);
 
   const me = state === null || you === null ? null : state.players[you] ?? null;
+
+  /*
+    THE SERVER'S PLAYABLE-CONSPIRACY LIST, read once.
+
+    Two consumers need it — the market panel's PLAY button and the dialog itself —
+    and they must never disagree about whether the player has a card to play. So it
+    is computed once here rather than twice at the two call sites, where a future
+    edit to one and not the other would produce a button that opens a dialog with
+    nothing in it: §9.10's prohibited control, arrived at from the other direction.
+
+    `undefined` (the server did not send the field) is distinct from `[]` (it sent
+    it and the answer is none), and the PLAY button only appears for the second.
+  */
+  const myConspiracies = useMemo(
+    () => (state === null ? undefined : playableConspiracies(state, you)),
+    [state, you],
+  );
 
   const interaction = useMemo<BoardInteraction>(() => {
     if (state === null) return IDLE_INTERACTION;
@@ -605,6 +623,19 @@ export function GameScreen({ store }: GameScreenProps) {
                   }
                   openPicker({ forKind: 'conspiracy', total: cost, pick: {} });
                 }}
+                /**
+                 * THE PLAY TRIGGER, and why it is gated on the server's list rather
+                 * than on a hand count. This client is never told what it holds, so
+                 * there is nothing local to test — the only honest question is "does
+                 * the server say I have something to play?", and asking it is what
+                 * makes the button's presence truthful. It appears during the
+                 * `answer` window too, not only on your own turn, because p19 lets
+                 * any player play a Conspiracy immediately before an opponent
+                 * answers; the button's own `disabled` is therefore only about the
+                 * LINK, never about whose turn it is.
+                 */
+                playableConspiracies={myConspiracies ?? []}
+                onPlayConspiracy={() => openPicker({ forKind: 'conspiracy', total: state.conspiracyTopCost ?? 0, pick: {} })}
                 armedSlot={app.marketModifier?.slot ?? null}
               />
             ) : (
@@ -732,11 +763,22 @@ export function GameScreen({ store }: GameScreenProps) {
           pool={me.resources}
           total={state.conspiracyTopCost ?? 0}
           pick={app.picker.pick}
-          playable={playableConspiracyIds(state, you)}
+          playable={myConspiracies}
           onPick={(next) => openPicker({ ...app.picker!, pick: next })}
           onConfirm={(pay) => {
             closePicker();
             dispatch(actions.buyConspiracy(pay as Record<string, number>));
+          }}
+          onPlay={(cardId) => {
+            /*
+              CLOSE FIRST, THEN ASK. A Conspiracy's effects can raise a
+              `PendingChoice`, which mounts the `ChoiceResolver` as a full-viewport
+              takeover. Leaving this dialog mounted underneath it would put two
+              `aria-modal` dialogs on screen at once, which is the contradiction
+              `ResourcePicker`'s `nested` prop exists to avoid.
+            */
+            closePicker();
+            dispatch(actions.playConspiracy(cardId));
           }}
           onCancel={closePicker}
         />
@@ -882,150 +924,43 @@ function seatIndex(order: readonly string[], id: string): 1 | 2 | 3 | 4 | 5 {
 // ─────────────────────────── the small composers ───────────────────────────
 
 /**
- * The ids this player may legally play, IF the server sends them.
+ * The Conspiracy Cards the SERVER says this player may play, right now.
  *
- * `ClientState` has no such field today — that is the server change this is
- * waiting on, and it is what makes a card LIST possible without revealing a hand.
- * It is read through a narrow cast rather than by editing `@shasn/engine`'s type,
- * because `engine` is not this file's to change and a cast on a field that does
- * not exist yet fails closed, which is the safe direction: absent means "the
- * server has not told us", and the picker renders its honest empty state.
+ * `ClientState` does not declare the field, and cannot: it is the engine's type and
+ * the engine's `playerView` deliberately ships no hand. The server therefore
+ * attaches one extra, viewer-scoped array to the payload it builds — see
+ * `packages/server/src/broadcast.ts` — and it arrives here as an ordinary property
+ * of `state`.
+ *
+ * Read through a NARROW CAST rather than by editing `@shasn/engine`'s type, and the
+ * cast FAILS CLOSED, which is the direction that matters: a payload without the
+ * field, a `null`, or a non-array all produce `undefined`, and `undefined` makes the
+ * picker render its honest "the server has not sent this" state rather than an empty
+ * list that would read as "you hold nothing". Those two are different claims and only
+ * one of them is safe to make on the server's behalf.
+ *
+ * And note what is NOT read, because it is the whole point: `state.players[you]
+ * .conspiracies` is `[]` here, as it is for every client, and this function would
+ * have nothing to return if it were not for the server's list. The client cannot
+ * construct or guess a hand, and does not try.
  */
-function playableConspiracyIds(
+function playableConspiracies(
   state: ClientState,
   you: PlayerID | null,
-): readonly string[] | undefined {
+): readonly PlayableConspiracy[] | undefined {
   if (you === null) return undefined;
-  const candidate = (state as { playableConspiracyIds?: unknown }).playableConspiracyIds;
-  if (!Array.isArray(candidate)) return undefined;
-  return candidate.filter((id): id is string => typeof id === 'string');
-}
-
-/**
- * THE CONSPIRACY PICKER, AND WHY IT SHOWS NO CARD.
- *
- * A Conspiracy Card is bought and held FACE DOWN (rules-reference.md:284-286), and
- * the engine enforces that on the wire: `engine/src/playerView.ts` strips the whole
- * `conspiracies` key out of `ClientState` for every viewer, with a comment that says
- * outright that "there is deliberately no viewer-scoped exception". `ClientState`
- * carries `conspiracyTopCost` and `conspiracyRemaining` — a price and a count — and
- * nothing that names a card.
- *
- * THAT MEANS THERE IS NOTHING TO RENDER, AND THAT IS CORRECT. The tempting "fix" —
- * showing the player's own hand so the picker has cards in it — is the same defect
- * as shipping the payout on the blind answer, one layer out: a client holding its
- * full hand picks what to play on information the other players do not have, and
- * the deduction never has to happen at the table. So this component refuses to
- * display hidden state, and it refuses LOUDLY.
- *
- * `playableConspiracyIds` is the field that would make a card list possible, and
- * the client is already shaped to consume it: a server-sent list of the ids this
- * player may legally play is not secret (it is the set of choices, not their
- * effects), and it is what `playerView`'s own comment already promises — "the
- * client learns that a card is *playable* from a public flag, never by reading the
- * hand". Until the server sends it, `playable` is `undefined` and the honest
- * empty state below is what renders.
- */
-function ConspiracyPicker({
-  pool,
-  total,
-  pick,
-  playable,
-  onPick,
-  onConfirm,
-  onCancel,
-}: {
-  pool: import('@shasn/engine').Pool;
-  total: number;
-  pick: Readonly<Record<string, number>>;
-  /** Card ids the server says this player may play. `undefined` = not sent yet. */
-  readonly playable?: readonly string[] | undefined;
-  onPick: (n: Readonly<Record<string, number>>) => void;
-  onConfirm: (pay: Readonly<Record<string, number>>) => void;
-  onCancel: () => void;
-}) {
-  // A price of 0 is not a Conspiracy Card the player cannot afford — the deck is
-  // empty. Say that, rather than rendering nothing at all and leaving a modal open
-  // with no content in it.
-  if (total <= 0) {
-    return (
-      <div className="scrim">
-        <div className="sheet" role="dialog" aria-modal="true" aria-label="Conspiracy Card">
-          <h2 className="sheet__title">No Conspiracy Card is purchasable</h2>
-          <p className="sheet__body">
-            The Conspiracy deck is empty, so there is nothing to buy. Your hand, if you hold any
-            cards, is unchanged.
-          </p>
-          <button type="button" className="btn btn--primary" onClick={onCancel} data-testid="conspiracy-close">
-            CLOSE
-          </button>
-        </div>
-      </div>
-    );
+  const raw = (state as { playableConspiracies?: unknown }).playableConspiracies;
+  if (!Array.isArray(raw)) return undefined;
+  const out: PlayableConspiracy[] = [];
+  for (const entry of raw) {
+    // Validate the SHAPE, not just the array. A payload is attacker-adjacent input:
+    // a row missing its text would otherwise render an empty card that looks real.
+    if (typeof entry !== 'object' || entry === null) continue;
+    const c = entry as Record<string, unknown>;
+    if (typeof c['id'] !== 'string' || typeof c['name'] !== 'string' || typeof c['text'] !== 'string') continue;
+    out.push({ id: c['id'], name: c['name'], text: c['text'] });
   }
-
-  if (playable === undefined) {
-    // THE HONEST EMPTY STATE. Not a spinner, not a blank panel, not a fabricated
-    // card: a plain statement of what is known, why nothing is listed, and what
-    // the player can still do. §9.10 — a control that cannot do what it looks like
-    // says so, rather than pretending.
-    return (
-      <div className="scrim">
-        <div className="sheet" role="dialog" aria-modal="true" aria-label="Conspiracy Card">
-          <h2 className="sheet__title">Nothing to choose from — yet</h2>
-          <p className="sheet__body">
-            A Conspiracy Card is bought and held face down, so this client is not told what you are
-            holding and cannot show you a list of it. The server has not sent the set of cards you
-            may legally play, so rather than guess — and rather than show you your own hand, which
-            would be information the other players do not have — this panel says nothing.
-          </p>
-          <p className="sheet__body">
-            You can still buy the top card for any <strong>{total}</strong> resources. It goes to
-            the top of your hand unlooked-at, exactly as the rules intend.
-          </p>
-        </div>
-        <div style={{ maxWidth: '46rem', width: '100%', marginTop: 'var(--sp-3)' }}>
-          <ResourcePicker
-            pool={pool}
-            total={total}
-            pick={pick}
-            onPick={onPick}
-            heading={`Buy the top Conspiracy Card — any ${total} resources`}
-            confirmLabel={`BUY — ${total} RESOURCES`}
-            onConfirm={() => onConfirm(pick)}
-            onCancel={onCancel}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // A server-sent list. Each id renders as itself: the client has no card text and
-  // must not invent any, so the row says what it is and lets the player decide.
-  return (
-    <div className="scrim">
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Conspiracy Card">
-        <h2 className="sheet__title">Play a Conspiracy Card</h2>
-        <p className="sheet__body">
-          {playable.length === 0
-            ? 'You hold no Conspiracy Card you may play at the moment.'
-            : `The server says ${playable.length} of your cards may be played. You may also buy the top card for any ${total} resources.`}
-        </p>
-      </div>
-      <div style={{ maxWidth: '46rem', width: '100%', marginTop: 'var(--sp-3)' }}>
-        <ResourcePicker
-          pool={pool}
-          total={total}
-          pick={pick}
-          onPick={onPick}
-          heading={`Buy the top Conspiracy Card — any ${total} resources`}
-          confirmLabel={`BUY — ${total} RESOURCES`}
-          onConfirm={() => onConfirm(pick)}
-          onCancel={onCancel}
-        />
-      </div>
-    </div>
-  );
+  return out;
 }
 
 /**

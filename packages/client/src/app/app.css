@@ -762,6 +762,54 @@
   margin: 0 0 var(--sp-4);
 }
 
+/* ── The playable Conspiracy list ───────────────────────────────────────────
+   A Conspiracy is a held card, not a market card, so it is presented like a
+   card and NOT like a slot: the printed NAME is the heading at card-scenario
+   size, the printed EFFECT is body copy under it at log size, and the PLAY
+   button sits at the foot of the card rather than across the whole row.
+
+   THE HAZARD THIS AVOIDS. A `.mkt`-style tile makes a row's clickability
+   ambiguous, and an ambiguous target in a dialog whose whole purpose is to
+   choose one of several cards is how the wrong card gets played. One card, one
+   visible button, `align-self: flex-start` so the button is the size of its
+   label and not the width of the card. */
+
+.con {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--sp-2);
+}
+
+.con__card {
+  box-sizing: border-box;
+  background: var(--paper-100);
+  border: 1px solid var(--paper-300);
+  border-left: 4px solid var(--ink-700);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  /* A single card must not stretch to a three-column grid track's full width and
+     leave a PLAY button marooned at the far edge of the dialog. */
+  max-width: 30rem;
+}
+
+.con__name {
+  font: var(--type-card-side-label);
+  color: var(--ink-900);
+  margin: 0;
+}
+
+.con__text {
+  font: var(--type-log);
+  color: var(--ink-700);
+  margin: 0 0 var(--sp-1);
+}
+
 .eyebrow {
   font: var(--type-display-m);
   color: var(--ink-500);

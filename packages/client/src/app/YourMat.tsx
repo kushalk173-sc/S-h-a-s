@@ -448,6 +448,17 @@ export type MarketPanelProps = {
   readonly disabled: boolean;
   readonly onBuy: (index: number) => void;
   readonly onBuyConspiracy: () => void;
+  /**
+   * The server's list of Conspiracy Cards this player may legally play, or `[]`.
+   *
+   * It arrives here already read out of the payload and validated, and it is the
+   * ONLY thing that may decide whether the PLAY button is rendered. There is no
+   * local hand count to test — this client is not told what it holds (D25,
+   * ARCHITECTURE §8.1.1) — so a button gated on anything else would either lie about
+   * the player's cards or stay dead forever.
+   */
+  readonly playableConspiracies: readonly { readonly id: string }[];
+  readonly onPlayConspiracy: () => void;
   /** Which market slot holds an armed power, if any. Shown, not hidden. */
   readonly armedSlot: number | null;
 };
@@ -474,10 +485,13 @@ export function MarketPanel({
   disabled,
   onBuy,
   onBuyConspiracy,
+  playableConspiracies,
+  onPlayConspiracy,
   armedSlot,
 }: MarketPanelProps) {
   const me = state.players[you];
   if (me === undefined) return null;
+  const canPlay = playableConspiracies.length > 0;
   return (
     <section className="panel" aria-label="HQ market" data-testid="market-panel">
       <h2 className="panel__title">HQ MAT · MARKET</h2>
@@ -499,6 +513,34 @@ export function MarketPanel({
           BUY THE TOP CONSPIRACY CARD — ANY {state.conspiracyTopCost}
         </button>
       )}
+      {/*
+        THE PLAY BUTTON EXISTS ONLY WHEN THE SERVER SAYS SO.
+
+        Two things it deliberately does NOT do. It does not render the count of
+        cards in hand — this client is not told that, and inventing a number from
+        the deck sizes would be a lie the player could act on. And it does not
+        survive a reconnect on its own: `match:state` is the only source, so a
+        reconnect that has not landed yet shows no button, which is the correct
+        answer for "I do not know what I may play".
+
+        `disabled` is passed straight through rather than ANDed with the turn. The
+        server already scoped the list — during the `answer` window it is non-empty
+        for a player who is NOT on move, and gating that button on `isMyTurn` would
+        make a legal play unreachable.
+      */}
+      {canPlay ? (
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={onPlayConspiracy}
+          disabled={disabled}
+          aria-disabled={disabled}
+          data-testid="play-conspiracy"
+        >
+          PLAY A CONSPIRACY CARD — {playableConspiracies.length}{' '}
+          {playableConspiracies.length === 1 ? 'CARD' : 'CARDS'} READY
+        </button>
+      ) : null}
       {armedSlot === null ? null : (
         <p className="panel__note" data-testid="armed-modifier">
           A power is armed on market card {armedSlot + 1}. Buy that card to spend it, or press the
