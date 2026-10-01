@@ -308,6 +308,24 @@ function roomFor(state: GameState): Room {
 
 const CORPUS = playedCorpus(14);
 
+/**
+ * What the two VALUE scans walk: `CORPUS` plus `REDRAW_CORPUS`.
+ *
+ * Both leak tests used to read `CORPUS` alone, and that left a hole with a very
+ * specific shape. `CORPUS` never redraws, so every id in its `_ideologyDiscard`
+ * belongs to an answered card and is in some player's `manifestoCards` — which
+ * means it is excused. Leaking the discard pile in that corpus is therefore
+ * INVISIBLE: a projection carrying `topOfIdeologyDiscard` passes every value scan,
+ * because the only id it would leak is a public one. Verified, not assumed —
+ * that exact leak was reintroduced into `viewFor` and the suite stayed green.
+ *
+ * `REDRAW_CORPUS` closes it. It has redrawn, so its discard pile holds cards in no
+ * player's mat, and a leak of any of those fails here exactly as a draw-pile leak
+ * does. Both corpora are walked for the value scans only: `CORPUS` stays the corpus
+ * for the structural and phase-coverage tests, where its shape is deliberate.
+ */
+const LEAK_CORPUS: readonly GameState[] = [...CORPUS, ...REDRAW_CORPUS];
+
 if (process.env['SHASN_DEBUG_CORPUS'] === '1') {
   for (const [i, s] of CORPUS.entries()) {
     const b = s.phase === 'answer' ? blindPromptFor(s, CARDS, s.activePlayer) : null;
@@ -456,7 +474,7 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
   });
 
 it('no secret VALUE survives: no card id, and not the seed', () => {
-    for (const [i, s] of CORPUS.entries()) {
+    for (const [i, s] of LEAK_CORPUS.entries()) {
       const { cards, seed } = allSecretValues(s);
       expect(cards.length, `state ${i} has no secret ids at all — the scan would be vacuous`).toBeGreaterThan(0);
       for (const viewer of [null, ...s.turnOrder]) {
@@ -615,7 +633,7 @@ describe('LAYER 2 — no ServerMessage the handler can produce leaks a server-on
   });
 
 it('no message carries a secret card id or the seed', () => {
-    for (const s of CORPUS) {
+    for (const s of LEAK_CORPUS) {
       const { seed } = allSecretValues(s);
       for (const msg of renderAll(s, { rules: ctx.rules, cards: CARDS })) {
         const json = JSON.stringify(msg);
