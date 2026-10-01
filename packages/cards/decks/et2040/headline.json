@@ -4,26 +4,26 @@
   "cards": [
     {
       "id": "hl-et2040-001",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. Two clauses are not expressible: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state (REF 5.5), and 'every player' cannot be stated either because `gerrymander` is the one resource-shaped op in cards.ts with NO `target` field — unlike `voters`, `gain` and `lose`. The card as shipped therefore affects you only. See KNOWN-GAPS.md G5 and G8.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. Two clauses are not expressible: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state (REF 5.5), and 'every player' needs `target` on gerrymander, which cards.ts gained for this (KNOWN-GAPS G8) but reduce.ts does not yet honour — so a targeted gerrymander is rejected by the validator rather than played. The card as shipped therefore gives YOU the extra move. See KNOWN-GAPS.md G5 and G8.",
       "provenance": "adapted",
       "name": "New Face Who Dis",
-      "text": "Immediately gerrymanders 1 of your majority or non-majority voters, under the normal gerrymandering rules.",
+      "text": "You may Gerrymander 1 of your majority or non-majority voters this turn, under the normal Gerrymandering rules. It does not have to happen now.",
       "effects": [{ "op": "gerrymander", "n": 1 }]
     },
     {
       "id": "hl-et2040-002",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Red Blooded. The scaling ('Players receive any 2 resources for EACH of their discarded voters') needs a per-unit iteration op — see KNOWN-GAPS.md G4. The fixed pair is represented instead.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Red Blooded. DROPPED: (1) the scaling ('any 2 resources for EACH of their discarded voters') needs a per-unit iteration op, KNOWN-GAPS G4; (2) the real discard is 'any 2 voters' including your own, and reduce.ts resolveChoice rejects any area the chooser owns, so `discard-voter` strikes an OPPONENT's voter only. `text` states what the engine does; the fix is one condition in resolveChoice plus a target on the op.",
       "provenance": "adapted",
       "name": "Red Blooded",
-      "text": "Discard 2 of your own voters from the board, permanently. Every opponent then gains 2 resources of their choice from the Public Reserve.",
+      "text": "You strike 2 of your opponents' voters from the board, permanently — voters in Volatile Areas cannot be struck, and your own voters are out of your reach. Each opponent then gains 2 resources of their choice from the Public Reserve.",
       "effects": [{ "op": "discard-voter", "n": 2 }, { "op": "gain-any", "n": 2, "target": "each-opponent" }]
     },
     {
       "id": "hl-et2040-003",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The OR-branch ('Donate 1 of your voters to the player on your left') needs a DONATE op aimed at a seat-relative neighbour, and the 'if you are unable to do either, ignore this card' clause needs a conditional — see KNOWN-GAPS.md G1.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The first branch is represented; two things in it are dropped. (1) The real discard is '2 of YOUR OWN voters', and reduce.ts resolveChoice rejects any area the chooser owns, so `discard-voter` reaches opponents' voters only — `text` says so. (2) The OR-branch ('Donate 1 of your voters to the player on your left. If you are unable to do either, ignore this card') needs a DONATE op aimed at a seat-relative neighbour and a conditional over the whole effect — KNOWN-GAPS G1.",
       "provenance": "adapted",
       "name": "Ain't No Cure For Love",
-      "text": "Discard 2 of your own voters from the board, permanently.",
+      "text": "You strike 2 of your opponents' voters from the board, permanently. Voters in Volatile Areas cannot be struck, and your own voters cannot be.",
       "effects": [{ "op": "discard-voter", "n": 2 }]
     },
     {
@@ -78,6 +78,30 @@
         { "op": "gain", "res": { "media": 2 } }
       ],
       "excludeInTwoPlayer": true
+    },
+    {
+      "id": "hl-et2040-009",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of The Four Horsemen. The real card is 'Choose and discard one of the following: 2 Funds OR 2 Clout OR 2 Media OR 2 Trust', which is a single `lose-any` of 2 — any two of one kind and one of each are both in that set, so the choice is expressed exactly. DROPPED: 'You can't make any purchases until you do so', which is a standing RESTRICTION on the player and needs PlayerState.restrictions (KNOWN-GAPS G5); a lasting clause also needs G9/G22. Without it this is a plain 2-resource tax rather than a soft-lock.",
+      "provenance": "adapted",
+      "name": "The Four Horsemen",
+      "text": "Discard 2 resources of your choice to the Public Reserve. Any two of the same kind, or one of each.",
+      "effects": [{ "op": "lose-any", "n": 2 }]
+    },
+    {
+      "id": "hl-et2040-010",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Married With Bits. DROPPED: 'to 2 opponents' becomes every opponent, because the card can only be aimed at a target SET (`each-opponent`), not at a count of chosen players; and 'They can choose not to take it' has no expression at all — a granted voter is a pending group the opponent places. `text` states exactly what the engine does. See KNOWN-GAPS G1.",
+      "provenance": "adapted",
+      "name": "Married With Bits",
+      "text": "Every opponent gains 1 voter, which they may place in any zone on their own turn.",
+      "effects": [{ "op": "voters", "n": 1, "target": "each-opponent" }]
+    },
+    {
+      "id": "hl-et2040-011",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Good Gig Well Played. Only the 'Keep one for yourself' branch is represented. DROPPED: 'give one card each to 2 opponents', because no op moves a card from one player's hand to another's and no op addresses a target set of chosen players (KNOWN-GAPS G20); and 'if there are fewer than 3 cards in the draw pile, draw the remaining from the discard pile at random' (KNOWN-GAPS G17). A Conspiracy Card is worth its printed 4-5 resources, so this is roughly a third of the real card's swing.",
+      "provenance": "adapted",
+      "name": "Good Gig Well Played",
+      "text": "Draw the top Conspiracy Card and keep it. It is yours to play whenever you choose.",
+      "effects": [{ "op": "draw-conspiracy", "n": 1 }]
     }
   ]
 }

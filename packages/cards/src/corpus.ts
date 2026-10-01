@@ -160,28 +160,55 @@ export function toEngineVoterCard(c: CorpusVoterCard): VoterCard {
 }
 
 export function toEngineConspiracyCard(c: CorpusConspiracyCard): ConspiracyCard {
-  return c.excludeInTwoPlayer === undefined
-    ? { id: c.id, name: c.name, text: c.text, cost: c.cost, effects: c.effects }
-    : {
-        id: c.id,
-        name: c.name,
-        text: c.text,
-        cost: c.cost,
-        effects: c.effects,
-        excludeInTwoPlayer: c.excludeInTwoPlayer,
-      };
+  return withXScope(
+    c.excludeInTwoPlayer === undefined
+      ? { id: c.id, name: c.name, text: c.text, cost: c.cost, effects: c.effects }
+      : {
+          id: c.id,
+          name: c.name,
+          text: c.text,
+          cost: c.cost,
+          effects: c.effects,
+          excludeInTwoPlayer: c.excludeInTwoPlayer,
+        },
+    c,
+  );
 }
 
 export function toEngineHeadlineCard(c: CorpusHeadlineCard): HeadlineCard {
-  return c.excludeInTwoPlayer === undefined
-    ? { id: c.id, name: c.name, text: c.text, effects: c.effects }
-    : {
-        id: c.id,
-        name: c.name,
-        text: c.text,
-        effects: c.effects,
-        excludeInTwoPlayer: c.excludeInTwoPlayer,
-      };
+  return withXScope(
+    c.excludeInTwoPlayer === undefined
+      ? { id: c.id, name: c.name, text: c.text, effects: c.effects }
+      : {
+          id: c.id,
+          name: c.name,
+          text: c.text,
+          effects: c.effects,
+          excludeInTwoPlayer: c.excludeInTwoPlayer,
+        },
+    c,
+  );
+}
+
+/**
+ * Carry `duration` / `timing` / `interrupt` through to the engine when present.
+ *
+ * Every value of all three is refused by the validator today (see
+ * `src/executable.ts`), so this is not a path a card can take today. It exists so
+ * that the day `reduce()` grows a case for one, the field is already on the card
+ * object the reducer sees, instead of being quietly stripped here.
+ *
+ * Built by spread rather than `delete`, for the reason `toEngineIdeologyCard`
+ * documents: `exactOptionalPropertyTypes` is on, and `advisory: undefined` is not
+ * the same as no `advisory` at all.
+ */
+function withXScope<T extends object>(card: T, c: CorpusConspiracyCard | CorpusHeadlineCard): T {
+  return {
+    ...card,
+    ...(c.duration !== undefined ? { duration: c.duration } : {}),
+    ...(c.timing !== undefined ? { timing: c.timing } : {}),
+    ...(c.interrupt !== undefined ? { interrupt: c.interrupt } : {}),
+  };
 }
 
 // ─────────────────────────── whole-corpus view ───────────────────────────

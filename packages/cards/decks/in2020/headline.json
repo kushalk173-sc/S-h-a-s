@@ -23,10 +23,10 @@
     },
     {
       "id": "hl-in2020-003",
-      "source": "original; register per REF 8.2 rule 5. The discard-your-own-voters branch of the recovered Ain't No Cure For Love (REF 4.3).",
+      "source": "original; register per REF 8.2 rule 5. The discard-voters branch of the recovered Ain't No Cure For Love (REF 4.3). NOTE: `text` used to read 'Discard 2 of your OWN voters', which reduce.ts does not do — resolveChoice rejects any area the chooser owns, so `discard-voter` reaches opponents' voters only. Corrected here, and the same correction was applied to hl-et2040-002 and hl-et2040-003.",
       "provenance": "inferred",
       "name": "Aakhri Pehchaan",
-      "text": "Discard 2 of your own voters from the board, permanently.",
+      "text": "You strike 2 of your opponents' voters from the board, permanently. Voters in Volatile Areas cannot be struck, and your own voters cannot be.",
       "effects": [{ "op": "discard-voter", "n": 2 }]
     },
     {
@@ -52,6 +52,14 @@
       "name": "Chuppi Ke Baad",
       "text": "Take 1 resource of your choice from a chosen opponent.",
       "effects": [{ "op": "steal-any", "n": 1 }]
+    },
+    {
+      "id": "hl-in2020-007",
+      "source": "REF 4.1 (scribd 814006944/2024-Headline-And-Conspiracy-Cards-Explained) recovers the name and effect of Khaki Terror. The donation is represented exactly. DROPPED: 'You cannot make any purchases until you do so' — a standing RESTRICTION on the player, needing PlayerState.restrictions (KNOWN-GAPS G5) and the token pile of G10, since the real card's punchline is the resources sitting ON it until donated. What remains is a one-turn tax.",
+      "provenance": "adapted",
+      "name": "Khaki Terror",
+      "text": "Donate 1 Funds, 1 Clout, 1 Media and 1 Trust to the Public Reserve. Anything you are not holding is simply not donated.",
+      "effects": [{ "op": "lose", "res": { "funds": 1, "clout": 1, "media": 1, "trust": 1 } }]
     }
   ]
 }

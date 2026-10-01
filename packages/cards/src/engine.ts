@@ -23,11 +23,17 @@ export type {
   CardIndex,
   ConspiracyCard,
   Effect,
+  EffectDuration,
+  EffectScope,
   EffectTarget,
+  EffectTiming,
+  EffectTrigger,
   HeadlineCard,
   IdeologyCard,
   IdeologySide,
+  Interrupt,
   VoterCard,
+  XCardScope,
 } from '../../engine/src/cards';
 
 export { indexCards, sidePayout } from '../../engine/src/cards';

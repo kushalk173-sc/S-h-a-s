@@ -13,12 +13,12 @@
     },
     {
       "id": "ct-et2040-002",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs, including 'there are two such cards'. The mandatory RECURRING obligation ('Discard an open Voter Card every turn') and the denomination ('for every 1-Voter Card that you discard, get any 1 resource') are not expressible — see KNOWN-GAPS.md G3. Only the single resolution is represented.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' — a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource.",
       "provenance": "adapted",
       "name": "Eradicating Germs",
-      "text": "Gain 1 resource of your choice, then discard 1 resource of your choice to the Public Reserve.",
+      "text": "Every face-up Voter Card is discarded and replaced with a fresh one. You then gain 1 resource of your choice.",
       "cost": 4,
-      "effects": [{ "op": "gain-any", "n": 1 }, { "op": "lose-any", "n": 1 }]
+      "effects": [{ "op": "refresh-market" }, { "op": "gain-any", "n": 1 }]
     },
     {
       "id": "ct-et2040-003",
