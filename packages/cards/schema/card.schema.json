@@ -260,16 +260,16 @@
       "$comment": "Narrowing on the event that woke a hook, ANDed across the keys present. EffectCondition in cards.ts.\n\nbyOwner: the event's actor is the effect's own owner. POWER TRIP is 'every time YOU influence a 3-Voter Card', which is byOwner plus influencedVotersAtLeast: 3 — the two keys are separate because the real card needs both at once.\n\ninfluencedVotersAtLeast: the Voter Card that was bought carried at least this many voters. Only meaningful on 'on-voter-influenced'.\n\nmovedMyVoter: the voter the event moved belongs to the owner. GROWING DISSENT is 'every time any opponent Gerrymanders your voters'. Only meaningful on 'on-gerrymander'.\n\nminProperties 1: an empty condition constrains nothing, and a card that writes one reads as though it narrowed something."
     },
 
-    "dynamicCount": {
+    "computedCount": {
       "type": "object",
       "additionalProperties": false,
       "required": ["of"],
       "properties": {
         "of": {
-          "enum": ["ideologue-level", "your-pool", "opponent-volatile-voters", "your-gerrymander-rights"]
+          "enum": ["your-pool", "ideologue-level", "your-gerrymander-rights", "volatile-voters", "held-of-each-resource"]
         }
       },
-      "$comment": "RESERVED — NOT EXECUTABLE TODAY. The tagged union KNOWN-GAPS G15 proposes in place of a literal `n`. Accepted here so a computed count gets the precise validator error; the validator rejects it, because reduce() reads effect.n as a number and pushes it into a Choice.count and a loop bound. See KNOWN-GAPS.md G15."
+      "$comment": "EXECUTED. A count read out of player state instead of written on the card. ComputedCount in cards.ts, read by resolveCount / computedValue in reduce.ts, always against the player the effect resolves FOR.\n\nyour-pool: the total resources that player holds.\n\nideologue-level: 1, 3 or 5, from the number of Ideology CARDS that player has answered. THIS IS NOT THE BALANCE CHECKER'S RESOURCE PROXY. The engine's real unlock rule is powers.ts hasPower, which counts CARDS answered and not resources paid, so a player who answers three Capitalist cards unlocks Prospecting whatever those cards paid and a player who answers one Capitalist card paying 3 Funds unlocks nothing. KNOWN-GAPS.md §6 sets out why D3's resource proxy over-reports, and reading resources here would make a card agree with the checker and disagree with the engine.\n\nyour-gerrymander-rights: moves still available across every zone the player leads, summed. p16 gives rights to a strict leader and nobody to a tie, so a zone they do not lead contributes zero.\n\nvolatile-voters: their pegs in Volatile Areas. p18 makes those permanent, so it only grows.\n\nheld-of-each-resource: for `per` only — what the player holds OF THE RESOURCE BEING GAINED. A `res` of 1 in each resource with this multiplier is IF YOU LIKE PIÑA COLADA's doubling of the whole mat, and the cap still applies on top, which is the card's own second sentence. EXECUTABLE_COMPUTED_SOURCES in packages/cards/src/executable.ts is the registry, and it also refuses `per` on any source but this one, because `per` multiplies each component of `res` and any other source would multiply a single number into four resources. See KNOWN-GAPS.md G15 and G4."
     },
 
     "interrupt": {
@@ -292,14 +292,14 @@
     },
 
     "countOrComputed": {
-      "oneOf": [{ "$ref": "#/$defs/count" }, { "$ref": "#/$defs/dynamicCount" }],
-      "$comment": "A literal count, or the reserved computed form (see $defs.dynamicCount). The second branch exists to be REJECTED by the validator with an actionable message, not to be shipped."
+      "oneOf": [{ "$ref": "#/$defs/count" }, { "$ref": "#/$defs/computedCount" }],
+      "$comment": "A literal count, or the computed form (see $defs.computedCount). BOTH are executable: reduce() resolves the computed form against the player the effect resolves for, before it constructs a Choice.count or a loop bound, so the engine only ever sees a number. This is Count in cards.ts, and the widening of `n` from `number` is safe precisely because of that resolution step — KNOWN-GAPS.md G15 originally proposed NOT widening it, on the grounds that TypeScript would then stop a computed count reaching the engine. The resolution step is what keeps that guarantee, and $defs/computedCount is where the sources are documented."
     },
 
     "effect": {
       "type": "object",
       "required": ["op"],
-      "$comment": "The Effect union in packages/engine/src/cards.ts.\n\nNOTE FOR REVIEWERS: the task brief calls this a '12-op union'. cards.ts as of this\ncommit declares 13 (gain, lose, gain-any, lose-any, steal-any, voters, evict,\ndiscard-voter, convert-voter, gerrymander, draw-conspiracy, refresh-market,\ndiscount). The schema follows cards.ts, because the engine is the contract. See\nsrc/effect-ops.ts for the compile-time drift guard.\n\nWhat this union CANNOT express is the subject of packages/cards/KNOWN-GAPS.md:\nduration, tokens-on-card, hostages, timed pass, auction, vote, out-of-turn\nreactive block/deflect, triggers, scaling off board state, dynamic cost modifiers,\nset collection, borrowed powers, delayed cross-turn payoffs, and any effect aimed at\nsomething other than you/each-opponent/everyone/leader. REF 5.4 puts that at roughly\n40% of real Conspiracy/Headline effects.\n\nTHE THREE STATES, and which one every part of this schema is in:\n  (a) expressible AND executed by reduce(): every op below, carrying only the fields\n      EXECUTED_OPS in packages/cards/src/executable.ts says the case actually reads.\n  (b) expressible and validated but NOT executed: `when`, `until`, a computed `n`,\n      and gerrymander's `target` with any value other than 'you'. The schema ACCEPTS\n      these so an author gets the engine explanation instead of 'unknown property';\n      packages/cards/src/validate.ts then REJECTS them, with the reducer change named.\n      No shipped card may use one.\n  (c) not expressible at all: auction, vote, hostage, token piles, deck search, zone\n      scoping, set collection. See KNOWN-GAPS.md G3/G6/G10/G11/G12/G16/G17/G18/G20.\npackages/cards/test/reducer-parity.test.ts reads reduce.ts and re-asserts (a) over the\nwhole shipped corpus, so this list cannot drift away from the reducer.",
+      "$comment": "The Effect union in packages/engine/src/cards.ts.\n\nNOTE FOR REVIEWERS: the task brief calls this a '12-op union'. cards.ts as of this\ncommit declares 13 (gain, lose, gain-any, lose-any, steal-any, voters, evict,\ndiscard-voter, convert-voter, gerrymander, draw-conspiracy, refresh-market,\ndiscount). The schema follows cards.ts, because the engine is the contract. See\nsrc/effect-ops.ts for the compile-time drift guard.\n\nWhat this union CANNOT express is the subject of packages/cards/KNOWN-GAPS.md:\ntokens-on-a-card, hostages, timed pass, auction, vote, out-of-turn reactive\nblock/deflect, dynamic COST modifiers, set collection, borrowed powers, delayed\ncross-turn payoffs, and any effect aimed at something other than\nyou/each-opponent/everyone/leader. REF 5.4 puts that at roughly 40% of real\nConspiracy/Headline effects.\n\nCLOSED SINCE THIS COMMENT WAS WRITTEN, kept so the next reader does not re-derive\nit: duration and timing (G9/G22), when / until / condition (G14), target on\ngerrymander (G8) and a computed n or per (G15/G4) are all EXECUTED.\n\nTHE THREE STATES, and which one every part of this schema is in:\n  (a) expressible AND executed by reduce(): every op below, carrying only the fields\n      EXECUTED_OPS in packages/cards/src/executable.ts says the case actually reads,\n      plus the scope fields SCOPE_FIELDS_READ_BY_INSTALL says installLiveEffects\n      reads, plus a computed n/per naming a source EXECUTABLE_COMPUTED_SOURCES\n      implements.\n  (b) expressible and validated but NOT executed: `interrupt`, and `timing:\n      'after-this-turn'`. The schema ACCEPTS these so an author gets the engine\n      explanation instead of 'unknown property'; packages/cards/src/validate.ts then\n      REJECTS them, with the reason. No shipped card may use one.\n  (c) not expressible at all: auction, vote, hostage, token piles, deck search, zone\n      scoping, set collection. See KNOWN-GAPS.md G3/G6/G10/G11/G12/G16/G17/G18/G20.\npackages/cards/test/reducer-parity.test.ts reads reduce.ts and re-asserts (a) over the\nwhole shipped corpus, so this list cannot drift away from the reducer.",
       "oneOf": [
         {
           "type": "object",
@@ -308,6 +308,7 @@
           "properties": {
             "op": { "const": "gain" },
             "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
+            "per": { "$ref": "#/$defs/computedCount" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" },
@@ -321,6 +322,7 @@
           "properties": {
             "op": { "const": "lose" },
             "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
+            "per": { "$ref": "#/$defs/computedCount" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" },

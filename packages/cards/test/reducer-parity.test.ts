@@ -40,6 +40,7 @@ import {
 import { EFFECT_OPS, EFFECT_OP_SET } from '../src/effect-ops.js';
 import {
   EXECUTED_OPS,
+  EXECUTABLE_COMPUTED_SOURCES,
   EXECUTABLE_TRIGGERS,
   SCOPE_FIELDS_READ_BY_INSTALL,
   unexecutedCardProblems,
@@ -167,6 +168,33 @@ describe('EXECUTED_OPS says which fields each case reads, and that is true', () 
     for (const [op, body] of Object.entries(CASES)) {
       const readsN = (EXECUTED_OPS as Record<string, readonly string[]>)[op]?.includes('n') ?? false;
       expect(/\beffect\.n\b/.test(body), `${op} reads effect.n`).toBe(readsN);
+    }
+  });
+
+  it('`per` is read exactly where the registry claims it is, and that is gain and lose only', () => {
+    // G15/G4. `per` multiplies a `res`, so only the two resource-shaped ops can
+    // honour it, and registering it anywhere else would be a claim the reducer does
+    // not back. Derived from the source, like `n` and `res`.
+    for (const [op, body] of Object.entries(CASES)) {
+      const readsPer = (EXECUTED_OPS as Record<string, readonly string[]>)[op]?.includes('per') ?? false;
+      expect(/\beffect\.per\b/.test(body), `${op} reads effect.per`).toBe(readsPer);
+    }
+  });
+
+  it('and both of them resolve the value BEFORE constructing anything from it', () => {
+    // The invariant that makes widening `n` to `Count` safe. `Choice.count` is still
+    // a `number` where it is built, so a computed value cannot reach the engine as
+    // one — which is the guarantee KNOWN-GAPS G15 originally wanted from the type
+    // system and now gets from the reducer instead.
+    for (const op of ['gain-any', 'lose-any', 'steal-any', 'voters', 'discount', 'gerrymander'] as const) {
+      const body = CASES[op];
+      expect(body, op).toBeDefined();
+      expect(
+        /\bresolveCount\(/.test(body ?? ''),
+        `${op} resolves a computed n before using it`,
+      ).toBe(true);
+      // And never the raw `effect.n` inside a count or a bound.
+      expect(/count: effect\.n/.test(body ?? ''), `${op} does not push effect.n raw`).toBe(false);
     }
   });
 
@@ -424,11 +452,52 @@ describe('a field the reducer ignores is rejected however it is spelled', () => 
     }
   });
 
-  it('rejects a computed n, which reduce() would push into a Choice.count', () => {
+  it('rejects a computed n the reducer cannot read, and accepts one it can', () => {
     expect(validateEffect(FILE, { op: 'gain-any', n: { of: 'your-pool' } }, EFFECT_OP_SET)).toEqual([]);
-    const report = findingsForEffect({ op: 'gain-any', n: { of: 'your-pool' } });
-    expect(codes(report)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    expect(report.errors[0]?.message).toContain('G15');
+    expect(codes(findingsForEffect({ op: 'gain-any', n: { of: 'your-pool' } }))).toEqual([]);
+    // Every source `computedValue` implements is accepted…
+    for (const of of EXECUTABLE_COMPUTED_SOURCES) {
+      expect(codes(findingsForEffect({ op: 'gain-any', n: { of } })), of).toEqual([]);
+    }
+    // …and the schema's `of` enum is that same set, so a deck file cannot name a
+    // source the registry has never heard of.
+    const schemaSources = (
+      (
+        corpusSchema().$defs as Record<
+          string,
+          { readonly properties?: Record<string, { readonly enum?: readonly string[] }> }
+        >
+      ).computedCount?.properties?.of?.enum
+    );
+    expect([...(schemaSources ?? [])].sort()).toEqual([...EXECUTABLE_COMPUTED_SOURCES].sort());
+  });
+
+  it('rejects an unknown computed source, because an unknown one silently reads as zero', () => {
+    // The worst possible outcome for a computed value: not an error, a zero. A card
+    // that reads as though it doubles something and doubles nothing. The schema
+    // catches the typo as well, so the finding is filtered to the executability one —
+    // both are real, and asserting on the union of them would let either pass alone.
+    const report = findingsForEffect({ op: 'gain-any', n: { of: 'the-phase-of-the-moon' } });
+    const executability = report.errors.filter((e) => e.code === 'EFFECT_FIELD_NOT_EXECUTED');
+    expect(executability).toHaveLength(1);
+    expect(executability[0]?.message).toContain('no quantity reduce() can read');
+  });
+
+  it('accepts `per` only on gain and lose, and only with `held-of-each-resource`', () => {
+    expect(codes(findingsForEffect({ op: 'gain', res: { funds: 1 }, per: { of: 'held-of-each-resource' } }))).toEqual([]);
+    expect(codes(findingsForEffect({ op: 'lose', res: { funds: 1 }, per: { of: 'held-of-each-resource' } }))).toEqual([]);
+    // `per` multiplies EACH component of `res`, so any other source would multiply a
+    // single number into four resources — which is not what any recovered card means.
+    const wrong = findingsForEffect({ op: 'gain', res: { funds: 1 }, per: { of: 'your-pool' } });
+    expect(codes(wrong)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
+    expect(wrong.errors[0]?.message).toContain("'held-of-each-resource'");
+    // And on an op with no `res` it is a field the case does not read. Filtered to the
+    // executability finding, because the schema reports the same thing as an
+    // additionalProperties error and both are true.
+    const onVoters = findingsForEffect({ op: 'voters', n: 1, per: { of: 'held-of-each-resource' } });
+    expect(
+      onVoters.errors.filter((e) => e.code === 'EFFECT_FIELD_NOT_EXECUTED'),
+    ).toHaveLength(1);
   });
 
   it('rejects a malformed effect twice over: shape AND executability', () => {
@@ -540,22 +609,22 @@ describe('the reserved shapes are still shapes', () => {
   });
 
   it('and the validator refuses exactly the two the engine still does not perform', () => {
-    // `interrupt` (G13 — a change of phase, not of resources) and a computed `n`
-    // (G15 — reduce() reads it as a literal). Everything else in that object is now
-    // executed, so a card carrying only the executed half validates clean, which is
-    // the assertion that the registry is not just refusing everything.
+    // `interrupt` (G13 — a change of phase, not of resources) and `timing:
+    // 'after-this-turn'`, which has no anchor between `advanceTurn` and the next
+    // player's first action. Everything else in that object is now executed, so a
+    // card carrying only the executed half validates clean — which is the assertion
+    // that the registry is not simply refusing everything.
+    expect(
+      codes(validateWithHeadline(baseHeadline({ duration: 'rest-of-game', timing: 'next-turn' }))),
+    ).toEqual([]);
     const report = validateWithHeadline(
       baseHeadline({
         interrupt: { op: 'vote', window: 'always' },
-        duration: 'rest-of-game',
-        timing: 'next-turn',
+        timing: 'after-this-turn',
         effects: [{ op: 'voters', n: { of: 'your-pool' }, when: 'on-turn-start', until: 'round' }],
       }),
     );
-    expect(codes(report).slice().sort()).toEqual([
-      'EFFECT_FIELD_NOT_EXECUTED',
-      'EFFECT_NOT_EXECUTED',
-    ]);
+    expect(codes(report).slice().sort()).toEqual(['EFFECT_NOT_EXECUTED', 'EFFECT_NOT_EXECUTED']);
   });
 });
 

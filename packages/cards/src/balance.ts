@@ -668,7 +668,7 @@ export function voterValue(cards: readonly CorpusVoterCard[]): number {
 
 /**
  * The net resources an X-card hands its own player. Negative means the card costs
- * its player resources.
+ * its player resources. `null` means the card cannot be measured statically.
  *
  * Only the RESOLVING player's share is counted. An effect aimed at `each-opponent`,
  * `everyone` or `leader` is another player's problem, and one that helps everybody is
@@ -677,12 +677,24 @@ export function voterValue(cards: readonly CorpusVoterCard[]): number {
  * That is a real limit of the measure and it is stated rather than hidden; the checks
  * that would catch it (target-sensitive payout analysis) belong with a corpus large
  * enough to have a distribution worth judging.
+ *
+ * WHY `null`, and why the answer is not zero. A computed `n` or `per` (G15 / G4) is
+ * read out of a player's own state at resolution — how much they hold, how many
+ * Ideology Cards they have answered, how many pegs they have in Volatile Areas. This
+ * function runs on ONE CARD IN ISOLATION with no player state, so there is nothing to
+ * read, and a card whose whole value is a function of the board cannot be priced
+ * before a board exists. Scoring it 0 would be the worst of the three answers: the
+ * check would pass, and it would pass for a reason that has nothing to do with the
+ * card. So the card is reported as UNMEASURED and the reviewer looks at it. This is
+ * the same shape as the D3 caveat in KNOWN-GAPS §6: the proxy is honest about being
+ * a proxy, and the alternative is a number that reads as a verdict and is not one.
  */
-export function xCardMagnitude(card: XCardLike, perVoter: number): number {
+export function xCardMagnitude(card: XCardLike, perVoter: number): number | null {
   let total = 0;
   for (const effect of card.effects) {
     const mine = !('target' in effect) || effect.target === undefined || effect.target === 'you';
     if (!mine) continue;
+    if (computedIn(effect)) return null;
     switch (effect.op) {
       case 'gain':
         total += deltaTotal(effect.res);
@@ -692,20 +704,20 @@ export function xCardMagnitude(card: XCardLike, perVoter: number): number {
         break;
       case 'gain-any':
       case 'steal-any':
-        total += effect.n;
+        total += literal(effect.n);
         break;
       case 'lose-any':
-        total -= effect.n;
+        total -= literal(effect.n);
         break;
       case 'voters':
-        total += effect.n * perVoter;
+        total += literal(effect.n) * perVoter;
         break;
       case 'discount':
         // A discount is worth one resource per use, at most.
-        total += effect.n;
+        total += literal(effect.n);
         break;
       case 'draw-conspiracy':
-        total += effect.n * CONSPIRACY_MIN_COST;
+        total += literal(effect.n) * CONSPIRACY_MIN_COST;
         break;
       // Board effects are not resources: evicting, discarding, converting,
       // gerrymandering and refreshing the market move pegs and cards, not discs.
@@ -720,11 +732,48 @@ export function xCardMagnitude(card: XCardLike, perVoter: number): number {
   return total;
 }
 
+/** Does this effect carry a count or multiplier that only exists at play time? */
+function computedIn(effect: unknown): boolean {
+  if (typeof effect !== 'object' || effect === null) return false;
+  const e = effect as { readonly n?: unknown; readonly per?: unknown };
+  if ('per' in e && e.per !== undefined) return true;
+  return 'n' in e && typeof e.n !== 'number';
+}
+
+/**
+ * The literal value of a Count. Only called after computedIn has said there is
+ * one, so the throw is unreachable through xCardMagnitude; it is here so that a
+ * future caller cannot quietly treat a computed count as zero.
+ */
+function literal(n: number | { readonly of: string }): number {
+  if (typeof n !== 'number') {
+    throw new Error(`computedIn() should have caught this: ${JSON.stringify(n)}`);
+  }
+  return n;
+}
+
 function xCardFindings(deck: string, cards: readonly XCardLike[], perVoter: number): readonly BalanceFinding[] {
   const out: BalanceFinding[] = [];
   for (const card of cards) {
     const magnitude = xCardMagnitude(card, perVoter);
+    if (magnitude === null) {
+      out.push({
+        code: 'X_EFFECT_MAGNITUDE',
+        severity: 'warn',
+        deck,
+        cardId: card.id,
+        message:
+          `"${card.name}" is NOT MEASURED by this check: its value is computed from a ` +
+          `player's own state at resolution, and this runs on one card in isolation with ` +
+          `no player state to read. Scoring it zero would have made the check pass for a ` +
+          `reason that has nothing to do with the card, so it is reported here instead. ` +
+          `See KNOWN-GAPS.md section 6 for why the balance checker's other proxies are ` +
+          `approximate too.`,
+      });
+      continue;
+    }
     if (magnitude <= X_EFFECT_MAGNITUDE_BUDGET) continue;
+
     out.push({
       code: 'X_EFFECT_MAGNITUDE',
       severity: 'warn',

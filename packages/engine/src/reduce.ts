@@ -13,7 +13,9 @@ import type { Action, ChoicePick, GameEvent, Result } from './actions';
 import { allMajoritiesFormed, boardFull, recount, scores, winners } from './board';
 import type {
   CardIndex,
+  ComputedCount,
   ComputedSource,
+  Count,
   Effect,
   EffectCondition,
   EffectDuration,
@@ -39,6 +41,7 @@ import {
   pegsOf,
   poolTotal,
   roundEndTurn,
+  tally,
   type Area,
   type AreaID,
   type CardID,
@@ -455,15 +458,160 @@ function raiseVoterDecision(
   state: GameState,
   source: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
-  n: number,
+  n: Count,
   target: EffectTarget,
+  ctx: Ctx,
 ): GameState {
   let s = state;
   for (const p of resolveTargets(s, source, target)) {
     const scope: ChoiceScope = p === source ? (kind === 'evict-voter' ? 'any' : 'others') : 'own';
-    s = pushChoice(s, { kind, count: n, scope, reason: 'Card effect' }, p);
+    s = pushChoice(
+      s,
+      { kind, count: resolveCount(s, p, n, ctx), scope, reason: 'Card effect' },
+      p,
+    );
   }
   return s;
+}
+
+/**
+ * Resolve a card's `n` against player state, before anything is pushed.
+ *
+ * G15 / G4: the `n` of every op used to be a literal, and a price or a payout that
+ * is a function of the seller's own board cannot be one. The read is ALWAYS against
+ * the player the effect is resolved FOR — the recipient of a `gain-any`, the victim
+ * of a `lose-any`, the thief of a `steal-any` — because that is the only reading on
+ * which "gain as many as you have" is true.
+ *
+ * A literal passes straight through, so every shipped card is bit-for-bit unchanged.
+ */
+function resolveCount(
+  state: GameState,
+  player: PlayerID,
+  n: number | ComputedCount,
+  ctx: Ctx,
+): number {
+  if (typeof n === 'number') return n;
+  return computedValue(state, player, n.of, undefined, ctx);
+}
+
+/**
+ * Resolve a `gain` / `lose` `res` against player state, applying `per`.
+ *
+ * `per: { of: 'held-of-each-resource' }` multiplies each resource by what the player
+ * holds OF THAT RESOURCE, which is exactly IF YOU LIKE PIÑA COLADA's *"Double all
+ * the resources on your player mat"*: a `res` of 1 in each resource, multiplied by
+ * the holder's own count of each, is a doubling. The cap still applies afterwards,
+ * because `applyEffect` runs `enforceCap` over whatever comes back — which is the
+ * card's own second sentence, *"Your current resource cap still applies"*.
+ */
+function resolveDelta(
+  state: GameState,
+  player: PlayerID,
+  res: Delta,
+  per: ComputedCount | undefined,
+  ctx: Ctx,
+): Delta {
+  if (per === undefined) return res;
+  const out: Delta = {};
+  for (const r of RESOURCES) {
+    const base = res[r] ?? 0;
+    if (base <= 0) continue;
+    const k = computedValue(state, player, per.of, r, ctx);
+    if (k <= 0) continue;
+    out[r] = base * k;
+  }
+  return out;
+}
+
+/**
+ * Read one computed quantity out of player state. Zero when it cannot be read.
+ *
+ * `ideologue-level` carries the caveat from KNOWN-GAPS §6, so it is worth stating
+ * here where the value is actually produced. The balance checker's D3
+ * `POWER_THRESHOLD_CLIFF` models the Ideologue ladder as a RESOURCE PROXY, because
+ * it runs on one card in isolation with no manifestos and so cannot count cards.
+ * This does not use that proxy: **the engine's real unlock rule counts Ideology
+ * CARDS answered** (`powers.ts` `hasPower` is
+ * `cardsOf(player, ideologue) >= rules.level3`), so this counts cards too. A player
+ * who answers three Capitalist cards unlocks Prospecting whatever those cards paid;
+ * a player who answers one Capitalist card paying 3 Funds unlocks nothing. Reading
+ * resources here would have made the card agree with the checker and disagree with
+ * the engine, which is the wrong way round.
+ */
+function computedValue(
+  state: GameState,
+  player: PlayerID,
+  of: ComputedSource,
+  resource: Resource | undefined,
+  ctx: Ctx,
+): number {
+  const p = state.players[player];
+  if (!p) return 0;
+  switch (of) {
+    case 'your-pool':
+      return poolTotal(p.resources);
+    case 'held-of-each-resource':
+      return resource === undefined ? 0 : p.resources[resource];
+    case 'volatile-voters':
+      return countVolatilePegs(state, player);
+    case 'your-gerrymander-rights':
+      return totalGerrymanderAllowance(state, player, ctx.rules);
+    case 'ideologue-level':
+      return ideologueLevel(state, player, ctx.rules);
+  }
+}
+
+/** p18: a peg in a Volatile Area is permanent, so this only ever goes up. */
+function countVolatilePegs(state: GameState, player: PlayerID): number {
+  let n = 0;
+  for (const z of state.zones) {
+    for (const a of z.areas) {
+      if (a.volatile && a.peg?.owner === player) n += 1;
+    }
+  }
+  return n;
+}
+
+/**
+ * The best Ideologue LEVEL this player has reached: 5, else 3, else 1.
+ *
+ * From the card count, per the note on `computedValue`. Which Ideologue is the
+ * player's own to choose — the card does not name one — so the best of the four is
+ * taken, and 1 is the floor because "the Ideologue level this card is on" is always
+ * at least Level 1.
+ */
+function ideologueLevel(state: GameState, player: PlayerID, rules: Rules): number {
+  const p = state.players[player];
+  if (!p) return 0;
+  const counts = tally(p.manifesto);
+  const best = Math.max(
+    counts.capitalist,
+    counts.supremo,
+    counts.showstopper,
+    counts.idealist,
+  );
+  if (best >= rules.level5) return 5;
+  if (best >= rules.level3) return 3;
+  return 1;
+}
+
+/**
+ * Gerrymander moves still available across EVERY zone, which is the number a card
+ * means by "the Gerrymandering Rights you have at this point" (DOSTI BANI RAHE).
+ *
+ * Summed over the zones where the player actually holds rights, p16: rights belong
+ * to whoever has strictly more voters in a zone than anybody else, and a tie gives
+ * nobody rights — so a zone the player does not lead contributes zero, which is what
+ * makes the sum the right reading rather than `zones × perZone`.
+ */
+function totalGerrymanderAllowance(state: GameState, player: PlayerID, rules: Rules): number {
+  let total = 0;
+  for (const z of state.zones) {
+    if (gerrymanderRights(z) !== player) continue;
+    total += gerrymanderAllowance(state, player, rules, z.id);
+  }
+  return total;
 }
 
 function applyEffect(
@@ -479,26 +627,26 @@ function applyEffect(
   switch (effect.op) {
     case 'gain': {
       for (const p of resolveTargets(s, source, target)) {
-        s = enforceCap(addResources(s, p, effect.res), p, ctx.rules);
+        s = enforceCap(addResources(s, p, resolveDelta(s, p, effect.res, effect.per, ctx)), p, ctx.rules);
       }
       return s;
     }
     case 'lose': {
       for (const p of resolveTargets(s, source, target)) {
-        [s] = takeResources(s, p, effect.res);
+        [s] = takeResources(s, p, resolveDelta(s, p, effect.res, effect.per, ctx));
       }
       return s;
     }
     case 'gain-any': {
       for (const p of resolveTargets(s, source, target)) {
-        s = pushChoice(s, { kind: 'gain-any', count: effect.n, reason: 'Card effect' }, p);
+        s = pushChoice(s, { kind: 'gain-any', count: resolveCount(s, p, effect.n, ctx), reason: 'Card effect' }, p);
       }
       return s;
     }
     case 'lose-any': {
       for (const p of resolveTargets(s, source, target)) {
         const held = poolTotal(s.players[p]?.resources ?? { funds: 0, clout: 0, media: 0, trust: 0 });
-        const n = Math.min(effect.n, held);
+        const n = Math.min(resolveCount(s, p, effect.n, ctx), held);
         if (n > 0) s = pushChoice(s, { kind: 'lose-any', count: n, reason: 'Card effect' }, p);
       }
       return s;
@@ -511,28 +659,28 @@ function applyEffect(
       // requires the pick to name exactly that player.
       const named = target !== 'you' ? resolveTargets(s, source, target) : [];
       if (named.length === 0) {
-        return pushChoice(s, { kind: 'steal-any', count: effect.n, from: null, reason: 'Card effect' }, source);
+        return pushChoice(s, { kind: 'steal-any', count: resolveCount(s, source, effect.n, ctx), from: null, reason: 'Card effect' }, source);
       }
       for (const victim of named) {
         if (victim === source) continue; // nobody snatches from themselves
         // A live effect that fires on somebody's purchase names them, not a field.
         const from = fire?.actor ?? victim;
-        s = pushChoice(s, { kind: 'steal-any', count: effect.n, from, reason: 'Card effect' }, source);
+        s = pushChoice(s, { kind: 'steal-any', count: resolveCount(s, source, effect.n, ctx), from, reason: 'Card effect' }, source);
       }
       return s;
     }
     case 'voters': {
       for (const p of resolveTargets(s, source, target)) {
-        s = grantVoters(s, p, effect.n, 'Card effect', false);
+        s = grantVoters(s, p, resolveCount(s, p, effect.n, ctx), 'Card effect', false);
       }
       return s;
     }
     case 'evict':
-      return raiseVoterDecision(s, source, 'evict-voter', effect.n, target);
+      return raiseVoterDecision(s, source, 'evict-voter', effect.n, target, ctx);
     case 'discard-voter':
-      return raiseVoterDecision(s, source, 'discard-voter', effect.n, target);
+      return raiseVoterDecision(s, source, 'discard-voter', effect.n, target, ctx);
     case 'convert-voter':
-      return raiseVoterDecision(s, source, 'convert-voter', effect.n, target);
+      return raiseVoterDecision(s, source, 'convert-voter', effect.n, target, ctx);
     case 'gerrymander': {
       // G8, closed on the REDUCER (KNOWN-GAPS.md G8). The bonus used to be credited
       // to `source` alone, which is why "starting with you, EVERY player can
@@ -550,7 +698,7 @@ function applyEffect(
         if (!player) continue;
         // Negative "used" counts read as bonus moves in the allowance check.
         const bonus: Record<string, number> = { ...player.powerUses.gerrymandered };
-        bonus['__bonus'] = (bonus['__bonus'] ?? 0) + effect.n;
+        bonus['__bonus'] = (bonus['__bonus'] ?? 0) + resolveCount(s, p, effect.n, ctx);
         s = withPlayer(s, p, { powerUses: { ...player.powerUses, gerrymandered: bonus } });
       }
       return s;
@@ -566,7 +714,7 @@ function applyEffect(
       // change the client owns. The top of the pile is the honest subset.
       const fromDiscard = effect.from === 'discard';
       for (const p of resolveTargets(s, source, target)) {
-        for (let i = 0; i < effect.n; i++) {
+        for (let i = 0; i < resolveCount(s, p, effect.n, ctx); i++) {
           const pile = fromDiscard ? s._conspiracyDiscard : s._conspiracyDraw;
           const id = fromDiscard ? pile[pile.length - 1] : pile[0];
           if (id === undefined) break;
@@ -596,7 +744,7 @@ function applyEffect(
         s = withPlayer(s, p, {
           powerUses: {
             ...player.powerUses,
-            helpingHands: player.powerUses.helpingHands - effect.n,
+            helpingHands: player.powerUses.helpingHands - resolveCount(s, p, effect.n, ctx),
           },
         });
       }

@@ -56,8 +56,8 @@ import type { Effect } from './engine.js';
  * table prevents, so the entries are deliberately exhaustive rather than minimal.
  */
 export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
-  gain: ['res', 'target'],
-  lose: ['res', 'target'],
+  gain: ['res', 'per', 'target'],
+  lose: ['res', 'per', 'target'],
   'gain-any': ['n', 'target'],
   'lose-any': ['n', 'target'],
   'steal-any': ['n', 'target'],
@@ -70,6 +70,7 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   'refresh-market': [],
   discount: ['n', 'target'],
 };
+
 
 export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(EXECUTED_OPS));
 
@@ -89,6 +90,40 @@ const FIELD_EXECUTABLE_WHEN: Readonly<Record<string, (value: unknown) => boolean
  * object itself, rather than inside one `case`.
  */
 export const EFFECT_INTRINSIC_FIELDS: readonly string[] = ['op'];
+
+/**
+ * The quantities a computed `n` or a `per` multiplier may be read from.
+ *
+ * Mirrors `ComputedSource` in `packages/engine/src/cards.ts`, and the JSON Schema's
+ * `dynamicCount.of` enum. Three of the five, so a typo in a deck file gets the
+ * registry's message rather than a silently-zero count.
+ *
+ *  - `your-pool` — the total the player holds.
+ *  - `ideologue-level` — 1, 3 or 5, from the count of Ideology CARDS answered. NOT
+ *    the balance checker's resource proxy: KNOWN-GAPS §6 says that proxy
+ *    over-reports, and `powers.ts hasPower` counts cards. The engine reads cards.
+ *  - `your-gerrymander-rights` — moves still available across every zone they lead.
+ *  - `volatile-voters` — their pegs in Volatile Areas. p18 makes those permanent, so
+ *    it only grows.
+ *  - `held-of-each-resource` — for `per` only: what the player holds of the resource
+ *    in `res`. A `res` of 1 in each resource with this multiplier is IF YOU LIKE
+ *    PIÑA COLADA's doubling of the whole mat.
+ */
+export const EXECUTABLE_COMPUTED_SOURCES: ReadonlySet<string> = new Set([
+  'your-pool',
+  'ideologue-level',
+  'your-gerrymander-rights',
+  'volatile-voters',
+  'held-of-each-resource',
+]);
+
+export const COMPUTED_SOURCE_FIX =
+  'reduce() reads a computed value through computedValue() in reduce.ts, and only ' +
+  'these sources are implemented. An unknown `of` resolves to zero, which is the ' +
+  'worst possible answer: a card that reads as though it doubles something and ' +
+  'doubles nothing. See ComputedSource in packages/engine/src/cards.ts and ' +
+  'KNOWN-GAPS.md G15 and G4.';
+
 
 /**
  * The scope fields `applyEffect` does NOT read but the card contract honours
@@ -199,9 +234,13 @@ export const CONDITION_FIX =
   'trigger is never evaluated, and the engine drops it silently. Write the trigger first.';
 
 export const DYNAMIC_N_FIX =
-  'reduce() reads `effect.n` as a number and pushes it straight into a Choice.count / a loop ' +
-  'bound. A computed value has to be resolved before applyEffect pushes anything, which means ' +
-  'the same read-the-player-state plumbing as G14. See KNOWN-GAPS.md G15.';
+  'Every implemented source is resolved by computedValue() in reduce.ts, against the ' +
+  'player the effect resolves FOR, before anything is pushed — so Choice.count is still a ' +
+  'number at the point it is built. The caveat that matters is ideologue-level: the engine ' +
+  'unlocks a power by counting Ideology CARDS answered (powers.ts hasPower), NOT resources ' +
+  'paid, so this reads cards. KNOWN-GAPS.md §6 explains why the balance checker\'s resource ' +
+  'proxy is only an approximation and over-reports. See G15 and G4.';
+
 
 
 // ─────────────────────────── the check ───────────────────────────
@@ -302,18 +341,49 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
     });
   }
 
-  // A computed `n` passes the field check — `n` IS a field the case reads — so the
-  // value is what has to be checked. reduce() pushes it into a Choice.count (typed
-  // `number`) and loops on it.
+  // A computed `n` is a FIELD the case reads, so the field check above passes it;
+  // what has to be checked is the VALUE. reduce() resolves it against the player the
+  // effect resolves for, before it constructs a Choice.count or a loop bound, so the
+  // only way to get this wrong is to name a source the reducer cannot read.
   if ('n' in effect && typeof effect.n !== 'number') {
-    out.push({
-      code: 'EFFECT_FIELD_NOT_EXECUTED',
-      pointer: `${pointer}/n`,
-      message:
-        `a computed n (${JSON.stringify(effect.n)}) is not something reduce() can evaluate: ` +
-        `applyEffect reads effect.n as a literal and pushes it straight into a Choice.count and a ` +
-        `loop bound. ${DYNAMIC_N_FIX}`,
-    });
+    const of = isPlainObject(effect.n) ? effect.n['of'] : undefined;
+    if (typeof of !== 'string' || !EXECUTABLE_COMPUTED_SOURCES.has(of)) {
+      out.push({
+        code: 'EFFECT_FIELD_NOT_EXECUTED',
+        pointer: `${pointer}/n`,
+        message:
+          `a computed n of ${JSON.stringify(effect.n)} names no quantity reduce() can read. ` +
+          `${COMPUTED_SOURCE_FIX}`,
+      });
+    }
+  }
+  // `per` is the same question about a multiplier, and it is only meaningful on
+  // `gain` / `lose` — but that is already covered by the field check above, because
+  // `per` is registered as read on exactly those two ops and nowhere else.
+  if ('per' in effect) {
+    const of = isPlainObject(effect.per) ? effect.per['of'] : undefined;
+    if (typeof of !== 'string' || !EXECUTABLE_COMPUTED_SOURCES.has(of)) {
+      out.push({
+        code: 'EFFECT_FIELD_NOT_EXECUTED',
+        pointer: `${pointer}/per`,
+        message:
+          `a per multiplier of ${JSON.stringify(effect.per)} names no quantity reduce() can read. ` +
+          `${COMPUTED_SOURCE_FIX}`,
+      });
+    } else if (of !== 'held-of-each-resource') {
+      // The multiplier is applied PER RESOURCE, so any other source would multiply
+      // the same number into four components, which is not what any recovered card
+      // means. Naming the one legal value is more useful than letting it through.
+      out.push({
+        code: 'EFFECT_FIELD_NOT_EXECUTED',
+        pointer: `${pointer}/per`,
+        message:
+          'per is a multiplier applied to EACH component of `res`, so the only source ' +
+          `that means anything is 'held-of-each-resource' — what the player holds of the ` +
+          `resource being gained. "${of}" would multiply one number into every resource. ` +
+          `${COMPUTED_SOURCE_FIX}`,
+      });
+    }
   }
   return out;
 }

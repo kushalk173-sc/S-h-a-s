@@ -204,14 +204,21 @@ export type EffectScope = {
 
 
 export type Effect = (
-  /** Gain a fixed set of resources from the Public Reserve. */
-  | { readonly op: 'gain'; readonly res: Delta; readonly target?: EffectTarget }
-  /** Pay a fixed set to the Public Reserve. Capped at what the player holds. */
-  | { readonly op: 'lose'; readonly res: Delta; readonly target?: EffectTarget }
-  /** Gain N resources of the recipient's choice. */
-  | { readonly op: 'gain-any'; readonly n: number; readonly target?: EffectTarget }
-  /** Discard N resources of the recipient's choice. */
-  | { readonly op: 'lose-any'; readonly n: number; readonly target?: EffectTarget }
+  /**
+   * Gain a fixed set of resources from the Public Reserve.
+   *
+   * `per` multiplies `res` by a quantity read out of the recipient's own state —
+   * `{ of: 'held-of-each-resource' }` on a `res` of 1 in each resource is IF YOU
+   * LIKE PIÑA COLADA's *"Double all the resources on your player mat"*, and the cap
+   * still applies on top, which is the card's own second sentence.
+   */
+  | { readonly op: 'gain'; readonly res: Delta; readonly per?: ComputedCount; readonly target?: EffectTarget }
+  /** Pay a fixed set to the Public Reserve. Capped at what the player holds. `per` as for `gain`. */
+  | { readonly op: 'lose'; readonly res: Delta; readonly per?: ComputedCount; readonly target?: EffectTarget }
+  /** Gain N resources of the recipient's choice. `n` may be computed. */
+  | { readonly op: 'gain-any'; readonly n: Count; readonly target?: EffectTarget }
+  /** Discard N resources of the recipient's choice. `n` may be computed. */
+  | { readonly op: 'lose-any'; readonly n: Count; readonly target?: EffectTarget }
   /**
    * p34 Snatch: take N resources from a chosen opponent, nothing in return.
    *
@@ -220,17 +227,20 @@ export type Effect = (
    * raised per resolved player, so `'each-opponent'` reads "take N from every
    * opponent" and nothing else. It cannot mean "donate to a chosen player" — that
    * is G1, and it needs a different op.
+   *
+   * A computed `n` is read from the THIEF, who is the player the effect resolves
+   * for.
    */
-  | { readonly op: 'steal-any'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'steal-any'; readonly n: Count; readonly target?: EffectTarget }
   /** Gain N voters to place. Splittable across zones (they are not from a Voter Card). */
-  | { readonly op: 'voters'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'voters'; readonly n: Count; readonly target?: EffectTarget }
   /**
    * p34 Evict: back to the owner's mat, replaceable next turn.
    *
    * `target` names who is asked to make the eviction. A player named by the card
    * chooses among their OWN voters; the caster chooses from the whole board.
    */
-  | { readonly op: 'evict'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'evict'; readonly n: Count; readonly target?: EffectTarget }
   /**
    * p34 Discard: off the board permanently. `target` as for `evict`.
    *
@@ -238,9 +248,9 @@ export type Effect = (
    * own — the reading three shipped cards state in their text. See
    * `ChoiceScope` for why "your own voters" needs the target rather than a flag.
    */
-  | { readonly op: 'discard-voter'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'discard-voter'; readonly n: Count; readonly target?: EffectTarget }
   /** p34 Convert: replace an opponent's voter in the same area with your own. `target` as for `evict`. */
-  | { readonly op: 'convert-voter'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'convert-voter'; readonly n: Count; readonly target?: EffectTarget }
   /**
    * Extra gerrymander moves this turn, above the normal per-zone allowance.
    *
@@ -252,7 +262,7 @@ export type Effect = (
    * whose turn the card resolved on; a lasting cross-player grant is a `LiveEffect`
    * with `duration`, not a bigger `n`.
    */
-  | { readonly op: 'gerrymander'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'gerrymander'; readonly n: Count; readonly target?: EffectTarget }
   /**
    * Draw the top Conspiracy Card(s). `target` says who receives them, so
    * `'each-opponent'` is GOOD GIG WELL PLAYED's gift. Hands are hidden from every
@@ -268,7 +278,7 @@ export type Effect = (
    */
   | {
       readonly op: 'draw-conspiracy';
-      readonly n: number;
+      readonly n: Count;
       readonly target?: EffectTarget;
       readonly from?: 'draw' | 'discard';
     }
@@ -279,9 +289,21 @@ export type Effect = (
    * which is a write to another player's `powerUses` — the only such write in the
    * effect vocabulary, and the reason it is a card field rather than a resource.
    */
-  | { readonly op: 'discount'; readonly n: number; readonly target?: EffectTarget }
+  | { readonly op: 'discount'; readonly n: Count; readonly target?: EffectTarget }
 ) &
   EffectScope;
+
+/**
+ * The `n` of a non-resource Effect: a literal, or a quantity read out of player
+ * state.
+ *
+ * G15 / G4. The widening is safe *because* `reduce()` resolves it before it pushes
+ * anything: `Choice.count` is still a `number` at the point it is constructed, so
+ * TypeScript still stops a computed count from reaching the engine as one. See
+ * `resolveCount` in reduce.ts.
+ */
+export type Count = number | ComputedCount;
+
 
 /**
  * The fields the two X-card types share.
