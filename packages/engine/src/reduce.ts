@@ -11,7 +11,16 @@
 
 import type { Action, ChoicePick, GameEvent, Result } from './actions';
 import { allMajoritiesFormed, boardFull, recount, scores, winners } from './board';
-import type { CardIndex, Effect, EffectTarget, EffectTrigger } from './cards';
+import type {
+  CardIndex,
+  ComputedSource,
+  Effect,
+  EffectCondition,
+  EffectDuration,
+  EffectTarget,
+  EffectTiming,
+  EffectTrigger,
+} from './cards';
 import { hasPower, passiveBonus, usesLeft } from './powers';
 import { applyDiscounts, canAfford, deltaError, overCap, subtract } from './resources';
 import { shuffle } from './rng';
@@ -25,14 +34,18 @@ import {
   findArea,
   findZone,
   gerrymanderRights,
+  isInForce,
+  ownerNextTurn,
   pegsOf,
   poolTotal,
+  roundEndTurn,
   type Area,
   type AreaID,
   type CardID,
   type ChoiceScope,
   type Delta,
   type GameState,
+  type LiveEffect,
   type LogEntry,
   type PendingChoice,
   type PlayerID,
@@ -41,6 +54,7 @@ import {
   type Resource,
   type Zone,
 } from './state';
+
 
 export type Ctx = { readonly rules: Rules; readonly cards: CardIndex };
 
@@ -266,23 +280,114 @@ function grantVoters(
  * a hook's effects can read "who just did this" without the reducer carrying a
  * mutable cursor.
  *
- * Only two ops read it today, and each for one card:
+ * Only three ops read it today, each for one card:
  *  - `steal-any` takes its victim from `actor`, which is LAB-GROWN EARWORM's
  *    "every time THEY influence a Voter Card, they will give you 1 of their
  *    resources" (REF 4.2.1);
- *  - the `condition` check on the hook itself, which is POWER TRIP's "every time
- *    you influence a 3-Voter Card".
+ *  - `movedMyVoter`, which compares `pegOwner` against the effect's owner and is
+ *    GROWING DISSENT's "every time any opponent Gerrymanders your voters";
+ *  - `influencedVotersAtLeast`, which is POWER TRIP's "every time you influence a
+ *    3-Voter Card".
  */
 export type FireContext = {
   readonly trigger: EffectTrigger;
   readonly actor: PlayerID;
   /** Voters on the purchased card. 0 for an event that is not a purchase. */
   readonly voters: number;
-  /** The voter a board event moved, where the event has one. */
+  /** The area a board event touched, where the event has one. */
   readonly areaId: AreaID | null;
+  /** The owner of the voter a board event moved. GROWING DISSENT. */
+  readonly pegOwner: PlayerID | null;
 };
 
 const NO_FIRE: FireContext | undefined = undefined;
+
+/**
+ * How many effects ONE firing event may set off, in total.
+ *
+ * RE-ENTRANCY, and why a number is the right answer. A wave applies at most one
+ * live effect, and an effect that has already fired in this cascade is not eligible
+ * again, so two hooks on the same event cost two waves and stop. A cycle among live
+ * effects — A installs B, B re-arms A — would be the unbounded case, and the cap is
+ * what makes it terminate rather than hang the server. Nothing in today's effect
+ * vocabulary can install a live effect, so the cap is defence in depth rather than a
+ * live hazard; `live-effects.test.ts` proves the clamp is real by driving the
+ * cascade with an explicit budget of 1 and 2.
+ *
+ * 16 is far above the number of live effects a game can plausibly hold (each costs
+ * a card from a 22-card Conspiracy deck or a 26-card Headline deck) and far below
+ * anything that would stall a request.
+ */
+export const TRIGGER_MAX_WAVES = 16;
+
+const NO_CONSUMED: ReadonlySet<string> = new Set();
+
+/**
+ * The trigger registry: fire every live effect hooked on this event.
+ *
+ * `consumed` is an ARGUMENT, threaded through the loop, precisely so the "already
+ * fired" set is not module state and not a field on `GameState` — R2 forbids both.
+ * Two identical calls with the same inputs take the same path and reach the same
+ * state, which is what the replay test in `integration.test.ts` checks.
+ *
+ * `waves` is a parameter so a test can prove the clamp rather than assert it. The
+ * production call sites pass nothing and take `TRIGGER_MAX_WAVES`.
+ */
+function fireTriggers(
+  state: GameState,
+  fire: FireContext,
+  ctx: Ctx,
+  waves: number = TRIGGER_MAX_WAVES,
+  consumed: ReadonlySet<string> = NO_CONSUMED,
+): GameState {
+  let s = state;
+  let done = consumed;
+  for (let wave = 0; wave < waves; wave += 1) {
+    const next = s.liveEffects.find(
+      (le) =>
+        !done.has(le.id) &&
+        le.trigger === fire.trigger &&
+        // `on-turn-start` means the OWNER's turn. Without this a hook would fire at
+        // the top of every seat's turn, which is not what a card means when it says
+        // "at the top of your turn" — and is the difference between one payout a turn
+        // and one per player per turn.
+        (fire.trigger !== 'on-turn-start' || fire.actor === le.owner) &&
+        isInForce(le, s.turn) &&
+        conditionHolds(le, fire),
+    );
+    if (next === undefined) return s;
+    done = new Set([...done, next.id]);
+    // NO_FIRE, not `fire`: a hook's own effects are resolved for real, and
+    // re-threading the waking event into them would let `steal-any` read the
+    // triggering actor a second time.
+    for (const e of next.effects) s = applyEffect(s, next.owner, e, ctx, NO_FIRE);
+    s = log(s, {
+      player: next.owner,
+      text: `${next.sourceCardId} takes effect.`,
+      kind: 'card',
+    });
+  }
+  return s;
+}
+
+/** Every key present must hold. `EffectCondition`'s doc is the rule; this is it. */
+function conditionHolds(le: LiveEffect, fire: FireContext): boolean {
+  const condition = le.condition;
+  if (condition === undefined) return true;
+  if (condition.byOwner !== undefined && (fire.actor === le.owner) !== condition.byOwner) {
+    return false;
+  }
+  if (condition.influencedVotersAtLeast !== undefined) {
+    if (fire.trigger !== 'on-voter-influenced') return false;
+    if (fire.voters < condition.influencedVotersAtLeast) return false;
+  }
+  if (condition.movedMyVoter === true) {
+    if (fire.trigger !== 'on-gerrymander') return false;
+    if (fire.pegOwner !== le.owner) return false;
+  }
+  return true;
+}
+
 
 /**
  * Raise the voter-targeting decision for `kind`, one per player the card names.
@@ -451,15 +556,199 @@ function applyEffect(
   }
 }
 
+/**
+ * Is this effect SCOPED — does it describe something that outlives or hangs off an
+ * event rather than resolving now?
+ *
+ * A scoped effect is INSTALLED, never applied. That distinction is the whole reason
+ * `installLiveEffects` exists as a separate pass, and getting it wrong is the
+ * specific failure the install test pins: an effect that both fires once at play
+ * time AND keeps its hook hands out a free effect on the turn it was played. POWER
+ * TRIP would give a discard for free the moment you played it, and then keep giving
+ * one every time you influence a 3-Voter Card for the rest of the game.
+ *
+ * `condition` counts as scoped even without a `when`, and `installLiveEffects` drops
+ * it in that case — there is no event for it to narrow. The corpus validator refuses
+ * the combination outright rather than letting it reach here, so the engine's
+ * behaviour is belt and braces rather than the primary defence.
+ */
+function isScoped(effect: Effect): boolean {
+  return effect.when !== undefined || effect.until !== undefined || effect.condition !== undefined;
+}
+
 function applyEffects(
   state: GameState,
   source: PlayerID,
   effects: readonly Effect[],
   ctx: Ctx,
   fire?: FireContext,
+  install?: InstallContext,
 ): GameState {
-  return effects.reduce((s, e) => applyEffect(s, source, e, ctx, fire), state);
+  const applied = effects.reduce(
+    (s, e) => (isScoped(e) ? s : applyEffect(s, source, e, ctx, fire)),
+    state,
+  );
+  return install ? installLiveEffects(applied, source, effects, ctx, install) : applied;
 }
+
+
+// ─────────────────────────── live effects (G9 / G22) ───────────────────────────
+
+/**
+ * The card-level half of a lasting effect: which card, how long, from when.
+ *
+ * Passed by `PLAY_CONSPIRACY` and `ACK_HEADLINE` — the only two places a card's
+ * effect list is resolved — and threaded into `applyEffects` so that `when` /
+ * `until` reach `installLiveEffects` without `applyEffect` ever seeing them. That
+ * separation is deliberate and is what the honesty gate re-derives: `applyEffect`
+ * decides what ONE resolution does, `installLiveEffects` decides what LINGERS.
+ */
+type InstallContext = {
+  readonly sourceCardId: CardID;
+  readonly duration: EffectDuration;
+  readonly timing: EffectTiming;
+};
+
+/**
+ * Turn a resolved card's lasting clauses into `GameState.liveEffects` entries.
+ *
+ * THREE RULES, and each is a ruling rather than an implementation detail:
+ *
+ * 1. **An effect carrying `when` or `until` is installed, not applied.** It does
+ *    not fire once at play time and then linger; it does nothing until its event
+ *    fires or its standing turn arrives. Otherwise POWER TRIP would give a free
+ *    discard on the turn it was played and then keep the hook, which is not what
+ *    "every time you influence a 3-Voter Card" says.
+ * 2. **A card-level `duration` other than `'this-turn'` installs ONE standing
+ *    effect** holding the whole list, re-applied at the top of every one of the
+ *    owner's turns. One entry rather than one per effect, so a two-effect list
+ *    under `duration: 'rest-of-game'` reads as "this happens again each turn", not
+ *    as two independent auras that can drift apart.
+ * 3. **Per-effect scope wins over card-level.** A card may mix a one-shot branch
+ *    with a lasting hook, and the one-shot branch is applied by `applyEffect` in
+ *    the same pass.
+ *
+ * NOTHING HERE READS THE CLOCK. Every number comes out of the state that was
+ * handed in, so a replay from seed + action log reproduces the same list — the
+ * property `state.ts`'s `LiveEffect` note relies on.
+ */
+function installLiveEffects(
+  state: GameState,
+  source: PlayerID,
+  effects: readonly Effect[],
+  ctx: Ctx,
+  install: InstallContext,
+): GameState {
+  let s = state;
+  const perEffect = effects.filter(isScoped);
+  if (perEffect.length > 0) {
+    for (const effect of perEffect) {
+      s = pushLiveEffect(s, source, effect.when ?? null, effect.condition, [effect], ctx, {
+        sourceCardId: install.sourceCardId,
+        until: effect.until ?? install.duration,
+        timing: install.timing,
+      });
+    }
+    return s;
+  }
+  if (install.duration === 'this-turn') return s;
+  // Rule 2: one standing effect for the whole list.
+  return pushLiveEffect(s, source, null, undefined, effects, ctx, {
+    sourceCardId: install.sourceCardId,
+    until: install.duration,
+    timing: install.timing,
+  });
+}
+
+/** Append one `LiveEffect`, minting its id from the state's own counter. R2. */
+function pushLiveEffect(
+  state: GameState,
+  owner: PlayerID,
+  trigger: EffectTrigger | null,
+  condition: EffectCondition | undefined,
+  effects: readonly Effect[],
+  ctx: Ctx,
+  opts: { readonly sourceCardId: CardID; readonly until: EffectDuration; readonly timing: EffectTiming },
+): GameState {
+  if (effects.length === 0) return state;
+  if (!state.players[owner]) return state;
+  const activeFrom = opts.timing === 'next-turn' ? ownerNextTurn(state, owner) : state.turn;
+  const rawExpiry = durationExpiry(state, owner, opts.until);
+  // A lifetime shorter than the delay before it may first act is a card whose two
+  // clauses contradict each other; widen it to one turn rather than install an
+  // effect that is born expired. `Math.max` is the safe direction: err towards
+  // living too long is a rules problem, err towards expiring before it ever acted
+  // is a card that silently does nothing.
+  const expiresAt = rawExpiry === null ? null : Math.max(rawExpiry, activeFrom + 1);
+  const seq = state._idSeq + 1;
+  const entry: LiveEffect = {
+    id: `L${seq}`,
+    owner,
+    sourceCardId: opts.sourceCardId,
+    // A condition with no trigger has no event to narrow, so it is dropped rather
+    // than stored as a field nothing reads. `isScoped` is why such an effect is not
+    // applied once either. The corpus validator refuses the combination outright
+    // (CONDITION_FIX); this is the engine declining to half-honour it.
+    trigger,
+    ...(condition === undefined || trigger === null ? {} : { condition }),
+    effects,
+    activeFrom,
+    expiresAt,
+  };
+  void ctx;
+  return { ...state, _idSeq: seq, liveEffects: [...state.liveEffects, entry] };
+}
+
+/** When a lifetime of this length runs out, in absolute turn numbers. */
+function durationExpiry(state: GameState, owner: PlayerID, until: EffectDuration): number | null {
+  switch (until) {
+    case 'this-turn':
+      return state.turn + 1;
+    case 'next-turn':
+      // Live through the owner's next turn, gone at the boundary after it.
+      return ownerNextTurn(state, owner) + 1;
+    case 'round':
+      return roundEndTurn(state);
+    case 'rest-of-game':
+      return null;
+  }
+}
+
+/**
+ * The turn boundary: drop what has run out, then let what is still in force act.
+ *
+ * ORDER IS THE WHOLE POINT and is asserted by `live-effects.test.ts`: expiry runs
+ * FIRST, so an effect whose last turn is the one that just ended is gone before
+ * anything gets a chance to re-apply it. Reversing the two would make a
+ * `'this-turn'` effect immortal — it would be re-applied at the very boundary that
+ * was supposed to remove it.
+ *
+ * A STANDING effect (no `when`) applies to the incoming player at the top of their
+ * turn. That is ERADICATING GERMS' "discard an open Voter Card every turn
+ * (mandatory)": the turn that installed it has already begun, so the first
+ * application is the owner's next one, and every turn thereafter.
+ *
+ * A `when: 'on-turn-start'` hook is fired by `fireTriggers` immediately after, so
+ * both families act at the same point and in a fixed order.
+ */
+function tickLiveEffects(state: GameState, ctx: Ctx): GameState {
+  let s: GameState = {
+    ...state,
+    liveEffects: state.liveEffects.filter((le) => isInForce(le, state.turn)),
+  };
+  for (const le of s.liveEffects) {
+    if (le.trigger !== null || le.owner !== s.activePlayer) continue;
+    if (!isInForce(le, s.turn)) continue;
+    for (const e of le.effects) s = applyEffect(s, le.owner, e, ctx, NO_FIRE);
+  }
+  return fireTriggers(s, TURN_START(s.activePlayer), ctx);
+}
+
+/** The `FireContext` for a turn boundary. Carries no card, no area and no voter. */
+function TURN_START(actor: PlayerID): FireContext {
+  return { trigger: 'on-turn-start', actor, voters: 0, areaId: null, pegOwner: null };
+}
+
 
 // ─────────────────────────── gerrymander allowance ───────────────────────────
 
@@ -576,6 +865,11 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
     _pendingCard: cardId,
     activeHeadline: null,
   };
+
+  // G9/G22: expire what has run out, then let what is still in force act. Last,
+  // because it is the only part of the turn boundary that reads a clock, and
+  // putting it last means every number it uses is already the incoming turn's.
+  s = tickLiveEffects(s, ctx);
 
   return { ok: true, state: s, events };
 }
@@ -963,7 +1257,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       let s = withPlayer(state, playerId, {
         conspiracies: self.conspiracies.filter((c) => c !== action.cardId),
       });
-      s = applyEffects(s, playerId, card.effects, ctx);
+      s = applyEffects(s, playerId, card.effects, ctx, undefined, {
+        sourceCardId: card.id,
+        duration: card.duration ?? 'this-turn',
+        timing: card.timing ?? 'now',
+      });
       s = discardTo(s, 'conspiracy', action.cardId);
       s = log(s, { player: playerId, text: `Played "${card.name}".`, kind: 'card' });
       return { ok: true, state: s, events: [{ type: 'conspiracy', player: playerId, cardId: action.cardId }] };
@@ -1142,7 +1440,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       const source = entry?.by ?? playerId;
 
       let s: GameState = { ...state, headlineQueue: state.headlineQueue.slice(1) };
-      s = applyEffects(s, source, card.effects, ctx);
+      s = applyEffects(s, source, card.effects, ctx, undefined, {
+        sourceCardId: card.id,
+        duration: card.duration ?? 'this-turn',
+        timing: card.timing ?? 'now',
+      });
       s = discardTo(s, 'headline', cardId);
       s = log(s, { player: source, text: `HEADLINE — ${card.name}`, kind: 'card' });
 

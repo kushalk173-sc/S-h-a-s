@@ -52,38 +52,110 @@ export type EffectTarget =
 /**
  * FIELDS THAT ARE PART OF THE CARD CONTRACT BUT NOT YET INTERPRETED.
  *
- * Every field below is **inert**. `reduce()` (`packages/engine/src/reduce.ts`,
- * `applyEffect`) does not read any of them, so a card that sets one resolves
- * exactly as if it were absent. That is not a licence to ship such a card — it
- * is the reason the corpus validator rejects them.
+ * Exactly one family is still inert: `interrupt` (G13). `reduce()`
+ * (`packages/engine/src/reduce.ts`) does not read it, so a card that sets one
+ * resolves exactly as if it were absent. That is not a licence to ship such a
+ * card — it is the reason the corpus validator rejects them.
  *
- * WHY THEY ARE HERE AT ALL, in this file, rather than only in
+ * CLOSED SINCE THIS BLOCK WAS WRITTEN, and kept here so the next reader does not
+ * re-derive the same history:
+ *  - `duration` / `timing` (G9 / G22) — EXECUTED by `installLiveEffects`, which
+ *    writes a `GameState.liveEffects` entry whose `activeFrom` / `expiresAt` are
+ *    absolute turn numbers, ticked in `advanceTurn`.
+ *  - `when` / `until` / `condition` (G14) — EXECUTED by `fireTriggers`, a bounded
+ *    cascade consulted by `INFLUENCE`, `BUY_CONSPIRACY`, `GERRYMANDER`, `setArea`
+ *    and the turn boundary.
+ *  - `target` on `gerrymander` (G8) — EXECUTED; the case loops `resolveTargets`.
+ *
+ * WHY THE INERT ONE IS HERE AT ALL, in this file rather than only in
  * `packages/cards/schema/card.schema.json`: a shape nobody has written down is a
  * shape nobody will implement, and this is the one file the engine owner reads.
- * They are grouped here, named `RESERVED`, and every one of them is listed in
+ * It is grouped here, named RESERVED, and it is listed in
  * `packages/cards/KNOWN-GAPS.md` with the reducer change it waits on.
  *
- * THE RULE, and it is the only rule that matters for these fields:
+ * THE RULE, and it is the only rule that matters:
  * **a card must not ship using behaviour the engine does not perform.** The
  * validator in `packages/cards/src/validate.ts` enforces that (finding codes
  * `EFFECT_NOT_EXECUTED`, `EFFECT_FIELD_NOT_EXECUTED`, `CARD_FIELD_NOT_EXECUTED`),
  * and `packages/cards/test/reducer-parity.test.ts` re-asserts it over the whole
- * shipped corpus, so an inert field cannot reach a deck.
+ * shipped corpus against BOTH `applyEffect`'s and `installLiveEffects`'s own
+ * source text, so an inert field cannot reach a deck.
  */
 
-/** G9/G22 — how long an effect's effect lasts. See `packages/cards/KNOWN-GAPS.md` G9, G22. */
+/** G9/G22 — how long an effect lasts. EXECUTED by `installLiveEffects`. */
 export type EffectDuration = 'this-turn' | 'round' | 'next-turn' | 'rest-of-game';
 
 /** G22 — when a persistent effect starts. `'next-turn'` must not apply to the resolving turn. */
 export type EffectTiming = 'now' | 'next-turn' | 'after-this-turn';
 
-/** G14 — the events an effect can be installed as a hook on. */
+/**
+ * G14 — the events an effect can be installed as a hook on. EXECUTED by
+ * `fireTriggers`, which `INFLUENCE`, `BUY_CONSPIRACY`, `GERRYMANDER`, `setArea` and
+ * the turn boundary all consult.
+ */
 export type EffectTrigger =
+  /** The top of a turn, after expiry has been ticked. */
+  | 'on-turn-start'
+  /** INFLUENCE or BUY_CONSPIRACY: a purchase of anything. */
   | 'on-purchase'
+  /** INFLUENCE only: a Voter Card was bought. `FireContext.voters` carries its size. */
   | 'on-voter-influenced'
+  /** `setArea` put a peg into a Volatile Area. p18. */
   | 'on-volatile-placement'
+  /** A GERRYMANDER moved a voter. `FireContext.pegOwner` says whose. */
   | 'on-gerrymander'
+  /** `setArea` formed or broke a majority. */
   | 'on-majority-formed';
+
+/**
+ * G15 / G4 — a count read out of player state instead of written on the card.
+ *
+ * `of` names WHAT is read, and the value is always read from the player the effect
+ * is resolved FOR (the recipient, or the thief for `steal-any`). A card that says
+ * "as many as you hold" therefore means the recipient's own pool.
+ */
+export type ComputedSource =
+  /** Total resources the player holds. */
+  | 'your-pool'
+  /**
+   * The Ideologue LEVEL the player has reached. See the long note on the
+   * implementation in `reduce.ts` `computedValue`: the engine's real unlock rule
+   * counts Ideology **Cards** answered (`powers.ts` `hasPower`), not resources
+   * paid, and this reads the engine's rule rather than the balance checker's
+   * resource proxy.
+   */
+  | 'ideologue-level'
+  /** Gerrymander moves the player may still make this turn, across every zone. */
+  | 'your-gerrymander-rights'
+  /** Pegs the player owns that sit in a Volatile Area. p18 pegs there are permanent. */
+  | 'volatile-voters'
+  /**
+   * For `per` only: what the player holds OF THE RESOURCE BEING GAINED. This is
+   * what makes IF YOU LIKE PIÑA COLADA's "double all the resources on your player
+   * mat" expressible — `res` of 1 in each resource, multiplied by the holder's own
+   * count of that resource, is a doubling. The cap still applies afterwards, which
+   * is the card's own second sentence.
+   */
+  | 'held-of-each-resource';
+
+export type ComputedCount = { readonly of: ComputedSource };
+
+/**
+ * G14 — narrowing on the event that woke a hook. All present keys must hold.
+ *
+ * Every key is optional and the semantics are AND, because the two real cards that
+ * need one need two at once: POWER TRIP is "every time **you** influence a
+ * **3**-Voter Card", which is `byOwner` plus `influencedVotersAtLeast`.
+ */
+export type EffectCondition = {
+  /** The event's actor is the effect's own `owner`. */
+  readonly byOwner?: boolean;
+  /** The purchase that woke the hook was a Voter Card with at least this many voters. */
+  readonly influencedVotersAtLeast?: number;
+  /** The voter the event moved belongs to the effect's `owner`. GROWING DISSENT. */
+  readonly movedMyVoter?: boolean;
+};
+
 
 /**
  * G13 — phase-changing ops.
@@ -103,19 +175,33 @@ export type Interrupt = {
 };
 
 /**
- * RESERVED — per-effect scope. Inert today; see the block comment above.
+ * LIFETIME AND TRIGGER — the two scope fields every `Effect` carries.
  *
- * `when` (G14) installs the effect as a hook on another player's action;
- * `until` (G9/G22) gives it a lifetime. Both need a list of active effects in
- * `GameState` that the reducer re-reads on every event, which is engine work
- * this package cannot do.
+ * Both are EXECUTED, by `installLiveEffects` and `fireTriggers` in
+ * `packages/engine/src/reduce.ts`, not by `applyEffect`. The distinction is
+ * load-bearing for the honesty gate: `packages/cards/test/reducer-parity.test.ts`
+ * slices `applyEffect`'s body to learn which fields each op reads, and `when` /
+ * `until` / `condition` are read one function above it. The same test therefore
+ * also re-derives `SCOPE_FIELDS_READ_BY_INSTALL` from `installLiveEffects`'s own
+ * source text, so a scope field cannot be declared and then ignored.
+ *
+ * THE SEMANTICS, because they are a ruling and not an implementation detail:
+ *
+ *  - An effect carrying `when` or `until` is INSTALLED, not applied. It does not
+ *    resolve once at play time and then sit there; it does nothing until its event
+ *    fires or its standing turn arrives.
+ *  - An effect carrying NEITHER is applied once, immediately. That is every shipped
+ *    card's behaviour today and it is unchanged.
  */
 export type EffectScope = {
-  /** RESERVED, not executed by `reduce()`. See G14. */
+  /** G14 — install this effect as a hook on an event. EXECUTED. */
   readonly when?: EffectTrigger;
-  /** RESERVED, not executed by `reduce()`. See G9/G22. */
+  /** G9/G22 — how long the hook lives. Defaults to the card's `duration`. EXECUTED. */
   readonly until?: EffectDuration;
+  /** G14 — narrowing on the firing event. Only meaningful alongside `when`. EXECUTED. */
+  readonly condition?: EffectCondition;
 };
+
 
 export type Effect = (
   /** Gain a fixed set of resources from the Public Reserve. */
@@ -158,12 +244,13 @@ export type Effect = (
   /**
    * Extra gerrymander moves this turn, above the normal per-zone allowance.
    *
-   * G8: `target` is now on the op — this was the one resource-shaped op with no
-   * target field, which is why "every player can Gerrymander 1" could not be
-   * written at all. **`reduce()` does not read it yet** (`applyEffect` credits the
-   * bonus to `source` only, see reduce.ts:303), so a card that sets it is
-   * rejected by the corpus validator with the one-line fix named. `target: 'you'`
-   * and an absent `target` are equivalent and both fine.
+   * G8: `target` is on the op and `reduce()` honours every `EffectTarget` — the
+   * case loops `resolveTargets`, which is what makes "starting with you, every
+   * player can Gerrymander 1" (SUBMERGED / NEW FACE WHO DIS) writable. The grant
+   * lands in `powerUses.gerrymandered`, which `advanceTurn` resets at the start of
+   * each player's own turn, so a cross-player grant is spendable only by the player
+   * whose turn the card resolved on; a lasting cross-player grant is a `LiveEffect`
+   * with `duration`, not a bigger `n`.
    */
   | { readonly op: 'gerrymander'; readonly n: number; readonly target?: EffectTarget }
   /**
@@ -197,24 +284,31 @@ export type Effect = (
   EffectScope;
 
 /**
- * The three fields the two X-card types share. See the RESERVED block above: none
- * of them is interpreted by `reduce()` today.
+ * The fields the two X-card types share.
+ *
+ * `duration` and `timing` are EXECUTED — `installLiveEffects` turns a lasting
+ * `duration` into a `GameState.liveEffects` entry and `timing` sets when it may
+ * first act. `interrupt` is still inert, because it is not an effect at all (see
+ * `Interrupt` above).
  */
 export type XCardScope = {
   /**
-   * RESERVED, not executed by `reduce()`. G9/G22.
+   * G9/G22. `'this-turn'` — the default, and the value every shipped card means —
+   * is what the engine always did: resolve the effects once, discard the card. Any
+   * other value installs them as a `LiveEffect` that lives until the named expiry.
    *
-   * `'this-turn'` is the one value the engine already honours — by resolving the
-   * effects once and discarding the card — so it is accepted as a statement of
-   * fact. Every other value needs a list of live effects in `GameState` that the
-   * reducer re-applies, and a card asking for one is rejected by the validator.
+   * A lasting `duration` with no per-effect `when` installs ONE standing effect
+   * holding the whole list, re-applied at the top of every one of the owner's turns
+   * until it expires. Per-effect `when` / `until` take precedence and are installed
+   * one entry each, so a card may mix a one-shot branch with a lasting hook.
    */
   readonly duration?: EffectDuration;
-  /** RESERVED, not executed by `reduce()`. G22. */
+  /** G22 — `'now'` (default) or `'next-turn'` (dormant until the owner's next turn). */
   readonly timing?: EffectTiming;
   /** RESERVED, not executed by `reduce()`. G13. */
   readonly interrupt?: Interrupt;
 };
+
 
 export type ConspiracyCard = {
   readonly id: CardID;

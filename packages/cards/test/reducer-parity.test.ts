@@ -40,6 +40,8 @@ import {
 import { EFFECT_OPS, EFFECT_OP_SET } from '../src/effect-ops.js';
 import {
   EXECUTED_OPS,
+  EXECUTABLE_TRIGGERS,
+  SCOPE_FIELDS_READ_BY_INSTALL,
   unexecutedCardProblems,
   unexecutedEffectProblems,
 } from '../src/executable.js';
@@ -80,6 +82,48 @@ function reducerCaseBodies(): Record<string, string> {
 }
 
 const CASES = reducerCaseBodies();
+
+/**
+ * The scope fields `installLiveEffects` reads, re-derived from ITS OWN source text.
+ *
+ * The same reasoning as `reducerCaseBodies`, applied to the second honesty seam.
+ * `when`, `until` and `condition` are not read by `applyEffect` — they are read one
+ * function above it, by the installer that decides what LINGERS — so slicing
+ * `applyEffect` cannot see them at all. Without this slice the registry entry for
+ * them would be an unfalsifiable claim, which is the one thing this file exists to
+ * prevent.
+ */
+function installerSource(): string {
+  const src = readFileSync(REDUCE_SRC, 'utf8');
+  const start = src.indexOf('function installLiveEffects');
+  expect(start, 'reduce.ts still has installLiveEffects').toBeGreaterThan(-1);
+  const end = src.indexOf('function pushLiveEffect', start);
+  return src.slice(start, end === -1 ? undefined : end);
+}
+
+const INSTALLER = installerSource();
+
+/**
+ * The trigger values the reducer RAISES, re-derived from its own source.
+ *
+ * The registry `EXECUTED_TRIGGERS` is a list of promises about `reduce()`, and a
+ * promise nobody checks is the thing this whole file was written to stop. Each
+ * value must appear as a `trigger: '<value>'` in a raise site, and every raise site
+ * must be in the registry. A `when` the reducer never raises installs a hook that
+ * never fires — the card reads as though something happens on every purchase and
+ * nothing ever happens.
+ */
+function raisedTriggers(): string[] {
+  const src = readFileSync(REDUCE_SRC, 'utf8');
+  const out = new Set<string>();
+  const re = /trigger: '([a-z-]+)'/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src)) !== null) {
+    if (m[1] !== undefined) out.add(m[1]);
+  }
+  return [...out].sort();
+}
+
 
 // ─────────────────────────── layer 1: the op set ───────────────────────────
 
@@ -155,6 +199,52 @@ describe('EXECUTED_OPS says which fields each case reads, and that is true', () 
         const re = field === 'target' ? /\btarget\b/ : new RegExp(`\\beffect\\.${field}\\b`);
         expect(re.test(body), `${op} reads effect.${field}`).toBe(true);
       }
+    }
+  });
+});
+
+// ─────────────────────── layer 2b: the installer, the second seam ───────────────────────
+
+describe('SCOPE_FIELDS_READ_BY_INSTALL is what installLiveEffects actually reads', () => {
+  it('every scope field the registry claims is read by the installer', () => {
+    for (const field of SCOPE_FIELDS_READ_BY_INSTALL) {
+      expect(
+        new RegExp(`\\beffect\\.${field}\\b`).test(INSTALLER),
+        `installLiveEffects reads effect.${field}`,
+      ).toBe(true);
+    }
+  });
+
+  it('and the list is not empty, so the seam cannot be satisfied by asserting nothing', () => {
+    // The same guard as `PRIVATE_PLAYER_KEYS is not empty`. An empty registry would
+    // make every assertion below vacuously true and the seam decorative.
+    expect(SCOPE_FIELDS_READ_BY_INSTALL.length).toBeGreaterThan(0);
+  });
+
+  it('none of them is claimed by an op registry, so the two lists cannot disagree', () => {
+    // `EXECUTED_OPS` is asserted against `applyEffect`'s text; the scope list is
+    // asserted against the installer's. A field appearing in both would mean two
+    // registries claiming one read, and the validator would then be checking it
+    // twice against two different oracles.
+    for (const reads of Object.values(EXECUTED_OPS)) {
+      for (const field of reads) {
+        expect(SCOPE_FIELDS_READ_BY_INSTALL).not.toContain(field);
+      }
+    }
+  });
+});
+
+describe('EXECUTED_TRIGGERS is exactly the set of events reduce() raises', () => {
+  it('every claimed trigger has a raise site in reduce.ts, and every raise site is claimed', () => {
+    expect([...EXECUTABLE_TRIGGERS].sort()).toEqual(raisedTriggers());
+  });
+
+  it('so a `when` naming an unraised event is refused, naming the ones that are raised', () => {
+    const refused = findingsForEffect({ op: 'voters', n: 1, when: 'on-purchase' });
+    expect(codes(refused)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
+    expect(refused.errors[0]?.message).toContain('never fire');
+    for (const trigger of EXECUTABLE_TRIGGERS) {
+      expect(codes(findingsForEffect({ op: 'voters', n: 1, when: trigger })), trigger).toEqual([]);
     }
   });
 });
@@ -325,22 +415,29 @@ describe('a field the reducer ignores is rejected however it is spelled', () => 
     expect(validateEffect(FILE, { op: 'gain-any', n: { of: 'your-pool' } }, EFFECT_OP_SET)).toEqual([]);
     const report = findingsForEffect({ op: 'gain-any', n: { of: 'your-pool' } });
     expect(codes(report)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    expect(report.errors[0]?.message).toContain('KNOWN-GAPS G15');
+    expect(report.errors[0]?.message).toContain('G15');
   });
 
   it('rejects a malformed effect twice over: shape AND executability', () => {
-    // `when` on a card that also has a nonsense n. Both problems must be reported;
-    // neither is a duplicate of the other.
-    const report = findingsForEffect({ op: 'gain-any', n: 1, when: 'on-purchase' });
+    // `when` naming an event reduce() never raises, on a card that also has a
+    // nonsense n. Both problems must be reported; neither is a duplicate of the
+    // other.
+    const report = findingsForEffect({ op: 'gain-any', n: 1, when: 'on-gerrymander' });
     expect(codes(report)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    expect(report.errors[0]?.message).toContain('KNOWN-GAPS G14');
+    expect(report.errors[0]?.message).toContain('never fire');
   });
 
-  it('rejects `when` and `until` on any op, and says which gap is waiting', () => {
-    expect(validateEffect(FILE, { op: 'voters', n: 1, until: 'round' }, EFFECT_OP_SET)).toEqual([]);
-    const until = findingsForEffect({ op: 'voters', n: 1, until: 'round' });
-    expect(codes(until)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    expect(until.errors[0]?.message).toContain('KNOWN-GAPS G9');
+  it('rejects a `condition` with no `when` to narrow, rather than dropping it', () => {
+    // The engine discards a condition on a standing effect — there is no event, so
+    // there is nothing to narrow — and a silently discarded clause is a card that
+    // reads as though it filtered something and did not.
+    const report = findingsForEffect({ op: 'voters', n: 1, condition: { byOwner: true } });
+    expect(codes(report)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
+    expect(report.errors[0]?.message).toContain('needs a `when`');
+    // …and accepted alongside one.
+    expect(
+      codes(findingsForEffect({ op: 'voters', n: 1, when: 'on-turn-start', condition: { byOwner: true } })),
+    ).toEqual([]);
   });
 
   it('rejects an op with no case at all, rather than letting it reach reduce()', () => {
@@ -355,27 +452,32 @@ describe('a field the reducer ignores is rejected however it is spelled', () => 
   });
 });
 
-describe('G9 / G22 — duration and timing', () => {
-  it("accepts duration: 'this-turn', because that is what the engine already does", () => {
-    const report = validateWithHeadline(baseHeadline({ duration: 'this-turn' }));
-    expect(codes(report)).toEqual([]);
-  });
-
-  it('rejects every lasting duration, with the state change it needs', () => {
-    for (const duration of ['round', 'next-turn', 'rest-of-game']) {
-      const report = validateWithHeadline(baseHeadline({ duration }));
-      expect(codes(report), duration).toEqual(['EFFECT_NOT_EXECUTED']);
-      expect(report.errors[0]?.message, duration).toContain('never expire');
-      expect(report.errors[0]?.message, duration).toContain('advanceTurn()');
+describe('G9 / G22 — every duration is installed, and expires on a turn boundary', () => {
+  it('accepts all four, because installLiveEffects writes all four', () => {
+    for (const duration of ['this-turn', 'round', 'next-turn', 'rest-of-game']) {
+      expect(codes(validateWithHeadline(baseHeadline({ duration }))), duration).toEqual([]);
     }
   });
 
-  it('rejects timing, even with a harmless-looking value', () => {
-    const report = validateWithHeadline(baseHeadline({ timing: 'next-turn' }));
-    expect(codes(report)).toEqual(['EFFECT_NOT_EXECUTED']);
-    expect(report.errors[0]?.message).toContain('no clock on an effect');
+  it('accepts a lasting duration on the EFFECT too, which overrides the card default', () => {
+    // Per-effect scope wins over card-level scope: a card may mix a one-shot branch
+    // with a lasting hook, and the one-shot is still applied immediately.
+    const report = validateWithHeadline(
+      baseHeadline({ effects: [{ op: 'voters', n: 1, until: 'rest-of-game' }] }),
+    );
+    expect(codes(report)).toEqual([]);
+  });
+
+  it('accepts timing now and next-turn, and refuses after-this-turn with the reason', () => {
+    for (const timing of ['now', 'next-turn']) {
+      expect(codes(validateWithHeadline(baseHeadline({ timing }))), timing).toEqual([]);
+    }
+    const refused = validateWithHeadline(baseHeadline({ timing: 'after-this-turn' }));
+    expect(codes(refused)).toEqual(['EFFECT_NOT_EXECUTED']);
+    expect(refused.errors[0]?.message).toContain('no anchor');
   });
 });
+
 
 describe('G13 — the phase-changing ops are not effects', () => {
   it('rejects an interrupt, and explains that it is not an Effect at all', () => {
@@ -399,38 +501,48 @@ describe('G13 — the phase-changing ops are not effects', () => {
 });
 
 describe('the reserved shapes are still shapes', () => {
-  it('the JSON Schema accepts duration, timing, interrupt, when, until and a computed n', () => {
+  it('the JSON Schema accepts duration, timing, interrupt, when, condition and a computed n', () => {
     // Asserted as SCHEMA acceptance, not as validator acceptance: the whole point
     // of modelling them is that the author is told what the ENGINE cannot do.
     expect(
       schemaProblems({
         ...baseHeadline({}),
         duration: 'rest-of-game',
-        timing: 'next-turn',
+        timing: 'now',
         interrupt: { op: 'vote', window: 'always' },
-        effects: [{ op: 'voters', n: { of: 'your-pool' }, when: 'on-purchase', until: 'round' }],
+        effects: [
+          {
+            op: 'voters',
+            n: { of: 'your-pool' },
+            when: 'on-turn-start',
+            until: 'round',
+            condition: { byOwner: true },
+          },
+        ],
       }),
     ).toEqual([]);
   });
 
-  it('and the validator rejects every one of them', () => {
+  it('and the validator refuses exactly the two the engine still does not perform', () => {
+    // `interrupt` (G13 — a change of phase, not of resources) and a computed `n`
+    // (G15 — reduce() reads it as a literal). Everything else in that object is now
+    // executed, so a card carrying only the executed half validates clean, which is
+    // the assertion that the registry is not just refusing everything.
     const report = validateWithHeadline(
       baseHeadline({
+        interrupt: { op: 'vote', window: 'always' },
         duration: 'rest-of-game',
         timing: 'next-turn',
-        interrupt: { op: 'vote', window: 'always' },
-        effects: [{ op: 'voters', n: 1, when: 'on-purchase', until: 'round' }],
+        effects: [{ op: 'voters', n: { of: 'your-pool' }, when: 'on-turn-start', until: 'round' }],
       }),
     );
     expect(codes(report).slice().sort()).toEqual([
       'EFFECT_FIELD_NOT_EXECUTED',
-      'EFFECT_FIELD_NOT_EXECUTED',
-      'EFFECT_NOT_EXECUTED',
-      'EFFECT_NOT_EXECUTED',
       'EFFECT_NOT_EXECUTED',
     ]);
   });
 });
+
 
 /** The schema alone, with no validator pass on top. */
 function schemaProblems(card: Record<string, unknown>): readonly SchemaProblem[] {

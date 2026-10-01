@@ -1,24 +1,49 @@
 /**
  * Test fixtures.
  *
- * Two card sets, and the reason for having both:
+ * Two card sets, and the reason for having both — and note that the reason has
+ * CHANGED, because the first version of this comment was wrong in a way that cost
+ * the project a month:
  *
- *  - `realCards()` is the shipped corpus, loaded through the same path the server
- *    uses at boot. Everything about shape and scale is real, so the leak tests run
- *    against genuine card text, genuine payouts and the real four decks.
+ *  - `realCards()` / `loadCtx()` is the shipped corpus, loaded through the same path
+ *    the server uses at boot. This is now what `startHarness()` deals by DEFAULT, so
+ *    every server test that does not ask for something else is on the real cards.
  *
- *  - `bigCards()` is synthetic and deliberately oversized. The shipped corpus has
- *    20 Ideology Cards and 12 Voter Cards, which is 36 voters — nowhere near the
- *    69 majority voters needed to form all nine zones, so a real-corpus game
- *    cannot be driven to `finished` and the acceptance criterion "a 2-player game
- *    runs to completion" would be untestable. The synthetic set has enough of
- *    everything to finish. It exercises the real engine and the real server over a
- *    real socket; only the card data is a fixture.
+ *  - `bigCards()` is synthetic, and it is now opt-in. It exists for tests that need
+ *    a deck with room to spare, and nothing else.
  *
- *  NOTE on the Ideology deck size: it has to be larger than the number of turns,
- *    because the engine's deck-exhaustion path (audit R10) leaves a table with no
- *    legal move. That is an engine bug, not a server one, and the fixture papers
- *    over it rather than working around it in the server.
+ * WHAT USED TO BE HERE, AND WHY IT WAS WRONG
+ *
+ * This file used to say:
+ *
+ *   "The shipped corpus has 20 Ideology Cards and 12 Voter Cards, which is 36
+ *    voters — nowhere near the 69 majority voters needed to form all nine zones, so
+ *    a real-corpus game cannot be driven to `finished` and the acceptance criterion
+ *    'a 2-player game runs to completion' would be untestable."
+ *
+ * Every number in that paragraph is wrong, and the conclusion drawn from them was
+ * the reason the shipped game was unwinnable for a month. The real corpus is 52
+ * Ideology Cards, 18 Voter Cards and 36 voters — not 20 and 12. And 36 voters is
+ * never a cap, because a Voter Card RECYCLES: `INFLUENCE` discards it and
+ * `refillMarket` reshuffles. The same 36 voters can be bought and placed over and
+ * over, so 69 pegs and 129 are reachable from 18 cards.
+ *
+ * A fixture that declares the real game unwinnable, with invented numbers to
+ * support it, is worse than no fixture: it makes every test built on it a test of
+ * the fixture. The suite drove `bigCards()` because `bigCards()` was the only corpus
+ * anyone had checked, and the deck-size blindness hid the shipped bug in the engine
+ * because 240 and 4000 are both far from 52.
+ *
+ * The measurements that replaced it are in `test/corpus.test.ts` (the corpus's size
+ * and composition, pinned) and `test/winnable.test.ts` (a real-corpus game reaching
+ * nine majorities at 2, 3, 4 and 5 seats across a seed sweep).
+ *
+ * The one caveat that is still true, and is now a property of the ENGINE rather
+ * than an excuse for a fixture: the Ideology deck must be larger than the number of
+ * turns a game takes, or a table runs out of cards with no legal move. At 52 cards
+ * the shipped corpus relies on `ANSWER` discarding the answered card so the pile
+ * can be reshuffled. `test/corpus.test.ts` asserts that recycle happens; this file
+ * must not paper over it again.
  */
 
 import { createHash } from 'node:crypto';
@@ -42,7 +67,7 @@ import {
   type VoterCard,
 } from '@shasn/engine';
 
-import { loadCards } from '../src/index.ts';
+import { loadCards, loadCtx } from '../src/index.ts';
 import { decksOf } from '../src/store.ts';
 import { InMemoryMatchStore } from '../src/store.ts';
 import { ShasnServer } from '../src/index.ts';
@@ -125,8 +150,18 @@ function tick(): number {
 export async function startHarness(
   opts: { cards?: CardIndex; store?: InMemoryMatchStore; dispatchRate?: number } = {},
 ): Promise<Harness> {
-  const cards = opts.cards ?? bigCards();
-  const ctx = makeCtx(cards);
+  // THE SHIPPED CORPUS, unless a test asks for something else.
+  //
+  // This used to default to `bigCards()`, which dealt 240 Ideology Cards against
+  // the shipped 52 — and 52, drawn one per turn, is the number that decides whether
+  // a game is winnable. A suite that defaults to a 4.6x deck is a suite that
+  // cannot see the game shipping unwinnable, and it did not see it for a month.
+  // `loadCtx()` is the server's own boot path, so the default here is the same
+  // cards a deployment deals, not a lookalike.
+  //
+  // `test/corpus.test.ts` asserts this, so a future change that reintroduces a
+  // synthetic default has to change an assertion to get past it.
+  const ctx = opts.cards === undefined ? loadCtx() : makeCtx(opts.cards);
   const store = opts.store ?? new InMemoryMatchStore();
   const server = new ShasnServer({
     port: 0,

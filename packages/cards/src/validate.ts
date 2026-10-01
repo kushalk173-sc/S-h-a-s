@@ -70,10 +70,17 @@ const KIND_PREFIX: Readonly<Record<CardKind, string>> = {
 
 /**
  * The card-level shapes that are in `cards.ts` but inert in `reduce()`. See
- * `src/executable.ts` and KNOWN-GAPS.md G9/G13/G22. Listed here only so the
- * card-level schema fan-out does not bury the precise finding.
+ * `src/executable.ts` and KNOWN-GAPS.md G13. Listed here only so the card-level
+ * schema fan-out does not bury the precise finding.
+ *
+ * `duration` and `timing` used to be on this list. They are not any more: both are
+ * executed by `installLiveEffects`, so the engine is the authority on which VALUES
+ * are legal and `executable.ts` says so. Only the phase-changing `interrupt`
+ * remains, and a card carrying one is refused with the reason rather than with
+ * "unknown property" four times over.
  */
-const RESERVED_CARD_FIELDS: readonly string[] = ['duration', 'timing', 'interrupt'];
+const RESERVED_CARD_FIELDS: readonly string[] = ['interrupt'];
+
 
 /** The reference citation an adapted or verbatim card must actually carry. */
 const CITATION_RE = /(https?:\/\/|scribd\/\d|\bREF\b\s*§?\s*\d|§\s*\d)/;
@@ -140,10 +147,10 @@ function readAll(
       // effects, 13 times; for a side, 4 times — none of which is the real error.
       if (/(^|\/)effects(\/|$)/.test(problem.pointer)) continue;
       if (/\/sides\/[0-9]+/.test(problem.pointer)) continue;
-      // Same reason for the reserved card-level shapes (duration / timing /
-      // interrupt): the schema accepts them so an author who writes one gets the
-      // engine explanation from EXECUTED_NOT_EXECUTED below, not "unknown
-      // property" from four card branches at once.
+      // Same reason for the reserved card-level shape (`interrupt`): the schema
+      // accepts it so an author who writes one gets the engine explanation from
+      // EXECUTED_NOT_EXECUTED below, not "unknown property" from four card
+      // branches at once.
       if (RESERVED_CARD_FIELDS.some((f) => problem.pointer.endsWith(`/${f}`))) continue;
       findings.push({
         severity: 'error',

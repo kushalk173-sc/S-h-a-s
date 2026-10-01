@@ -10,6 +10,8 @@
  * underscore is load-bearing and enforced by test.
  */
 
+import type { Effect, EffectCondition, EffectTrigger } from './cards';
+
 export type PlayerID = string;
 export type CardID = string;
 export type AreaID = string;
@@ -246,6 +248,109 @@ export type MarketSlot = {
   readonly voters: number;
 };
 
+/**
+ * G9 / G22 — AN EFFECT THAT OUTLIVES THE CARD THAT INSTALLED IT.
+ *
+ * Before this type, `reduce()` resolved a Conspiracy or Headline Card's `effects`
+ * once, discarded the card, and had no way to remember that the card had said
+ * anything lasting. Every real card in that position — PYTHONPOST, GROWING
+ * DISSENT, SNOOP B-O-DOUBLE-T, THE BIG FREEZE — therefore had to ship as a lie or
+ * not at all (KNOWN-GAPS §2 G9, §3 item 2).
+ *
+ * ## Visibility: PUBLIC, and that is a ruling with an argument, not an omission
+ *
+ * `playerView.ts` strips `_`-prefixed keys and separately blanks
+ * `PlayerState.conspiracies`, because a Conspiracy Card is a hidden hand
+ * (rules-reference.md:284-286). A live effect is neither:
+ *
+ *  - It can only be created by a card that is being RESOLVED — `PLAY_CONSPIRACY`
+ *    or `ACK_HEADLINE` — and both of those put the card face up on the discard pile
+ *    in the same breath. There is no path from a card in a hidden hand to a
+ *    `LiveEffect`, so `sourceCardId` can never name a card anybody is still holding
+ *    secretly.
+ *  - Every real card that creates one announces it. KHAKI TERROR's whole point is
+ *    that everyone can see you cannot buy; a surcharge on somebody's purchases is
+ *    a cost every other player must be able to predict. "A Headline is in force
+ *    until my next turn" is a public condition with public parameters.
+ *
+ * So `liveEffects` is unprefixed and reaches every client. That is also why no
+ * change is owed to `packages/server/test/secret-inventory.ts`: a new `_` field
+ * would have needed a deliberate entry there, and this avoided the need entirely.
+ * If a future card ever needs a *hidden* live effect — THE PSYCHOHISTORIAN's
+ * unrevealed three-action detector is G7, and it is exactly that case — the
+ * mechanism is a `_`-prefixed twin list, not a re-interpretation of this one.
+ *
+ * ## Why the lifetime is two integers and not a rule
+ *
+ * `activeFrom` / `expiresAt` are ABSOLUTE turn numbers, computed once at install
+ * from the installing turn and the seat order. A live effect therefore needs no
+ * "whose turn is it" logic at expiry time, and — the load-bearing part — a replay
+ * from seed + action log reproduces it exactly, because the numbers are already in
+ * the state that was written down. `null` on `expiresAt` is "rest of game".
+ */
+export type LiveEffect = {
+  /** `L<n>` from `GameState._idSeq`. R2: no module-scope counter. */
+  readonly id: string;
+  /**
+   * The player the effect belongs to. Its `target` resolves against them, and it
+   * is the seat whose turn boundary a standing effect acts on.
+   */
+  readonly owner: PlayerID;
+  /** The card that installed it. Public for the reason in the note above. */
+  readonly sourceCardId: CardID;
+  /**
+   * The event that fires this effect, or `null` for a STANDING effect — one with a
+   * lifetime but no event, re-applied at the top of every one of the owner's turns
+   * until it expires. That is ERADICATING GERMS' "discard an open Voter Card every
+   * turn (mandatory)".
+   */
+  readonly trigger: EffectTrigger | null;
+  /** Narrowing on the firing event. Absent means "always". */
+  readonly condition?: EffectCondition;
+  readonly effects: readonly Effect[];
+  /** The first turn number on which this effect may act. */
+  readonly activeFrom: number;
+  /** The turn number on which it is removed. `null` = rest of game. */
+  readonly expiresAt: number | null;
+};
+
+/** Is this live effect in force on `turn`? Dormant-before and expired-both read false. */
+export function isInForce(le: LiveEffect, turn: number): boolean {
+  if (le.activeFrom > turn) return false;
+  return le.expiresAt === null || le.expiresAt > turn;
+}
+
+/**
+ * The turn number on which `owner` next takes their turn.
+ *
+ * `turnOrder` is the seat order, and turn N belongs to `turnOrder[(N-1) % n]` —
+ * `setup()` deals the first card to `turnOrder[0]` and `advanceTurn` walks the list
+ * from the outgoing player's own index, so the offset arithmetic below is exact
+ * rather than approximate. An unknown seat falls back to "the very next turn",
+ * which is the conservative answer: expire sooner, never later.
+ */
+export function ownerNextTurn(state: GameState, owner: PlayerID): number {
+  const n = state.turnOrder.length;
+  const a = state.turnOrder.indexOf(state.activePlayer);
+  const o = state.turnOrder.indexOf(owner);
+  if (n === 0 || a < 0 || o < 0) return state.turn + 1;
+  const step = (o - a + n) % n;
+  return state.turn + (step === 0 ? n : step);
+}
+
+/**
+ * The first turn number of the round AFTER the one in progress — i.e. the
+ * `'round'` expiry, for GROWING DISSENT's "starting this turn, for 1 round".
+ *
+ * Turn 1 is `turnOrder[0]`'s, so the round in progress ends after the last seat's
+ * turn and the next round begins on `turn + (n - (turn - 1) mod n)`. With three
+ * players: turn 1 -> 4, turn 2 -> 4, turn 3 -> 4, turn 4 -> 7.
+ */
+export function roundEndTurn(state: GameState): number {
+  const n = Math.max(1, state.turnOrder.length);
+  return state.turn + (n - ((state.turn - 1 + n) % n));
+}
+
 export type GameState = {
   readonly zones: readonly Zone[];
   readonly players: Readonly<Record<PlayerID, PlayerState>>;
@@ -268,6 +373,14 @@ export type GameState = {
   readonly activeHeadline: CardID | null;
 
   readonly choices: readonly PendingChoice[];
+
+  /**
+   * G9 / G22 — effects still in force. See `LiveEffect` for the full visibility
+   * argument; the short form is that a live effect is always a PUBLIC condition
+   * installed by a card that is already face up, so it is unprefixed and reaches
+   * every client deliberately.
+   */
+  readonly liveEffects: readonly LiveEffect[];
 
   /**
    * Set when the board fills before every majority forms (p20). Everyone gets one

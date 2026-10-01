@@ -235,17 +235,29 @@
 
     "effectDuration": {
       "enum": ["this-turn", "round", "next-turn", "rest-of-game"],
-      "$comment": "RESERVED — NOT EXECUTABLE TODAY. EffectDuration in cards.ts; the schema accepts it so that an author who writes a lasting clause gets the engine explanation from the validator instead of 'unknown property'. Only 'this-turn' is accepted by packages/cards/src/validate.ts, because that is the only value reduce() already performs (resolve once, discard the card). Every other value is rejected with finding code EFFECT_NOT_EXECUTED and the reducer change named. See KNOWN-GAPS.md G9 and G22."
+      "$comment": "EXECUTED. EffectDuration in cards.ts. reduce.ts installLiveEffects turns a lasting duration into a GameState.liveEffects entry whose activeFrom / expiresAt are absolute turn numbers computed at install, and advanceTurn drops it when the turn passes expiresAt. 'this-turn' is the default and is what the engine always did: resolve the effects once, discard the card. EXECUTABLE_DURATIONS in packages/cards/src/executable.ts is the registry, and it currently accepts all four. See KNOWN-GAPS.md G9 and G22."
     },
 
     "effectTiming": {
       "enum": ["now", "next-turn", "after-this-turn"],
-      "$comment": "RESERVED — NOT EXECUTABLE TODAY. EffectTiming in cards.ts. Rejected by the validator: reduce() has no clock on an effect. See KNOWN-GAPS.md G22."
+      "$comment": "EXECUTED, for two of the three values. EffectTiming in cards.ts. 'now' (the default) installs the effect live immediately; 'next-turn' keeps it dormant until the owner's next turn, using state.ts ownerNextTurn. 'after-this-turn' has no anchor — it would need a queue of effects to run between advanceTurn and the next player's first action, and nothing in the corpus needs one, so EXECUTABLE_TIMINGS refuses it. See KNOWN-GAPS.md G22."
     },
 
     "effectTrigger": {
-      "enum": ["on-purchase", "on-voter-influenced", "on-volatile-placement", "on-gerrymander", "on-majority-formed"],
-      "$comment": "RESERVED — NOT EXECUTABLE TODAY. EffectTrigger in cards.ts, carried on every Effect as `when`. A hook on another player's action needs a trigger registry in GameState that INFLUENCE / BUY_CONSPIRACY / GERRYMANDER / PLACE_VOTERS consult. Rejected by the validator. See KNOWN-GAPS.md G14."
+      "enum": ["on-turn-start", "on-purchase", "on-voter-influenced", "on-volatile-placement", "on-gerrymander", "on-majority-formed"],
+      "$comment": "EXECUTED. EffectTrigger in cards.ts, carried on every Effect as `when`. installLiveEffects writes the effect into GameState.liveEffects and fireTriggers — a bounded cascade, one effect per wave, capped by TRIGGER_MAX_WAVES — applies it when the event is raised. EXECUTABLE_TRIGGERS in packages/cards/src/executable.ts is the registry of the events the reducer actually raises, because a `when` that is never raised installs a hook that never wakes. See KNOWN-GAPS.md G14."
+    },
+
+    "effectCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "byOwner": { "type": "boolean" },
+        "influencedVotersAtLeast": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "movedMyVoter": { "type": "boolean" }
+      },
+      "$comment": "Narrowing on the event that woke a hook, ANDed across the keys present. EffectCondition in cards.ts.\n\nbyOwner: the event's actor is the effect's own owner. POWER TRIP is 'every time YOU influence a 3-Voter Card', which is byOwner plus influencedVotersAtLeast: 3 — the two keys are separate because the real card needs both at once.\n\ninfluencedVotersAtLeast: the Voter Card that was bought carried at least this many voters. Only meaningful on 'on-voter-influenced'.\n\nmovedMyVoter: the voter the event moved belongs to the owner. GROWING DISSENT is 'every time any opponent Gerrymanders your voters'. Only meaningful on 'on-gerrymander'.\n\nminProperties 1: an empty condition constrains nothing, and a card that writes one reads as though it narrowed something."
     },
 
     "dynamicCount": {
@@ -298,7 +310,8 @@
             "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -310,7 +323,8 @@
             "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -322,7 +336,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -334,7 +349,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -347,7 +363,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -359,7 +376,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -371,7 +389,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -383,7 +402,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -395,7 +415,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -408,7 +429,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -422,7 +444,8 @@
             "target": { "$ref": "#/$defs/effectTarget" },
             "from": { "enum": ["draw", "discard"] },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -433,7 +456,8 @@
           "properties": {
             "op": { "const": "refresh-market" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         },
         {
@@ -445,7 +469,8 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "when": { "$ref": "#/$defs/effectTrigger" },
-            "until": { "$ref": "#/$defs/effectDuration" }
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
           }
         }
       ]
@@ -514,7 +539,7 @@
         "timing": { "$ref": "#/$defs/effectTiming" },
         "interrupt": { "$ref": "#/$defs/interrupt" }
       },
-      "$comment": "HeadlineCard = ConspiracyCard minus `cost`. REF 5.5 confirms that is correct:\n'Headline Cards have no cost'.\n\nRULES p18: a Headline is resolved at the end of the turn of the player who placed a\nvoter into a Volatile Area, one per voter, in the order the voters were placed.\n\nREF 4.3 preamble, verified: Headlines are always carried out chronologically and in\nthe post-turn phase unless the card says otherwise; if a headline involves several\nturns or several players a Block must be applied at the very beginning; donated\nvoters must be placed immediately. None of that is representable here — see\npackages/cards/KNOWN-GAPS.md. The `duration` / `timing` / `interrupt` fields exist so\nthat an author who reaches for one of them gets the engine explanation from the\nvalidator rather than 'unknown property'; all three are inert in reduce()."
+      "$comment": "HeadlineCard = ConspiracyCard minus `cost`. REF 5.5 confirms that is correct:\n'Headline Cards have no cost'.\n\nRULES p18: a Headline is resolved at the end of the turn of the player who placed a\nvoter into a Volatile Area, one per voter, in the order the voters were placed.\n\nREF 4.3 preamble, verified: Headlines are always carried out chronologically and in\nthe post-turn phase unless the card says otherwise; if a headline involves several\nturns or several players a Block must be applied at the very beginning; donated\nvoters must be placed immediately. None of that is representable here — see\npackages/cards/KNOWN-GAPS.md. `duration` and `timing` are now EXECUTED: a lasting\n`duration` installs a GameState.liveEffects entry that advanceTurn expires, and\n`timing` decides when it may first act. `interrupt` is still inert in reduce(), and\nit exists so that an author who reaches for one gets the engine explanation from\nthe validator rather than 'unknown property'."
     }
   }
 }

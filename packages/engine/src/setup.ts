@@ -185,6 +185,10 @@ export function setup(opts: SetupOptions): GameState {
     headlineQueue: [],
     activeHeadline: null,
     choices: [],
+    // Nothing is in force on turn 1. PUBLIC, deliberately: see `LiveEffect` in
+    // state.ts for the visibility argument, which is why this line is above the
+    // server-only block rather than inside it.
+    liveEffects: [],
     finalRoundFrom: null,
     log: [],
 

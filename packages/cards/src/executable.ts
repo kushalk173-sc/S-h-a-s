@@ -32,11 +32,16 @@
  *
  * ## The reserved shapes
  *
- * `duration`, `timing`, `interrupt`, `when`, `until` and a dynamic `n` are real,
- * specified, wanted — and inert. They are accepted by the JSON Schema so a card
- * author gets a precise explanation instead of "unknown property", and rejected
- * here with the exact engine change each one is waiting on. See
- * `packages/cards/KNOWN-GAPS.md`.
+ * `interrupt` and a dynamic `n` are real, specified, wanted — and inert. They are
+ * accepted by the JSON Schema so a card author gets a precise explanation instead
+ * of "unknown property", and rejected here with the exact engine change each one
+ * is waiting on. See `packages/cards/KNOWN-GAPS.md`.
+ *
+ * `duration`, `timing`, `when`, `until` and `condition` are no longer on that list:
+ * they are EXECUTED, by `installLiveEffects` and `fireTriggers` in the reducer, and
+ * `SCOPE_FIELDS_READ_BY_INSTALL` below is the registry that says so — re-derived
+ * from the reducer's own source by `test/reducer-parity.test.ts`, like everything
+ * else in this file.
  */
 
 import type { Effect } from './engine.js';
@@ -86,10 +91,27 @@ const FIELD_EXECUTABLE_WHEN: Readonly<Record<string, (value: unknown) => boolean
 export const EFFECT_INTRINSIC_FIELDS: readonly string[] = ['op'];
 
 /**
+ * The scope fields `applyEffect` does NOT read but the card contract honours
+ * anyway, because ONE FUNCTION ABOVE IT does: `installLiveEffects` in
+ * `packages/engine/src/reduce.ts`.
+ *
+ * This is the second honesty seam, and it exists because the first one cannot see
+ * these. `test/reducer-parity.test.ts` re-derives the per-op field list by slicing
+ * `applyEffect`'s body between its `case` marks — a field read by the installer
+ * would be invisible there, and declaring one in `EXECUTED_OPS` would be a lie in
+ * the other direction. So the registry names them separately, and the parity test
+ * re-derives THIS list from `installLiveEffects`'s own source text too. A scope
+ * field that the installer stops reading fails the test; one it never read fails
+ * the validator.
+ */
+export const SCOPE_FIELDS_READ_BY_INSTALL: readonly string[] = ['when', 'until', 'condition'];
+
+
+/**
  * Fields the reducer ignores, and the exact change each one is waiting on.
  *
  * Keyed `op.field`. A field with no bespoke entry still fails, with the generic
- * message from `unexecutedEffectFindings`; these are the ones an author is most
+ * message from `unexecutedEffectProblems`; these are the ones an author is most
  * likely to reach for, written out so the message is actionable on its own.
  */
 const IGNORED_FIELD_FIX: Readonly<Record<string, string>> = {
@@ -99,42 +121,72 @@ const IGNORED_FIELD_FIX: Readonly<Record<string, string>> = {
   // G8 (gerrymander) was the last entry and its case now loops `resolveTargets`.
 };
 
-// ─────────────────────────── the reserved (inert) shapes ───────────────────────────
+// ─────────────────────────── the scope fields the installer reads ───────────────────────────
 
 /**
- * `duration: 'this-turn'` is the ONE reserved value the engine already performs:
- * the effects resolve once and the card is discarded. It is accepted because it is
- * a statement of fact rather than a request for new behaviour. Everything else in
- * this enum needs a live-effects list in `GameState`.
+ * The trigger values the reducer actually raises.
+
+ *
+ * `'on-turn-start'` is raised by `tickLiveEffects`, at the top of a player's turn
+ * after expiry has been ticked. The other four are raised by the event consult
+ * points — `INFLUENCE`, `BUY_CONSPIRACY`, `GERRYMANDER` and `setArea` — and an
+ * effect naming one of those is installed as a hook that never wakes, which is the
+ * exact failure this registry exists to prevent: the card reads as though a thing
+ * happens every time somebody buys, and nothing happens, ever.
  */
-export const EXECUTABLE_DURATIONS: ReadonlySet<string> = new Set(['this-turn']);
+export const EXECUTABLE_TRIGGERS: ReadonlySet<string> = new Set(['on-turn-start']);
+
+/** `timing` values `installLiveEffects` honours. `'after-this-turn'` is the gap. */
+export const EXECUTABLE_TIMINGS: ReadonlySet<string> = new Set(['now', 'next-turn']);
+
+/**
+ * Every card-level `duration` is now performed.
+ *
+ * `'this-turn'` was always performed — resolve once, discard the card — and it
+ * remains the DEFAULT, so a card that omits `duration` behaves exactly as it did
+ * before this list existed. The other three install a `GameState.liveEffects`
+ * entry whose `activeFrom` / `expiresAt` are absolute turn numbers computed at
+ * install and ticked in `advanceTurn`. See KNOWN-GAPS.md G9 and G22.
+ */
+export const EXECUTABLE_DURATIONS: ReadonlySet<string> = new Set([
+  'this-turn',
+  'round',
+  'next-turn',
+  'rest-of-game',
+]);
 
 export const DURATION_FIX =
-  'reduce() resolves a Conspiracy/Headline once and discards the card (applyEffects, then ' +
-  'discardTo). A lasting effect needs a live-effects list on GameState that the reducer ' +
-  're-applies on each event and expires on a turn boundary — state.ts plus a tick in ' +
-  'advanceTurn(). See KNOWN-GAPS G9 and G22; this is the single largest engine change the ' +
-  'corpus exposes.';
+  'Every card-level duration is now installed as a GameState.liveEffects entry (reduce.ts ' +
+  'installLiveEffects) and expired in advanceTurn, so there is nothing left to wait for. If a ' +
+  'card is still refused for a duration, that is a bug in the registry above, not a missing ' +
+  'engine feature.';
 
 export const TIMING_FIX =
-  'reduce() has no clock on an effect. "next turn" needs the owning player\'s turn index, so ' +
-  'the effect has to be stored with an expiry and checked at the top of that player\'s turn in ' +
-  'advanceTurn(). See KNOWN-GAPS G22.';
+  'reduce() honours timing "now" (the default) and "next-turn" (dormant until the owner\'s next ' +
+  'turn, via state.ts ownerNextTurn). "after-this-turn" has no anchor — it would need a queue of ' +
+  'effects to run between advanceTurn and the next player\'s first action, and nothing in the ' +
+  'corpus needs one. See KNOWN-GAPS.md G22.';
 
 export const INTERRUPT_FIX =
   'reduce() has no interrupt window: PLAY_CONSPIRACY is gated on phase/actions|answer for the ' +
   'card owner alone, there is no auction, no vote, and no way to cancel an effect that has ' +
-  'already resolved. See KNOWN-GAPS G13.';
+  'already resolved. See KNOWN-GAPS.md G13.';
 
 export const WHEN_FIX =
-  'reduce() applies an effect list once, at resolution. A hook on another player\'s action needs ' +
-  'a trigger registry on GameState that INFLUENCE, BUY_CONSPIRACY, GERRYMANDER, PLACE_VOTERS and ' +
-  'setArea consult. See KNOWN-GAPS G14.';
+  'A `when` the reducer never raises would install a hook that never wakes — a card that reads ' +
+  'as though something happens on every purchase and nothing does, ever. The raised events are ' +
+  'listed in EXECUTABLE_TRIGGERS and each one is re-derivable from reduce.ts by ' +
+  'test/reducer-parity.test.ts.';
+
+export const CONDITION_FIX =
+  '`condition` narrows a `when`, so it needs a `when` to narrow: a condition on an effect with no ' +
+  'trigger is never evaluated, and the engine drops it silently. Write the trigger first.';
 
 export const DYNAMIC_N_FIX =
   'reduce() reads `effect.n` as a number and pushes it straight into a Choice.count / a loop ' +
   'bound. A computed value has to be resolved before applyEffect pushes anything, which means ' +
-  'the same read-the-player-state plumbing as G14. See KNOWN-GAPS G15.';
+  'the same read-the-player-state plumbing as G14. See KNOWN-GAPS.md G15.';
+
 
 // ─────────────────────────── the check ───────────────────────────
 
@@ -179,26 +231,43 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
   for (const field of Object.keys(effect)) {
     if (EFFECT_INTRINSIC_FIELDS.includes(field)) continue;
 
-    // The two reserved scope fields ride on every op, so they are matched by name
-    // rather than by `op.field`.
+    // The three scope fields are read by `installLiveEffects`, one function above
+    // `applyEffect`. They are checked here by VALUE rather than skipped, because
+    // "the installer reads it" and "the installer honours this value" are different
+    // claims: a `when` the reducer never raises installs a hook that never wakes.
     if (field === 'when') {
-      out.push({
-        code: 'EFFECT_FIELD_NOT_EXECUTED',
-        pointer: `${pointer}/when`,
-        message:
-          `"when" is on every Effect in cards.ts but applyEffect ignores it, so a trigger clause ` +
-          `would read as a live hook and fire exactly never. ${WHEN_FIX}`,
-      });
+      const when = effect[field];
+      if (typeof when !== 'string' || !EXECUTABLE_TRIGGERS.has(when)) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/when`,
+          message:
+            `when ${JSON.stringify(when)} is not an event reduce() raises, so the hook would be ` +
+            `installed and never fire — a card that reads as though something happens on every ` +
+            `purchase, and nothing ever happens. ${WHEN_FIX}`,
+        });
+      }
       continue;
     }
     if (field === 'until') {
-      out.push({
-        code: 'EFFECT_FIELD_NOT_EXECUTED',
-        pointer: `${pointer}/until`,
-        message:
-          `"until" is on every Effect in cards.ts but applyEffect ignores it, so a lasting clause ` +
-          `would read as a duration and behave as a one-shot. ${DURATION_FIX}`,
-      });
+      if (typeof effect[field] !== 'string' || !EXECUTABLE_DURATIONS.has(effect[field])) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/until`,
+          message:
+            `until ${JSON.stringify(effect[field])} is not a lifetime reduce() can expire. ${DURATION_FIX}`,
+        });
+      }
+      continue;
+    }
+    if (field === 'condition') {
+      if (effect.when === undefined) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/condition`,
+          message: CONDITION_FIX,
+        });
+      }
       continue;
     }
 
@@ -250,18 +319,19 @@ export function unexecutedCardProblems(card: unknown, pointer: string): readonly
         code: 'EFFECT_NOT_EXECUTED',
         pointer: `${pointer}/duration`,
         message:
-          `duration "${card.duration}" is not performed by reduce(): the effects resolve once and ` +
-          `the card is discarded, so a lasting effect would simply never expire — or never re-apply. ` +
-          `Only "this-turn" is accepted, because that is what the engine already does. ${DURATION_FIX}`,
+          `duration "${card.duration}" is not a lifetime reduce() can install. ${DURATION_FIX}`,
       });
     }
   }
   if ('timing' in card) {
-    out.push({
-      code: 'EFFECT_NOT_EXECUTED',
-      pointer: `${pointer}/timing`,
-      message: `"timing" is not read by reduce(). ${TIMING_FIX}`,
-    });
+    if (typeof card.timing !== 'string' || !EXECUTABLE_TIMINGS.has(card.timing)) {
+      out.push({
+        code: 'EFFECT_NOT_EXECUTED',
+        pointer: `${pointer}/timing`,
+        message:
+          `timing ${JSON.stringify(card.timing)} is not read by reduce(). ${TIMING_FIX}`,
+      });
+    }
   }
   if ('interrupt' in card) {
     out.push({
