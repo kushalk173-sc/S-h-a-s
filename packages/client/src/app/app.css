@@ -771,8 +771,9 @@
    THE HAZARD THIS AVOIDS. A `.mkt`-style tile makes a row's clickability
    ambiguous, and an ambiguous target in a dialog whose whole purpose is to
    choose one of several cards is how the wrong card gets played. One card, one
-   visible button, `align-self: flex-start` so the button is the size of its
-   label and not the width of the card. */
+   visible button, sized to the full card width so the tap target is a thumb's
+   width rather than a line of text. `max-width` stops a lone card stretching to
+   a three-column track. */
 
 .con {
   list-style: none;
