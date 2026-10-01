@@ -50,8 +50,10 @@ import {
   IDEOLOGUE_RESOURCE,
   RESOURCES,
   RULES,
+  deltaTotal,
   sidePayout,
   type Delta,
+  type Effect,
   type IdeologyCard,
   type IdeologySide,
   type Ideologue,
@@ -126,7 +128,8 @@ export type BalanceFinding = {
     | 'RESOURCE_BLIND_LEAN'
     | 'IDEOLOGUE_SKEW'
     | 'VOTER_COST_NON_MONOTONIC'
-    | 'VOTER_VALUE_UNDERREPRESENTED';
+    | 'VOTER_VALUE_UNDERREPRESENTED'
+    | 'X_EFFECT_MAGNITUDE';
   readonly severity: BalanceSeverity;
   readonly deck: string;
   readonly cardId: string;
@@ -604,6 +607,139 @@ function voterFindings(deck: string, cards: readonly CorpusVoterCard[]): readonl
   return out;
 }
 
+// ─────────────────────────── X-card magnitude ───────────────────────────
+
+/**
+ * The most a single Conspiracy or Headline Card may be worth, in resources, to
+ * the player who resolves it.
+ *
+ * WHY THIS EXISTS. Everything above this section analyses an Ideology Card, where
+ * the design question is "is one answer strictly better than the other". A Conspiracy
+ * or Headline Card has no sides to compare — it is a single effect — so the whole
+ * checker was silent on the class of card the recovered corpus is actually made of
+ * (REF 4: 50 recovered X-cards, and REF 4.4 item 1 says they are mostly not resource
+ * deltas at all). A card that hands one player a dozen resources would sail through
+ * with no finding, and the resource cap is 12.
+ *
+ * HALF THE CAP. `RULES.resourceCap` is 12, so 6 is half a player's whole pool, and it
+ * is also more than the printed cost of the card carrying it (RULES p19: 4-5). A card
+ * that costs 4 and can be worth 7 is a card that pays for itself twice, whatever it
+ * does to the other players.
+ *
+ * A WARNING, not an error, for the same reason every other tilt is: the argument
+ * about a flagged card belongs in a pull request with a human in it. Errors here are
+ * for defects (EMPTY_SIDE), not for strong cards.
+ */
+export const X_EFFECT_MAGNITUDE_BUDGET = 6;
+
+/**
+ * What one `draw-conspiracy` is worth. RULES p19 prints 4-5 on the back of the card;
+ * the lower bound is used so the check cannot be softened by a costlier edition.
+ */
+export const CONSPIRACY_MIN_COST = 4;
+
+/** Fallback for the price of a voter when no voter deck is supplied. */
+const DEFAULT_VOTER_VALUE = 3;
+
+export type XCardLike = {
+  readonly id: string;
+  readonly name: string;
+  readonly effects: readonly Effect[];
+};
+
+/**
+ * What a voter costs in the shipped decks, on average.
+ *
+ * Derived rather than assumed, because a voter granted by a card is worth exactly
+ * what a voter bought from the market costs, and that number is corpus data. Rounded
+ * to a whole resource: it is a magnitude estimate for a warning, and a fractional
+ * threshold would make the finding depend on the deck's arithmetic.
+ */
+export function voterValue(cards: readonly CorpusVoterCard[]): number {
+  let total = 0;
+  let count = 0;
+  for (const c of cards) {
+    if (c.voters < 1) continue;
+    total += voterTotalCost(c.cost) / c.voters;
+    count += 1;
+  }
+  return count === 0 ? DEFAULT_VOTER_VALUE : Math.max(1, Math.round(total / count));
+}
+
+/**
+ * The net resources an X-card hands its own player. Negative means the card costs
+ * its player resources.
+ *
+ * Only the RESOLVING player's share is counted. An effect aimed at `each-opponent`,
+ * `everyone` or `leader` is another player's problem, and one that helps everybody is
+ * not the same design failure as one that hands the caster everything — but note the
+ * asymmetry this leaves: a card that gives every opponent 6 resources scores 0 here.
+ * That is a real limit of the measure and it is stated rather than hidden; the checks
+ * that would catch it (target-sensitive payout analysis) belong with a corpus large
+ * enough to have a distribution worth judging.
+ */
+export function xCardMagnitude(card: XCardLike, perVoter: number): number {
+  let total = 0;
+  for (const effect of card.effects) {
+    const mine = !('target' in effect) || effect.target === undefined || effect.target === 'you';
+    if (!mine) continue;
+    switch (effect.op) {
+      case 'gain':
+        total += deltaTotal(effect.res);
+        break;
+      case 'lose':
+        total -= deltaTotal(effect.res);
+        break;
+      case 'gain-any':
+      case 'steal-any':
+        total += effect.n;
+        break;
+      case 'lose-any':
+        total -= effect.n;
+        break;
+      case 'voters':
+        total += effect.n * perVoter;
+        break;
+      case 'discount':
+        // A discount is worth one resource per use, at most.
+        total += effect.n;
+        break;
+      case 'draw-conspiracy':
+        total += effect.n * CONSPIRACY_MIN_COST;
+        break;
+      // Board effects are not resources: evicting, discarding, converting,
+      // gerrymandering and refreshing the market move pegs and cards, not discs.
+      case 'evict':
+      case 'discard-voter':
+      case 'convert-voter':
+      case 'gerrymander':
+      case 'refresh-market':
+        break;
+    }
+  }
+  return total;
+}
+
+function xCardFindings(deck: string, cards: readonly XCardLike[], perVoter: number): readonly BalanceFinding[] {
+  const out: BalanceFinding[] = [];
+  for (const card of cards) {
+    const magnitude = xCardMagnitude(card, perVoter);
+    if (magnitude <= X_EFFECT_MAGNITUDE_BUDGET) continue;
+    out.push({
+      code: 'X_EFFECT_MAGNITUDE',
+      severity: 'warn',
+      deck,
+      cardId: card.id,
+      message:
+        `"${card.name}" is worth about ${magnitude} resources to the player who resolves it ` +
+        `(a voter counted at ${perVoter}, a drawn Conspiracy Card at its printed minimum of ` +
+        `${CONSPIRACY_MIN_COST}), against a budget of ${X_EFFECT_MAGNITUDE_BUDGET} and a ` +
+        `resource cap of ${RULES.resourceCap}. It costs 4-5 to buy, so it pays for itself twice.`,
+    });
+  }
+  return out;
+}
+
 // ─────────────────────────── the report ───────────────────────────
 
 export type BalanceInput = {
@@ -611,6 +747,13 @@ export type BalanceInput = {
   readonly ideology: ReadonlyMap<string, readonly CorpusIdeologyCard[]>;
   /** Deck id → its Voter Cards. */
   readonly voter: ReadonlyMap<string, readonly CorpusVoterCard[]>;
+  /**
+   * Deck id → its Conspiracy and Headline Cards, for the magnitude check.
+   *
+   * Optional because the Ideology analysis does not need it, and a caller that only
+   * wants the dominance relations should not have to load a deck to get them.
+   */
+  readonly x?: ReadonlyMap<string, readonly XCardLike[]>;
 };
 
 export function balanceCorpus(input: BalanceInput): BalanceReport {
@@ -658,6 +801,14 @@ export function balanceCorpus(input: BalanceInput): BalanceReport {
   for (const [deck, cards] of input.voter) {
     cardsChecked += cards.length;
     findings.push(...voterFindings(deck, cards));
+  }
+
+  if (input.x !== undefined) {
+    const perVoter = voterValue([...input.voter.values()].flat());
+    for (const [deck, cards] of input.x) {
+      cardsChecked += cards.length;
+      findings.push(...xCardFindings(deck, cards, perVoter));
+    }
   }
 
   const errors = findings.filter((f) => f.severity === 'error');

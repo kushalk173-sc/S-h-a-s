@@ -7,9 +7,11 @@
  */
 
 import { loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
+import type { XCardLike } from '../src/balance.js';
 import {
   BALANCE_TOLERANCE_TOTAL,
   RESOURCE_BLIND_LEAN_THRESHOLD,
+  X_EFFECT_MAGNITUDE_BUDGET,
   balanceCorpus,
 } from '../src/balance.js';
 import { RULES } from '../src/engine.js';
@@ -19,25 +21,29 @@ const strict = process.argv.includes('--strict');
 const decks = ['core', 'et2040', 'in2020'];
 const ideology = new Map<string, ReturnType<typeof loadIdeologyDeck>>();
 const voter = new Map<string, ReturnType<typeof loadVoterDeck>>();
+const x = new Map<string, XCardLike[]>();
 for (const d of decks) {
   const i = loadIdeologyDeck(d);
   const v = loadVoterDeck(d);
   // A deck that ships no cards of a kind is not an error here; the validator owns that.
   if (i.length > 0) ideology.set(d, i);
   if (v.length > 0) voter.set(d, v);
-  // Touch the other two so a malformed file fails here too.
   const c = loadConspiracyDeck(d);
   const h = loadHeadlineDeck(d);
-  if (c.length + h.length < 0) throw new Error('unreachable');
+  if (c.length + h.length > 0) x.set(d, [...c, ...h]);
 }
 
-const report = balanceCorpus({ ideology, voter });
+const report = balanceCorpus({ ideology, voter, x });
 
 console.log('shasn cards — balance');
 console.log('─'.repeat(72));
 console.log(`cards checked         ${report.cardsChecked}`);
 console.log(`tolerance band        ±${BALANCE_TOLERANCE_TOTAL} total resources (RULES.resourceCap = ${RULES.resourceCap})`);
 console.log(`resource-blind lean   > ${(RESOURCE_BLIND_LEAN_THRESHOLD * 100).toFixed(0)}% of decisive cards`);
+console.log(
+  `x-card magnitude       > ${X_EFFECT_MAGNITUDE_BUDGET} resources to the resolving player ` +
+    `(resource cap ${RULES.resourceCap})`,
+);
 console.log('');
 
 for (const b of report.bias) {

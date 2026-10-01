@@ -39,7 +39,7 @@ export type {
 export { indexCards, sidePayout } from '../../engine/src/cards';
 
 export type { CardID, Delta, Ideologue, PlayerID, Pool, Resource } from '../../engine/src/state';
-export { IDEOLOGUES, IDEOLOGUE_RESOURCE, RESOURCES, RESOURCE_IDEOLOGUE } from '../../engine/src/state';
+export { IDEOLOGUES, IDEOLOGUE_RESOURCE, RESOURCES, RESOURCE_IDEOLOGUE, deltaTotal } from '../../engine/src/state';
 
 export { RULES } from '../../engine/src/rules';
 export type { Rules } from '../../engine/src/rules';

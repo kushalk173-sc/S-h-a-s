@@ -2,16 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BALANCE_TOLERANCE_TOTAL,
+  CONSPIRACY_MIN_COST,
   IDEOLOGUE_SKEW_TOLERANCE,
   RESOURCE_BLIND_LEAN_THRESHOLD,
+  X_EFFECT_MAGNITUDE_BUDGET,
   analyseIdeologyCard,
   balanceCorpus,
   deckBias,
+  voterValue,
+  xCardMagnitude,
   type BalanceFinding,
+  type XCardLike,
 } from '../src/balance.js';
-import { RULES } from '../src/engine.js';
+import { RULES, type Effect } from '../src/engine.js';
 import type { CorpusIdeologyCard, CorpusVoterCard } from '../src/corpus.js';
-import { loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
+import { loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
 
 let nextId = 0;
 
@@ -435,6 +440,80 @@ describe('the voter deck cost curve', () => {
   });
 });
 
+describe('X-card magnitude: a card with no second side still has a value', () => {
+  const xCard = (effects: Effect[]): XCardLike => ({ id: 'ct-test-001', name: 'A Test Card', effects });
+
+  it('sums what the card hands its OWN player, counting a voter at the deck price', () => {
+    // 3 Funds + 2 voters at 3 each = 9, over the budget of 6.
+    expect(xCardMagnitude(xCard([{ op: 'gain', res: { funds: 3 } }, { op: 'voters', n: 2 }]), 3)).toBe(9);
+  });
+
+  it('subtracts what the card costs its player', () => {
+    expect(xCardMagnitude(xCard([{ op: 'gain', res: { funds: 4 } }, { op: 'lose-any', n: 2 }]), 3)).toBe(2);
+  });
+
+  it("ignores what it does to OTHER players, which is not its caster's payoff", () => {
+    // Every opponent losing 3 is 0 to the player resolving the card, and must not be
+    // scored as if it were a 3-resource gift to them.
+    expect(
+      xCardMagnitude(
+        xCard([
+          { op: 'lose-any', n: 3, target: 'each-opponent' },
+          { op: 'gain', res: { trust: 1 }, target: 'everyone' },
+        ]),
+        3,
+      ),
+    ).toBe(0);
+  });
+
+  it('counts a drawn Conspiracy Card at its printed minimum, and a discount at one per use', () => {
+    expect(xCardMagnitude(xCard([{ op: 'draw-conspiracy', n: 2 }]), 3)).toBe(2 * CONSPIRACY_MIN_COST);
+    expect(xCardMagnitude(xCard([{ op: 'discount', n: 2 }]), 3)).toBe(2);
+  });
+
+  it('counts board effects as zero — they move pegs, not discs', () => {
+    expect(
+      xCardMagnitude(
+        xCard([
+          { op: 'evict', n: 3 },
+          { op: 'discard-voter', n: 3 },
+          { op: 'convert-voter', n: 3 },
+          { op: 'gerrymander', n: 3 },
+          { op: 'refresh-market' },
+        ]),
+        3,
+      ),
+    ).toBe(0);
+  });
+
+  it('flags a card over the budget, and does not flag one inside it', () => {
+    const loud = xCard([{ op: 'gain-any', n: 5 }, { op: 'voters', n: 1 }]);
+    const quiet = xCard([{ op: 'gain-any', n: 2 }, { op: 'voters', n: 1 }]);
+    const report = balanceCorpus({
+      ideology: new Map(),
+      voter: new Map(),
+      x: new Map([['test', [loud, quiet]]]),
+    });
+    const flagged = report.findings.filter((f) => f.code === 'X_EFFECT_MAGNITUDE');
+    expect(flagged.map((f) => f.cardId)).toEqual(['ct-test-001']);
+    expect(flagged[0]?.severity).toBe('warn');
+    expect(flagged[0]?.message).toContain(String(X_EFFECT_MAGNITUDE_BUDGET));
+  });
+
+  it('derives the price of a voter from the deck rather than assuming it', () => {
+    // 2/1 = 2, 4/2 = 2, 9/3 = 3. Mean 2.33, rounded to a whole resource because a
+    // fractional threshold would make the finding depend on deck arithmetic.
+    expect(
+      voterValue([
+        { id: 'vo-test-001', source: 'original; test', provenance: 'inferred', cost: { funds: 2 }, voters: 1 },
+        { id: 'vo-test-002', source: 'original; test', provenance: 'inferred', cost: { funds: 4 }, voters: 2 },
+        { id: 'vo-test-003', source: 'original; test', provenance: 'inferred', cost: { funds: 9 }, voters: 3 },
+      ]),
+    ).toBe(2);
+    expect(voterValue([])).toBeGreaterThan(0);
+  });
+});
+
 describe('the shipped decks', () => {
   const report = balanceCorpus({
     ideology: new Map([
@@ -442,6 +521,10 @@ describe('the shipped decks', () => {
       ['in2020', loadIdeologyDeck('in2020')],
     ]),
     voter: new Map([['core', loadVoterDeck('core')]]),
+    x: new Map([
+      ['et2040', [...loadConspiracyDeck('et2040'), ...loadHeadlineDeck('et2040')]],
+      ['in2020', [...loadConspiracyDeck('in2020'), ...loadHeadlineDeck('in2020')]],
+    ]),
   });
 
   it('has no dominance errors', () => {
@@ -451,6 +534,15 @@ describe('the shipped decks', () => {
 
   it('has no warnings either, so the corpus is reviewable in one pass', () => {
     expect(report.warnings.map((f) => `${f.code} ${f.deck} ${f.message}`)).toEqual([]);
+  });
+
+  it('checks every X-card as well as every Ideology Card', () => {
+    const xCount =
+      loadConspiracyDeck('et2040').length +
+      loadHeadlineDeck('et2040').length +
+      loadConspiracyDeck('in2020').length +
+      loadHeadlineDeck('in2020').length;
+    expect(report.cardsChecked).toBe(8 + 12 + 12 + xCount);
   });
 
   it('reports one bias row per deck', () => {
