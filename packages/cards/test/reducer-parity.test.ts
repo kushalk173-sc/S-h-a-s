@@ -124,6 +124,31 @@ describe('EXECUTED_OPS says which fields each case reads, and that is true', () 
       expect(/\beffect\.res\b/.test(body), `${op} reads effect.res`).toBe(readsRes);
     }
   });
+
+  it('`from` is read exactly where the registry claims it is', () => {
+    // G17. `draw-conspiracy.from` is the discard-pile reach (SELECTIVE ACCESS MEMORY),
+    // and it is the only op with one — so the check has to be derived from the source
+    // like `n` and `res` are, not asserted once.
+    for (const [op, body] of Object.entries(CASES)) {
+      const readsFrom = (EXECUTED_OPS as Record<string, readonly string[]>)[op]?.includes('from') ?? false;
+      expect(/\beffect\.from\b/.test(body), `${op} reads effect.from`).toBe(readsFrom);
+    }
+  });
+
+  it('and every field the registry claims for an op is one the case reads', () => {
+    // The generic form of the three checks above, so a NEW field on an op cannot be
+    // registered without the case reading it. `target` is matched as a bare word
+    // because `applyEffect` computes it once, above the switch, and every targetable
+    // case consumes that local.
+    for (const [op, reads] of Object.entries(EXECUTED_OPS)) {
+      const body = CASES[op];
+      if (body === undefined) throw new Error(`no case body for ${op}`);
+      for (const field of reads) {
+        const re = field === 'target' ? /\btarget\b/ : new RegExp(`\\beffect\\.${field}\\b`);
+        expect(re.test(body), `${op} reads effect.${field}`).toBe(true);
+      }
+    }
+  });
 });
 
 // ─────────────────────────── layer 3: the corpus ───────────────────────────

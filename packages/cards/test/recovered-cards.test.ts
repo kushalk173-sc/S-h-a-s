@@ -13,9 +13,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ConspiracyCard, HeadlineCard } from '../src/engine.js';
+import type { Ctx } from '../../engine/src/reduce';
 import type { GameState } from '../../engine/src/state';
 
 import {
+  FIXTURE_CONSPIRACIES,
   drainChoices,
   fixture,
   pegsOf,
@@ -92,6 +94,40 @@ export const RECOVERED: readonly RecoveredCard[] = [
     },
   },
   {
+    name: 'Selective Access Memory',
+    ref: 'REF 4.2.1 (2040 Deck – Conspiracy Cards)',
+    kind: 'conspiracy',
+    verbatim: 'Pick any Conspiracy Card from the discard pile. It can be in any order from the discard pile.',
+    drops: [
+      "'pick ANY Conspiracy Card … in ANY order' becomes the most recently DISCARDED one: `from: 'discard'` takes the top of the pile, because choosing among the pile's contents needs a `choose-card` decision and a new `Choice` kind is a wire-format change the client owns.",
+    ],
+    card: {
+      id: 'ct-recovered-selective-access',
+      name: 'Selective Access Memory',
+      text: 'Take the Conspiracy Card that was played most recently back into your hand.',
+      cost: 4,
+      effects: [{ op: 'draw-conspiracy', n: 1, from: 'discard' }],
+    } as ConspiracyCard,
+    drive: (s, ctx) =>
+      // Nothing is in the discard pile until something has been played, so play a
+      // filler first. That is the state the real card is written for.
+      playConspiracy(s, 'p1', FIXTURE_CONSPIRACIES[0] as ConspiracyCard, ctx),
+    check: (s, before) => {
+      const discarded = before._conspiracyDiscard;
+      expect(discarded.length).toBeGreaterThan(0);
+      // The card came out of the DISCARD pile — the most recently discarded one —
+      // and went into this player's hand.
+      expect(s.players.p1!.conspiracies).toHaveLength(1);
+      expect(s.players.p1!.conspiracies[0]).toBe(discarded[discarded.length - 1]);
+      // The pile is one shorter, and then this card is discarded onto it in turn, so
+      // the net effect is the discarded card being back where the hand is.
+      expect(s._conspiracyDiscard).toEqual([...discarded.slice(0, -1), 'ct-recovered-selective-access']);
+      // Nobody else's hand is touched, and nothing came off the draw pile.
+      expect(s.players.p2!.conspiracies).toEqual(before.players.p2!.conspiracies);
+      expect(s._conspiracyDraw).toEqual(before._conspiracyDraw);
+    },
+  },
+  {
     name: 'Good Gig Well Played',
     ref: 'REF 4.3 (2040 Deck – Headline Cards)',
     kind: 'headline',
@@ -126,26 +162,28 @@ export const RECOVERED: readonly RecoveredCard[] = [
 // ─────────────────────────── the measurement ───────────────────────────
 
 /** Play one card through the real reducer, resolving whatever it asks for. */
-function play(entry: RecoveredCard): { raised: GameState; after: GameState } {
+function play(entry: RecoveredCard): { raised: GameState; after: GameState; before: GameState; ctx: Ctx } {
   const { ctx, game } = fixture([entry.card]);
-  const first = entry.drive ? entry.drive(game, ctx) : game;
+  // Whatever the setup did is answered first: a pending decision freezes its owner,
+  // and the card under test would be refused with "resolve X first".
+  const before = entry.drive ? drainChoices(entry.drive(game, ctx), ctx) : game;
   const raised =
     entry.kind === 'conspiracy'
-      ? playConspiracy(first, 'p1', entry.card as ConspiracyCard, ctx)
-      : resolveHeadline(first, 'p1', entry.card as HeadlineCard, ctx, 2);
-  return { raised, after: drainChoices(raised, ctx) };
+      ? playConspiracy(before, 'p1', entry.card as ConspiracyCard, ctx)
+      : resolveHeadline(before, 'p1', entry.card as HeadlineCard, ctx, 2);
+  return { raised, after: drainChoices(raised, ctx), before, ctx };
 }
 
 describe('the recovered real cards the reducer can play', () => {
   for (const entry of RECOVERED) {
     it(`${entry.name} — ${entry.ref}`, () => {
-      const { ctx, game } = fixture([entry.card]);
-      const { raised, after } = play(entry);
+      const { raised, after, before, ctx } = play(entry);
       // `raised` is the state the moment the card resolved, with its decisions still
       // open; `after` is the table with every decision answered. A card about who is
       // ASKED asserts on the first, a card about what the board then looks like
-      // asserts on the second.
-      entry.check(raised, game, ctx, after);
+      // asserts on the second. `before` is the position the card was played on to,
+      // after any setup `drive` did.
+      entry.check(raised, before, ctx, after);
     });
   }
 });

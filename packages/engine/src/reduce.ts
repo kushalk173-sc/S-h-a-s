@@ -402,11 +402,25 @@ function applyEffect(
       return s;
     }
     case 'draw-conspiracy': {
+      // G17: `from: 'discard'` takes the most recently DISCARDED card rather than the
+      // top of the draw pile. `discardTo` pushes onto the end of the pile and `draw`
+      // shifts off the front, so "the top of the discard pile" is `length - 1` — and
+      // picking it that way is deterministic, which a reshuffle would not be.
+      //
+      // No `choose-card`: SELECTIVE ACCESS MEMORY's "any card, in any order" needs a
+      // decision over the pile's contents, and a new `Choice` kind is a wire-format
+      // change the client owns. The top of the pile is the honest subset.
+      const fromDiscard = effect.from === 'discard';
       for (const p of resolveTargets(s, source, target)) {
         for (let i = 0; i < effect.n; i++) {
-          const [next, id] = draw(s, 'conspiracy');
-          s = next;
-          if (id === null) break;
+          const pile = fromDiscard ? s._conspiracyDiscard : s._conspiracyDraw;
+          const id = fromDiscard ? pile[pile.length - 1] : pile[0];
+          if (id === undefined) break;
+          s = {
+            ...s,
+            _conspiracyDiscard: fromDiscard ? pile.slice(0, -1) : s._conspiracyDiscard,
+            _conspiracyDraw: fromDiscard ? s._conspiracyDraw : pile.slice(1),
+          };
           const player = s.players[p];
           if (player) s = withPlayer(s, p, { conspiracies: [...player.conspiracies, id] });
         }

@@ -412,6 +412,7 @@
           }
         },
         {
+          "$comment": "draw-conspiracy's `from: 'discard'` is G17: the discard-pile reach that SELECTIVE ACCESS MEMORY needs. The top of a discard pile is the most recently discarded card, because that is the order discardTo pushes them in; choosing ANY card from the pile would need a decision over the pile's contents, which is a Choice kind this engine does not have. `target` says who receives the card.",
           "type": "object",
           "additionalProperties": false,
           "required": ["op", "n"],
@@ -419,6 +420,7 @@
             "op": { "const": "draw-conspiracy" },
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
+            "from": { "enum": ["draw", "discard"] },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }

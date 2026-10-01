@@ -61,7 +61,7 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   'discard-voter': ['n', 'target'],
   'convert-voter': ['n', 'target'],
   gerrymander: ['n', 'target'],
-  'draw-conspiracy': ['n', 'target'],
+  'draw-conspiracy': ['n', 'target', 'from'],
   'refresh-market': [],
   discount: ['n', 'target'],
 };

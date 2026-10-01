@@ -171,8 +171,20 @@ export type Effect = (
    * `'each-opponent'` is GOOD GIG WELL PLAYED's gift. Hands are hidden from every
    * viewer including their owner (`playerView`), so handing a card to an opponent
    * leaks nothing the caster's own play did not.
+   *
+   * `from: 'discard'` reaches the DISCARD pile instead of the draw pile (G17) — the
+   * top of a discard pile being the most recently discarded card, because that is
+   * the order `discardTo` pushes them in and the reducer is not allowed to invent
+   * another. SELECTIVE ACCESS MEMORY's "pick ANY Conspiracy Card from the discard
+   * pile, in ANY order" still needs a choice among the pile's contents, which is a
+   * `Choice` this engine does not have.
    */
-  | { readonly op: 'draw-conspiracy'; readonly n: number; readonly target?: EffectTarget }
+  | {
+      readonly op: 'draw-conspiracy';
+      readonly n: number;
+      readonly target?: EffectTarget;
+      readonly from?: 'draw' | 'discard';
+    }
   /** Discard all face-up Voter Cards and deal fresh ones. */
   | { readonly op: 'refresh-market' }
   /**
