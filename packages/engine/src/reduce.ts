@@ -210,8 +210,22 @@ function syncConspiracyTop(state: GameState, ctx: Ctx): GameState {
 
 type BoardEdit = { readonly state: GameState; readonly events: GameEvent[] };
 
-/** Write an area back and recount its zone, emitting majority events. */
-function setArea(state: GameState, area: Area): BoardEdit {
+/**
+ * Write an area back and recount its zone, emitting majority events.
+ *
+ * The two board events are raised HERE rather than at the seven call sites, because
+ * `setArea` is the only thing in the engine that can change a peg, and a trigger
+ * registry that has to be remembered at every caller is a registry that will be
+ * missed at one. `GERRYMANDER`, `PLACE_VOTERS`, the three powers and
+ * `resolveChoice`'s voter branch all route through it, so all of them raise
+ * `on-volatile-placement` and `on-majority-formed` for free.
+ *
+ * THE COST, and it is paid knowingly: `setArea` now needs `ctx` to fire a hook.
+ * That is why the recursion is bounded rather than merely hoped-for — no effect op
+ * calls `setArea`, so a hook cannot wake a hook through the board, and
+ * `live-effects.test.ts` asserts that by reading `applyEffect`'s source.
+ */
+function setArea(state: GameState, area: Area, ctx: Ctx): BoardEdit {
   const zone = findZone(state, area.zone);
   if (!zone) return { state, events: [] };
   const before = zone.majorityHolder;
@@ -226,11 +240,44 @@ function setArea(state: GameState, area: Area): BoardEdit {
       events.push({ type: 'majority-formed', zoneId: zone.id, player: updated.majorityHolder });
     }
   }
-  return {
-    state: { ...state, zones: state.zones.map((z) => (z.id === updated.id ? updated : z)) },
-    events,
+  let s: GameState = {
+    ...state,
+    zones: state.zones.map((z) => (z.id === updated.id ? updated : z)),
   };
+
+  // p18: a peg in a Volatile Area is permanent and fires a Headline. The actor is the
+  // peg's owner, not whoever performed the move — a gerrymander into a Volatile Area
+  // attributes the Headline to the mover (D6, ruled in `GERRYMANDER`), but the
+  // trigger hook belongs to whoever's voter landed there.
+  if (area.volatile && area.peg !== null) {
+    s = fireTriggers(
+      s,
+      {
+        trigger: 'on-volatile-placement',
+        actor: area.peg.owner,
+        voters: 0,
+        areaId: area.id,
+        pegOwner: area.peg.owner,
+      },
+      ctx,
+    );
+  }
+  if (updated.majorityHolder !== null && before !== updated.majorityHolder) {
+    s = fireTriggers(
+      s,
+      {
+        trigger: 'on-majority-formed',
+        actor: updated.majorityHolder,
+        voters: 0,
+        areaId: area.id,
+        pegOwner: updated.majorityHolder,
+      },
+      ctx,
+    );
+  }
+  return { state: s, events };
 }
+
 
 // ─────────────────────────── effects ───────────────────────────
 
@@ -357,10 +404,12 @@ function fireTriggers(
     );
     if (next === undefined) return s;
     done = new Set([...done, next.id]);
-    // NO_FIRE, not `fire`: a hook's own effects are resolved for real, and
-    // re-threading the waking event into them would let `steal-any` read the
-    // triggering actor a second time.
-    for (const e of next.effects) s = applyEffect(s, next.owner, e, ctx, NO_FIRE);
+    // The waking event IS threaded in, because `steal-any` reads `actor` for its
+    // victim and that is the whole of LAB-GROWN EARWORM: "every time THEY influence
+    // a Voter Card, they will give you 1 of their resources". The effect is applied
+    // through `applyEffect` rather than `applyEffects`, so its own `when` / `until`
+    // are inert here and cannot re-arm it — the cascade cannot install.
+    for (const e of next.effects) s = applyEffect(s, next.owner, e, ctx, fire);
     s = log(s, {
       player: next.owner,
       text: `${next.sourceCardId} takes effect.`,
@@ -997,7 +1046,27 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
         kind: 'voters',
       });
 
-      return { ok: true, state: s, events: [{ type: 'influenced', player: playerId, voters }] };
+      // G14, the purchase trigger. TWO events, in this order, and the order is a
+      // ruling rather than an accident: `on-voter-influenced` is the specific one and
+      // is raised first, so a table with a specific hook and a general hook sees the
+      // specific one resolve before the general one. `FireContext.voters` carries the
+      // size of the card just bought, which is what POWER TRIP's condition reads.
+      s = fireTriggers(
+        s,
+        { trigger: 'on-voter-influenced', actor: playerId, voters, areaId: null, pegOwner: null },
+        ctx,
+      );
+      s = fireTriggers(
+        s,
+        { trigger: 'on-purchase', actor: playerId, voters, areaId: null, pegOwner: null },
+        ctx,
+      );
+
+      return {
+        ok: true,
+        state: s,
+        events: [{ type: 'influenced', player: playerId, voters }],
+      };
     }
 
     case 'PLACE_VOTERS': {
@@ -1022,7 +1091,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       const events: GameEvent[] = [];
       const volatileHits: string[] = [];
       for (const area of resolved) {
-        const edit = setArea(s, { ...area, peg: { owner: playerId, majority: false } });
+        const edit = setArea(s, { ...area, peg: { owner: playerId, majority: false } }, ctx);
         s = edit.state;
         events.push(...edit.events);
         if (area.volatile) {
@@ -1110,12 +1179,12 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
       const mover = from.peg;
       let s = state;
-      let edit = setArea(s, { ...from, peg: null });
+      let edit = setArea(s, { ...from, peg: null }, ctx);
       s = edit.state;
       const events = [...edit.events];
       const toNow = findArea(s, to.id);
       if (!toNow) return fail('unknown area');
-      edit = setArea(s, { ...toNow, peg: { owner: mover.owner, majority: false } });
+      edit = setArea(s, { ...toNow, peg: { owner: mover.owner, majority: false } }, ctx);
       s = edit.state;
       events.push(...edit.events);
 
@@ -1161,6 +1230,23 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
         },
       });
       s = log(s, { player: playerId, text: `Gerrymandered a voter out of ${rightsZone.name}.`, kind: 'gerrymander' });
+
+      // G14: `on-gerrymander`, with the OWNER of the moved peg in `pegOwner`. That is
+      // the whole of GROWING DISSENT's condition — "every time any opponent
+      // Gerrymanders YOUR voters" — and it is why `pegOwner` is a field rather than
+      // something re-derived from the board: the peg has already moved by the time
+      // anyone asks.
+      s = fireTriggers(
+        s,
+        {
+          trigger: 'on-gerrymander',
+          actor: playerId,
+          voters: 0,
+          areaId: to.id,
+          pegOwner: mover.owner,
+        },
+        ctx,
+      );
 
       events.push({ type: 'gerrymandered', player: playerId, from: from.id, to: to.id });
       return { ok: true, state: s, events };
@@ -1235,6 +1321,17 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       });
       s = syncConspiracyTop(s, ctx);
       s = log(s, { player: playerId, text: 'Bought a Conspiracy.', kind: 'card' });
+
+      // G14: a Conspiracy purchase raises `on-purchase` and nothing else.
+      // `on-voter-influenced` is deliberately NOT raised — there is no Voter Card
+      // here, so `FireContext.voters` would be 0 and a condition like POWER TRIP's
+      // would be silently false for a reason that has nothing to do with the card.
+      s = fireTriggers(
+        s,
+        { trigger: 'on-purchase', actor: playerId, voters: 0, areaId: null, pegOwner: null },
+        ctx,
+      );
+
       return { ok: true, state: s, events: [] };
     }
 
@@ -1298,7 +1395,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       if (area.volatile) return fail('voters in a Volatile Area cannot be evicted');
 
       const victim = area.peg.owner;
-      const edit = setArea(state, { ...area, peg: null });
+      const edit = setArea(state, { ...area, peg: null }, ctx);
       let s = edit.state;
       // p34: the evicted voter goes back to its owner's mat and may be replaced
       // anywhere on their next turn, or it is discarded.
@@ -1351,7 +1448,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
       let s = state;
       [s] = takeResources(s, playerId, { [action.pay]: 1 });
-      const edit = setArea(s, { ...area, peg: null });
+      const edit = setArea(s, { ...area, peg: null }, ctx);
       s = edit.state;
       // R12: see POWER_LAND_GRAB. A `fail(...)`, not a TypeError.
       const me = s.players[playerId];
@@ -1406,7 +1503,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
         const now = findArea(s, area.id);
         if (!now?.peg) continue;
         // p34 Convert: replace the voter in the same area with your own.
-        const edit = setArea(s, { ...now, peg: { owner: playerId, majority: false } });
+        const edit = setArea(s, { ...now, peg: { owner: playerId, majority: false } }, ctx);
         s = edit.state;
         events.push(...edit.events);
       }
@@ -1601,6 +1698,7 @@ function resolveChoice(
           c.kind === 'convert-voter'
             ? { ...area, peg: { owner: playerId, majority: false } }
             : { ...area, peg: null },
+          ctx,
         );
         s = edit.state;
         events.push(...edit.events);

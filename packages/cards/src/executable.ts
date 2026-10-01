@@ -125,16 +125,32 @@ const IGNORED_FIELD_FIX: Readonly<Record<string, string>> = {
 
 /**
  * The trigger values the reducer actually raises.
-
  *
- * `'on-turn-start'` is raised by `tickLiveEffects`, at the top of a player's turn
- * after expiry has been ticked. The other four are raised by the event consult
- * points — `INFLUENCE`, `BUY_CONSPIRACY`, `GERRYMANDER` and `setArea` — and an
- * effect naming one of those is installed as a hook that never wakes, which is the
- * exact failure this registry exists to prevent: the card reads as though a thing
- * happens every time somebody buys, and nothing happens, ever.
+ * This is a list of PROMISES about `reduce()`, so it is re-derived from the
+ * reducer's own source by `test/reducer-parity.test.ts`, which greps every
+ * `trigger: '…'` raise site and asserts the two sets are equal. A value added here
+ * without a raise site fails that test; a raise site added without a value here
+ * fails it the other way. And a card naming an event the reducer never raises is
+ * refused by the validator rather than shipping a hook that never wakes.
+ *
+ * WHERE each one is raised:
+ *  - `on-turn-start` — `tickLiveEffects`, after expiry, for the incoming player.
+ *  - `on-purchase` / `on-voter-influenced` — `INFLUENCE` raises both, the
+ *    voter-specific one first; `BUY_CONSPIRACY` raises the general one only.
+ *  - `on-gerrymander` — `GERRYMANDER`, with the moved peg's owner in `pegOwner`.
+ *  - `on-volatile-placement` / `on-majority-formed` — `setArea`, which every peg
+ *    change in the engine routes through, so the three powers and `resolveChoice`'s
+ *    voter branch raise them too without knowing they exist.
  */
-export const EXECUTABLE_TRIGGERS: ReadonlySet<string> = new Set(['on-turn-start']);
+export const EXECUTABLE_TRIGGERS: ReadonlySet<string> = new Set([
+  'on-turn-start',
+  'on-purchase',
+  'on-voter-influenced',
+  'on-volatile-placement',
+  'on-gerrymander',
+  'on-majority-formed',
+]);
+
 
 /** `timing` values `installLiveEffects` honours. `'after-this-turn'` is the gap. */
 export const EXECUTABLE_TIMINGS: ReadonlySet<string> = new Set(['now', 'next-turn']);

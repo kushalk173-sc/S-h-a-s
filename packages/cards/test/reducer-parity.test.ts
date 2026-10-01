@@ -45,7 +45,7 @@ import {
   unexecutedCardProblems,
   unexecutedEffectProblems,
 } from '../src/executable.js';
-import { validateEffect, validateDeckFile, type SchemaProblem } from '../src/schema.js';
+import { validateEffect, validateDeckFile, corpusSchema, type SchemaProblem } from '../src/schema.js';
 import { validateCorpus, validateDecks, shippedDeckInputs, type DeckInput } from '../src/validate.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -239,13 +239,26 @@ describe('EXECUTED_TRIGGERS is exactly the set of events reduce() raises', () =>
     expect([...EXECUTABLE_TRIGGERS].sort()).toEqual(raisedTriggers());
   });
 
-  it('so a `when` naming an unraised event is refused, naming the ones that are raised', () => {
-    const refused = findingsForEffect({ op: 'voters', n: 1, when: 'on-purchase' });
-    expect(codes(refused)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    expect(refused.errors[0]?.message).toContain('never fire');
-    for (const trigger of EXECUTABLE_TRIGGERS) {
+  it('so the whole enum is executable and no shipped card can name an unraised event', () => {
+    // Which means the refusal branch in `unexecutedEffectProblems` is now reachable
+    // only by a hand-built effect — the JSON Schema's `effectTrigger` enum and the
+    // reducer's raise sites are asserted to be the same list, from both sides. The
+    // day they diverge, the divergence is a card that ships and never fires.
+    const schemaTriggers = (corpusSchema().$defs as Record<string, { enum?: readonly string[] }>)
+      .effectTrigger?.enum;
+    expect([...(schemaTriggers ?? [])].sort()).toEqual(raisedTriggers());
+    for (const trigger of raisedTriggers()) {
       expect(codes(findingsForEffect({ op: 'voters', n: 1, when: trigger })), trigger).toEqual([]);
     }
+  });
+
+  it('and an unraised trigger is still refused, for anyone who hand-builds an effect', () => {
+    // Unreachable through the schema, which is the point of the case above — but
+    // `unexecutedEffectProblems` is public and a `CardIndex` is hand-buildable, so
+    // the refusal has to exist rather than being assumed away by an enum.
+    const problems = unexecutedEffectProblems({ op: 'voters', n: 1, when: 'on-a-deal' }, '');
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.message).toContain('never fire');
   });
 });
 
@@ -419,12 +432,15 @@ describe('a field the reducer ignores is rejected however it is spelled', () => 
   });
 
   it('rejects a malformed effect twice over: shape AND executability', () => {
-    // `when` naming an event reduce() never raises, on a card that also has a
-    // nonsense n. Both problems must be reported; neither is a duplicate of the
-    // other.
-    const report = findingsForEffect({ op: 'gain-any', n: 1, when: 'on-gerrymander' });
-    expect(codes(report)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    expect(report.errors[0]?.message).toContain('never fire');
+    // `res` on `gain-any`, which has no such field. Two passes catch it and they are
+    // not duplicates: the schema knows the shape is wrong, and the executability
+    // registry knows the reducer's `gain-any` case would not read it. Keeping both is
+    // the point of the pair — an author fixing only the finding they saw first would
+    // still ship a card that lies.
+    const report = findingsForEffect({ op: 'gain-any', n: 1, when: 'on-turn-start', res: {} });
+    expect(codes(report).slice().sort()).toEqual(['EFFECT_FIELD_NOT_EXECUTED', 'SCHEMA']);
+    const executability = report.errors.find((e) => e.code === 'EFFECT_FIELD_NOT_EXECUTED');
+    expect(executability?.message).toContain('is on the gain-any op');
   });
 
   it('rejects a `condition` with no `when` to narrow, rather than dropping it', () => {
