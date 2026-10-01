@@ -217,7 +217,7 @@ export class Room {
     return {
       viewer,
       viewId: this.#viewId,
-      state: viewFor(this.#state, viewer),
+      state: viewFor(this.#state, this.ctx.cards, viewer),
       blind: viewer === null ? null : blindPromptFor(this.#state, this.ctx.cards, viewer),
     };
   }

@@ -26,7 +26,7 @@ import type { ServerMessage } from '../src/protocol.ts';
 /** `Room.viewFor` returns this; the render mirrors the server's own send paths. */
 function project(state: GameState, ctx: Ctx, viewer: PlayerID | null) {
   return {
-    state: viewFor(state, viewer),
+    state: viewFor(state, ctx.cards, viewer),
     blind: viewer === null ? null : blindPromptFor(state, ctx.cards, viewer),
   };
 }

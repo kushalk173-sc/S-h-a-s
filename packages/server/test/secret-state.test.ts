@@ -199,7 +199,7 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
       // which must be exactly as safe as one that does.
       const viewers: (PlayerID | null)[] = [null, ...s.turnOrder, 'p_not_a_real_seat', ''];
       for (const viewer of viewers) {
-        const keys = allKeys(viewFor(s, viewer)).filter((k) => k.startsWith('_'));
+        const keys = allKeys(viewFor(s, CARDS, viewer)).filter((k) => k.startsWith('_'));
         expect(keys, `state ${i} (${s.phase}), viewer ${String(viewer)}`).toEqual([]);
       }
     }
@@ -226,7 +226,7 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
     for (const [i, s] of CORPUS.entries()) {
       const { cards, seed } = allSecretValues(s);
       for (const viewer of [null, ...s.turnOrder]) {
-        const json = JSON.stringify(viewFor(s, viewer));
+        const json = JSON.stringify(viewFor(s, CARDS, viewer));
         for (const id of cards) {
           expect(json.includes(id), `state ${i} leaked card id ${id} to ${String(viewer)}`).toBe(false);
         }
@@ -243,7 +243,7 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
     // mechanic into a solved one, and the prefix walk above cannot see it.
     for (const s of CORPUS) {
       for (const viewer of [null, ...s.turnOrder]) {
-        const view = viewFor(s, viewer);
+        const view = viewFor(s, CARDS, viewer);
         for (const pid of s.turnOrder) {
           const hand = view.players[pid]?.conspiracies;
           expect(Array.isArray(hand), `${pid} hand is not an array`).toBe(true);
@@ -257,17 +257,17 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
     // If deck depth differed per viewer, the difference itself would leak a redraw
     // or a purchase.
     for (const s of CORPUS) {
-      const sizes = s.turnOrder.map((p) => JSON.stringify(viewFor(s, p).deckSizes));
+      const sizes = s.turnOrder.map((p) => JSON.stringify(viewFor(s, CARDS, p).deckSizes));
       expect(new Set(sizes).size, 'deckSizes differ between viewers').toBe(1);
-      expect(viewFor(s, null).deckSizes.ideology).toBe(s._ideologyDraw.length);
+      expect(viewFor(s, CARDS, null).deckSizes.ideology).toBe(s._ideologyDraw.length);
     }
   });
 
   it('awaitingAnswer is a boolean and identical for every viewer', () => {
     for (const s of CORPUS) {
-      const values = s.turnOrder.map((p) => viewFor(s, p).awaitingAnswer);
+      const values = s.turnOrder.map((p) => viewFor(s, CARDS, p).awaitingAnswer);
       expect(new Set(values).size).toBe(1);
-      expect(typeof viewFor(s, null).awaitingAnswer).toBe('boolean');
+      expect(typeof viewFor(s, CARDS, null).awaitingAnswer).toBe('boolean');
     }
   });
 
@@ -276,7 +276,7 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
     if (s === undefined) throw new Error('empty corpus');
     const before = JSON.stringify(s);
     for (const viewer of [null, ...s.turnOrder]) {
-      viewFor(s, viewer);
+      viewFor(s, CARDS, viewer);
       blindPromptFor(s, CARDS, viewer ?? '');
     }
     expect(JSON.stringify(s)).toBe(before);
@@ -504,7 +504,7 @@ describe('the leak vectors the type system cannot see', () => {
     // would be a natural-looking "helpful" change — this fails, and the game is dead
     // for every client that can read a log.
     for (const s of CORPUS) {
-      const json = JSON.stringify(viewFor(s, null).log);
+      const json = JSON.stringify(viewFor(s, CARDS, null).log);
       const pending = s._pendingCard;
       if (pending === null) continue;
       const card = CARDS.ideology[pending];

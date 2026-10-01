@@ -6,9 +6,40 @@
  * separate:
  *
  *   viewFor        — the broad public view. `playerView`, plus the strip of
- *                    every other player's Conspiracy hand.
+ *                    every other player's Conspiracy hand, plus the one
+ *                    viewer-scoped addition described below.
  *   blindPromptFor — the narrow one. Question text and two answer strings, and
  *                    nothing else that could help a player choose.
+ *
+ * THE VIEWER-SCOPED ADDITION — `playableConspiracies` — and why it is here and
+ * not in `playerView.ts`. The D25 ruling (ARCHITECTURE §8.1.1) holds that a hand
+ * is private: `playerView` strips every player's `conspiracies`, the viewer's own
+ * included, and that is load-bearing, because a client holding its own hand
+ * decides for itself what to play and the deduction never has to happen at the
+ * table. But "the client may not see its hand" is not the same as "the client may
+ * not use its cards", and the engine's own docstring names the way out: the client
+ * learns a card is *playable* from a public flag, never by reading the hand. So
+ * `viewFor` computes, per viewer, the set of that viewer's OWN Conspiracy Cards
+ * that are legally playable right now, and attaches it to the view.
+ *
+ * WHY SENDING THE ID IS SAFE, which is the sentence the next reader needs:
+ *
+ *   Every id in the list is an id the viewer ALREADY OWNS. Learning the name of
+ *   a card in your own hand tells you nothing about anybody else's hand, because
+ *   the list is built from `state.players[viewer].conspiracies` and from no other
+ *   player's state. There is no union, no "possible cards" set, no count of what
+ *   another player might hold. A player who sees `playableConspiracies: [X]` has
+ *   learned one thing: X is in their own hand and X is playable now — which is
+ *   precisely the information a player holding a physical card already has.
+ *
+ * AND WHY IT IS NOT A HAND. The list is empty at every moment the viewer could not
+ * legally play a conspiracy anyway: outside the `actions`/`answer` windows, when it
+ * is not their turn, and while they owe a `PendingChoice`. A player therefore sees
+ * their cards at the one instant they must decide, and at no other time — so the
+ * payload cannot be used as a persistent view of the hand, which is the thing D25
+ * was ruling out. `secret-state.test.ts` asserts both halves: the list is a subset
+ * of the viewer's hand, and every card in it is one the engine will actually
+ * accept a `PLAY_CONSPIRACY` for.
  *
  * The separator is the design. A single `playerView` that conditionally included
  * the prompt would still pass the structural leak test, because a prompt is not a
@@ -81,12 +112,114 @@ export type AnswerOrder = BlindPrompt['order'];
 const NO_VIEWER = '';
 
 /**
+ * ONE Conspiracy Card the viewer may legally play right now, named.
+ *
+ * `name` and `text` are the printed card, and they are here rather than looked up
+ * by the client for a reason worth stating: the client has no card index. It could
+ * not render a card list at all from ids alone, and the alternative — shipping the
+ * whole Conspiracy deck to the browser so the client could resolve them — would
+ * publish the pool of conspiracies in this match's deck, which is a change in what
+ * the game is about even though every individual card is public once played. So the
+ * server sends the two strings alongside the id, for the viewer's own cards only.
+ */
+export type PlayableConspiracy = {
+  readonly id: CardID;
+  readonly name: string;
+  /** The printed rules text — the effect, in the players' own words. */
+  readonly text: string;
+};
+
+/**
+ * `ClientState` plus the single viewer-scoped field. Exported because the wire type
+ * declares `match:state.state` as `ClientState` and widening it to `PublicView`
+ * there would break protocol parity with the client's copy — see `protocol.ts`.
+ */
+export type PublicView = ClientState & {
+  readonly playableConspiracies: readonly PlayableConspiracy[];
+};
+
+/**
  * The public projection. One code path for players and spectators alike, which is
  * the only reason the structural leak test can be meaningful: a separate spectator
  * projection would be a second projection, and second projections leak.
+ *
+ * `cards` is required rather than optional for a specific reason. It is the only
+ * thing that can turn an id into a name, so an optional parameter would mean a
+ * caller who forgot it produced a payload with an empty `playableConspiracies` —
+ * a picker that silently shows nothing, which is the exact failure this field
+ * exists to fix and which no test would catch, because an empty list is legal.
  */
-export function viewFor(state: GameState, viewer: PlayerID | null): ClientState {
-  return playerView(state, viewer ?? NO_VIEWER);
+export function viewFor(
+  state: GameState,
+  cards: CardIndex,
+  viewer: PlayerID | null,
+): PublicView {
+  const base = playerView(state, viewer ?? NO_VIEWER);
+  return {
+    ...base,
+    playableConspiracies: playableConspiraciesFor(state, cards, viewer),
+  };
+}
+
+/** The empty list. Shared so the common case allocates nothing per viewer. */
+const NO_CONSPIRACIES: readonly PlayableConspiracy[] = Object.freeze([]);
+
+/**
+ * The Conspiracy Cards THIS viewer may legally play right now. Never anybody's else.
+ *
+ * Every guard below is a transcription of a guard the engine's own `reduce` applies
+ * to `PLAY_CONSPIRACY`, in the engine's order, and each one is there because the
+ * projection and the reducer must agree exactly. If they ever disagree the client
+ * offers a button the server refuses, which is a control that looks like it works
+ * and does not — §9.10's prohibited case. So the guards are:
+ *
+ *   1. no viewer (a spectator) or no such seat
+ *   2. `state.finished`                     — reduce: 'the game is over'
+ *   3. a pending `PendingChoice`            — reduce: `blockedBy`, which freezes
+ *                                              a player until the choice resolves
+ *   4. the turn window: not your turn is legal ONLY in the `answer` window
+ *                                              (reduce's `outOfTurnOk`), because
+ *                                              p19 lets a conspiracy be played
+ *                                              immediately before an opponent
+ *                                              answers
+ *   5. the phase window: `actions` or `answer` only (reduce's own phase check),
+ *      and specifically NOT `headlines`
+ *   6. the card is in the viewer's hand and is readable from the index
+ *
+ * Note what is NOT a guard: nothing here looks at another player. `self` is the
+ * only `PlayerState` read, so the list cannot contain a card the viewer does not
+ * hold even by accident.
+ *
+ * COMPUTED, NEVER CACHED. There is no memo: the function is called on every
+ * projection, for every viewer, on every action and on every sync, and it reads
+ * `state` rather than anything derived from an earlier state. A conspiracy that is
+ * bought, played, traded away or drawn changes the answer on the very next
+ * projection, with no invalidation step that can be forgotten. The alternative —
+ * a cache invalidated on some subset of actions — is how a card you no longer hold
+ * stays on screen.
+ */
+export function playableConspiraciesFor(
+  state: GameState,
+  cards: CardIndex,
+  viewer: PlayerID | null,
+): readonly PlayableConspiracy[] {
+  if (viewer === null) return NO_CONSPIRACIES;
+  const self = state.players[viewer];
+  if (self === undefined) return NO_CONSPIRACIES;
+  if (state.finished) return NO_CONSPIRACIES;
+  if (state.choices.some((c) => c.player === viewer)) return NO_CONSPIRACIES;
+  if (viewer !== state.activePlayer && state.phase !== 'answer') return NO_CONSPIRACIES;
+  if (state.phase !== 'actions' && state.phase !== 'answer') return NO_CONSPIRACIES;
+
+  const out: PlayableConspiracy[] = [];
+  for (const id of self.conspiracies) {
+    const card = cards.conspiracy[id];
+    // A held id the index cannot read is not offered: `reduce` answers
+    // 'unknown conspiracy card' for it, so listing it would be a dead button.
+    if (card === undefined) continue;
+    out.push({ id: card.id, name: card.name, text: card.text });
+  }
+  return out;
 }
 
 /**

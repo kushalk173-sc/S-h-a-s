@@ -105,6 +105,20 @@ export type ServerMessage =
    * admits a card payout, a card id, an Ideologue, or a PRNG cursor. `blind` is
    * populated only for the player who is actually answering.
    *
+   * ONE FIELD IS UNDER-DECLARED, AND IT IS DELIBERATE. `viewFor` returns a
+   * `PublicView` — `ClientState` plus `playableConspiracies`, the viewer's own
+   * legally-playable Conspiracy Cards by id, name and printed text. Every id in it
+   * is an id that viewer already owns, so it reveals nothing about anyone else, and
+   * it is empty at every moment the viewer could not play one anyway; see
+   * `broadcast.ts` for the full argument and `secret-state.test.ts` for the gates.
+   *
+   * It rides inside `state` rather than beside it for one reason: the client's
+   * `net/store.ts` adopts `msg.state` wholesale and passes no other envelope field
+   * through, so a sibling field would have to be threaded through a module this
+   * change does not own. `PublicView` is assignable to `ClientState`, which is what
+   * keeps protocol parity in both directions, and the client's
+   * `app/GameScreen.tsx` reads it through a narrow cast that fails closed.
+   *
    * `order` is a seed-derived coin flip deciding which side of the card renders
    * first. Without it, "the left one" is a channel: a card's two sides belong to
    * different Ideologues and the answer pool is not balanced side-to-side, so a
