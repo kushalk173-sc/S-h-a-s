@@ -285,6 +285,33 @@ export type Effect = (
   /** Discard all face-up Voter Cards and deal fresh ones. */
   | { readonly op: 'refresh-market' }
   /**
+   * G5 — attach a RULE to a player that other actions must consult.
+   *
+   * The one op that is not a change to a pool, a mat or the board. It writes a
+   * `PlayerState.restrictions` entry, and `INFLUENCE` and `BUY_CONSPIRACY` are the
+   * two actions that consult it today: `'no-purchases'` refuses both outright, and
+   * `'surcharge'` adds `value` to the computed cost.
+   *
+   * `until` (from `EffectScope`) is the lifetime, and it is read here rather than
+   * being left to `installLiveEffects`: a restriction is not a live effect — it has
+   * no trigger and no effect list, and a hook that fired on an event could not
+   * refund a price. Expiry is ticked in `advanceTurn` alongside live effects.
+   *
+   * `owed` is the KHAKI TERROR condition, and it is the field the soft-lock ruling
+   * lives in: see `Restriction` in state.ts. It is the amount the card ASKS for; the
+   * engine decrements `remaining` by what was ACTUALLY donated, so a player who
+   * cannot afford the whole ask can still clear it.
+   */
+  | {
+      readonly op: 'restrict';
+      readonly kind: 'no-purchases' | 'surcharge';
+      /** Extra resources per purchase, for `'surcharge'`. Zero for `'no-purchases'`. */
+      readonly value: number;
+      /** For `'no-purchases'`: what the player must give before buying again. */
+      readonly owed?: number;
+      readonly target?: EffectTarget;
+    }
+  /**
    * Additional purchase discounts this turn. `target` grants them to somebody else,
    * which is a write to another player's `powerUses` — the only such write in the
    * effect vocabulary, and the reason it is a card field rather than a resource.
@@ -292,6 +319,7 @@ export type Effect = (
   | { readonly op: 'discount'; readonly n: Count; readonly target?: EffectTarget }
 ) &
   EffectScope;
+
 
 /**
  * The `n` of a non-resource Effect: a literal, or a quantity read out of player

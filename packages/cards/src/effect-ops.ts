@@ -23,6 +23,7 @@ export const EFFECT_OPS = [
   'gerrymander',
   'draw-conspiracy',
   'refresh-market',
+  'restrict',
   'discount',
 ] as const satisfies readonly Effect['op'][];
 

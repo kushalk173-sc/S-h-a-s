@@ -247,6 +247,7 @@ describe('schema: the effect union', () => {
       gerrymander: { op: 'gerrymander', n: 1, target: 'you' },
       'draw-conspiracy': { op: 'draw-conspiracy', n: 2 },
       'refresh-market': { op: 'refresh-market' },
+      restrict: { op: 'restrict', kind: 'surcharge', value: 1, target: 'each-opponent', until: 'rest-of-game' },
       discount: { op: 'discount', n: 1 },
     };
     for (const op of EFFECT_OP_SET) {

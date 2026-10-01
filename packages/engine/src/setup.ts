@@ -145,6 +145,9 @@ export function setup(opts: SetupOptions): GameState {
       conspiracies: [],
       pending: [],
       powerUses: NO_POWER_USES,
+      // Nobody is restricted on turn 1. PUBLIC: see `Restriction` in state.ts, which
+      // also names the server secret-inventory entry this owes.
+      restrictions: [],
       isBot: false,
     };
   });

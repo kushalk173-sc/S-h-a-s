@@ -68,6 +68,7 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   gerrymander: ['n', 'target'],
   'draw-conspiracy': ['n', 'target', 'from'],
   'refresh-market': [],
+  restrict: ['kind', 'value', 'owed', 'target'],
   discount: ['n', 'target'],
 };
 

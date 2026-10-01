@@ -56,6 +56,7 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
       { op: 'gerrymander', n: 1 },
       { op: 'draw-conspiracy', n: 2 },
       { op: 'refresh-market' },
+      { op: 'restrict', kind: 'no-purchases', value: 0, owed: 4 },
       { op: 'discount', n: 1 },
     ];
     for (const effect of samples) {
@@ -77,6 +78,9 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
           expect(effect.n).toBeGreaterThan(0);
           break;
         case 'refresh-market':
+          break;
+        case 'restrict':
+          expect(effect.kind).toBeDefined();
           break;
         default: {
           const never: never = effect;

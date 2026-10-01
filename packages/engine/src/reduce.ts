@@ -55,6 +55,8 @@ import {
   type PlayerState,
   type Pool,
   type Resource,
+  type Restriction,
+  type RestrictionKind,
   type Zone,
 } from './state';
 
@@ -412,7 +414,7 @@ function fireTriggers(
     // a Voter Card, they will give you 1 of their resources". The effect is applied
     // through `applyEffect` rather than `applyEffects`, so its own `when` / `until`
     // are inert here and cannot re-arm it — the cascade cannot install.
-    for (const e of next.effects) s = applyEffect(s, next.owner, e, ctx, fire);
+    for (const e of next.effects) s = applyEffect(s, next.owner, e, ctx, fire, next.sourceCardId);
     s = log(s, {
       player: next.owner,
       text: `${next.sourceCardId} takes effect.`,
@@ -614,12 +616,129 @@ function totalGerrymanderAllowance(state: GameState, player: PlayerID, rules: Ru
   return total;
 }
 
+/**
+ * @param cardId the X-Card being resolved, or null. The one op that needs it is
+ *   `restrict`, because a restriction records which card imposed it and a client has
+ *   to be able to name it. Outside a card resolution — a live effect replaying its
+ *   own list — the recorded id is the card that DID impose it, which is the honest
+ *   answer rather than a blank.
+ */
+/** Append one `Restriction`, minting its id from the state's own counter. R2. */
+function pushRestriction(
+  state: GameState,
+  id: PlayerID,
+  imposedBy: PlayerID,
+  r: Omit<Restriction, 'id' | 'sourcePlayer'>,
+): GameState {
+  const player = state.players[id];
+  if (!player) return state;
+  const seq = state._idSeq + 1;
+  return {
+    ...state,
+    _idSeq: seq,
+    players: {
+      ...state.players,
+      [id]: { ...player, restrictions: [...(player.restrictions ?? []), { id: `R${seq}`, sourcePlayer: imposedBy, ...r }] },
+    },
+  };
+}
+
+/** Every restriction of a kind a player currently carries. */
+function restrictionsOf(
+  state: GameState,
+  id: PlayerID,
+  kind: RestrictionKind,
+): readonly Restriction[] {
+  return (state.players[id]?.restrictions ?? []).filter((r) => r.kind === kind);
+}
+
+/**
+ * The extra resources a purchase costs this player, from their surcharges.
+ *
+ * PYTHONPOST and SNOOP B-O-DOUBLE-T are the same clause: *"for the rest of the
+ * game, you have to pay an extra resource for every Conspiracy Card that you buy"*.
+ * Summed, not maxed, so two cards that both tax you tax you twice — which is what
+ * two cards means.
+ */
+function surchargeFor(state: GameState, id: PlayerID): number {
+  return restrictionsOf(state, id, 'surcharge').reduce((n, r) => n + Math.max(0, r.value), 0);
+}
+
+/** `"you cannot make any purchases"` — true while any unresolved lock is standing. */
+function purchasesBlocked(state: GameState, id: PlayerID): boolean {
+  return restrictionsOf(state, id, 'no-purchases').some((r) => r.remaining > 0);
+}
+
+/**
+ * THE KHAKI TERROR RULING, and it is the one that decides whether this card is a
+ * card or a soft-lock.
+ *
+ * *"Donate 1 resource of each type to the Public Reserve. You cannot make any
+ * purchases until you do so."* (REF 4.1; rules-reference.md p12 for the freeze.)
+ * The card's punchline is that the resources sit physically ON the card and it is
+ * discarded when all four are donated.
+ *
+ * `lose` never takes more than the player holds — `takeResources` clamps, and that
+ * is not negotiable, because the alternative is a negative pool. So a player holding
+ * 3 Funds and no Media has donated what they could and the card's own words are
+ * satisfied. **Therefore `remaining` is decremented by what was ACTUALLY TAKEN, not
+ * by what the card asked for.** Decrementing by the ask would make the only card
+ * that can clear the lock unplayable for anyone short of 4 resources of every type,
+ * which is a table-stalling bug wearing a card's clothes.
+ *
+ * THE SAFE DIRECTION IS DELIBERATE. Under-decrementing leaves the player locked, who
+ * can donate again and eventually get to zero — annoying and recoverable.
+ * Over-decrementing unlocks a purchase they have not paid for, which hands out a free
+ * Voter Card. So the arithmetic rounds towards "still owed".
+ *
+ * Called from the `lose` case, because a donation IS a `lose` in this engine — the
+ * Public Reserve is modelled as the absence of a resource, not as a pile.
+ */
+function creditDonation(state: GameState, id: PlayerID, taken: Delta): GameState {
+  const given = deltaTotal(taken);
+  if (given <= 0) return state;
+  const player = state.players[id];
+  if (!player) return state;
+  let changed = false;
+  const restrictions = (player.restrictions ?? []).map((r) => {
+    if (r.kind !== 'no-purchases' || r.remaining <= 0) return r;
+    const next = Math.max(0, r.remaining - given);
+    if (next === r.remaining) return r;
+    changed = true;
+    return { ...r, remaining: next };
+  });
+  // A satisfied lock is REMOVED rather than left at zero, so `purchasesBlocked` stays
+  // a single honest predicate and the client does not have to know that zero means
+  // "cleared".
+  const kept = restrictions.filter((r) => !(r.kind === 'no-purchases' && r.remaining <= 0));
+  if (!changed) return state;
+  return { ...state, players: { ...state.players, [id]: { ...player, restrictions: kept } } };
+}
+
+/** Drop restrictions whose deadline has passed. Ticked with live effects. */
+function expireRestrictions(state: GameState): GameState {
+  let s = state;
+  for (const p of state.turnOrder) {
+    const player = s.players[p];
+    if (!player) continue;
+    const kept = (player.restrictions ?? []).filter(
+      (r) => r.expiresTurn === null || r.expiresTurn > state.turn,
+    );
+    if (kept.length !== (player.restrictions ?? []).length) {
+      s = { ...s, players: { ...s.players, [p]: { ...player, restrictions: kept } } };
+    }
+  }
+  return s;
+}
+
+
 function applyEffect(
   state: GameState,
   source: PlayerID,
   effect: Effect,
   ctx: Ctx,
   fire: FireContext | undefined = NO_FIRE,
+  cardId: CardID | null = null,
 ): GameState {
   let s = state;
   const target = 'target' in effect ? (effect.target ?? 'you') : 'you';
@@ -633,7 +752,14 @@ function applyEffect(
     }
     case 'lose': {
       for (const p of resolveTargets(s, source, target)) {
-        [s] = takeResources(s, p, resolveDelta(s, p, effect.res, effect.per, ctx));
+        // The `taken` Delta is what the engine ACTUALLY removed, which is the whole
+        // of the KHAKI TERROR ruling — see `creditDonation`.
+        const [after, taken] = takeResources(
+          s,
+          p,
+          resolveDelta(s, p, effect.res, effect.per, ctx),
+        );
+        s = creditDonation(after, p, taken);
       }
       return s;
     }
@@ -733,6 +859,23 @@ function applyEffect(
       for (const slot of s.market) s = discardTo(s, 'voter', slot.cardId);
       return refillMarket({ ...s, market: [] }, ctx);
     }
+    case 'restrict': {
+      // G5. Writes a rule, not a resource. `target` says who carries it, so `'you'`
+      // is KHAKI TERROR on its caster and a surcharge lands on whoever the card names.
+      for (const p of resolveTargets(s, source, target)) {
+        s = pushRestriction(s, p, source, {
+          kind: effect.kind,
+          value: effect.value,
+          remaining: effect.owed ?? 0,
+          // The same absolute-turn arithmetic a live effect uses, so all four
+          // durations work with no special case and a replay reproduces it from the
+          // state. `durationExpiry` is the single definition; see `Restriction`.
+          expiresTurn: durationExpiry(s, source, effect.until ?? 'rest-of-game'),
+          sourceCardId: cardId ?? 'unknown',
+        });
+      }
+      return s;
+    }
     case 'discount': {
       // Helping Hands' uses are stored as a NEGATIVE number (see gerrymanderAllowance's
       // sibling, the allowance check), so a discount is a subtraction from a negative
@@ -770,8 +913,20 @@ function applyEffect(
  * behaviour is belt and braces rather than the primary defence.
  */
 function isScoped(effect: Effect): boolean {
+  // `restrict` is the one op that carries `until` WITHOUT being scoped, and that is
+  // not an oversight. For every other op `until` is a hook's lifetime: the effect
+  // does not happen now, it happens on its trigger until the deadline. For
+  // `restrict`, `until` is the DEADLINE OF THE RULE BEING WRITTEN — the restriction
+  // is imposed right now and simply stops applying at that turn. Installing it as a
+  // live effect instead would (a) never impose it at all, because a scoped effect is
+  // not applied, and (b) if it were, re-impose it on every event, stacking a fresh
+  // entry each time. The two meanings of one field name is exactly the kind of
+  // collision the honesty registry exists to catch, so the case is named here and
+  // asserted in restrictions.test.ts.
+  if (effect.op === 'restrict') return false;
   return effect.when !== undefined || effect.until !== undefined || effect.condition !== undefined;
 }
+
 
 function applyEffects(
   state: GameState,
@@ -782,7 +937,7 @@ function applyEffects(
   install?: InstallContext,
 ): GameState {
   const applied = effects.reduce(
-    (s, e) => (isScoped(e) ? s : applyEffect(s, source, e, ctx, fire)),
+    (s, e) => (isScoped(e) ? s : applyEffect(s, source, e, ctx, fire, install?.sourceCardId ?? null)),
     state,
   );
   return install ? installLiveEffects(applied, source, effects, ctx, install) : applied;
@@ -933,10 +1088,15 @@ function tickLiveEffects(state: GameState, ctx: Ctx): GameState {
     ...state,
     liveEffects: state.liveEffects.filter((le) => isInForce(le, state.turn)),
   };
+  // G5: the same boundary, the same "expire first" ordering. A `'this-turn'` lock
+  // is gone before anything re-applies, and a `'next-turn'` one is gone too — both
+  // are relative to the turn the card resolved on, and a restriction is not a
+  // standing effect, so it acts on the resolver's own clock rather than its owner's.
+  s = expireRestrictions(s);
   for (const le of s.liveEffects) {
     if (le.trigger !== null || le.owner !== s.activePlayer) continue;
     if (!isInForce(le, s.turn)) continue;
-    for (const e of le.effects) s = applyEffect(s, le.owner, e, ctx, NO_FIRE);
+    for (const e of le.effects) s = applyEffect(s, le.owner, e, ctx, NO_FIRE, le.sourceCardId);
   }
   return fireTriggers(s, TURN_START(s.activePlayer), ctx);
 }
@@ -1159,6 +1319,13 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'INFLUENCE': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
+      // G5. The freeze is checked BEFORE affordability, so a locked player is told
+      // why rather than being left to wonder whether they are poor. p12's language —
+      // "you cannot take any other actions" — is the same freeze, and a live effect
+      // cannot produce this state: only a `restrict` op can.
+      if (purchasesBlocked(state, playerId)) {
+        return fail('you cannot make any purchases until you have made your donation');
+      }
       const slot = state.market[action.slot];
       if (!slot) return fail('no Voter Card in that slot');
 
@@ -1166,7 +1333,18 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       if (discounts.length > usesLeft(self, rules, 'helping-hands')) {
         return fail('not enough Helping Hands discounts left');
       }
-      const cost = applyDiscounts(slot.cost, discounts);
+      const discounted = applyDiscounts(slot.cost, discounts);
+      // A surcharge is added AFTER Helping Hands, and that ordering is a ruling.
+      // Helping Hands is the Idealist's own L3 power — p32, "reduce the cost of any
+      // purchase" — so letting it discount a tax would let a player buy their way out
+      // of somebody else's card. The card says "an EXTRA resource", not "one resource
+      // less than usual", and the safe reading of a cost modifier nobody asked for is
+      // that it stacks on top of what the player was already going to pay.
+      const surcharge = surchargeFor(state, playerId);
+      const cost =
+        surcharge > 0
+          ? { ...discounted, funds: (discounted.funds ?? 0) + surcharge }
+          : discounted;
       if (!canAfford(self.resources, cost)) return fail('you cannot afford that Voter Card');
 
       let voters = slot.voters;
@@ -1443,6 +1621,9 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'BUY_CONSPIRACY': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
+      if (purchasesBlocked(state, playerId)) {
+        return fail('you cannot make any purchases until you have made your donation');
+      }
       const topId = state._conspiracyDraw[0];
       if (topId === undefined) return fail('the Conspiracy deck is exhausted');
       const card = cards.conspiracy[topId];
@@ -1452,8 +1633,10 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       if (discounts.length > usesLeft(self, rules, 'helping-hands')) {
         return fail('not enough Helping Hands discounts left');
       }
-      // p19: "any combination of resources" totalling the printed cost.
-      const due = Math.max(0, card.cost - discounts.length);
+      // p19: "any combination of resources" totalling the printed cost. The surcharge
+      // stacks on top of the printed cost, for the same reason as INFLUENCE above:
+      // PYTHONPOST taxes a purchase, it does not discount it.
+      const due = Math.max(0, card.cost - discounts.length) + surchargeFor(state, playerId);
       // R3: client-supplied payment.
       const bad = deltaError(action.pay, 'a conspiracy payment');
       if (bad) return fail(bad);

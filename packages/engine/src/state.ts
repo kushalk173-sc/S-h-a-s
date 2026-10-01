@@ -164,6 +164,29 @@ export type PlayerState = {
   readonly conspiracies: readonly CardID[];
   readonly pending: readonly PendingVoters[];
   readonly powerUses: PowerUses;
+  /**
+   * G5 — rules attached to this player that other actions must consult. PUBLIC, and
+   * it must be listed as a deliberate non-secret in
+   * `packages/server/test/secret-inventory.ts`; see `Restriction` for why and for the
+   * two rulings the type forces.
+   *
+   * ## WHY THIS IS OPTIONAL, which is a wart and a coordination debt
+   *
+   * `PlayerState` is constructed by hand in `packages/client` and
+   * `packages/server` tests, and a REQUIRED new field breaks every one of those
+   * literals — including `packages/client/src/app/choiceResolver.test.tsx`, which
+   * this package does not own. Rather than break a package I cannot edit, the field
+   * is optional and every read goes through a helper that treats absent as empty.
+   *
+   * **It is never absent in a state this engine produced.** `setup()` writes `[]`
+   * and only `setup()` and `reduce()` build a `PlayerState` in this package, so
+   * `undefined` means exactly one thing: a hand-built literal that has not been
+   * updated. The one-line fix for the client, when its owner gets to it, is
+   * `restrictions: []` in that fixture — and it is worth doing rather than leaving,
+   * because an optional field on a state type is exactly the kind of thing that
+   * quietly becomes load-bearing.
+   */
+  readonly restrictions?: readonly Restriction[];
   readonly isBot: boolean;
 };
 
@@ -350,6 +373,95 @@ export function roundEndTurn(state: GameState): number {
   const n = Math.max(1, state.turnOrder.length);
   return state.turn + (n - ((state.turn - 1 + n) % n));
 }
+
+/**
+ * G5 — a RULE ATTACHED TO A PLAYER THAT OTHER THINGS MUST CONSULT.
+ *
+ * A restriction is not an effect. `Effect` describes what a resolution *does* to a
+ * pool, a mat or the board; a restriction describes what a player may no longer
+ * *do*, and every action that could breach it has to ask. Putting it in `Effect[]`
+ * would have meant teaching `applyEffect` to be a cost-modifier resolver and a
+ * permission check at the same time, which is a different mechanism with a
+ * different failure mode: an effect that silently does nothing is a card that lies,
+ * and a restriction that is never consulted is a card that lies the other way round —
+ * it promises a lock and grants none.
+ *
+ * ## Visibility: PUBLIC, deliberately, and non-obviously
+ *
+ * A Conspiracy Card hand is secret (rules-reference.md:284-286) and is blanked in
+ * `playerView`. A restriction is the opposite: **every real card that imposes one
+ * announces it**, and KHAKI TERROR's entire punchline is that everyone can see you
+ * cannot buy. A surcharge is a price every other player must be able to predict
+ * before they act. So `restrictions` is unprefixed and reaches every client.
+ *
+ * **THIS OWES THE SERVER AN ENTRY.** `packages/server/test/secret-inventory.ts`
+ * lists what the server treats as secret, and `restrictions` must appear in it as a
+ * deliberate NON-SECRET. That file is not this package's to change, and the omission
+ * is the one thing in this iteration that another owner has to make: without the
+ * entry, a later reader cannot tell whether the absence was a decision or an
+ * oversight, and a future `PRIVATE_PLAYER_KEYS` addition could swallow the list.
+ */
+export type RestrictionKind =
+  /** *"You cannot make any purchases until you do so."* KHAKI TERROR. */
+  | 'no-purchases'
+  /** *"All Voter Cards cost any 1 extra resource in your turn."* PYTHONPOST. */
+  | 'surcharge';
+
+/**
+ * ONE RESTRICTION. The two rulings this type forces are argued on the fields that
+ * carry them, because both were left open in KNOWN-GAPS §4 and both are soft-locks
+ * if decided carelessly.
+ *
+ * `remaining` is the first. The obvious implementation of KHAKI TERROR is a flag:
+ * "this player may not purchase until they donate". The obvious implementation is a
+ * **soft-lock**, and the real card's punchline is also its worst failure mode — the
+ * only card in the corpus that can clear the lock is unplayable, so a player who
+ * cannot satisfy it is stuck at the table for ever. It is avoidable, because the
+ * engine's `lose` never takes more than the player holds: a player with 3 Funds and
+ * no Media has still *donated*, just not 4 resources' worth. So `remaining` counts
+ * down by **what was actually taken**, never by what the card asked for, and reaches
+ * 0 exactly when the player has given everything of the types named. The safe
+ * direction is deliberate: erring towards "still locked" lets a player donate again
+ * and again, while erring towards "unlocked" would hand out a free purchase.
+ *
+ * `expiresTurn` is the second decision, and it is a departure from the
+ * `'resolved' | 'this-turn' | 'next-turn' | 'round' | 'rest-of-game'` enum KNOWN-GAPS
+ * §4 proposed. That enum mixes two different clocks — a *condition* and a *deadline*
+ * — in one field, and every consumer then has to ask which one it is looking at. An
+ * absolute turn number says exactly one thing, it reuses `ownerNextTurn` /
+ * `roundEndTurn` so all four durations work with no special cases, and it inherits
+ * `LiveEffect`'s reproducibility for free: the number is in the state that was
+ * written down, so a replay reproduces it without re-deriving anything. A
+ * `'no-purchases'` restriction additionally clears on the condition, which is what
+ * `remaining` is for; a `'surcharge'` has no condition and expires only on its
+ * deadline, which is PYTHONPOST's *"for the rest of the game"*.
+ */
+export type Restriction = {
+  /** `R<n>` from `GameState._idSeq`. R2: no module-scope counter. */
+  readonly id: string;
+  readonly kind: RestrictionKind;
+  /**
+   * `'surcharge'`: extra resources per purchase. `'no-purchases'`: unused, 0.
+   */
+  readonly value: number;
+  /**
+   * `'no-purchases'` only: how much is still owed. Starts at the amount the card
+   * named and is decremented by what was ACTUALLY donated — see the note above.
+   */
+  readonly remaining: number;
+  /**
+   * The absolute turn number this is removed at, or `null` for rest of game.
+   *
+   * A `'no-purchases'` restriction is ALSO removed the moment `remaining` reaches
+   * zero, which is the condition being met rather than the clock running out.
+   */
+  readonly expiresTurn: number | null;
+  /** The card that imposed it. Public for the same reason the restriction is. */
+  readonly sourceCardId: CardID;
+  /** The player who imposed it — the beneficiary of a KHAKI TERROR, the tax-payer's
+   *  opponent for a surcharge. */
+  readonly sourcePlayer: PlayerID;
+};
 
 export type GameState = {
   readonly zones: readonly Zone[];

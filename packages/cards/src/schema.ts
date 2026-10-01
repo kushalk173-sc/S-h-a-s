@@ -232,7 +232,8 @@ const EFFECT_OP_ORDER: Readonly<Record<string, number>> = {
   gerrymander: 9,
   'draw-conspiracy': 10,
   'refresh-market': 11,
-  discount: 12,
+  restrict: 12,
+  discount: 13,
 };
 
 /**

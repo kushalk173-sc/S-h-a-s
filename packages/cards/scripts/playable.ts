@@ -93,14 +93,14 @@ const PROBES: readonly Probe[] = [
   // ── Headline Cards, all campaigns, REF §4.1 ───────────────────────────────
   { name: 'GREAT LEADER, BAD ECONOMY', ref: '4.1', kind: 'headline', reduction: null, gap: 'G1/G14', note: 'the beneficiary is "the player after you", which is seat-relative; giving it to every opponent instead would be far stronger' },
   { name: 'DOSTI BANI RAHE', ref: '4.1', kind: 'headline', reduction: null, gap: 'G15/G22', note: '"in THEIR next turn they may use your rights" needs a turn trigger that fires on a seat other than the owner, and one named opponent' },
-  { name: 'KHAKI TERROR', ref: '4.1', kind: 'headline', reduction: [{ op: 'lose', res: { funds: 1, clout: 1, media: 1, trust: 1 } }], gap: 'G5/G10' },
+  { name: 'KHAKI TERROR', ref: '4.1', kind: 'headline', reduction: [{ op: 'lose', res: { funds: 1, clout: 1, media: 1, trust: 1 } }, { op: 'restrict', kind: 'no-purchases', value: 0, owed: 4, until: 'rest-of-game' }], gap: 'G10', note: 'now the WHOLE first clause, lock included. THE RULING: remaining decrements by what was ACTUALLY donated, so a player holding no Media can still satisfy it — decrementing by the ask would make the only card that can clear the lock unplayable, which is a table-stalling soft-lock' },
   { name: 'GROWING DISSENT', ref: '4.1', kind: 'headline', reduction: [{ op: 'voters', n: 1, when: 'on-gerrymander', until: 'round', condition: { movedMyVoter: true } }], gap: 'G9/G14', note: 'FAITHFUL: "starting this turn, for 1 round" is the round lifetime, and movedMyVoter is "any opponent Gerrymanders your voters". Dropped: "gained voters are placed immediately" — the engine grants them to your mat, so you place them' },
 
   { name: 'A CALL FROM KARACHI', ref: '4.1', kind: 'headline', reduction: null, gap: 'G13/G17/G20', note: 'auction, deck search, card moving' },
   { name: 'STAY IN YOUR LIMITS', ref: '4.1', kind: 'headline', reduction: null, gap: 'G18/G2', note: '"converts 2 voters of the player to their LEFT" — directional seat targeting, plus a conditional bonus' },
   { name: 'POLO RETREAT', ref: '4.1', kind: 'headline', reduction: null, gap: 'G20', note: "borrow another player's L3 powers" },
   { name: 'NEXT BILLION DATA POINTS', ref: '4.1', kind: 'headline', reduction: null, gap: 'G13', note: 'a vote, with no self-votes and a re-vote' },
-  { name: 'PYTHONPOST', ref: '4.1', kind: 'headline', reduction: null, gap: 'G9/G5', note: 'rest-of-game purchase surcharge' },
+  { name: 'PYTHONPOST', ref: '4.1', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'FAITHFUL: a permanent tax on your own purchases. Note the ruling that it stacks ON TOP of a Helping Hands discount rather than being discounted by it — otherwise the Idealist power would erase another player’s card' },
   { name: 'SUBMERGED', ref: '4.1', kind: 'headline', reduction: [{ op: 'gerrymander', n: 1, target: 'everyone' }], gap: 'G9', note: 'the grant is wiped by advanceTurn' },
   { name: 'COUGH IT UP', ref: '4.1', kind: 'headline', reduction: [{ op: 'evict', n: 1, target: 'each-opponent' }], gap: 'G2', note: 'the conditional bonus is dropped' },
   { name: "NERO'S GUESTS", ref: '4.1', kind: 'headline', reduction: null, gap: 'G16', note: 'zone-scoped, all-or-nothing' },
@@ -120,7 +120,7 @@ const PROBES: readonly Probe[] = [
   { name: 'As Clear As Water', ref: '4.3', kind: 'headline', reduction: null, gap: 'G17/G18/G20', note: 'reveal a hand, top up from the draw pile' },
   { name: 'Brave New Worlds', ref: '4.3', kind: 'headline', reduction: null, gap: 'G18', note: 'every player answers, suppressing income' },
   { name: 'Card Games', ref: '4.3', kind: 'headline', reduction: null, gap: 'G12/G20', note: 'same card as A COWARD OR A JOURNALIST?' },
-  { name: "Don't Kiss The Babies", ref: '4.3', kind: 'headline', reduction: null, gap: 'G5', note: 'a purchase surcharge is a cost modifier' },
+  { name: "Don't Kiss The Babies", ref: '4.3', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'the purchase surcharge, as a restriction rather than a cost modifier' },
   { name: 'Fatality', ref: '4.3', kind: 'headline', reduction: null, gap: 'G1', note: 'donate voters to a NAMED opponent, placed now' },
   { name: 'Fuelling The News', ref: '4.3', kind: 'headline', reduction: null, gap: 'G17/G20', note: 'draw 3 headlines, keep 1, give 2' },
   { name: 'Gender Trouble', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G22', note: 'a power is unavailable next turn' },
@@ -131,7 +131,7 @@ const PROBES: readonly Probe[] = [
   { name: 'Movement Anxiety Disorder', ref: '4.3', kind: 'headline', reduction: null, gap: 'G9/G22', note: 'next 3 gerrymanders discard' },
   { name: 'New Face Who Dis', ref: '4.3', kind: 'headline', reduction: [{ op: 'gerrymander', n: 1, target: 'everyone' }], gap: 'G5/G9', note: 'the Volatile-Area ban is dropped; same card as SUBMERGED' },
   { name: 'Red Blooded', ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 1, target: 'each-opponent' }], gap: 'G4/G-new' },
-  { name: 'Snoop B-O-Double-T', ref: '4.3', kind: 'headline', reduction: null, gap: 'G9/G5', note: 'rest-of-game surcharge; same card as PYTHONPOST' },
+  { name: 'Snoop B-O-Double-T', ref: '4.3', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'the same card as PYTHONPOST, per REF 4.3; not double-counted as two mechanisms' },
   { name: 'The Big Freeze', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G9/G15/G22', note: 'four gaps at once' },
   { name: 'The Four Horsemen', ref: '4.3', kind: 'headline', reduction: [{ op: 'lose-any', n: 2 }], gap: 'G5', note: 'the purchase lock is dropped' },
   { name: 'Why The Long Face?', ref: '4.3', kind: 'headline', reduction: null, gap: 'G14/G22', note: 'trigger with a duration' },
@@ -363,6 +363,11 @@ function fingerprint(s: GameState): string {
     gerrymandered: s.turnOrder.map((id) => s.players[id]?.powerUses.gerrymandered),
     helpingHands: s.turnOrder.map((id) => s.players[id]?.powerUses.helpingHands),
     liveEffects: s.liveEffects,
+    // A `restrict` effect changes nothing else at all — it writes a rule, and the rule
+    // is consulted later by a different action. Without the list here, PYTHONPOST,
+    // SNOOP B-O-DOUBLE-T and DON'T KISS THE BABIES would all report "played, NO-OP"
+    // even though the tax they impose is live from this moment on.
+    restrictions: s.turnOrder.map((id) => s.players[id]?.restrictions),
     pegs: s.zones.flatMap((z) => z.areas).map((a) => (a.peg ? `${a.id}:${a.peg.owner}` : null)),
     market: s.market.map((m) => m.cardId),
     draw: { i: s._ideologyDraw, v: s._voterDraw, c: s._conspiracyDraw },
