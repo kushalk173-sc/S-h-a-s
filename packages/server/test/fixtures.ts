@@ -200,12 +200,19 @@ export async function startHarness(
 export function testClientState(
   over: { phase?: GameState['phase']; activePlayer?: string } = {},
 ): ClientState {
+  // The SHIPPED corpus, not `bigCards(8)`. This is a projection fixture for the
+  // client's own store, so nothing about it is a leak or a winnability claim — but
+  // there is no reason for a client test to run against a deck that does not exist,
+  // and the real one is the same cost. `bigCards(8)` was here from before the
+  // corpus was ever loadable in a test, and it hid the fact that the real market
+  // holds three DIFFERENTLY-priced Voter Cards rather than three identical ones.
+  const cards = loadCtx().cards;
   const base = setup({
     players: ['p_1', 'p_2'],
     names: { p_1: 'Ada', p_2: 'Bo' },
-    cards: bigCards(8),
+    cards,
     seed: 4242,
-    ...decksOf(bigCards(8)),
+    ...decksOf(cards),
   });
   const state: GameState = {
     ...base,

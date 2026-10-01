@@ -54,12 +54,30 @@ import {
 
 import { answerSideFor, blindPromptFor, viewFor } from '../src/broadcast.ts';
 import { Room } from '../src/room.ts';
-import { makeCtx, bigCards } from './fixtures.ts';
+import { makeCtx, realCards } from './fixtures.ts';
 import { decksOf } from '../src/store.ts';
 import { renderAll } from './render-all.ts';
 import { LEAK_PATHS, SECRET_FIELDS } from './secret-inventory.ts';
 
-const CARDS = bigCards(60);
+/**
+ * THE SHIPPED CORPUS, and this used to be `bigCards(60)`.
+ *
+ * A leak detector that runs on synthetic cards is a leak detector that has never seen
+ * the cards players actually get, and the synthetic set was blind in a specific,
+ * demonstrated way: every one of its 24 Headline Cards was `gain media 1`, so it
+ * NEVER produced an effect-generated `PendingChoice`, and the 22 Conspiracy Cards were
+ * all `voters n:1`. The shipped corpus's 26 headlines carry twelve distinct ops and
+ * its conspiracies carry ten, and three of those ops open a decision that freezes a
+ * player — so the real corpus exercises projection paths — `blindPromptFor` under a
+ * mid-resolution effect, an `evict` target list, a `steal-any` victim — that this
+ * suite structurally could not reach.
+ *
+ * It is also the suite that found the real-corpus false positive in
+ * `reconnect.test.ts` (a Voter Card's PUBLIC printed price colliding with an Ideology
+ * Card's side payout), so pointing this suite at the real corpus is what makes the two
+ * of them consistent: the leak rules are now derived from the cards that ship.
+ */
+const CARDS = realCards();
 const ctx = makeCtx(CARDS);
 
 /**
@@ -413,7 +431,21 @@ function nextConspiracyAction(s: GameState, me: PlayerID) {
     }
     return { type: 'RESOLVE_CHOICE', choiceId: choice.id, pick: { kind: 'areas', areaIds: [] } } as const;
   }
-  return { type: 'BUY_CONSPIRACY', pay: { funds: 4 } } as const;
+  // The printed cost of the Conspiracy on top, paid in Funds — READ FROM THE STATE,
+  // not hardcoded. This used to be `{ funds: 4 }`, which was correct for `bigCards`
+  // (every Conspiracy printed 4) and is wrong for the shipped corpus, whose top card
+  // prints something else. So on the real cards every `BUY_CONSPIRACY` was refused,
+  // no seat ever held a Conspiracy, and the whole block below it went vacuous with
+  // empty hands — which is the one thing it exists to prevent.
+  //
+  // `conspiracyTopCost` is public by design (the cost is printed on the card's back,
+  // so the number is public even though the identity is not), so reading it here is
+  // reading what any player could read.
+  const cost = s.conspiracyTopCost;
+  if (cost !== null && (s.players[me]?.resources.funds ?? 0) >= cost) {
+    return { type: 'BUY_CONSPIRACY', pay: { funds: cost } } as const;
+  }
+  return { type: 'END_TURN' } as const;
 }
 
 const CONSPIRACY_CORPUS = conspiracyCorpus(20);
