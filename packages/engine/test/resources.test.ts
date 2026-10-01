@@ -262,9 +262,11 @@ describe('the cap choice in play', () => {
       },
       choices: [{ id: 'c1', player: 'p1', choice: { kind: 'lose-any', count: 5, reason: 'test' } }],
     };
-    // Asking for 5 when holding 2 is refused outright: `canAfford` runs first, so
-    // the "take only what is held" floor is never reached from a choice. The floor
-    // is what protects a *card* effect, which has no such pre-check.
+    // Asking for 5 when holding 2 is refused, and the refusal now names the ask the
+    // player CAN satisfy: `resolveChoice` clamps a `lose-any` to the pool as it
+    // stands when it is answered, so the pick has to total 2. ("discard exactly 2"
+    // is strictly more use than the old "you do not hold those", which described
+    // the problem without saying what to do about it.)
     const tooMany = reduce(
       s,
       'p1',
@@ -272,7 +274,19 @@ describe('the cap choice in play', () => {
       ctx,
     );
     expect(tooMany.ok).toBe(false);
-    if (!tooMany.ok) expect(tooMany.error).toBe('you do not hold those');
+    if (!tooMany.ok) expect(tooMany.error).toBe('discard exactly 2');
+
+    // The clamp is per-total, not per-denomination, so a pick of the right SIZE in
+    // the wrong denominations is still refused and `canAfford` still earns its
+    // keep — that check is what stops a total-right, pool-wrong pick.
+    const wrongDenom = reduce(
+      s,
+      'p1',
+      { type: 'RESOLVE_CHOICE', choiceId: 'c1', pick: { kind: 'resources', res: { clout: 2 } } },
+      ctx,
+    );
+    expect(wrongDenom.ok).toBe(false);
+    if (!wrongDenom.ok) expect(wrongDenom.error).toBe('you do not hold those');
 
     // A choice sized to what is actually held goes through and lands on zero.
     const s2: GameState = {

@@ -1221,7 +1221,27 @@ function resolveChoice(
       if (pick.kind !== 'resources') return fail('choose resources');
       const bad = deltaError(pick.res, 'a discard');
       if (bad) return fail(bad);
-      if (deltaTotal(pick.res) !== c.count) return fail(`discard exactly ${c.count}`);
+      // Clamp to what is held NOW, not to what was held when the ask was raised.
+      //
+      // Every other ask in this switch is clamped at resolution for the same
+      // reason (`steal-any` to the victim's present pool, the three voter kinds to
+      // the board as it stands), and `lose-any` was the one that was not — so it
+      // could be left with NO legal pick at all. Real shape of the bug, found by
+      // auditing every kind after the client's dead-`gain-any` dialog:
+      //
+      //   p1 holds 3 Funds and is asked to discard 3 (a card's `lose-any`, clamped
+      //   at raise time to exactly what p1 held). Before p1 can answer, p2 plays a
+      //   Conspiracy Card that strips 1 Fund from every opponent. p1 now holds 2,
+      //   and `deltaTotal(pick) === 3` is unsatisfiable while `canAfford` refuses
+      //   3 — so no pick resolves, `blockedBy` freezes p1, and the table is dead.
+      //   A pending decision is not a lock the answering player holds: the ask is
+      //   frozen but the pool is not.
+      //
+      // p12 says the player CHOOSES what to discard, so a smaller ask is still their
+      // choice — and the clamp can only ever lower it to something they hold, so a
+      // legal pick always exists.
+      const wanted = Math.min(c.count, poolTotal(self.resources));
+      if (deltaTotal(pick.res) !== wanted) return fail(`discard exactly ${wanted}`);
       if (!canAfford(self.resources, pick.res)) return fail('you do not hold those');
       let s = state;
       [s] = takeResources(s, playerId, pick.res);
