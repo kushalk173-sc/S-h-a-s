@@ -124,6 +124,11 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
             }
             onConfirm={() => props.onResolveResources(pending.id, props.draft)}
             onCancel={() => undefined}
+            /* This sheet IS the dialog; the picker is its content. Rendering it
+               as a second sheet put 42px of nested padding and border inside a
+               356px content box at 390px and clipped the right edge — see
+               `ResourcePicker`'s `nested` prop. */
+            nested
           />
         )}
 
@@ -286,6 +291,7 @@ function StealChoice({
         confirmLabel={`TAKE ${want}`}
         onConfirm={() => onResolve(choice.pending.id, target.id, draft)}
         onCancel={() => setVictim(named)}
+        nested
       />
     );
   }

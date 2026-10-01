@@ -35,6 +35,25 @@ export type ResourcePickerProps = {
   readonly confirmLabel: string;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
+  /**
+   * Render as CONTENT of a dialog that is already open, rather than as a dialog
+   * in its own right.
+   *
+   * A defect found by measuring at 390px: `ChoiceResolver` renders a `.sheet` and
+   * the picker rendered a SECOND `.sheet` inside it. Two full sheets means two
+   * sets of 20px padding, two borders and two shadows stacked inside a scrim
+   * that already has padding — and because `.sheet` is `width: 100%` on a
+   * `content-box`, the inner one measured 358px wide inside a 356px content box.
+   * 22px of the player's own resources were clipped off the right edge, which is
+   * the one thing this widget may never do (§5.9b: the decision is the only thing
+   * the player can legally do, so any of it being unreadable is a stall).
+   *
+   * `nested` also fixes the accessibility half of the same bug. Two stacked
+   * `aria-modal="true"` dialogs is a contradiction: the outer says nothing behind
+   * it is reachable while the inner is itself modal. Nested, this is a plain
+   * `<section>` and the outer dialog stays the only modal.
+   */
+  readonly nested?: boolean;
 };
 
 export function ResourcePicker({
@@ -46,6 +65,7 @@ export function ResourcePicker({
   confirmLabel,
   onConfirm,
   onCancel,
+  nested = false,
 }: ResourcePickerProps) {
   const chosen = useMemo(() => deltaTotal(pick as Record<Resource, number>), [pick]);
   const remaining = total - chosen;
@@ -65,14 +85,14 @@ export function ResourcePicker({
     onPick({ ...pick, [r]: next });
   };
 
-  return (
-    <div
-      className="sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-label={heading}
-      data-testid="resource-picker"
-    >
+  /*
+   * TWO SHAPES, ONE BODY. The grid, the numerals, the status line and the
+   * buttons are identical either way — only the container differs. That is the
+   * point: the player learns this widget once (§5.4's reasoning applied to
+   * choices), so `nested` must not change a single thing inside it.
+   */
+  const body = (
+    <>
       <h2 className="sheet__title">{heading}</h2>
 
       <div className="picker__grid">
@@ -145,6 +165,26 @@ export function ResourcePicker({
           Cancel
         </button>
       </div>
+    </>
+  );
+
+  if (nested) {
+    return (
+      <div className="picker__nested" data-testid="resource-picker">
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label={heading}
+      data-testid="resource-picker"
+    >
+      {body}
     </div>
   );
 }

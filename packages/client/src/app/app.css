@@ -713,6 +713,37 @@
   padding: var(--sp-5);
   max-width: 720px;
   width: 100%;
+  /*
+   * `box-sizing: border-box` IS LOAD-BEARING, NOT HOUSEKEEPING.
+   *
+   * Measured at 390px: with the default `content-box`, `width: 100%` sizes the
+   * CONTENT and the 20px padding plus 2px of border are added ON TOP. A dialog
+   * inside a 16px-padded scrim therefore rendered 358px wide inside a 356px
+   * content box and clipped 22px off its own right edge — and a `.sheet` nested
+   * inside another `.sheet` (the cap discard, `ChoiceResolver`) clipped the
+   * player's own resource numerals. Nothing in this file may ever rely on
+   * `content-box` for a width that has to fit.
+   */
+  box-sizing: border-box;
+}
+
+/*
+ * A SHEET INSIDE A SHEET IS NOT A SHEET.
+ *
+ * The cap-discard dialog (`ChoiceResolver`) needs the resource picker as its
+ * CONTENT, and the picker also has to work standalone — as its own dialog for the
+ * redraw offer, a Conspiracy purchase, Prospecting and a trade. Those are two
+ * different jobs, so there are two containers (`ResourcePicker`'s `nested` prop):
+ * the standalone one is a `.sheet`, and this one is plain flow with no chrome of
+ * its own. The nested form drops the background, the border, the shadow, the
+ * padding and the max-width, so it contributes zero width to its parent — which
+ * is what stops the overflow rather than capping it.
+ */
+.picker__nested {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sheet--wide {
@@ -1143,6 +1174,38 @@
   }
 
   /*
+   * A MODAL ON A PHONE MUST FIT THE PHONE, AND MUST NOT HIDE ITS OWN CONTENT.
+   *
+   * §5.9b makes a pending decision take the viewport, and it is the only thing
+   * the player can legally do — so a dialog taller than the screen is not a
+   * cosmetic problem, it is a stall: the DISCARD control sits at the bottom, and
+   * a bottom the player cannot scroll to is a bottom they never press.
+   *
+   * `max-height` is bounded by the DYNAMIC viewport height so the mobile browser
+   * chrome cannot eat the confirm button, and the scrim (which already scrolls)
+   * does the scrolling. Nothing is truncated and nothing is hidden behind a
+   * gradient: the player reads every resource they are discarding by scrolling,
+   * which is the requirement, rather than by having the type shrunk for them.
+   */
+  .scrim {
+    padding: var(--sp-3);
+    align-items: flex-start;
+  }
+
+  .sheet {
+    max-height: calc(100dvh - var(--sp-6));
+    overflow-y: auto;
+    /* A sheet that scrolls needs room to show it is scrollable, or the player
+       assumes the cut-off text is all there is. */
+    overscroll-behavior: contain;
+  }
+
+  .picker__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+  /*
    * THE LOG IS A TAB BELOW 600px, SO IT MUST NOT BE `display: none` HERE.
    *
    * This rule hid `.shell__log`, which is the rail element, and below 600px the
@@ -1181,10 +1244,6 @@
 
   .endturn-dock {
     display: block;
-  }
-
-  .picker__grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
