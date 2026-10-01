@@ -205,11 +205,18 @@ describe('schema: the effect union', () => {
     expect(found[0]?.message).toContain('steal-any');
   });
 
-  it('rejects a payload field the op does not have (gerrymander has no target)', () => {
-    // Caught in the real corpus: `gerrymander` is the one resource-shaped op in
-    // cards.ts with no `target`. See KNOWN-GAPS.md G8.
-    const found = validateEffect(FILE, { op: 'gerrymander', n: 1, target: 'everyone' }, EFFECT_OP_SET);
+  it('rejects a payload field the op does not have (evict has no target)', () => {
+    // The schema follows cards.ts, and cards.ts gives `target` only to the five ops
+    // that take one. `evict` pushes its decision to the card's own player, so a
+    // target would be a promise the engine cannot keep.
+    const found = validateEffect(FILE, { op: 'evict', n: 1, target: 'each-opponent' }, EFFECT_OP_SET);
     expect(found.some((p) => p.message.includes('unknown property "target"'))).toBe(true);
+  });
+
+  it('accepts a target on gerrymander, which cards.ts gained for G8', () => {
+    // Shape only. Whether the ENGINE does it is the validator's question, and it is
+    // asked in test/reducer-parity.test.ts.
+    expect(validateEffect(FILE, { op: 'gerrymander', n: 1, target: 'everyone' }, EFFECT_OP_SET)).toEqual([]);
   });
 
   it('rejects an n of zero, which would be a silent no-op', () => {
@@ -233,7 +240,7 @@ describe('schema: the effect union', () => {
       evict: { op: 'evict', n: 1 },
       'discard-voter': { op: 'discard-voter', n: 2 },
       'convert-voter': { op: 'convert-voter', n: 2 },
-      gerrymander: { op: 'gerrymander', n: 1 },
+      gerrymander: { op: 'gerrymander', n: 1, target: 'you' },
       'draw-conspiracy': { op: 'draw-conspiracy', n: 2 },
       'refresh-market': { op: 'refresh-market' },
       discount: { op: 'discount', n: 1 },

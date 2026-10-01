@@ -15,6 +15,7 @@ import {
   type Corpus,
 } from './corpus.js';
 import { EFFECT_OP_SET } from './effect-ops.js';
+import { unexecutedCardProblems } from './executable.js';
 import { IDEOLOGUES, RULES } from './engine.js';
 import {
   parseDeckFile,
@@ -42,7 +43,9 @@ export type Finding = {
     | 'CAMPAIGN_MISMATCH'
     | 'QUESTION_DUPLICATE'
     | 'SOURCE_NOT_CITED'
-    | 'EFFECT_OP_UNKNOWN';
+    | 'EFFECT_OP_UNKNOWN'
+    | 'EFFECT_NOT_EXECUTED'
+    | 'EFFECT_FIELD_NOT_EXECUTED';
   readonly file: string | null;
   readonly cardId: string | null;
   readonly message: string;
@@ -64,6 +67,13 @@ const KIND_PREFIX: Readonly<Record<CardKind, string>> = {
   conspiracy: 'ct',
   headline: 'hl',
 };
+
+/**
+ * The card-level shapes that are in `cards.ts` but inert in `reduce()`. See
+ * `src/executable.ts` and KNOWN-GAPS.md G9/G13/G22. Listed here only so the
+ * card-level schema fan-out does not bury the precise finding.
+ */
+const RESERVED_CARD_FIELDS: readonly string[] = ['duration', 'timing', 'interrupt'];
 
 /** The reference citation an adapted or verbatim card must actually carry. */
 const CITATION_RE = /(https?:\/\/|scribd\/\d|\bREF\b\s*§?\s*\d|§\s*\d)/;
@@ -130,6 +140,11 @@ function readAll(
       // effects, 13 times; for a side, 4 times — none of which is the real error.
       if (/(^|\/)effects(\/|$)/.test(problem.pointer)) continue;
       if (/\/sides\/[0-9]+/.test(problem.pointer)) continue;
+      // Same reason for the reserved card-level shapes (duration / timing /
+      // interrupt): the schema accepts them so an author who writes one gets the
+      // engine explanation from EXECUTED_NOT_EXECUTED below, not "unknown
+      // property" from four card branches at once.
+      if (RESERVED_CARD_FIELDS.some((f) => problem.pointer.endsWith(`/${f}`))) continue;
       findings.push({
         severity: 'error',
         code: 'SCHEMA',
@@ -320,6 +335,21 @@ export function validateDecks(inputs: readonly DeckInput[]): ValidationReport {
             });
           }
         }
+      }
+
+      // ── 10. what the ENGINE would not do, as opposed to what is malformed ──
+      // The passes above are shape. This one is the promise: a card is only
+      // allowed to describe behaviour `reduce()` actually performs. See the
+      // header of src/executable.ts for why nothing else in the toolchain can
+      // catch it.
+      for (const problem of unexecutedCardProblems(card, '')) {
+        findings.push({
+          severity: 'error',
+          code: problem.code,
+          file,
+          cardId: card.id,
+          message: `/cards/${index}${problem.pointer} ${problem.message}`,
+        });
       }
     }
   }

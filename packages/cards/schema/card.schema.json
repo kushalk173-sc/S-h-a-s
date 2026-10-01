@@ -233,6 +233,45 @@
       "$comment": "EffectTarget in cards.ts. 'leader' = the player holding the most majority voters; ties give nobody. REF 4.4 item 2 records that this four-value enum does not fit several real cards (ON THE \"HIGH\" SEAS attaches to the card, A CALL FROM KARACHI auctions, NEXT BILLION DATA POINTS votes) — see packages/cards/KNOWN-GAPS.md."
     },
 
+    "effectDuration": {
+      "enum": ["this-turn", "round", "next-turn", "rest-of-game"],
+      "$comment": "RESERVED — NOT EXECUTABLE TODAY. EffectDuration in cards.ts; the schema accepts it so that an author who writes a lasting clause gets the engine explanation from the validator instead of 'unknown property'. Only 'this-turn' is accepted by packages/cards/src/validate.ts, because that is the only value reduce() already performs (resolve once, discard the card). Every other value is rejected with finding code EFFECT_NOT_EXECUTED and the reducer change named. See KNOWN-GAPS.md G9 and G22."
+    },
+
+    "effectTiming": {
+      "enum": ["now", "next-turn", "after-this-turn"],
+      "$comment": "RESERVED — NOT EXECUTABLE TODAY. EffectTiming in cards.ts. Rejected by the validator: reduce() has no clock on an effect. See KNOWN-GAPS.md G22."
+    },
+
+    "effectTrigger": {
+      "enum": ["on-purchase", "on-voter-influenced", "on-volatile-placement", "on-gerrymander", "on-majority-formed"],
+      "$comment": "RESERVED — NOT EXECUTABLE TODAY. EffectTrigger in cards.ts, carried on every Effect as `when`. A hook on another player's action needs a trigger registry in GameState that INFLUENCE / BUY_CONSPIRACY / GERRYMANDER / PLACE_VOTERS consult. Rejected by the validator. See KNOWN-GAPS.md G14."
+    },
+
+    "dynamicCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["of"],
+      "properties": {
+        "of": {
+          "enum": ["ideologue-level", "your-pool", "opponent-volatile-voters", "your-gerrymander-rights"]
+        }
+      },
+      "$comment": "RESERVED — NOT EXECUTABLE TODAY. The tagged union KNOWN-GAPS G15 proposes in place of a literal `n`. Accepted here so a computed count gets the precise validator error; the validator rejects it, because reduce() reads effect.n as a number and pushes it into a Choice.count and a loop bound. See KNOWN-GAPS.md G15."
+    },
+
+    "interrupt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "window"],
+      "properties": {
+        "op": { "enum": ["block", "deflect", "auction", "vote", "pass-card"] },
+        "window": { "enum": ["out-of-turn", "pre-answer", "always"] },
+        "target": { "enum": ["any-card", "card-affecting-you", "any-player"] }
+      },
+      "$comment": "RESERVED — NOT EXECUTABLE TODAY. Interrupt in cards.ts, deliberately NOT in Effect[]: REF 5.4 and the recovered card text agree that a BLOCK, a DEFLECT, an AUCTION, a VOTE and a PASS change WHICH PHASE OF PLAY IS RUNNING, not how many resources anyone holds, so no parameterisation of the effect list expresses them. Rejected by the validator. See KNOWN-GAPS.md G13."
+    },
+
     "count": {
       "type": "integer",
       "minimum": 1,
@@ -240,10 +279,15 @@
       "$comment": "The `n` of a non-resource Effect. minimum 1: every op in the union is a gain or a loss of N, and a zero-N effect is a no-op that deserves to fail review. maximum 9 matches the delta ceiling; no recovered real card exceeds 4."
     },
 
+    "countOrComputed": {
+      "oneOf": [{ "$ref": "#/$defs/count" }, { "$ref": "#/$defs/dynamicCount" }],
+      "$comment": "A literal count, or the reserved computed form (see $defs.dynamicCount). The second branch exists to be REJECTED by the validator with an actionable message, not to be shipped."
+    },
+
     "effect": {
       "type": "object",
       "required": ["op"],
-      "$comment": "The Effect union in packages/engine/src/cards.ts.\n\nNOTE FOR REVIEWERS: the task brief calls this a '12-op union'. cards.ts as of this\ncommit declares 13 (gain, lose, gain-any, lose-any, steal-any, voters, evict,\ndiscard-voter, convert-voter, gerrymander, draw-conspiracy, refresh-market,\ndiscount). The schema follows cards.ts, because the engine is the contract. See\nsrc/effect-ops.ts for the compile-time drift guard.\n\nWhat this union CANNOT express is the subject of packages/cards/KNOWN-GAPS.md:\nduration, tokens-on-card, hostages, timed pass, auction, vote, out-of-turn\nreactive block/deflect, triggers, scaling off board state, dynamic cost modifiers,\nset collection, borrowed powers, delayed cross-turn payoffs, and any effect aimed at\nsomething other than you/each-opponent/everyone/leader. REF 5.4 puts that at roughly\n40% of real Conspiracy/Headline effects.",
+      "$comment": "The Effect union in packages/engine/src/cards.ts.\n\nNOTE FOR REVIEWERS: the task brief calls this a '12-op union'. cards.ts as of this\ncommit declares 13 (gain, lose, gain-any, lose-any, steal-any, voters, evict,\ndiscard-voter, convert-voter, gerrymander, draw-conspiracy, refresh-market,\ndiscount). The schema follows cards.ts, because the engine is the contract. See\nsrc/effect-ops.ts for the compile-time drift guard.\n\nWhat this union CANNOT express is the subject of packages/cards/KNOWN-GAPS.md:\nduration, tokens-on-card, hostages, timed pass, auction, vote, out-of-turn\nreactive block/deflect, triggers, scaling off board state, dynamic cost modifiers,\nset collection, borrowed powers, delayed cross-turn payoffs, and any effect aimed at\nsomething other than you/each-opponent/everyone/leader. REF 5.4 puts that at roughly\n40% of real Conspiracy/Headline effects.\n\nTHE THREE STATES, and which one every part of this schema is in:\n  (a) expressible AND executed by reduce(): every op below, carrying only the fields\n      EXECUTED_OPS in packages/cards/src/executable.ts says the case actually reads.\n  (b) expressible and validated but NOT executed: `when`, `until`, a computed `n`,\n      and gerrymander's `target` with any value other than 'you'. The schema ACCEPTS\n      these so an author gets the engine explanation instead of 'unknown property';\n      packages/cards/src/validate.ts then REJECTS them, with the reducer change named.\n      No shipped card may use one.\n  (c) not expressible at all: auction, vote, hostage, token piles, deck search, zone\n      scoping, set collection. See KNOWN-GAPS.md G3/G6/G10/G11/G12/G16/G17/G18/G20.\npackages/cards/test/reducer-parity.test.ts reads reduce.ts and re-asserts (a) over the\nwhole shipped corpus, so this list cannot drift away from the reducer.",
       "oneOf": [
         {
           "type": "object",
@@ -252,7 +296,9 @@
           "properties": {
             "op": { "const": "gain" },
             "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
-            "target": { "$ref": "#/$defs/effectTarget" }
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -262,7 +308,9 @@
           "properties": {
             "op": { "const": "lose" },
             "res": { "allOf": [{ "$ref": "#/$defs/delta" }, { "$ref": "#/$defs/nonEmptyDelta" }] },
-            "target": { "$ref": "#/$defs/effectTarget" }
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -271,8 +319,10 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "gain-any" },
-            "n": { "$ref": "#/$defs/count" },
-            "target": { "$ref": "#/$defs/effectTarget" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -281,8 +331,10 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "lose-any" },
-            "n": { "$ref": "#/$defs/count" },
-            "target": { "$ref": "#/$defs/effectTarget" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -292,7 +344,9 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "steal-any" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -301,8 +355,10 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "voters" },
-            "n": { "$ref": "#/$defs/count" },
-            "target": { "$ref": "#/$defs/effectTarget" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -311,7 +367,9 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "evict" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -320,7 +378,9 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "discard-voter" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -329,16 +389,22 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "convert-voter" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
+          "$comment": "G8, closed on the type and NOT on the reducer. gerrymander was the only resource-shaped op in cards.ts with no `target`, which is why \"every player can Gerrymander 1\" (SUBMERGED / NEW FACE WHO DIS, REF 4.3) could not be written at all — the validator caught the attempt on the real corpus. `target` is now on the op and accepted here. applyEffect still credits the bonus to `source` alone, so packages/cards/src/validate.ts REJECTS any card that sets target other than 'you' (finding EFFECT_FIELD_NOT_EXECUTED) until reduce.ts wraps the case in resolveTargets(). See KNOWN-GAPS.md G8.",
           "type": "object",
           "additionalProperties": false,
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "gerrymander" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -347,7 +413,9 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "draw-conspiracy" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -356,7 +424,9 @@
           "additionalProperties": false,
           "required": ["op"],
           "properties": {
-            "op": { "const": "refresh-market" }
+            "op": { "const": "refresh-market" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         },
         {
@@ -365,7 +435,9 @@
           "required": ["op", "n"],
           "properties": {
             "op": { "const": "discount" },
-            "n": { "$ref": "#/$defs/count" }
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" }
           }
         }
       ]
@@ -406,7 +478,10 @@
         "excludeInTwoPlayer": {
           "type": "boolean",
           "$comment": "cards.ts: 'p27: cards marked 2x are removed in the two-player game.'"
-        }
+        },
+        "duration": { "$ref": "#/$defs/effectDuration" },
+        "timing": { "$ref": "#/$defs/effectTiming" },
+        "interrupt": { "$ref": "#/$defs/interrupt" }
       }
     },
 
@@ -426,9 +501,12 @@
           "maxItems": 8,
           "items": { "$ref": "#/$defs/effect" }
         },
-        "excludeInTwoPlayer": { "type": "boolean" }
+        "excludeInTwoPlayer": { "type": "boolean" },
+        "duration": { "$ref": "#/$defs/effectDuration" },
+        "timing": { "$ref": "#/$defs/effectTiming" },
+        "interrupt": { "$ref": "#/$defs/interrupt" }
       },
-      "$comment": "HeadlineCard = ConspiracyCard minus `cost`. REF 5.5 confirms that is correct:\n'Headline Cards have no cost'.\n\nRULES p18: a Headline is resolved at the end of the turn of the player who placed a\nvoter into a Volatile Area, one per voter, in the order the voters were placed.\n\nREF 4.3 preamble, verified: Headlines are always carried out chronologically and in\nthe post-turn phase unless the card says otherwise; if a headline involves several\nturns or several players a Block must be applied at the very beginning; donated\nvoters must be placed immediately. None of that is representable here — see\npackages/cards/KNOWN-GAPS.md. There is also no `duration` field, which REF 4.4\nitem 1 identifies as the single largest gap in the schema."
+      "$comment": "HeadlineCard = ConspiracyCard minus `cost`. REF 5.5 confirms that is correct:\n'Headline Cards have no cost'.\n\nRULES p18: a Headline is resolved at the end of the turn of the player who placed a\nvoter into a Volatile Area, one per voter, in the order the voters were placed.\n\nREF 4.3 preamble, verified: Headlines are always carried out chronologically and in\nthe post-turn phase unless the card says otherwise; if a headline involves several\nturns or several players a Block must be applied at the very beginning; donated\nvoters must be placed immediately. None of that is representable here — see\npackages/cards/KNOWN-GAPS.md. The `duration` / `timing` / `interrupt` fields exist so\nthat an author who reaches for one of them gets the engine explanation from the\nvalidator rather than 'unknown property'; all three are inert in reduce()."
     }
   }
 }
