@@ -195,24 +195,21 @@ function codes(report: { errors: readonly { code: string }[] }): string[] {
   return report.errors.map((e) => e.code);
 }
 
-describe('G8 — target on gerrymander', () => {
-  it('accepts target: "you", which is exactly what the case already does', () => {
-    const found = validateEffect(FILE, { op: 'gerrymander', n: 1, target: 'you' }, EFFECT_OP_SET);
-    expect(found).toEqual([]);
-    expect(codes(findingsForEffect({ op: 'gerrymander', n: 1, target: 'you' }))).toEqual([]);
+describe('G8 — target on gerrymander, closed on the reducer', () => {
+  it('the case now honours every EffectTarget, so no value is special-cased', () => {
+    for (const target of ['you', 'each-opponent', 'everyone', 'leader'] as const) {
+      expect(codes(findingsForEffect({ op: 'gerrymander', n: 1, target })), target).toEqual([]);
+    }
+    // …and with no `target` at all, which is the same as 'you'.
+    expect(codes(findingsForEffect({ op: 'gerrymander', n: 1 }))).toEqual([]);
   });
 
-  it('accepts the effect shape for target: "everyone" but rejects the CARD', () => {
-    // The schema can now say it; the engine cannot yet do it. The validator is what
-    // stops the card, and its message has to name the one-line fix.
-    const shape = validateEffect(FILE, { op: 'gerrymander', n: 1, target: 'everyone' }, EFFECT_OP_SET);
-    expect(shape).toEqual([]);
-
-    const report = findingsForEffect({ op: 'gerrymander', n: 1, target: 'everyone' });
-    expect(codes(report)).toEqual(['EFFECT_FIELD_NOT_EXECUTED']);
-    const message = report.errors[0]?.message ?? '';
-    expect(message).toContain('resolveTargets');
-    expect(message).toContain('KNOWN-GAPS G8');
+  it('so the registry keeps no "executable only when" escape for this op', () => {
+    // The mechanism survives as an empty table on purpose: an op whose case honours
+    // `target` at exactly one value would be listed here, and the validator would
+    // refuse the rest. Nothing is listed, because nothing is special-cased.
+    expect(unexecutedEffectProblems({ op: 'gerrymander', n: 1, target: 'everyone' }, '')).toEqual([]);
+    expect(unexecutedEffectProblems({ op: 'gerrymander', n: 1, target: 'leader' }, '')).toEqual([]);
   });
 });
 

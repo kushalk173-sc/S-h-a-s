@@ -60,7 +60,7 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   evict: ['n'],
   'discard-voter': ['n'],
   'convert-voter': ['n'],
-  gerrymander: ['n'],
+  gerrymander: ['n', 'target'],
   'draw-conspiracy': ['n'],
   'refresh-market': [],
   discount: ['n'],
@@ -71,14 +71,13 @@ export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(
 /**
  * Fields the reducer ignores EXCEPT at the value that means "do nothing new".
  *
- * `target` on `gerrymander` is the one that matters: `resolveTargets(s, source,
- * 'you')` is `[source]`, so a card may state `target: 'you'` and be telling the
- * truth, while any other value promises something the reducer does not do. Absent
- * is the same as `'you'`, which is why the default needs no entry of its own.
+ * Empty today, and deliberately kept as a mechanism rather than deleted: it is the
+ * honest place for an op whose `case` honours `target` at exactly one value, and a
+ * validator that refuses the rest is how that stays visible. `gerrymander` was the
+ * only entry (KNOWN-GAPS G8) and its case now loops `resolveTargets`, so any
+ * `EffectTarget` is honoured.
  */
-const FIELD_EXECUTABLE_WHEN: Readonly<Record<string, (value: unknown) => boolean>> = {
-  'gerrymander.target': (value) => value === 'you',
-};
+const FIELD_EXECUTABLE_WHEN: Readonly<Record<string, (value: unknown) => boolean>> = {};
 
 /**
  * Fields `applyEffect` accepts on EVERY op because it reads them off the effect
@@ -94,13 +93,6 @@ export const EFFECT_INTRINSIC_FIELDS: readonly string[] = ['op'];
  * likely to reach for, written out so the message is actionable on its own.
  */
 const IGNORED_FIELD_FIX: Readonly<Record<string, string>> = {
-  // G8. KNOWN-GAPS' "cheapest win, one line" — and it is one line, on the
-  // reducer's side: resolve the target and credit each of them.
-  'gerrymander.target':
-    'reduce.ts applyEffect, case "gerrymander" credits the bonus to `source` only. ' +
-    'It needs `for (const p of resolveTargets(s, source, target))` in place of the ' +
-    'single `s.players[source]` write (KNOWN-GAPS G8) — `target` is already computed above the switch.',
-
   'evict.target':
     'reduce.ts applyEffect, case "evict" pushes the eviction decision to `source` as a single ' +
     "'evict-voter' choice, so an opponent cannot be made to evict. Targeting it means looping the " +

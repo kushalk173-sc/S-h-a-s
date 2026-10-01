@@ -301,12 +301,26 @@ function applyEffect(state: GameState, source: PlayerID, effect: Effect, ctx: Ct
     case 'convert-voter':
       return pushChoice(s, { kind: 'convert-voter', count: effect.n, reason: 'Card effect' }, source);
     case 'gerrymander': {
-      const p = s.players[source];
-      if (!p) return s;
-      // Negative "used" counts read as bonus moves in the allowance check.
-      const bonus: Record<string, number> = { ...p.powerUses.gerrymandered };
-      bonus['__bonus'] = (bonus['__bonus'] ?? 0) + effect.n;
-      return withPlayer(s, source, { powerUses: { ...p.powerUses, gerrymandered: bonus } });
+      // G8, closed on the REDUCER (KNOWN-GAPS.md G8). The bonus used to be credited
+      // to `source` alone, which is why "starting with you, EVERY player can
+      // Gerrymander 1" (NEW FACE WHO DIS / SUBMERGED, REF 4.3) could not be written
+      // at all — it was the one resource-shaped op with no `target`, and adding the
+      // field to the type without honouring it would have made the card read as if
+      // it hit every player while hitting one.
+      //
+      // The grant lands in `powerUses.gerrymandered`, which `advanceTurn` resets to
+      // NO_POWER_USES at the start of each player's own turn — so a bonus handed to
+      // every player lasts exactly the turn the card resolved on for whoever has
+      // not played yet, which is what the card says ("immediately").
+      for (const p of resolveTargets(s, source, target)) {
+        const player = s.players[p];
+        if (!player) continue;
+        // Negative "used" counts read as bonus moves in the allowance check.
+        const bonus: Record<string, number> = { ...player.powerUses.gerrymandered };
+        bonus['__bonus'] = (bonus['__bonus'] ?? 0) + effect.n;
+        s = withPlayer(s, p, { powerUses: { ...player.powerUses, gerrymandered: bonus } });
+      }
+      return s;
     }
     case 'draw-conspiracy': {
       for (let i = 0; i < effect.n; i++) {

@@ -16,7 +16,7 @@ import {
 } from '../src/balance.js';
 import { RULES, type Effect } from '../src/engine.js';
 import type { CorpusIdeologyCard, CorpusVoterCard } from '../src/corpus.js';
-import { loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
+import { DECK_IDS, loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
 
 let nextId = 0;
 
@@ -536,13 +536,30 @@ describe('the shipped decks', () => {
     expect(report.warnings.map((f) => `${f.code} ${f.deck} ${f.message}`)).toEqual([]);
   });
 
-  it('checks every X-card as well as every Ideology Card', () => {
+  it('checks every card that ships, and knows it without a hardcoded count', () => {
+    // The claim this test exists to make is COVERAGE: an X-card is analysed, not
+    // just an Ideology Card. Expressed as a hardcoded `8 + 12 + 12 + xCount`, the
+    // claim rots the moment the corpus grows — it reported 80 cards checked while
+    // the checker had actually looked at 118, which is the failure mode this form
+    // invites: a stale number that looks like a passing gate.
+    //
+    // So it is derived from the decks the same way `balanceCorpus` derives it, plus
+    // the assertion that the X-card class is non-empty, which is the part that would
+    // actually rot.
+    const shipped =
+      DECK_IDS.flatMap((d) => loadIdeologyDeck(d)).length +
+      DECK_IDS.flatMap((d) => loadVoterDeck(d)).length +
+      DECK_IDS.flatMap((d) => loadConspiracyDeck(d)).length +
+      DECK_IDS.flatMap((d) => loadHeadlineDeck(d)).length;
+    expect(report.cardsChecked).toBe(shipped);
+
+    // The coverage claim itself: Conspiracies and Headlines are in the report.
     const xCount =
       loadConspiracyDeck('et2040').length +
       loadHeadlineDeck('et2040').length +
       loadConspiracyDeck('in2020').length +
       loadHeadlineDeck('in2020').length;
-    expect(report.cardsChecked).toBe(8 + 12 + 12 + xCount);
+    expect(xCount).toBeGreaterThan(0);
   });
 
   it('reports one bias row per deck', () => {

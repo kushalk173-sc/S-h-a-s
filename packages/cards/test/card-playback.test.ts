@@ -20,7 +20,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { loadCorpus, toEngineConspiracyCard, toEngineHeadlineCard, toEngineIdeologyCard, toEngineVoterCard } from '../src/corpus.js';
-import { RULES, type CardIndex, type PlayerID } from '../src/engine.js';
+import { RULES, type CardID, type CardIndex, type HeadlineCard, type IdeologyCard, type PlayerID } from '../src/engine.js';
 
 import { reduce } from '../../engine/src/reduce';
 import { setup } from '../../engine/src/setup';
@@ -28,11 +28,68 @@ import type { GameState } from '../../engine/src/state';
 
 const corpus = loadCorpus();
 
+/**
+ * The fixture's OWN deck, so these tests measure the reducer and not the corpus.
+ *
+ * Two reasons, both learned the hard way while this file was being written:
+ *  1. the deck files are another author's and they grow independently — a fixture
+ *    built from `loadCorpus()` re-shuffles every time a card is added, so a
+ *    reducer test starts failing because somebody added a Voter Card;
+ *  2. `ANSWER` pays `side.pays` plus the p28 passive bonus, so a corpus-derived
+ *    draw can push the answering player over `RULES.resourceCap` and raise a cap
+ *    discard, which then sits in `state.choices` in front of the decision the test
+ *    is actually about.
+ *
+ * So the Ideology Cards are declared here, with a payout small enough that a player
+ * who starts at 6 cannot reach the cap, and the decks are built from them.
+ */
+const FIXTURE_IDEOLOGY: readonly IdeologyCard[] = [
+  {
+    id: 'ig-fixture-a',
+    campaign: 'fixture',
+    question: 'Does the ceiling move, or does the room?',
+    sides: [
+      { answer: 'It moves.', ideologue: 'capitalist', pays: { funds: 2 } },
+      { answer: 'The room.', ideologue: 'idealist', pays: { trust: 2 } },
+    ],
+  },
+  {
+    id: 'ig-fixture-b',
+    campaign: 'fixture',
+    question: 'And the floor?',
+    sides: [
+      { answer: 'It stays.', ideologue: 'supremo', pays: { clout: 2 } },
+      { answer: 'It goes.', ideologue: 'showstopper', pays: { media: 2 } },
+    ],
+  },
+];
+
+/**
+ * A recovered card the shipped deck does not carry, added to the index here.
+ *
+ * These are the real REF texts, written as the corpus owner would write them now
+ * the reducer honours them, so what is under test is the reducer and not a deck.
+ */
+const FIXTURE_HEADLINES: readonly HeadlineCard[] = [
+  {
+    id: 'hl-fixture-submerged',
+    name: 'Submerged',
+    text: 'Starting with you, every player may Gerrymander 1 majority or non-majority voter immediately, under the normal Gerrymandering rules.',
+    effects: [{ op: 'gerrymander', n: 1, target: 'everyone' }],
+  },
+];
+
 const INDEX: CardIndex = {
-  ideology: Object.fromEntries(corpus.ideology.map((c) => [c.id, toEngineIdeologyCard(c)])),
+  ideology: {
+    ...Object.fromEntries(corpus.ideology.map((c) => [c.id, toEngineIdeologyCard(c)])),
+    ...Object.fromEntries(FIXTURE_IDEOLOGY.map((c) => [c.id, c])),
+  },
   voter: Object.fromEntries(corpus.voter.map((c) => [c.id, toEngineVoterCard(c)])),
   conspiracy: Object.fromEntries(corpus.conspiracy.map((c) => [c.id, toEngineConspiracyCard(c)])),
-  headline: Object.fromEntries(corpus.headline.map((c) => [c.id, toEngineHeadlineCard(c)])),
+  headline: {
+    ...Object.fromEntries(corpus.headline.map((c) => [c.id, toEngineHeadlineCard(c)])),
+    ...Object.fromEntries(FIXTURE_HEADLINES.map((c) => [c.id, c])),
+  },
 };
 
 const CTX = { rules: RULES, cards: INDEX };
@@ -52,15 +109,20 @@ function game(): GameState {
     // 6 in total: the cap is on the pool, and answering adds to it (RULES p12),
     // so a fixture that starts at the cap cannot make a legal move at all.
     startResources: [{ funds: 3, clout: 1, media: 1, trust: 1 }],
-    ideologyDeck: corpus.ideology.map((c) => c.id),
-    voterDeck: corpus.voter.map((c) => c.id),
-    conspiracyDeck: corpus.conspiracy.map((c) => c.id),
-    headlineDeck: corpus.headline.map((c) => c.id),
+    ideologyDeck: FIXTURE_IDEOLOGY.map((c) => c.id),
+    voterDeck: corpus.voter.slice(0, 6).map((c) => c.id),
+    conspiracyDeck: corpus.conspiracy.slice(0, 3).map((c) => c.id),
+    headlineDeck: corpus.headline.slice(0, 3).map((c) => c.id),
   });
   // Answer, so the game is in the `actions` phase where a card can be played. The
-  // answer is deliberately arbitrary: none of the four cards reads an Ideology Card.
+  // answer is deliberately arbitrary: none of the cards here reads an Ideology Card.
   const answered = reduce(s, 'p1', { type: 'ANSWER', side: 0 }, CTX);
   if (!answered.ok) throw new Error(`fixture could not answer: ${answered.error}`);
+  // Nothing may be pending: a fixture whose first decision is somebody else's is a
+  // fixture whose assertions are about the wrong thing.
+  if (answered.state.choices.length > 0) {
+    throw new Error('fixture left a pending decision; the opening pool crosses the cap');
+  }
   return answered.state;
 }
 
@@ -72,12 +134,14 @@ function must(result: ReturnType<typeof reduce>): GameState {
 /**
  * Resolve a card through whichever path it really takes.
  *
- * All four recovered cards landed here are Headlines, which are drawn from the deck
- * and resolved in the post-turn queue, NOT bought and played by the caster. Resolving
- * them any other way would be a test of a path the game never uses.
+ * A Headline is drawn from the deck and resolved in the post-turn queue, NOT played
+ * by the caster; a Conspiracy is played from the hand. `ACK_HEADLINE` drains the
+ * queue and therefore advances the turn when the queue empties, which is why the
+ * state this returns is already the NEXT player's `answer` phase.
  */
-function play(s: GameState, id: string): GameState {
-  const headline = corpus.headline.find((c) => c.id === id);
+function play(s: GameState, x: HeadlineCard | string): GameState {
+  const id = typeof x === 'string' ? x : x.id;
+  const headline = typeof x === 'string' ? corpus.headline.find((c) => c.id === id) : x;
   if (headline !== undefined) return resolveHeadline(s, id);
   const held: GameState = {
     ...s,
@@ -96,12 +160,12 @@ function playConspiracy(s: GameState, id: string): GameState {
 }
 
 /** Resolve a Headline the way the end of a turn does, attributed to p1. */
-function resolveHeadline(s: GameState, id: string): GameState {
+function resolveHeadline(s: GameState, id: CardID, queueDepth = 1): GameState {
   const active: GameState = {
     ...s,
     phase: 'headlines',
     activeHeadline: id,
-    headlineQueue: [{ areaId: '', by: 'p1' }],
+    headlineQueue: Array.from({ length: queueDepth }, () => ({ areaId: '', by: 'p1' })),
   };
   return must(reduce(active, 'p1', { type: 'ACK_HEADLINE' }, CTX));
 }
@@ -116,7 +180,8 @@ describe('THE FOUR HORSEMEN — "Discard 2 resources of your choice"', () => {
   });
 
   it('asks its player to discard exactly two, and takes them when it does', () => {
-    const s = play(game(), c.id);
+    const before = game();
+    const s = play(before, c.id);
     const pending = s.choices.filter((x) => x.player === 'p1' && x.choice.kind === 'lose-any');
     expect(pending).toHaveLength(1);
     expect(pending[0]?.choice).toMatchObject({ kind: 'lose-any', count: 2 });
@@ -128,8 +193,11 @@ describe('THE FOUR HORSEMEN — "Discard 2 resources of your choice"', () => {
         pick: { kind: 'resources', res: { funds: 2 } },
       }, CTX),
     );
-    // The player chooses the denomination, which is the card's whole choice.
-    expect(pool(resolved, 'p1').funds).toBe(1);
+    // The player chooses the denomination, which is the card's whole choice — so the
+    // assertion is about what left the pool, not about a constant the fixture's
+    // opening hand happens to produce.
+    expect(pool(resolved, 'p1').funds).toBe(pool(before, 'p1').funds - 2);
+    expect(pool(resolved, 'p1').trust).toBe(pool(before, 'p1').trust);
     expect(pool(resolved, 'p1').trust).toBe(1);
   });
 });
@@ -241,6 +309,43 @@ describe('the three cards whose text was corrected', () => {
     // The market is refilled, so it is three cards either way — but not the same three.
     expect(after.market).toHaveLength(RULES.marketSize);
     expect(after.market.map((m) => m.cardId)).not.toEqual(before.market.map((m) => m.cardId));
+  });
+});
+
+describe('G8 — gerrymander resolves its target, so "every player" is playable', () => {
+  const SUBMERGED = 'hl-fixture-submerged';
+
+  it('writes the bonus into every resolved player, the caster included', () => {
+    // The behavioural half of G8. Before it, the case credited `source` alone, so
+    // `target` was a field the type carried and the reducer ignored — the card read
+    // as if it hit everyone while hitting one. SUBMERGED / NEW FACE WHO DIS (REF 4.3)
+    // is the real card that needs this.
+    //
+    // TWO headlines are queued so `ACK_HEADLINE` does not drain the queue into
+    // `advanceTurn`, which would reset the incoming player's `powerUses` and hide
+    // what this card did.
+    const after = resolveHeadline(game(), SUBMERGED, 2);
+    for (const pid of ['p1', 'p2', 'p3'] as const) {
+      expect(after.players[pid]?.powerUses.gerrymandered['__bonus'] ?? 0, pid).toBe(1);
+    }
+  });
+
+  it('and `you` — or no target at all — still resolves to the caster alone', () => {
+    const after = play(game(), { ...FIXTURE_HEADLINES[0]!, effects: [{ op: 'gerrymander' as const, n: 1 }] });
+    expect(after.players.p1?.powerUses.gerrymandered['__bonus'] ?? 0).toBe(1);
+    expect(after.players.p2?.powerUses.gerrymandered['__bonus'] ?? 0).toBe(0);
+  });
+
+  it('and the honest limit: the allowance lives in `powerUses`, which a turn resets', () => {
+    // This is a real limit of the CURRENT model, not of this card, and it is the
+    // reason SUBMERGED still cannot ship in its `everyone` reading: a grant written
+    // into the next player's `powerUses` is wiped by `advanceTurn` before they act.
+    // So the loop above is necessary and NOT sufficient — see KNOWN-GAPS G9/G22,
+    // where the lasting grant belongs.
+    const after = resolveHeadline(game(), SUBMERGED);
+    expect(after.activePlayer).toBe('p2');
+    expect(after.players.p1?.powerUses.gerrymandered['__bonus'] ?? 0).toBe(1);
+    expect(after.players.p2?.powerUses.gerrymandered['__bonus'] ?? 0).toBe(0);
   });
 });
 
