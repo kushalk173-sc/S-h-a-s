@@ -72,17 +72,18 @@ const PROBES: readonly Probe[] = [
   { name: 'Cut, Copy, and Paste', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G16/G22', note: 'zone-scoped, spans two turns' },
   { name: 'Deep Thoughts', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G20', note: "borrow an opponent's powers" },
   { name: 'Deflect', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13', note: 'retargeting a partial effect' },
-  { name: 'Eradicating Germs', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'refresh-market' }], gap: 'G3/G17' },
-  { name: 'Holo Sapiens', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'dynamic price, card moves, expiry' },
-  { name: 'If You Like Pina Colada', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G4', note: 'mat-wide doubling with a cap check' },
-  { name: 'Lab-Grown Earworm', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G14', note: "trigger on ANOTHER player's purchase" },
-  { name: 'Power Trip', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G14', note: 'trigger' },
+  { name: 'Eradicating Germs', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'refresh-market', until: 'rest-of-game' }], gap: 'G3', note: 'the RECURRING obligation — "discard an open Voter Card every turn (mandatory)" — is now installed as a standing live effect and re-applied at the top of every one of your turns; the per-card reward is dropped' },
+  { name: 'Holo Sapiens', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'dynamic price, card moves, expiry on purchase' },
+  { name: 'If You Like Pina Colada', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'gain', res: { funds: 1, clout: 1, media: 1, trust: 1 }, per: { of: 'held-of-each-resource' } }], gap: 'G4', note: 'FAITHFUL: a res of 1 in each resource multiplied by what you hold of each IS a doubling of the mat, and the cap still applies on top — the card own second sentence' },
+  { name: 'Lab-Grown Earworm', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'steal-any', n: 1, when: 'on-voter-influenced', until: 'rest-of-game' }], gap: 'G1', note: 'NOT FAITHFUL, and named: the chosen-opponent binding is G1, so the hook fires on ANY influence including your own and the thief picks the victim. STRICTLY STRONGER than the printed card — this would need a ruling before it ships' },
+  { name: 'Power Trip', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'discard-voter', n: 1, target: 'each-opponent', when: 'on-voter-influenced', until: 'rest-of-game', condition: { byOwner: true, influencedVotersAtLeast: 3 } }], gap: 'G14', note: 'dropped: "non-majority" — the engine reach here is any peg a victim owns. Otherwise faithful, and slightly WEAKER, because each opponent chooses which of their own' },
   { name: 'Quantum Wristband', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13/G14', note: 'auction of 3 headlines, IOU bids' },
   { name: 'Selective Access Memory', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'draw-conspiracy', n: 1, from: 'discard' }], gap: 'G17', note: 'top of the discard pile only; "any order" needs a new Choice kind' },
   { name: 'Singularity', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'voters', n: 2 }], gap: 'G6' },
   { name: 'The Greta Effect', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G14', note: 'persistent payout debuff, N-target' },
   { name: 'The Psychohistorian', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'draw-conspiracy', n: 2 }], gap: 'G7/G19' },
-  { name: 'Thoughts and Prayers', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G4', note: 'scales off an opponent board pegs' },
+  { name: 'Thoughts and Prayers', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G4', note: '"for EACH of THEIR voters" needs the read and the payout aimed at different players; there is no field that separates them' },
+
 
   // ── India Conspiracy Cards, REF §4.2.2 ───────────────────────────────────
   { name: 'Chai-Paani', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'unknown', note: 'base effect never recovered' },
@@ -90,10 +91,11 @@ const PROBES: readonly Probe[] = [
   { name: 'Cult-ivating Obedience', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'G-new/G20', note: 'convert own voters, transfer a card' },
 
   // ── Headline Cards, all campaigns, REF §4.1 ───────────────────────────────
-  { name: 'GREAT LEADER, BAD ECONOMY', ref: '4.1', kind: 'headline', reduction: null, gap: 'G9/G14', note: 'rest-of-game trigger on another player' },
-  { name: 'DOSTI BANI RAHE', ref: '4.1', kind: 'headline', reduction: null, gap: 'G15/G22', note: "your power read on their turn" },
+  { name: 'GREAT LEADER, BAD ECONOMY', ref: '4.1', kind: 'headline', reduction: null, gap: 'G1/G14', note: 'the beneficiary is "the player after you", which is seat-relative; giving it to every opponent instead would be far stronger' },
+  { name: 'DOSTI BANI RAHE', ref: '4.1', kind: 'headline', reduction: null, gap: 'G15/G22', note: '"in THEIR next turn they may use your rights" needs a turn trigger that fires on a seat other than the owner, and one named opponent' },
   { name: 'KHAKI TERROR', ref: '4.1', kind: 'headline', reduction: [{ op: 'lose', res: { funds: 1, clout: 1, media: 1, trust: 1 } }], gap: 'G5/G10' },
-  { name: 'GROWING DISSENT', ref: '4.1', kind: 'headline', reduction: null, gap: 'G9/G14', note: 'rest-of-game trigger' },
+  { name: 'GROWING DISSENT', ref: '4.1', kind: 'headline', reduction: [{ op: 'voters', n: 1, when: 'on-gerrymander', until: 'round', condition: { movedMyVoter: true } }], gap: 'G9/G14', note: 'FAITHFUL: "starting this turn, for 1 round" is the round lifetime, and movedMyVoter is "any opponent Gerrymanders your voters". Dropped: "gained voters are placed immediately" — the engine grants them to your mat, so you place them' },
+
   { name: 'A CALL FROM KARACHI', ref: '4.1', kind: 'headline', reduction: null, gap: 'G13/G17/G20', note: 'auction, deck search, card moving' },
   { name: 'STAY IN YOUR LIMITS', ref: '4.1', kind: 'headline', reduction: null, gap: 'G18/G2', note: '"converts 2 voters of the player to their LEFT" — directional seat targeting, plus a conditional bonus' },
   { name: 'POLO RETREAT', ref: '4.1', kind: 'headline', reduction: null, gap: 'G20', note: "borrow another player's L3 powers" },
@@ -342,6 +344,14 @@ function opening(): GameState {
  *  - `_headlineDraw`, which is drained by the QUEUE, not by any effect. There is no
  *    op that draws a Headline -- that is exactly why Fuelling The News is G17 -- so
  *    including it would report every headline probe as having done something.
+ *
+ * INCLUDED, and this is the interesting one: `liveEffects`. A lasting clause does
+ * nothing to the pools, the mat or the board on the turn it resolves -- it writes a
+ * `GameState.liveEffects` entry and starts acting at the next turn boundary or the
+ * next matching event. Without the list in the fingerprint, every `duration`,
+ * `until` and `when` card would be reported as "played, NO-OP", which is the one
+ * wrong answer a playability measurement must never give: it would read as a
+ * capability that does not exist.
  */
 function fingerprint(s: GameState): string {
   return JSON.stringify({
@@ -352,6 +362,7 @@ function fingerprint(s: GameState): string {
     manifestoCards: s.turnOrder.map((id) => s.players[id]?.manifestoCards),
     gerrymandered: s.turnOrder.map((id) => s.players[id]?.powerUses.gerrymandered),
     helpingHands: s.turnOrder.map((id) => s.players[id]?.powerUses.helpingHands),
+    liveEffects: s.liveEffects,
     pegs: s.zones.flatMap((z) => z.areas).map((a) => (a.peg ? `${a.id}:${a.peg.owner}` : null)),
     market: s.market.map((m) => m.cardId),
     draw: { i: s._ideologyDraw, v: s._voterDraw, c: s._conspiracyDraw },
