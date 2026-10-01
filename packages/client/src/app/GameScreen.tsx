@@ -95,6 +95,7 @@ import {
   gerrymanderRefusal,
   lockedZoneFor,
   placementRefusal,
+  requiredPicks,
   rightsZones,
   targetableAreas,
   toBoardState,
@@ -176,11 +177,11 @@ export function GameScreen({ store }: GameScreenProps) {
           c.choice.kind === 'convert-voter'),
     );
     if (owedAreaChoice !== undefined) {
-      const kind = owedAreaChoice.choice.kind;
-      const legal =
-        kind === 'evict-voter' || kind === 'discard-voter' || kind === 'convert-voter'
-          ? targetableAreas(state, you as PlayerID, kind)
-          : new Set<string>();
+      const oc = owedAreaChoice.choice;
+      if (oc.kind !== 'evict-voter' && oc.kind !== 'discard-voter' && oc.kind !== 'convert-voter') {
+        return IDLE_INTERACTION;
+      }
+      const legal = targetableAreas(state, you as PlayerID, oc.kind, oc.scope);
       return {
         mode: 'place',
         pickedAreaIds: app.toughLovePicks.filter((id) => legal.has(id)),
@@ -254,7 +255,7 @@ export function GameScreen({ store }: GameScreenProps) {
       if (owedAreaChoice !== undefined && you !== null) {
         const kind = owedAreaChoice.choice.kind;
         if (kind !== 'evict-voter' && kind !== 'discard-voter' && kind !== 'convert-voter') return;
-        const legal = targetableAreas(state, you, kind);
+        const legal = targetableAreas(state, you, kind, owedAreaChoice.choice.scope);
         if (!legal.has(areaId)) {
           setRefusal('that voter cannot be chosen — Volatile-Area voters are permanent');
           return;
@@ -263,8 +264,16 @@ export function GameScreen({ store }: GameScreenProps) {
           removeToughLovePick();
           return;
         }
-        if (app.toughLovePicks.length >= owedAreaChoice.choice.count) {
-          setRefusal(`you may only choose ${owedAreaChoice.choice.count}`);
+        /* The cap is the DERIVED ask, not the card's nominal count.
+         *
+         * `ChoiceResolver`'s confirm is `picked.length === requiredPicks(...)`, and
+         * `requiredPicks` is `min(count, targetable)`. A board that capped at the
+         * nominal count while the dialog demanded the derived one let a player
+         * collect picks the confirm would then refuse, and — the same failure
+         * again — no amount of clicking would clear it. One number, derived once. */
+        const ask = requiredPicks(owedAreaChoice.choice, state, you);
+        if (app.toughLovePicks.length >= ask) {
+          setRefusal(`you may only choose ${ask}`);
           return;
         }
         addToughLovePick(areaId);

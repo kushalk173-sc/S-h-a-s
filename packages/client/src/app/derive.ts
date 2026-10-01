@@ -33,6 +33,7 @@ import type {
   AreaID,
   Choice,
   ChoicePick,
+  ChoiceScope,
   ClientState,
   Delta,
   MarketSlot,
@@ -393,10 +394,33 @@ export function choiceReason(choice: Choice): string {
 /**
  * How many picks this choice actually needs.
  *
- * `Math.min(count, …)` in every case, and it is not a cosmetic clamp: the engine
- * caps the ask at what is actually available (`resolveChoice` uses the same
- * `Math.min`), so a UI that demands the uncapped number shows a player a
- * requirement the server will never accept.
+ * `Math.min(count, …)` in every case where the engine does the same clamp, and it
+ * is not a cosmetic clamp: the engine caps the ask at what is actually available
+ * (`resolveChoice` uses the same `Math.min`), so a UI that demands the uncapped
+ * number shows a player a requirement the server will never accept.
+ *
+ * PER KIND, AND WHY EACH IS SATISFIABLE — the property that keeps a dialog from
+ * ever being a dead end:
+ *
+ *   `gain-any`      `count`, uncapped. The engine checks only that the signed
+ *                   total EQUALS `count`; there is no `canAfford`, because a
+ *                   resource you are about to be handed is not one you must
+ *                   already own. A pick of any composition of `count` is
+ *                   therefore always legal — including for a player holding
+ *                   0/0/0/0, which is the case that used to dead-end the UI.
+ *   `lose-any`      `count`, uncapped, and the engine then requires
+ *                   `canAfford`. That is only safe because the engine never asks
+ *                   for more than is held: `applyEffect` clamps to
+ *                   `min(effect.n, held)` and skips the ask at 0, and
+ *                   `enforceCap` asks `poolTotal - cap`. So `count <= held`
+ *                   always holds, and a discard of `count` is always payable.
+ *   `steal-any`     `min(count, victim's total)` when the victim is fixed, the
+ *                   nominal `count` when the thief picks one. In the latter case
+ *                   the number is recomputed per victim against that victim's own
+ *                   pool, and a victim holding nothing yields 0 — which the engine
+ *                   accepts as an empty pick. Never unsatisfiable; sometimes free.
+ *   the three       `min(count, targetable)`, and 0 targets is resolvable because
+ *   voter kinds     the engine accepts an EMPTY `areaIds` list for a zero ask.
  */
 export function requiredPicks(
   choice: Choice,
@@ -414,31 +438,50 @@ export function requiredPicks(
       return v === undefined ? 0 : Math.min(choice.count, poolTotal(v.resources));
     }
     case 'evict-voter':
-      return Math.min(choice.count, targetableCount(state, player, 'evict-voter'));
     case 'discard-voter':
     case 'convert-voter':
-      return Math.min(choice.count, targetableCount(state, player, choice.kind));
+      return Math.min(choice.count, targetableCount(state, player, choice.kind, choice.scope));
   }
 }
 
 /**
  * How many areas a voter-targeting choice may legally name.
  *
- * Mirrors `reduce.ts:targetableCount`: a peg in a non-Volatile Area, and for
- * `discard-voter` / `convert-voter` NOT one of yours (the engine rejects your
- * own with "that targets an opponent"). Getting this wrong produces a picker
- * the engine refuses, so it is derived rather than trusted from the choice.
+ * Mirrors `reduce.ts:targetableCount` — INCLUDING ITS `scope`, which is the whole
+ * point and was a second instance of the dead-dialog bug.
+ *
+ * The engine's count is a function of three things: the peg is real, it is not in
+ * a Volatile Area, and it is on the correct SIDE OF `scope`. `'own'` counts only
+ * the chooser's pegs, `'others'` only opponents', `'any'` everything; and
+ * `convert-voter` never counts the chooser's own, because converting a voter to
+ * yourself is not a conversion.
+ *
+ * This function used to hardcode "everything, except yours for discard and
+ * convert", which is correct for exactly one of the three scopes. So for a choice
+ * with `scope: 'own'` — which `raiseVoterDecision` produces for every player a
+ * card NAMES as its victim — the client offered, and demanded, a pick count drawn
+ * from a SET THE ENGINE WILL REJECT. A player asked to "evict 2 of your own
+ * voters" while holding one non-volatile peg of their own was shown every peg on
+ * the board, told to choose 2, and could not: the engine's `wanted` was
+ * `min(2, ownPegs = 1) = 1`, the confirm demanded 2, and no sequence of clicks
+ * could ever satisfy it. Identical deadlock, different cause.
+ *
+ * The mirror is kept honest by `choiceResolver.test.tsx`, which drives the engine's
+ * own count alongside this one.
  */
 export function targetableCount(
   state: ClientState,
   player: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  scope: ChoiceScope,
 ): number {
   let n = 0;
   for (const z of state.zones) {
     for (const a of z.areas) {
       if (a.peg === null || a.volatile) continue;
-      if (kind !== 'evict-voter' && a.peg.owner === player) continue;
+      if (scope === 'own' && a.peg.owner !== player) continue;
+      if (scope === 'others' && a.peg.owner === player) continue;
+      if (kind === 'convert-voter' && a.peg.owner === player) continue;
       n += 1;
     }
   }
@@ -450,12 +493,15 @@ export function targetableAreas(
   state: ClientState,
   player: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  scope: ChoiceScope,
 ): ReadonlySet<string> {
   const out = new Set<string>();
   for (const z of state.zones) {
     for (const a of z.areas) {
       if (a.peg === null || a.volatile) continue;
-      if (kind !== 'evict-voter' && a.peg.owner === player) continue;
+      if (scope === 'own' && a.peg.owner !== player) continue;
+      if (scope === 'others' && a.peg.owner === player) continue;
+      if (kind === 'convert-voter' && a.peg.owner === player) continue;
       out.add(a.id);
     }
   }
