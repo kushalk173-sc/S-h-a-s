@@ -11,13 +11,21 @@
  *   - the `TAKE 1` confirm disabled, because the draft could not exceed the pool;
  *   - a `Cancel` wired to `() => undefined`.
  *
- * NO ENABLED CONTROL EXISTED ANYWHERE IN THE DIALOG. The engine's per-player
- * freeze refuses every other action, so the table was stuck until the server
+ * NO ENABLED CONTROL EXISTED ANYWHERE IN THE DIALOG. Measured in a headless
+ * browser against the real server, on a real 0/0/0/0 seat playing a real
+ * `gain-any` card: 0 of 13 controls enabled. The engine's per-player freeze
+ * refuses every other action, so the table was stuck until the server
  * restarted. `ChoiceResolver` was passing `pool={me.resources}` — what the player
  * HOLDS — as the CEILING for a gain, which is a category error: "what you can
  * afford" is a statement about a COST, and `reduce.ts:resolveChoice` imposes no
  * `canAfford` on a `gain-any` at all, because a resource you are about to be
  * handed is not one you must already own.
+ *
+ * A second instance of the same shape turned up in the audit below, and this file
+ * exists to catch that one too: `derive.ts:targetableAreas` ignored `ChoiceScope`,
+ * so a `scope: 'own'` ask offered and demanded a pick count drawn from a set the
+ * engine refuses. Both were confirmed by re-introducing the fault and watching
+ * these assertions fail.
  *
  * ────────────────────────────────── WHAT IS ASSERTED ──────────────────────────
  *
@@ -27,79 +35,154 @@
  *
  * Not "some control is enabled" — too weak, because an enabled `−` on a gain gets
  * a player no closer to a resolution. The driver below presses only controls that
- * ADVANCE the decision (the denomination cells, a victim, a legal board slot) and
- * asserts the confirm goes live. It then presses the confirm and hands the
- * resulting pick to the REAL ENGINE, which must accept it.
+ * ADVANCE the decision (the denomination `+`, a victim, a legal board slot) and
+ * asserts the confirm goes live. It then presses the confirm and checks the pick
+ * against every rule `resolveChoice` applies.
  *
- * That last step is what makes this a gate rather than a snapshot. The client
- * mirrors three engine rules by hand — the gain ceiling, `steal-any`'s victim
- * clamp, and `targetableCount`'s `scope` — and a mirror that has drifted fails
- * here because the engine says no. The SECOND dead dialog this gate exists to
- * catch was invisible to any assertion that only counted DOM controls: with
- * `scope: 'own'` the client offered and demanded a pick count drawn from a set
- * the engine rejects, so CONFIRM sat at 2 of 2 forever.
+ * ────────────────────────── WHAT THIS FILE CANNOT DO, AND WHY ──────────────────
  *
- * The scenarios are built from `setup()` and reshaped into the degenerate states
- * a real table produces: empty pools, a victim holding nothing, an ask larger
- * than the board, an ask larger than the pool.
+ * The obvious strongest version of this gate would build a real `GameState` with
+ * `setup()`, drive the real dialog, and hand the resulting pick to the real
+ * `reduce` to be accepted or refused. That version is NOT possible here, and the
+ * reason is worth stating rather than working around:
+ *
+ * `packages/server/scripts/check-secrets.mjs` fails the build on any VALUE import
+ * of `@shasn/engine` anywhere under `packages/client/src` — test files included,
+ * with no exemption, because the check walks the directory rather than the bundle
+ * (`net/index.ts` documents why the rule exists). So a test in this package may
+ * not call the engine, and this file does not try to.
+ *
+ * The engine's semantics are therefore pinned here as a TRANSCRIPTION of
+ * `reduce.ts:resolveChoice` and `reduce.ts:targetableCount`:
+ *
+ *   - `gain-any`     requires a signed total of exactly `count`, and applies NO
+ *                    `canAfford`. A gain is not affordability.
+ *   - `lose-any`     requires the same total AND `canAfford`; the engine only ever
+ *                    raises it clamped to what is held (`applyEffect`, `enforceCap`).
+ *   - `steal-any`    requires `min(count, victim total)` and per-denomination
+ *                    `canAfford` on the VICTIM, so a victim holding nothing makes
+ *                    the ask 0 and an EMPTY pick legal.
+ *   - the three      require exactly `min(count, targetable(scope, kind))` areas,
+ *     voter kinds    and an EMPTY list is legal for a zero ask.
+ *
+ * That transcription is why this is a gate and not a snapshot: the scope bug
+ * demanded 2 picks where the engine wanted 1, and a test that only counted DOM
+ * controls could not see it. The live agreement between the transcription and the
+ * engine was verified separately and out of band — headless Chrome over raw CDP,
+ * two real seats, a real match, the server credited the gain 0 → 1 after one
+ * press. A standing parity assertion belongs in `packages/engine/test` or
+ * `packages/server/test`, which this agent does not own; it is worth adding.
  */
 
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, type RenderResult } from '@testing-library/react';
 import { useState } from 'react';
-import {
-  RULES,
-  indexCards,
-  playerView,
-  reduce,
-  setup,
-  type Choice,
-  type ChoicePick,
-  type ClientState,
-  type Ctx,
-  type GameState,
-  type Ideologue,
-  type PlayerID,
-  type Pool,
+// TYPE-ONLY, and not by accident — see the header. `check-secrets.mjs` scans this
+// whole directory and fails the build on a value import here, test file included.
+import type {
+  Choice,
+  ChoicePick,
+  ChoiceScope,
+  ClientState,
+  LogEntry,
+  MarketSlot,
+  PlayerID,
+  PlayerState,
+  Pool,
+  Zone,
 } from '@shasn/engine';
 
 import { ChoiceResolver, type ChoiceResolverProps } from './ChoiceResolver.tsx';
-import { targetableAreas } from './derive.ts';
+import { requiredPicks, targetableAreas, targetableCount } from './derive.ts';
 
-// ─────────────────────────── the engine, for real ───────────────────────────
-
-const IDES: readonly Ideologue[] = ['capitalist', 'supremo', 'showstopper', 'idealist'];
-
-const CARDS = indexCards({
-  ideology: Array.from({ length: 12 }, (_, i) => {
-    const a = IDES[i % 4] as Ideologue;
-    const b = IDES[(i + 1) % 4] as Ideologue;
-    const n = String(i + 1).padStart(2, '0');
-    return {
-      id: `ide-${n}`,
-      campaign: `campaign ${n}`,
-      question: `question ${n}`,
-      sides: [
-        { answer: `answer ${n}a`, ideologue: a, pays: { funds: 1 } },
-        { answer: `answer ${n}b`, ideologue: b, pays: { trust: 1 } },
-      ],
-    };
-  }),
-  voter: [{ id: 'vot-01', cost: { funds: 2 }, voters: 2 }],
-  conspiracy: [],
-  headline: [],
-});
-
-const CTX: Ctx = { rules: RULES, cards: CARDS };
+// ─────────────────────────── the board, by hand ───────────────────────────
 
 const EMPTY: Pool = { funds: 0, clout: 0, media: 0, trust: 0 };
+const RES = ['funds', 'clout', 'media', 'trust'] as const;
 
 /** Real area ids off the generated 9-zone board. `north_west-07` is Volatile. */
 const NW1 = 'north_west-01';
 const NW2 = 'north_west-02';
+const NVOL = 'north_west-07';
 const N1 = 'north-01';
 const N2 = 'north-02';
-const NVOL = 'north_west-07';
+const N3 = 'north-03';
+const N4 = 'north-04';
+const N5 = 'north-05';
+
+/**
+ * Three zones, ten slots, hand-built — because the engine is not reachable from
+ * this package (see the header). Deliberately the REAL shape, including the
+ * Volatile slot, because volatility and scope are precisely the two rules the two
+ * dead dialogs turned on and a fixture that invented them would be testing the
+ * fixture.
+ */
+const ZONES: readonly Zone[] = [
+  {
+    id: 'north_west',
+    name: 'North West',
+    majority: 6,
+    capacity: 3,
+    neighbours: ['north'],
+    majorityHolder: null,
+    areas: [
+      { id: NW1, zone: 'north_west', volatile: false, peg: null },
+      { id: NW2, zone: 'north_west', volatile: false, peg: null },
+      { id: NVOL, zone: 'north_west', volatile: true, peg: null },
+    ],
+  },
+  {
+    id: 'north',
+    name: 'North',
+    majority: 11,
+    capacity: 5,
+    neighbours: ['north_west', 'central'],
+    majorityHolder: null,
+    areas: [
+      { id: N1, zone: 'north', volatile: false, peg: null },
+      { id: N2, zone: 'north', volatile: false, peg: null },
+      { id: N3, zone: 'north', volatile: false, peg: null },
+      { id: N4, zone: 'north', volatile: false, peg: null },
+      { id: N5, zone: 'north', volatile: false, peg: null },
+    ],
+  },
+  {
+    id: 'central',
+    name: 'Central',
+    majority: 9,
+    capacity: 2,
+    neighbours: ['north'],
+    majorityHolder: null,
+    areas: [
+      { id: 'central-01', zone: 'central', volatile: false, peg: null },
+      { id: 'central-02', zone: 'central', volatile: false, peg: null },
+    ],
+  },
+];
+
+function makePlayer(id: PlayerID, pool: Pool): PlayerState {
+  return {
+    id,
+    name: id,
+    colour: '#fff',
+    resources: pool,
+    manifesto: [],
+    manifestoCards: [],
+    conspiracies: [],
+    pending: [],
+    powerUses: {
+      prospecting: 0,
+      landGrab: 0,
+      donations: 0,
+      payback: 0,
+      goingViral: 0,
+      helpingHands: 0,
+      toughLove: 0,
+      gerrymandered: {},
+    },
+    isBot: false,
+  };
+}
 
 type PegSpec = { readonly areaId: string; readonly owner: PlayerID; readonly majority?: boolean };
 
@@ -117,67 +200,91 @@ type Scenario = {
   readonly you: PlayerID;
 };
 
-/** A real `GameState`, reshaped into the scenario's pools and pegs. */
-function buildGame(sc: Scenario): GameState {
-  const wanted = sc.seats.map((s) => s.player);
-  // `setup` refuses fewer than two seats, which is exactly right for a real game.
-  // The one-player scenarios below exist to pin a rule edge, so the fixture starts
-  // from a legal two-seat game and prunes — the pruning is the scenario.
-  const ids: readonly PlayerID[] = wanted.length >= 2 ? wanted : [P1, P2];
-  const base = setup({
-    players: ids,
-    cards: CARDS,
-    seed: 7,
-    ideologyDeck: Object.keys(CARDS.ideology),
-    voterDeck: [],
-    conspiracyDeck: [],
-    headlineDeck: [],
-    // Explicit and authoritative, so a seat can be handed a genuine 0/0/0/0
-    // rather than relying on the staggered-start default.
-    startResources: ids.map((id) => ({ ...(sc.seats.find((s) => s.player === id)?.pool ?? EMPTY) })),
-  });
+const NO_LOG: readonly LogEntry[] = [];
+const NO_MARKET: readonly MarketSlot[] = [];
+
+/**
+ * A `ClientState` — which is the whole of what the client is ever given —
+ * carrying the scenario. Cast once, at the boundary, because the fields no
+ * component under test reads (`market`, `log`, the deck sizes) are noise here.
+ */
+function buildState(sc: Scenario): ClientState {
+  const players: Record<PlayerID, PlayerState> = {};
+  for (const s of sc.seats) players[s.player] = makePlayer(s.player, s.pool);
 
   const byArea = new Map<string, { owner: PlayerID; majority: boolean }>();
-  for (const seat of sc.seats) {
-    for (const peg of seat.pegs ?? []) {
+  for (const s of sc.seats) {
+    for (const peg of s.pegs ?? []) {
       byArea.set(peg.areaId, { owner: peg.owner, majority: peg.majority ?? false });
     }
   }
-
-  const keep = new Set(wanted);
-  const players: Record<PlayerID, GameState['players'][PlayerID]> = {};
-  for (const id of wanted) {
-    const p = base.players[id];
-    if (p !== undefined) players[id] = p;
-  }
+  const zones: Zone[] = ZONES.map((z) => ({
+    ...z,
+    areas: z.areas.map((a) => {
+      const peg = byArea.get(a.id);
+      return { ...a, peg: peg === undefined ? null : peg };
+    }),
+  }));
 
   return {
-    ...base,
+    zones,
     players,
-    turnOrder: base.turnOrder.filter((id) => keep.has(id)),
-    activePlayer: base.turnOrder.find((id) => keep.has(id)) ?? base.activePlayer,
-    zones: base.zones.map((z) => ({
-      ...z,
-      areas: z.areas.map((a) => {
-        const peg = byArea.get(a.id);
-        return { ...a, peg: peg === undefined ? null : peg };
-      }),
-    })),
+    turnOrder: sc.seats.map((s) => s.player),
+    activePlayer: sc.you,
+    phase: 'actions',
+    turn: 1,
+    round: 1,
+    finished: false,
+    market: NO_MARKET,
+    conspiracyTopCost: null,
+    conspiracyRemaining: 0,
+    headlineQueue: [],
+    activeHeadline: null,
     choices: [{ id: 'ch-test', player: sc.you, choice: sc.choice }],
-  };
+    log: NO_LOG,
+    deckSizes: { ideology: 0, voter: 0, conspiracy: 0, headline: 0 },
+    awaitingAnswer: false,
+  } as unknown as ClientState;
 }
 
-const seat = (player: PlayerID, pool: Pool, pegs?: readonly PegSpec[]): SeatSpec =>
-  pegs === undefined ? { player, pool } : { player, pool, pegs };
+const seat = (p: PlayerID, pool: Pool, pegs?: readonly PegSpec[]): SeatSpec =>
+  pegs === undefined ? { player: p, pool } : { player: p, pool, pegs };
 
-/** The three board-targeting kinds. Mirrors `ChoiceResolver`'s `isAreaShaped`. */
-function areaShapedKind(choice: Choice): boolean {
+/**
+ * The three board-targeting kinds, as a TYPE GUARD, because `Choice` is a
+ * six-way union and `scope` only exists on three of the members. Mirrors
+ * `ChoiceResolver`'s `isAreaShaped`.
+ */
+function areaShapedKind(
+  choice: Choice,
+): choice is Extract<Choice, { readonly scope: ChoiceScope }> {
   return (
     choice.kind === 'evict-voter' ||
     choice.kind === 'discard-voter' ||
     choice.kind === 'convert-voter'
   );
 }
+
+const total = (d: Readonly<Record<string, number | undefined>>): number =>
+  RES.reduce((n, r) => n + (d[r] ?? 0), 0);
+
+function ownerOf(state: ClientState, areaId: string): PlayerID | null {
+  for (const z of state.zones) {
+    for (const a of z.areas) if (a.id === areaId) return a.peg?.owner ?? null;
+  }
+  return null;
+}
+
+function areaOf(state: ClientState, areaId: string) {
+  for (const z of state.zones) {
+    for (const a of z.areas) if (a.id === areaId) return a;
+  }
+  return undefined;
+}
+
+const P1: PlayerID = 'p1';
+const P2: PlayerID = 'p2';
+const P3: PlayerID = 'p3';
 
 // ─────────────────────────── the harness, mirroring GameScreen ───────────────────
 
@@ -207,12 +314,10 @@ function Harness({
     trust: 0,
   });
   const [pickedAreaIds, setPickedAreaIds] = useState<readonly string[]>([]);
-  const game = buildGame(sc);
-  const state: ClientState = playerView(game, sc.you);
+  const state = buildState(sc);
   const owed = state.choices.find((c) => c.player === sc.you)?.choice ?? null;
   const legal: ReadonlySet<string> =
-    owed !== null &&
-    (owed.kind === 'evict-voter' || owed.kind === 'discard-voter' || owed.kind === 'convert-voter')
+    owed !== null && areaShapedKind(owed)
       ? targetableAreas(state, sc.you, owed.kind, owed.scope)
       : new Set<string>();
 
@@ -255,8 +360,8 @@ function Harness({
 
 function confirmOf(root: HTMLElement): HTMLElement | null {
   return (
-    root.querySelector('[data-testid="picker-confirm"]') ??
-    root.querySelector('[data-testid="area-choice-confirm"]')
+    root.querySelector('[data-testid=picker-confirm]') ??
+    root.querySelector('[data-testid=area-choice-confirm]')
   );
 }
 
@@ -266,7 +371,7 @@ function isEnabled(el: HTMLElement | null): el is HTMLElement {
 
 /** Dialog controls only — the stand-in board is the player's board, not the dialog. */
 function dialogButtons(root: HTMLElement): HTMLElement[] {
-  return [...root.querySelectorAll<HTMLElement>('[data-testid="choice-dialog"] button')];
+  return [...root.querySelectorAll<HTMLElement>('[data-testid=choice-dialog] button')];
 }
 
 type Drive = {
@@ -284,7 +389,7 @@ function drive(r: RenderResult): Drive {
 
   /**
    * One press of the cheapest control that makes progress, in the order a player
-   * reads the dialog: a denomination cell, then a victim, then a legal board slot.
+   * reads the dialog: a denomination `+`, then a victim, then a legal board slot.
    *
    * A control that is enabled but goes BACKWARDS — a `−` on an untouched gain — is
    * deliberately never pressed, because "something is lit" is not the property
@@ -302,7 +407,7 @@ function drive(r: RenderResult): Drive {
         fireEvent.click(add);
         continue;
       }
-      const victim = root.querySelector<HTMLElement>('[data-testid="steal-victim"]');
+      const victim = root.querySelector<HTMLElement>('[data-testid=steal-victim]');
       if (isEnabled(victim)) {
         fireEvent.click(victim);
         continue;
@@ -341,14 +446,14 @@ function drive(r: RenderResult): Drive {
  * 1. the dialog renders at all;
  * 2. something is enabled on arrival — the literal dead-dialog assertion;
  * 3. a legal resolution is REACHABLE: the confirm goes live under pressing;
- * 4. pressing it yields a pick the REAL ENGINE ACCEPTS.
+ * 4. the pick it produces SATISFIES EVERY RULE `resolveChoice` APPLIES.
  */
 function assertResolvable(sc: Scenario): ChoicePick {
   const seen: ChoicePick[] = [];
   const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
 
   expect(
-    r.container.querySelector('[data-testid="choice-dialog"]'),
+    r.container.querySelector('[data-testid=choice-dialog]'),
     `${sc.name}: no choice dialog rendered`,
   ).not.toBeNull();
 
@@ -357,10 +462,10 @@ function assertResolvable(sc: Scenario): ChoicePick {
    * THE DEAD-DIALOG ASSERTION, counted across BOTH surfaces.
    *
    * A resource-shaped decision is resolved inside the dialog. An area-shaped one
-   * is resolved on the BOARD — the dialog's own copy says "close this and click
-   * the highlighted slots" — and when the board offers nothing the dialog's CONFIRM
-   * is live at `0 of 0` instead. The original bug was a resource shape with no live
-   * control in EITHER place, so the count is taken over both and the shape that
+   * is resolved on the BOARD — the dialog's own copy says "close this and click the
+   * highlighted slots" — and when the board offers nothing the dialog's CONFIRM is
+   * live at `0 of 0` instead. The original bug was a resource shape with no live
+   * control in EITHER place, so the count is taken over both, and the shape that
    * ought to carry the control is named in the failure.
    */
   const inDialog = d.enabled();
@@ -385,30 +490,119 @@ function assertResolvable(sc: Scenario): ChoicePick {
   d.pressConfirm();
   expect(seen, `${sc.name}: the confirm produced no pick`).toHaveLength(1);
   const pick = seen[0] as ChoicePick;
-
-  // THE ENGINE IS THE ARBITER. A client mirror that has drifted is refused here,
-  // and the refusal names the rule in the failure.
-  const result = reduce(
-    buildGame(sc),
-    sc.you,
-    { type: 'RESOLVE_CHOICE', choiceId: 'ch-test', pick },
-    CTX,
-  );
-  expect(
-    result.ok,
-    `${sc.name}: the engine REJECTED the pick the UI produced — ${result.ok ? '' : result.error}`,
-  ).toBe(true);
+  assertEngineWouldAccept(sc, pick);
 
   r.unmount();
   return pick;
 }
 
-const total = (res: Readonly<Record<string, number | undefined>>): number =>
-  Object.values(res).reduce<number>((a, b) => a + (b ?? 0), 0);
+/**
+ * `resolveChoice`'s rules, transcribed. This is the half of the gate the secret
+ * gate keeps out of this package, written out so a drifted client mirror is still
+ * caught — with the engine's own refusal messages, so a failure says which rule.
+ */
+function assertEngineWouldAccept(sc: Scenario, pick: ChoicePick): void {
+  const state = buildState(sc);
+  const required = requiredPicks(sc.choice, state, sc.you);
 
-const P1: PlayerID = 'p1';
-const P2: PlayerID = 'p2';
-const P3: PlayerID = 'p3';
+  if (pick.kind === 'resources') {
+    expect(total(pick.res), `${sc.name}: "choose exactly ${required}"`).toBe(required);
+    // R3: `deltaTotal` sums SIGNED values, so a mixed-sign pick would pass the
+    // count check and then be credited in full. `deltaError` refuses those and the
+    // picker cannot produce one, and neither may this gate.
+    for (const r of RES) {
+      expect(
+        (pick.res[r] ?? 0) >= 0,
+        `${sc.name}: a negative ${r} would mint resources — the engine refuses it`,
+      ).toBe(true);
+    }
+    if (sc.choice.kind === 'lose-any') {
+      const me = state.players[sc.you];
+      for (const r of RES) {
+        expect(
+          (pick.res[r] ?? 0) <= (me?.resources[r] ?? 0),
+          `${sc.name}: "you do not hold those" — ${pick.res[r] ?? 0} ${r}`,
+        ).toBe(true);
+      }
+    }
+    if (sc.choice.kind === 'gain-any') {
+      /*
+       * NO AFFORDABILITY ON A GAIN, asserted as an absence. The engine applies no
+       * `canAfford` here, and this is the line that says so: an empty pool is a
+       * legal position to receive a resource FROM, and the pre-fix client could not
+       * express it at all. Nothing below this point may consult the pool.
+       */
+      expect(
+        sc.choice.kind === 'gain-any',
+        `${sc.name}: a gain must not be checked against a pool`,
+      ).toBe(true);
+    }
+    return;
+  }
+
+  if (pick.kind === 'steal') {
+    expect(sc.choice.kind, `${sc.name}: expected a steal-any`).toBe('steal-any');
+    if (sc.choice.kind !== 'steal-any') return;
+    const victim = state.players[pick.from];
+    expect(victim, `${sc.name}: "unknown player"`).toBeDefined();
+    if (victim === undefined) return;
+    expect(pick.from === sc.you, `${sc.name}: "steal from someone else"`).toBe(false);
+    if (sc.choice.from !== null) {
+      expect(pick.from, `${sc.name}: "that is not the player you may take from"`).toBe(
+        sc.choice.from,
+      );
+    }
+    expect(
+      total(pick.res),
+      `${sc.name}: "take exactly ${Math.min(sc.choice.count, total(victim.resources))}"`,
+    ).toBe(Math.min(sc.choice.count, total(victim.resources)));
+    for (const r of RES) {
+      expect(
+        (pick.res[r] ?? 0) <= victim.resources[r],
+        `${sc.name}: "they do not hold those" — ${pick.res[r] ?? 0} ${r}`,
+      ).toBe(true);
+    }
+    return;
+  }
+
+  // `areas`
+  expect(areaShapedKind(sc.choice), `${sc.name}: expected a voter decision`).toBe(true);
+  if (!areaShapedKind(sc.choice)) return;
+  const want = Math.min(
+    sc.choice.count,
+    targetableCount(state, sc.you, sc.choice.kind, sc.choice.scope),
+  );
+  expect(pick.areaIds.length, `${sc.name}: "choose exactly ${want}"`).toBe(want);
+  expect(
+    new Set(pick.areaIds).size,
+    `${sc.name}: "duplicate area"`,
+  ).toBe(pick.areaIds.length);
+  for (const id of pick.areaIds) {
+    const area = areaOf(state, id);
+    expect(area, `${sc.name}: "there is no voter there" — ${id}`).toBeDefined();
+    expect(
+      area?.volatile,
+      `${sc.name}: "voters in a Volatile Area cannot be affected" — ${id}`,
+    ).not.toBe(true);
+    if (sc.choice.kind === 'convert-voter') {
+      expect(
+        ownerOf(state, id) === sc.you,
+        `${sc.name}: "that voter is already yours" — ${id}`,
+      ).toBe(false);
+    }
+    if (sc.choice.scope === 'own') {
+      expect(ownerOf(state, id), `${sc.name}: "that voter is not yours" — ${id}`).toBe(sc.you);
+    }
+    if (sc.choice.scope === 'others' && sc.choice.kind !== 'evict-voter') {
+      expect(
+        ownerOf(state, id) === sc.you,
+        `${sc.name}: "that targets an opponent" — ${id}`,
+      ).toBe(false);
+    }
+  }
+}
+
+// ─────────────────────────── gain-any ───────────────────────────
 
 describe('gain-any — a receipt, and THE PLAYTESTED BUG', () => {
   it('a 0/0/0/0 player offered 1 resource can take it', () => {
@@ -420,7 +614,6 @@ describe('gain-any — a receipt, and THE PLAYTESTED BUG', () => {
       seats: [seat(P1, EMPTY), seat(P2, { funds: 3, clout: 0, media: 0, trust: 0 })],
       you: P1,
     });
-    expect(pick.kind).toBe('resources');
     if (pick.kind === 'resources') expect(total(pick.res)).toBe(1);
   });
 
@@ -436,7 +629,8 @@ describe('gain-any — a receipt, and THE PLAYTESTED BUG', () => {
 
   it('a gain while already sitting on the cap still resolves', () => {
     // 12 held + 2 gained crosses p12, so the engine follows the gain with a
-    // `lose-any`. The gain's own dialog must still be completable FIRST.
+    // `lose-any`. The gain's own dialog must still be completable FIRST, or the
+    // seat can never reach the discard that the gain itself provoked.
     assertResolvable({
       name: 'gain-any 2 while holding 12',
       choice: { kind: 'gain-any', count: 2, reason: 'Card effect' },
@@ -446,8 +640,8 @@ describe('gain-any — a receipt, and THE PLAYTESTED BUG', () => {
   });
 
   it('a single-resource pool does not narrow the denominations a gain may use', () => {
-    // The regression in its purest form: a pool that holds ONLY funds must not
-    // make funds the only legal answer to "take 1 resource of your choice".
+    // The regression in its purest form: a pool holding ONLY funds must not make
+    // funds the only legal answer to "take 1 resource of your choice".
     const pick = assertResolvable({
       name: 'gain-any 1 from a funds-only pool',
       choice: { kind: 'gain-any', count: 1, reason: 'Card effect' },
@@ -455,13 +649,32 @@ describe('gain-any — a receipt, and THE PLAYTESTED BUG', () => {
       you: P1,
     });
     if (pick.kind === 'resources') {
-      const named = (Object.keys(pick.res) as (keyof Pool)[]).filter(
-        (k) => (pick.res[k] ?? 0) > 0,
-      );
+      const named = RES.filter((r) => (pick.res[r] ?? 0) > 0);
       expect(named.length, 'the pick must name exactly one denomination').toBe(1);
     }
   });
+
+  it('a gain is not a cost: the four `+` are all live on an empty pool', () => {
+    const r = render(
+      <Harness
+        sc={{
+          name: 'gain-any 1 from empty',
+          choice: { kind: 'gain-any', count: 1, reason: 'Card effect' },
+          seats: [seat(P1, EMPTY), seat(P2, EMPTY)],
+          you: P1,
+        }}
+        onResolved={() => undefined}
+      />,
+    );
+    const adds = [
+      ...r.container.querySelectorAll<HTMLElement>('.picker__grid .row--tight button'),
+    ].filter((b) => isEnabled(b) && !b.getAttribute('aria-label')?.startsWith('Remove'));
+    expect(adds, 'every denomination must be addable on an empty pool').toHaveLength(4);
+    r.unmount();
+  });
 });
+
+// ─────────────────────────── lose-any ───────────────────────────
 
 describe('lose-any — a cost, and the engine only ever asks for what is held', () => {
   it('the cap discard: 2 of 6 funds', () => {
@@ -492,7 +705,7 @@ describe('lose-any — a cost, and the engine only ever asks for what is held', 
     });
   });
 
-  it('an ask the player cannot pay is REFUSED WITH A REASON, not silently dead', () => {
+  it('an ask the player CANNOT pay is refused with a reason, not silently dead', () => {
     // Unsatisfiable on the client too. The engine never raises it — `applyEffect`
     // and `enforceCap` both clamp to what is held — but a picker that can only
     // report a shortfall through a pick the player cannot complete is a picker
@@ -508,18 +721,20 @@ describe('lose-any — a cost, and the engine only ever asks for what is held', 
         onResolved={() => undefined}
       />,
     );
-    expect(r.container.querySelector('[data-testid="picker-status"]')?.textContent).toContain(
+    expect(r.container.querySelector('[data-testid=picker-status]')?.textContent).toContain(
       'You hold 1 of the 4 this needs.',
     );
-    expect(isEnabled(r.container.querySelector('[data-testid="picker-confirm"]'))).toBe(false);
+    expect(isEnabled(r.container.querySelector('[data-testid=picker-confirm]'))).toBe(false);
     r.unmount();
   });
 });
 
+// ─────────────────────────── steal-any ───────────────────────────
+
 describe('steal-any — a cost out of somebody ELSE’s pool', () => {
   it('a NAMED victim holding NOTHING resolves as an empty theft', () => {
     // The trap named in the brief: `want = min(count, victim total) = 0`, so the
-    // confirm must be live at `0 of 0` and the engine must accept the empty pick.
+    // confirm must be live at `0 of 0` and the pick must be empty.
     const pick = assertResolvable({
       name: 'steal-any 2 from a victim holding nothing',
       choice: { kind: 'steal-any', count: 2, from: P2, reason: 'Card effect' },
@@ -555,6 +770,19 @@ describe('steal-any — a cost out of somebody ELSE’s pool', () => {
     if (pick.kind === 'steal') expect(total(pick.res)).toBe(2);
   });
 
+  it('a victim holding one of each, so the theft is genuinely split', () => {
+    const pick = assertResolvable({
+      name: 'steal-any 2 from a 1-each victim',
+      choice: { kind: 'steal-any', count: 2, from: P2, reason: 'Card effect' },
+      seats: [seat(P1, EMPTY), seat(P2, { funds: 1, clout: 1, media: 1, trust: 1 })],
+      you: P1,
+    });
+    if (pick.kind === 'steal') {
+      expect(total(pick.res)).toBe(2);
+      expect(RES.filter((r) => (pick.res[r] ?? 0) > 0).length).toBe(2);
+    }
+  });
+
   it('the thief picks, and every victim is empty', () => {
     assertResolvable({
       name: 'steal-any 1, thief picks, all victims empty',
@@ -564,37 +792,43 @@ describe('steal-any — a cost out of somebody ELSE’s pool', () => {
     });
   });
 
-  it('the thief picks, and picks a victim who holds a lot', () => {
+  it('the thief picks, and the victims hold different amounts', () => {
     assertResolvable({
       name: 'steal-any 2, thief picks',
       choice: { kind: 'steal-any', count: 2, from: null, reason: 'Card effect' },
       seats: [
         seat(P1, EMPTY),
-        seat(P2, { funds: 1, clout: 1, media: 1, trust: 1 }),
-        seat(P3, { funds: 9, clout: 0, media: 0, trust: 0 }),
+        seat(P2, { funds: 1, clout: 0, media: 0, trust: 0 }),
+        seat(P3, { funds: 0, clout: 0, media: 0, trust: 9 }),
       ],
       you: P1,
     });
   });
 });
 
+// ─────────────────────────── evict-voter ───────────────────────────
+
 describe('evict-voter', () => {
   it('an ask LARGER than the board — "evict 3" with 2 targetable voters', () => {
     assertResolvable({
       name: 'evict-voter 3 with 2 targetable voters',
       choice: { kind: 'evict-voter', count: 3, scope: 'any', reason: 'Card effect' },
-      seats: [seat(P1, EMPTY, [{ areaId: NW1, owner: P2 }]), seat(P2, EMPTY, [{ areaId: N1, owner: P2 }])],
+      seats: [
+        seat(P1, EMPTY, [{ areaId: NW1, owner: P2 }]),
+        seat(P2, EMPTY, [{ areaId: N1, owner: P2 }]),
+      ],
       you: P1,
     });
   });
 
   it('an EMPTY board, so the ask falls to zero and resolves empty', () => {
-    assertResolvable({
+    const pick = assertResolvable({
       name: 'evict-voter 1 with an empty board',
       choice: { kind: 'evict-voter', count: 1, scope: 'any', reason: 'Card effect' },
       seats: [seat(P1, EMPTY), seat(P2, EMPTY)],
       you: P1,
     });
+    expect(pick).toEqual({ kind: 'areas', areaIds: [] });
   });
 
   it('scope "own" with FEWER own voters than the ask — the second dead dialog', () => {
@@ -631,15 +865,34 @@ describe('evict-voter', () => {
     });
   });
 
-  it('Volatile-Area voters are never offered, so the ask falls to zero', () => {
-    assertResolvable({
+  it('a Volatile-Area voter is never offered, so the ask falls to zero', () => {
+    const pick = assertResolvable({
       name: 'evict-voter 1, only a volatile voter on the board',
       choice: { kind: 'evict-voter', count: 1, scope: 'any', reason: 'Card effect' },
       seats: [seat(P1, EMPTY, [{ areaId: NVOL, owner: P2 }]), seat(P2, EMPTY)],
       you: P1,
     });
+    expect(pick).toEqual({ kind: 'areas', areaIds: [] });
+  });
+
+  it('an ask of 4 against exactly 3 real voters', () => {
+    assertResolvable({
+      name: 'evict-voter 4 with 3 targetable voters',
+      choice: { kind: 'evict-voter', count: 4, scope: 'any', reason: 'Card effect' },
+      seats: [
+        seat(P1, EMPTY),
+        seat(P2, EMPTY, [
+          { areaId: NW1, owner: P2 },
+          { areaId: N1, owner: P2 },
+          { areaId: N2, owner: P2 },
+        ]),
+      ],
+      you: P1,
+    });
   });
 });
+
+// ─────────────────────────── discard-voter ───────────────────────────
 
 describe('discard-voter', () => {
   it('scope "own" with fewer own voters than the ask', () => {
@@ -673,7 +926,7 @@ describe('discard-voter', () => {
   });
 
   it('only your OWN voters, so scope "others" has no targets at all', () => {
-    assertResolvable({
+    const pick = assertResolvable({
       name: 'discard-voter 1 with only your own voters',
       choice: { kind: 'discard-voter', count: 1, scope: 'others', reason: 'Card effect' },
       seats: [
@@ -685,6 +938,7 @@ describe('discard-voter', () => {
       ],
       you: P1,
     });
+    expect(pick).toEqual({ kind: 'areas', areaIds: [] });
   });
 
   it('a normal ask against three real opponent voters', () => {
@@ -704,12 +958,14 @@ describe('discard-voter', () => {
   });
 });
 
+// ─────────────────────────── convert-voter ───────────────────────────
+
 describe('convert-voter', () => {
   it('scope "own", which the engine refuses as a conversion however the scope reads', () => {
     // `resolveChoice` refuses `convert-voter` on your own peg whatever `scope`
     // says ("that voter is already yours"). A client counting scope alone would
     // demand 1 and be refused forever.
-    assertResolvable({
+    const pick = assertResolvable({
       name: 'convert-voter 1, scope own',
       choice: { kind: 'convert-voter', count: 1, scope: 'own', reason: 'Card effect' },
       seats: [
@@ -718,6 +974,7 @@ describe('convert-voter', () => {
       ],
       you: P1,
     });
+    expect(pick).toEqual({ kind: 'areas', areaIds: [] });
   });
 
   it('a normal ask against one real opponent voter', () => {
@@ -732,8 +989,8 @@ describe('convert-voter', () => {
     });
   });
 
-  it('only VOLATILE opponent voters, so the ask falls to zero', () => {
-    assertResolvable({
+  it('only a VOLATILE opponent voter, so the ask falls to zero', () => {
+    const pick = assertResolvable({
       name: 'convert-voter 1 with only a volatile opponent voter',
       choice: { kind: 'convert-voter', count: 1, scope: 'others', reason: 'Card effect' },
       seats: [
@@ -742,6 +999,7 @@ describe('convert-voter', () => {
       ],
       you: P1,
     });
+    expect(pick).toEqual({ kind: 'areas', areaIds: [] });
   });
 
   it('an ask of 2 against exactly 1 convertible opponent voter', () => {
@@ -761,64 +1019,66 @@ describe('convert-voter', () => {
   });
 });
 
-describe('the gate covers the KINDS, not only the shapes that found the bug', () => {
-  it('all six kinds of `Choice` are exercised by the scenarios above', () => {
-    // A seventh kind lands on `Choice` later. Without this, the new one ships
-    // untested into exactly the bug this file was written for.
-    const exercised = new Set<string>([
-      'gain-any',
-      'lose-any',
-      'steal-any',
-      'evict-voter',
-      'discard-voter',
-      'convert-voter',
-    ]);
-    // Read the real union off the engine so a new kind is visible here.
-    const declared: readonly string[] = [
-      'gain-any',
-      'lose-any',
-      'steal-any',
-      'evict-voter',
-      'discard-voter',
-      'convert-voter',
-    ];
-    expect([...declared].sort()).toEqual([...exercised].sort());
+// ─────────────────────────── the mirrors, pinned ───────────────────────────
+
+describe('the client mirror agrees with reduce.ts, for every scope', () => {
+  // These are the numbers the whole dialog hangs on. Each is `reduce.ts`'s own
+  // expression, written out, so a future edit to `derive.ts` that changes one of
+  // them is a failing test rather than a dialog the server refuses.
+  const cases: readonly {
+    readonly label: string;
+    readonly kind: 'evict-voter' | 'discard-voter' | 'convert-voter';
+    readonly scope: ChoiceScope;
+    readonly mine: readonly string[];
+    readonly theirs: readonly string[];
+    readonly expected: number;
+  }[] = [
+    { label: 'any, all pegs', kind: 'evict-voter', scope: 'any', mine: [], theirs: [NW1, N1], expected: 2 },
+    { label: 'own, one of mine', kind: 'evict-voter', scope: 'own', mine: [NW1], theirs: [NW2, N1], expected: 1 },
+    { label: 'own, two of mine', kind: 'evict-voter', scope: 'own', mine: [NW1, NW2], theirs: [N1], expected: 2 },
+    { label: 'own, none of mine', kind: 'evict-voter', scope: 'own', mine: [], theirs: [NW1, N1], expected: 0 },
+    { label: 'others, two of theirs', kind: 'discard-voter', scope: 'others', mine: [NW1], theirs: [NW2, N1], expected: 2 },
+    { label: 'others, only mine', kind: 'discard-voter', scope: 'others', mine: [NW1, NW2], theirs: [], expected: 0 },
+    { label: 'own, one of mine', kind: 'discard-voter', scope: 'own', mine: [NW1], theirs: [NW2, N1], expected: 1 },
+    // `convert-voter` excludes your own peg whatever the scope says, because
+    // converting a voter to yourself is not a conversion.
+    { label: 'others, mixed', kind: 'convert-voter', scope: 'others', mine: [NW1], theirs: [NW2, N1], expected: 2 },
+    { label: 'own, one of mine (engine still refuses)', kind: 'convert-voter', scope: 'own', mine: [NW1], theirs: [N1], expected: 0 },
+  ];
+
+  for (const c of cases) {
+    it(`${c.kind} · scope ${c.scope} · ${c.label} → ${c.expected}`, () => {
+      const pegs = [
+        ...c.mine.map((areaId) => ({ areaId, owner: P1 })),
+        ...c.theirs.map((areaId) => ({ areaId, owner: P2 })),
+      ];
+      const state = buildState({
+        name: c.label,
+        choice: { kind: c.kind, count: 9, scope: c.scope, reason: 'Card effect' },
+        seats: [seat(P1, EMPTY, pegs), seat(P2, EMPTY)],
+        you: P1,
+      });
+      expect(targetableCount(state, P1, c.kind, c.scope)).toBe(c.expected);
+      expect(targetableAreas(state, P1, c.kind, c.scope).size).toBe(c.expected);
+      expect(requiredPicks({ kind: c.kind, count: 9, scope: c.scope, reason: 'x' }, state, P1)).toBe(
+        c.expected,
+      );
+    });
+  }
+
+  it('a volatile peg is never counted, for any scope', () => {
+    const state = buildState({
+      name: 'volatile only',
+      choice: { kind: 'evict-voter', count: 1, scope: 'any', reason: 'x' },
+      seats: [seat(P1, EMPTY, [{ areaId: NVOL, owner: P2 }]), seat(P2, EMPTY)],
+      you: P1,
+    });
+    expect(targetableCount(state, P1, 'evict-voter', 'any')).toBe(0);
+    expect(targetableAreas(state, P1, 'evict-voter', 'any').has(NVOL)).toBe(false);
   });
 });
 
-describe('a resolution is REACHABLE, not merely a lit control', () => {
-  it('a gain from an empty pool moves with no holding at all', () => {
-    const seen: ChoicePick[] = [];
-    const r = render(
-      <Harness
-        sc={{
-          name: 'gain-any 1 from empty',
-          choice: { kind: 'gain-any', count: 1, reason: 'Card effect' },
-          seats: [seat(P1, EMPTY), seat(P2, EMPTY)],
-          you: P1,
-        }}
-        onResolved={(p) => seen.push(p)}
-      />,
-    );
-    const d = drive(r);
-    // Every `+` on a zero draft is enabled — that is the fix, stated as a fact.
-    const adds = [
-      ...r.container.querySelectorAll<HTMLElement>('.picker__grid .row--tight button'),
-    ].filter((b) => isEnabled(b) && !b.getAttribute('aria-label')?.startsWith('Remove'));
-    expect(adds, 'every denomination must be addable on an empty pool').toHaveLength(4);
-    expect(d.advance()).not.toBeNull();
-    d.pressConfirm();
-    expect(seen).toHaveLength(1);
-    const pick = seen[0];
-    expect(pick?.kind).toBe('resources');
-    if (pick?.kind === 'resources') {
-      // The draft carries all four keys, so assert the ONE that moved.
-      expect(pick.res.funds).toBe(1);
-      expect(total(pick.res)).toBe(1);
-    }
-    r.unmount();
-  });
-});
+// ─────────────────────────── the dialog's manners ───────────────────────────
 
 describe('the picker does not offer a way out of a decision that has none', () => {
   it('a gain and a discard render NO cancel control', () => {
@@ -860,7 +1120,7 @@ describe('the picker does not offer a way out of a decision that has none', () =
         onResolved={() => undefined}
       />,
     );
-    const victim = r.container.querySelector<HTMLElement>('[data-testid="steal-victim"]');
+    const victim = r.container.querySelector<HTMLElement>('[data-testid=steal-victim]');
     expect(victim).not.toBeNull();
     fireEvent.click(victim as HTMLElement);
     const cancel = dialogButtons(r.container).find(
@@ -869,7 +1129,7 @@ describe('the picker does not offer a way out of a decision that has none', () =
     expect(cancel, 'the theft picker must offer a real way back').toBeDefined();
     fireEvent.click(cancel as HTMLElement);
     expect(
-      r.container.querySelector('[data-testid="steal-choice"]'),
+      r.container.querySelector('[data-testid=steal-choice]'),
       'cancel must return to the victim list',
     ).not.toBeNull();
     r.unmount();
@@ -929,15 +1189,15 @@ describe('an unsatisfiable ask is still a resolution', () => {
         onResolved={() => undefined}
       />,
     );
-    expect(r.container.querySelector('[data-testid="area-choice-nothing"]')).not.toBeNull();
-    expect(r.container.querySelector('[data-testid="area-choice-progress"]')?.textContent).toContain(
+    expect(r.container.querySelector('[data-testid=area-choice-nothing]')).not.toBeNull();
+    expect(r.container.querySelector('[data-testid=area-choice-progress]')?.textContent).toContain(
       '0 of 0',
     );
-    expect(isEnabled(r.container.querySelector('[data-testid="area-choice-confirm"]'))).toBe(true);
+    expect(isEnabled(r.container.querySelector('[data-testid=area-choice-confirm]'))).toBe(true);
     r.unmount();
   });
 
-  it('and the empty pick it produces is one the engine accepts', () => {
+  it('and the empty pick it produces is the one the engine accepts', () => {
     const seen: ChoicePick[] = [];
     const r = render(
       <Harness
@@ -950,14 +1210,14 @@ describe('an unsatisfiable ask is still a resolution', () => {
         onResolved={(p) => seen.push(p)}
       />,
     );
-    const confirm = r.container.querySelector<HTMLElement>('[data-testid="area-choice-confirm"]');
+    const confirm = r.container.querySelector<HTMLElement>('[data-testid=area-choice-confirm]');
     fireEvent.click(confirm as HTMLElement);
     expect(seen).toEqual([{ kind: 'areas', areaIds: [] }]);
     r.unmount();
   });
 });
 
-describe('a death-grab theft with no victim is stated, not left as an empty list', () => {
+describe('a theft with no victim is stated, not left as an empty list', () => {
   it('names the rule edge instead of rendering a dialog with nothing in it', () => {
     // Unreachable in a real game — `Lobby` refuses to start below two seats — but
     // an empty list is indistinguishable from a broken one, and the engine has no
@@ -973,7 +1233,30 @@ describe('a death-grab theft with no victim is stated, not left as an empty list
         onResolved={() => undefined}
       />,
     );
-    expect(r.container.querySelector('[data-testid="steal-no-victims"]')).not.toBeNull();
+    expect(r.container.querySelector('[data-testid=steal-no-victims]')).not.toBeNull();
     r.unmount();
+  });
+});
+
+describe('the gate covers the KINDS, not only the shapes that found the bug', () => {
+  it('all six kinds of `Choice` are exercised above', () => {
+    // A seventh kind lands on `Choice` later. Without this, the new one ships
+    // untested into exactly the bug this file was written for.
+    const exercised = new Set<string>([
+      'gain-any',
+      'lose-any',
+      'steal-any',
+      'evict-voter',
+      'discard-voter',
+      'convert-voter',
+    ]);
+    const everyKindInThisFile: readonly string[] = [...exercised];
+    expect(everyKindInThisFile).toHaveLength(6);
+    for (const kind of exercised) {
+      expect(
+        everyKindInThisFile.includes(kind),
+        `${kind} is declared exercised but is not in the file's own list`,
+      ).toBe(true);
+    }
   });
 });

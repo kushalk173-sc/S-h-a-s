@@ -17,10 +17,16 @@
  * ENGINE IMPORTS ARE TYPE-ONLY, for the reason spelled out in `net/index.ts`:
  * a value import drags `reduce.ts` — every card, every payout, the whole rule
  * engine — into the browser bundle. `packages/server/scripts/check-secrets.mjs`
- * fails the build on one. So the handful of rule NUMBERS the UI needs to render
- * (the resource cap, the redraw cost, the unlock thresholds) are re-declared
- * below as a frozen mirror, and `derive.test.ts` asserts they still agree with
- * the engine's `RULES` — which a test may import, because a test is not a bundle.
+ * fails the build on one, and it scans `packages/client/src` WHOLE — test files
+ * included, with no exemption. (An earlier version of this comment claimed
+ * `derive.test.ts` existed and "a test may import, because a test is not a
+ * bundle". There is no such file, and the claim was wrong twice over: the file
+ * did not exist, and a test in this tree may not value-import the engine either.
+ * The consequence is real and it is stated where it bites, in
+ * `choiceResolver.test.tsx`: the mirrors below cannot be checked against the
+ * engine from inside the client, so their expected values are pinned as
+ * literals and the live agreement is verified in a browser against the real
+ * server.)
  *
  * That arrangement is deliberate rather than lazy. A client that imports the
  * engine's values has a copy of every payout in its bundle, and a bundle is a
