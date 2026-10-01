@@ -62,22 +62,82 @@ import { LEAK_PATHS, SECRET_FIELDS } from './secret-inventory.ts';
 const CARDS = bigCards(60);
 const ctx = makeCtx(CARDS);
 
+/**
+ * Card ids that are PUBLIC BY DESIGN, and so are not secrets at all.
+ *
+ * An ANSWERED Ideology Card is face up under the answering player's Manifesto mat
+ * at a real table (rules-reference.md:190-191), and `PlayerState.manifestoCards`
+ * deliberately publishes it to every client — the Ideologue a card carries is that
+ * player's public identity, which is why `reconnect.test.ts` also records that the
+ * string "capitalist" is in every payload by design. So an answered card is public.
+ *
+ * This matters because `ANSWER` now writes the answered card to `_ideologyDiscard`
+ * (the recycle fix: the deck was otherwise never reshuffled, so every game died at
+ * turn 52). Before that fix the discard pile was written only by the paid, optional
+ * `REDRAW_IDEOLOGY` — genuinely secret, because a redrawn card was never answered
+ * and never reached a mat. Treating the whole pile as secret was correct then and
+ * became wrong here: `t-ide-0054` is in the discard pile AND in some player's
+ * `manifestoCards`, so it is public, and asserting its absence failed on the very
+ * first answered card in the corpus.
+ *
+ * THE SUBTRACTION IS EXACT, NOT A BLANKET EXEMPTION. `secretIds` below removes
+ * precisely the ids that are in some player's `manifestoCards`, and nothing else.
+ * A card sitting in the discard pile that is NOT in any mat — the `REDRAW_IDEOLOGY`
+ * case, which is still a genuine secret — stays in the set and still has to be
+ * absent. The two cases are distinguished by a fact about the state, not by a
+ * decision about which assertion to run; see "the discard pile is not a secret
+ * pile" in the LAYER 1 block for the test that holds them apart.
+ */
+function publicCardIds(s: GameState): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const pid of s.turnOrder) {
+    for (const id of s.players[pid]?.manifestoCards ?? []) out.add(id);
+  }
+  return out;
+}
+
 /** Deck ids that must never appear in a client payload. */
 function allSecretValues(s: GameState): { cards: readonly string[]; seed: string } {
+  const isPublic = publicCardIds(s);
+  const candidates = [
+    ...s._ideologyDraw,
+    ...s._ideologyDiscard,
+    ...s._voterDraw,
+    ...s._voterDiscard,
+    ...s._conspiracyDraw,
+    ...s._conspiracyDiscard,
+    ...s._headlineDraw,
+    ...s._headlineDiscard,
+    // The pending card is face DOWN and in nobody's mat, so it is never public.
+    // Listed unconditionally rather than through `isPublic` on purpose: if a future
+    // refactor ever put the pending card in a manifesto, that is itself the bug this
+    // assertion exists to catch, and quietly excusing it here would hide it.
+    ...(s._pendingCard === null ? [] : [s._pendingCard]),
+  ];
   return {
-    cards: [
-      ...s._ideologyDraw,
-      ...s._ideologyDiscard,
-      ...s._voterDraw,
-      ...s._voterDiscard,
-      ...s._conspiracyDraw,
-      ...s._conspiracyDiscard,
-      ...s._headlineDraw,
-      ...s._headlineDiscard,
-      ...(s._pendingCard === null ? [] : [s._pendingCard]),
-    ],
+    cards: [...new Set(candidates.filter((id) => !isPublic.has(id)))],
     seed: String(s._seed),
   };
+}
+
+/**
+ * The same set, as a predicate. Both leak assertions go through this so there is
+ * ONE definition of "secret" in the file — a second transcription is how a suite
+ * ends up asserting two different things in two different layers.
+ */
+function secretIds(s: GameState): ReadonlySet<string> {
+  return new Set(allSecretValues(s).cards);
+}
+
+/**
+ * THE INSTRUMENT. Which of this state's secret ids are present in `json`.
+ *
+ * One function, so LAYER 1 and LAYER 2 cannot drift into checking different things,
+ * and so the "TEETH" test can fire the real check against a payload that really does
+ * carry a secret, rather than asserting about a reimplementation of it.
+ */
+function leakedIds(s: GameState, json: string): readonly string[] {
+  return [...secretIds(s)].filter((id) => json.includes(id));
 }
 
 /**
@@ -153,6 +213,68 @@ function freeAreas(s: GameState): readonly string[] {
   }
   return [];
 }
+
+/**
+ * A corpus that has actually paid to REDRAW an Ideology Card.
+ *
+ * `playedCorpus` never redraws, so every id in its discard pile is an ANSWERED card
+ * and every one of them is in some player's `manifestoCards`. That is the whole
+ * reason the discard pile needs an exemption — and it is also why the exemption needs
+ * a counter-example before anyone can claim it is not a blanket one. This corpus is
+ * that counter-example: it reaches a state where the discard pile holds a card that
+ * NOBODY is holding face up, which is the `REDRAW_IDEOLOGY` case, and that id must
+ * still be treated as secret.
+ *
+ * The staggered start is the only legal way for a player to have resources at all
+ * (`playedCorpus`'s players open 0/0/0 and never buy anything), and p13 costs the
+ * redraw at 4 resources, so this is also the fixture that makes the redraw affordable.
+ */
+function redrawCorpus(steps: number): readonly GameState[] {
+  let s = setup({
+    players: ['p1', 'p2'],
+    names: { p1: 'One', p2: 'Two' },
+    cards: CARDS,
+    seed: 0x5eed_52,
+    startResources: [{ funds: 9 }, { funds: 7, media: 2 }],
+    ...decksOf(CARDS),
+  });
+  const corpus: GameState[] = [];
+  const order = [...s.turnOrder];
+  let attempts = 0;
+  // Turn one answers so the recycle has put a public card in the discard pile; every
+  // turn after that REDRAWS, which puts a genuinely secret card there too. The state
+  // is recorded after each, so both kinds are present at once.
+  let answered = 0;
+  while (corpus.length < steps && !s.finished && attempts < steps * 12) {
+    attempts += 1;
+    const me = order[attempts % order.length] as PlayerID;
+    if (s.phase === 'answer' && s.activePlayer === me) {
+      const a =
+        answered === 0
+          ? ({ type: 'ANSWER', side: 0 } as const)
+          : ({ type: 'REDRAW_IDEOLOGY', pay: { funds: 4 } } as const);
+      const r = reduce(s, me, a, { rules: ctx.rules, cards: CARDS });
+      if (!r.ok) continue;
+      s = r.state;
+      if (a.type === 'ANSWER') answered += 1;
+      corpus.push(s);
+      continue;
+    }
+    if (s.phase === 'headlines' && s.activePlayer === me) {
+      const r = reduce(s, me, { type: 'ACK_HEADLINE' }, { rules: ctx.rules, cards: CARDS });
+      if (!r.ok) continue;
+      s = r.state;
+      continue;
+    }
+    if (s.phase !== 'actions' || s.activePlayer !== me) continue;
+    const r = reduce(s, me, { type: 'END_TURN' }, { rules: ctx.rules, cards: CARDS });
+    if (!r.ok) continue;
+    s = r.state;
+  }
+  return corpus;
+}
+
+const REDRAW_CORPUS = redrawCorpus(6);
 
 /** A room wrapping a state, so the walk goes through the production fan-out path. */
 function roomFor(state: GameState): Room {
@@ -333,19 +455,97 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
     }
   });
 
-  it('no secret VALUE survives: no card id, and not the seed', () => {
+it('no secret VALUE survives: no card id, and not the seed', () => {
     for (const [i, s] of CORPUS.entries()) {
       const { cards, seed } = allSecretValues(s);
+      expect(cards.length, `state ${i} has no secret ids at all — the scan would be vacuous`).toBeGreaterThan(0);
       for (const viewer of [null, ...s.turnOrder]) {
         const json = JSON.stringify(viewFor(s, CARDS, viewer));
-        for (const id of cards) {
-          expect(json.includes(id), `state ${i} leaked card id ${id} to ${String(viewer)}`).toBe(false);
-        }
+        expect(leakedIds(s, json), `state ${i}, viewer ${String(viewer)}`).toEqual([]);
         // The seed is a bare number and is the single highest-leverage secret in
         // the process: it reconstructs every deck from the start.
         expect(json.includes(`:${seed}`), `state ${i} leaked the seed`).toBe(false);
       }
     }
+  });
+
+  it('the discard pile is not a secret pile, but only because answered cards went public', () => {
+    // The exemption `publicCardIds` grants is exactly as wide as the set of ids a
+    // player is holding face up, and not one id wider. This is the assertion that
+    // makes the exemption honest, and it is the direct answer to "did you just
+    // shrink the asserted set until it passed?" — no: the set is unchanged except
+    // for ids the state itself proves are public, and this pins both halves.
+    let sawPublicDiscard = 0;
+    let sawSecretDiscard = 0;
+
+    // BOTH corpora, because only the second one puts a card in the discard pile that
+    // is in nobody's mat. `CORPUS` alone would exercise the exempted branch and no
+    // other, and "the exemption is narrow" would be a claim nobody could check.
+    for (const s of [...CORPUS, ...REDRAW_CORPUS]) {
+      const isPublic = publicCardIds(s);
+      const secrets = secretIds(s);
+      for (const id of s._ideologyDiscard) {
+        if (isPublic.has(id)) {
+          sawPublicDiscard += 1;
+          // A public id is public for a REASON: the state says a player is holding
+          // it face up. So the projection is REQUIRED to contain it, not merely
+          // permitted to. If this ever stops holding, the exemption has outgrown its
+          // justification and the "leak" it suppresses is real.
+          expect(
+            JSON.stringify(viewFor(s, CARDS, null)).includes(id),
+            `${id} is excused as public but no projection carries it — the exemption is unfounded`,
+          ).toBe(true);
+          continue;
+        }
+        sawSecretDiscard += 1;
+        expect(secrets.has(id), `${id} is in the discard pile, in no mat, and was not excused`).toBe(true);
+      }
+      // The face-down card is never excused, whatever the mat says.
+      if (s._pendingCard !== null) {
+        expect(secrets.has(s._pendingCard), 'the face-down pending card was excused').toBe(true);
+      }
+    }
+
+    // The corpus must exercise BOTH halves or the loop above proves nothing: a
+    // corpus with no answered cards would find `sawPublicDiscard === 0` and pass
+    // without ever reaching the branch that matters.
+    expect(sawPublicDiscard, 'no answered card reached the discard pile — the exemption is untested').toBeGreaterThan(0);
+    expect(sawSecretDiscard, 'no genuinely secret discard card — the un-excused branch is untested').toBeGreaterThan(0);
+  });
+
+  it('a REDRAWED card is still secret: paying to swap it does not put it on a mat', () => {
+    // The specific case the exemption must NOT swallow. `REDRAW_IDEOLOGY` discards
+    // the face-down card without answering it, so it lands in `_ideologyDiscard`
+    // holding the same place an answered card does — and it is NOT in any
+    // `manifestoCards`, because nobody ever chose a side. It is exactly as secret as
+    // it was before the recycle fix, and this drives the real action rather than
+    // hand-editing a pile.
+    //
+    // `REDRAW_CORPUS` exists so the state has BOTH kinds of discard entry at once: a
+    // public one from the first ANSWER and a secret one from every redraw after it.
+    // Without that, "the exemption is narrow" would be an unfalsifiable claim.
+    let publicOnes = 0;
+    let secretOnes = 0;
+    for (const s of REDRAW_CORPUS) {
+      const isPublic = publicCardIds(s);
+      const secrets = secretIds(s);
+      for (const id of s._ideologyDiscard) {
+        if (isPublic.has(id)) {
+          publicOnes += 1;
+          continue;
+        }
+        secretOnes += 1;
+        expect(secrets.has(id), `${id} is a redrawn card and stopped being secret`).toBe(true);
+        for (const viewer of [null, ...s.turnOrder]) {
+          expect(
+            JSON.stringify(viewFor(s, CARDS, viewer)).includes(id),
+            `a redrawn card reached ${String(viewer)}`,
+          ).toBe(false);
+        }
+      }
+    }
+    expect(publicOnes, 'the redraw corpus produced no answered card — only the exempted half').toBeGreaterThan(0);
+    expect(secretOnes, 'the redraw corpus produced no redrawn card — the branch is untested').toBeGreaterThan(0);
   });
 
   it('the conspiracy-hand leak is closed: no player, including its owner, sees a hand', () => {
@@ -414,15 +614,50 @@ describe('LAYER 2 — no ServerMessage the handler can produce leaks a server-on
     }
   });
 
-  it('no message carries a secret card id or the seed', () => {
+it('no message carries a secret card id or the seed', () => {
     for (const s of CORPUS) {
-      const { cards, seed } = allSecretValues(s);
+      const { seed } = allSecretValues(s);
       for (const msg of renderAll(s, { rules: ctx.rules, cards: CARDS })) {
         const json = JSON.stringify(msg);
-        for (const id of cards) expect(json.includes(id), `${msg.t} leaked ${id}`).toBe(false);
+        expect(leakedIds(s, json), `${msg.t}`).toEqual([]);
         expect(json.includes(`:${seed}`), `${msg.t} leaked the seed`).toBe(false);
       }
     }
+  });
+
+  it('TEETH: a deliberately reintroduced secret id in a payload IS caught', () => {
+    // The proof that the two assertions above are still load-bearing after the
+    // public-id exemption. It does not weaken the projection to test it — that would
+    // prove nothing about the real one — so instead it takes the assertion's OWN
+    // instrument, `leakedIds`, and shows it fires on a payload that really does carry
+    // a secret card.
+    //
+    // The shape is the one the exemption could have opened: a genuinely secret card
+    // (still face down in the draw pile) smuggled into a client payload under a
+    // plausible-looking key. That is what `playerView` failing to drop a `_` key, or a
+    // future field inlining a draw-pile id, looks like on the wire.
+    const mid = CORPUS.find((s) => s.phase === 'answer');
+    if (mid === undefined) throw new Error('no mid-answer state in the corpus');
+
+    // The clean state: no leak, so the instrument reports nothing.
+    expect(leakedIds(mid, JSON.stringify(viewFor(mid, CARDS, null)))).toEqual([]);
+
+    // The same state with ONE secret id spliced in, which is what a leak looks like.
+    const victim = mid._ideologyDraw[0];
+    expect(victim, 'the corpus has no face-down card to smuggle').toBeTruthy();
+    if (victim === undefined) return;
+    expect(secretIds(mid).has(victim), 'the smuggled id is not actually secret — this would prove nothing').toBe(true);
+
+    const tampered = { ...viewFor(mid, CARDS, null), lastDrawnCardId: victim };
+    expect(leakedIds(mid, JSON.stringify(tampered))).toEqual([victim]);
+
+    // And the seed, which the same assertion guards separately, is caught too: a
+    // bare number is the highest-leverage secret in the process, because it rebuilds
+    // every deck from the start. It has to be spliced in as a NUMBER, since that is
+    // the form the assertion looks for (`:1234`) and the form a real leak takes.
+    const withSeed = { ...viewFor(mid, CARDS, null), cursor: mid._seed };
+    expect(leakedIds(mid, JSON.stringify(withSeed))).toEqual([]);
+    expect(JSON.stringify(withSeed).includes(`:${mid._seed}`)).toBe(true);
   });
 });
 
