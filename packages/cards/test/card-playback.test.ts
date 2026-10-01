@@ -79,6 +79,27 @@ const FIXTURE_HEADLINES: readonly HeadlineCard[] = [
   },
 ];
 
+/**
+ * The other three decks, pinned by id rather than sliced off the corpus.
+ *
+ * The Ideology deck above is fixture-owned for two reasons; these three were left
+ * reading `corpus.X.slice(0, n)`, which is stable only while every card is APPENDED
+ * to the top of a deck file. Insert one at the front — a new `core/headline.json`, a
+ * campaign reorder — and the seeded shuffle deals a different hand, so a reducer test
+ * starts failing for a reason that has nothing to do with the reducer. Pinning the
+ * exact ids the slices currently produce makes that impossible: same shuffle input,
+ * same game, by construction rather than by luck.
+ *
+ * Six Voter Cards because three fill the HQ Mat (p10) and three stay in `_voterDraw`.
+ * Three Conspiracy Cards because the market is a refill, and `refresh-market` can only
+ * change the market if there is something left in the deck to change it with.
+ */
+const FIXTURE_DECKS = {
+  voter: ['vo-core-001', 'vo-core-002', 'vo-core-003', 'vo-core-004', 'vo-core-005', 'vo-core-006'],
+  conspiracy: ['ct-et2040-001', 'ct-et2040-002', 'ct-et2040-003'],
+  headline: ['hl-et2040-001', 'hl-et2040-002', 'hl-et2040-003'],
+} as const;
+
 const INDEX: CardIndex = {
   ideology: {
     ...Object.fromEntries(corpus.ideology.map((c) => [c.id, toEngineIdeologyCard(c)])),
@@ -110,9 +131,9 @@ function game(): GameState {
     // so a fixture that starts at the cap cannot make a legal move at all.
     startResources: [{ funds: 3, clout: 1, media: 1, trust: 1 }],
     ideologyDeck: FIXTURE_IDEOLOGY.map((c) => c.id),
-    voterDeck: corpus.voter.slice(0, 6).map((c) => c.id),
-    conspiracyDeck: corpus.conspiracy.slice(0, 3).map((c) => c.id),
-    headlineDeck: corpus.headline.slice(0, 3).map((c) => c.id),
+    voterDeck: FIXTURE_DECKS.voter,
+    conspiracyDeck: FIXTURE_DECKS.conspiracy,
+    headlineDeck: FIXTURE_DECKS.headline,
   });
   // Answer, so the game is in the `actions` phase where a card can be played. The
   // answer is deliberately arbitrary: none of the cards here reads an Ideology Card.
