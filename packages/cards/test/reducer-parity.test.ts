@@ -28,7 +28,15 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { DECK_IDS, loadCorpus } from '../src/corpus.js';
+import {
+  DECK_IDS,
+  loadConspiracyDeck,
+  loadCorpus,
+  loadHeadlineDeck,
+  loadIdeologyDeck,
+  loadVoterDeck,
+  type AnyCorpusCard,
+} from '../src/corpus.js';
 import { EFFECT_OPS, EFFECT_OP_SET } from '../src/effect-ops.js';
 import {
   EXECUTED_OPS,
@@ -156,29 +164,89 @@ describe('EXECUTED_OPS says which fields each case reads, and that is true', () 
 describe('no shipped card uses an effect the reducer cannot execute', () => {
   const corpus = loadCorpus(DECK_IDS);
 
-  it('every Conspiracy and Headline Card is fully executable', () => {
+  /**
+   * Every shipped card, in one list, from the decks rather than from a hand-picked
+   * pair of kinds.
+   *
+   * The walk below used to read `[...corpus.conspiracy, ...corpus.headline]`, which
+   * is 48 of the 118 cards and is right for the EFFECT vocabulary -- Ideology and
+   * Voter Cards have no `effects` array, so there is no op for the registry to rule
+   * on. But "the walk covers the X-cards" is a claim about a list comprehension in a
+   * test, and a list comprehension that grew a `.slice()` would still read as
+   * exhaustive. So the walk is now over all four kinds and its size is asserted
+   * against the decks.
+   *
+   * What this layer does NOT claim: that an Ideology Card's question and its two
+   * payouts are honest. That is a different invariant with a different oracle --
+   * `validateIdeologySide` for the Ideologue/Resource pairing and `balance.ts` for
+   * the lean -- and it is asserted by `validateCorpus()` in the last case of this
+   * block, which walks the same 118 cards. Stating the boundary is the point: a
+   * coverage claim that quietly covered less than it said is the failure this file
+   * exists to prevent.
+   */
+  const allCards: readonly AnyCorpusCard[] = [
+    ...corpus.ideology,
+    ...corpus.voter,
+    ...corpus.conspiracy,
+    ...corpus.headline,
+  ];
+
+  it('the walk is exhaustive, and knows it without a hardcoded count', () => {
+    // Derived from the decks by the same path `loadCorpus` takes, so a corpus that
+    // grows does not break this and a card that escapes the walk does.
+    const shipped =
+      DECK_IDS.flatMap((d) => loadIdeologyDeck(d)).length +
+      DECK_IDS.flatMap((d) => loadVoterDeck(d)).length +
+      DECK_IDS.flatMap((d) => loadConspiracyDeck(d)).length +
+      DECK_IDS.flatMap((d) => loadHeadlineDeck(d)).length;
+    expect(allCards.length).toBe(shipped);
+
+    // And all four kinds are actually in `allCards`, not three and a zero: a kind
+    // dropped from the spread above would show up here as a missing bucket.
+    for (const kind of ['ideology', 'voter', 'conspiracy', 'headline'] as const) {
+      expect(corpus[kind].length, kind).toBeGreaterThan(0);
+    }
+    expect(allCards.length).toBe(
+      corpus.ideology.length +
+        corpus.voter.length +
+        corpus.conspiracy.length +
+        corpus.headline.length,
+    );
+  });
+
+  it('every one of them is fully executable', () => {
+    // Run over ALL kinds, not just the two that carry `effects`. For the other two
+    // the honest answer is `[]` -- they have no effect list and no duration/timing/
+    // interrupt, so the registry has nothing to rule on -- and running them anyway
+    // means a future Ideology Card that grows a `duration` is caught by this layer
+    // rather than only by `validateCorpus`.
     const offenders: string[] = [];
-    for (const card of [...corpus.conspiracy, ...corpus.headline]) {
+    for (const card of allCards) {
       const problems = unexecutedCardProblems(card, '');
       for (const p of problems) offenders.push(`${card.id} ${p.pointer}: ${p.message}`);
     }
     expect(offenders).toEqual([]);
   });
 
-  it('and no card carries a reserved duration / timing / interrupt', () => {
-    for (const card of [...corpus.conspiracy, ...corpus.headline]) {
-      expect(card.duration ?? 'this-turn', `${card.id} duration`).toBe('this-turn');
+  it('and no card of any kind carries a reserved duration / timing / interrupt', () => {
+    // Previously scoped to the X-cards only. Ideology and Voter Cards have no such
+    // field in the schema today, so this cannot fail yet -- which is exactly why it
+    // belongs here: it is the assertion that stops it starting.
+    for (const card of allCards) {
+      expect((card as { duration?: string }).duration ?? 'this-turn', `${card.id} duration`).toBe('this-turn');
       expect('timing' in card, `${card.id} timing`).toBe(false);
       expect('interrupt' in card, `${card.id} interrupt`).toBe(false);
     }
   });
 
-  it('the CI gate agrees with the test', () => {
+  it('the CI gate agrees with the test, over the same 118 cards', () => {
     // Same corpus, different entry point. If these two ever disagree, the one that
-    // matters is the stricter — so make both fail rather than choosing.
-    expect(
-      validateCorpus().errors.map((f) => `${f.code} ${f.cardId ?? ''} ${f.message}`),
-    ).toEqual([]);
+    // matters is the stricter — so make both fail rather than choosing. The count is
+    // carried alongside so a validator that silently stopped walking a deck is
+    // visible here rather than as a mysteriously smaller report.
+    const report = validateCorpus();
+    expect(report.errors.map((f) => `${f.code} ${f.cardId ?? ''} ${f.message}`)).toEqual([]);
+    expect(report.counts.total).toBe(allCards.length);
   });
 });
 
