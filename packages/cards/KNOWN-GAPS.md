@@ -10,6 +10,83 @@ kept because they are still true. §3 is the handoff.
 
 ---
 
+## 0bis. What the effect-execution substrate iteration landed
+
+Three engine changes, in this order, each a green commit. `npm run playable` — which
+**plays** each reduction through the real reducer rather than asking whether the
+schema accepts it — went from **14 of 54** to **18 of 54**.
+
+| gap | what landed | cards moved |
+|---|---|---|
+| **G9 + G22** | `GameState.liveEffects`, expired in `advanceTurn` | GROWING DISSENT (with G14); ERADICATING GERMS from a one-shot to its real recurring obligation |
+| **G14** | `fireTriggers`, consulted at five places, bounded cascade | POWER TRIP; LAB-GROWN EARWORM (with a caveat, below) |
+| **G15 + G4** | `n: number \| ComputedCount` and `per` on `gain`/`lose` | IF YOU LIKE PIÑA COLADA |
+| G8 | `target` on `gerrymander` (previous iteration) | — (already closed) |
+
+**The visibility decision, which is the one to check first in review.**
+`GameState.liveEffects` is **public and unprefixed**, so
+`packages/server/test/secret-inventory.ts` owes nothing and no client change is
+needed. The argument, in full, is in `state.ts` on `LiveEffect`: a live effect can
+only be created by a card being *resolved*, and both `PLAY_CONSPIRACY` and
+`ACK_HEADLINE` put that card face up on the discard pile in the same breath, so
+`sourceCardId` can never name a card in a hidden hand; and every real card that
+creates one announces it (KHAKI TERROR's whole point is that everyone can see you
+cannot buy). **No `_`-prefixed field was added.** `live-effects.test.ts` asserts the
+property rather than trusting the argument — including that a live effect never
+names a Conspiracy Card a player is still holding.
+
+**The honesty gate grew a second seam.** `applyEffect` decides what ONE resolution
+does; `installLiveEffects` decides what LINGERS, one function above it. Slicing
+`applyEffect` cannot see a field read by the installer, so
+`reducer-parity.test.ts` now re-derives `SCOPE_FIELDS_READ_BY_INSTALL` from
+`installLiveEffects`'s own source text, and `EXECUTABLE_TRIGGERS` from every
+`trigger: '…'` raise site in `reduce.ts`. A `when` naming an event the reducer never
+raises installs a hook that never wakes — a card that reads as though something
+happens on every purchase, and nothing ever happens — so the registry is checked
+against the reducer in both directions, and against the JSON Schema's enum.
+
+### 0b.1 The rulings this iteration made, so the next person does not re-derive them
+
+1. **An effect carrying `when` / `until` / `condition` is INSTALLED, not applied.**
+   It does not fire once at play time and then linger. Otherwise POWER TRIP hands out
+   a free discard on the turn you played it and keeps the hook for the rest of the
+   game.
+2. **Expiry runs BEFORE re-application** at a turn boundary. Reversed, a
+   `'this-turn'` effect is re-applied at the very boundary meant to remove it and
+   lives for ever.
+3. **A lasting `duration` with no per-effect `when` installs ONE standing effect**
+   holding the whole list, re-applied at the top of every one of the owner's turns.
+   One entry rather than one per effect, so a two-effect list does not become two
+   auras that can drift apart.
+4. **`'round'` is read as the end of the current round**, and `'next-turn'` as "live
+   through the owner's next turn". In a three-player game a `'round'` effect
+   installed on turn 1 expires on turn 4, which IS the owner's next turn, so it never
+   acts — which is the correct reading of GROWING DISSENT's "for 1 round" and is
+   pinned by a test.
+5. **`on-turn-start` means the OWNER's turn.** A hook firing at the top of every
+   seat's turn is the difference between one payout a turn and one per player per
+   turn.
+6. **A computed value reads the state of the player the effect resolves FOR**, and
+   `ideologue-level` counts Ideology **Cards** answered, not resources paid. See §6
+   for why that is the opposite of the balance checker's proxy and therefore the
+   right way round.
+7. **The balance checker now reports a computed-value card as NOT MEASURED** rather
+   than scoring it zero. `xCardMagnitude` runs on one card in isolation with no
+   player state, so a computed value has no value yet; scoring it 0 would have made
+   the check pass for a reason that has nothing to do with the card.
+
+### 0b.2 The card the substrate did NOT make honest
+
+**LAB-GROWN EARWORM's reduction is strictly STRONGER than the printed card** and is
+flagged as such in `scripts/playable.ts`. The real card binds one chosen opponent —
+which is G1, `'chosen-player'`, a decision over players that needs a new `Choice`
+kind and therefore a client wire-format change. The reduction fires on ANY influence
+including your own, and the thief picks the victim. It proves the mechanism
+(`steal-any` is the one op that reads `FireContext.actor`) and it is **not** a
+candidate for shipping without a ruling.
+
+---
+
 ## 0. The three states, and the number that matters
 
 A card can be **expressible** without being **playable**, and those are not the same
@@ -40,28 +117,37 @@ text and re-asserts it over every shipped card, so the promise cannot drift.
 | Shipped as `inferred` | 45 | 45 |
 | Total cards shipped | 60 | 64 |
 
-### 0.2 The finding, stated plainly
+### 0.2 The finding, and what changed about it
 
-**No new expressiveness produced a new playable card, and that is not a failure of
-the schema work — it is the shape of the problem.**
+**The first pass at expressiveness produced no new playable card, and that was not a
+failure of the schema work — it was the shape of the problem.**
 
-Everything landed in this iteration is state (b): `target` on `gerrymander` (G8),
+Everything landed in that iteration was state (b): `target` on `gerrymander` (G8),
 `duration` / `timing` (G9 / G22), `interrupt` (G13), `when` / `until` (G14) and a
 computed `n` (G15) are all now writable in the schema and all refused by the
-validator, because `reduce()` performs none of them. A card that used any of them
-would be a card that lies.
+validator, because `reduce()` performed none of them. A card that used any of them
+would have been a card that lies.
 
-The four real cards that *did* become playable were unlocked by something else
+The four real cards that *did* become playable then were unlocked by something else
 entirely: by re-reading `applyEffect` closely enough to see which recovered cards
 were already expressible in the shipped op vocabulary, and accepting a smaller card
 rather than a bigger lie. Their dropped clauses are named in their `source` fields
 and counted per gap in §2.
 
-So the honest reading of the old "86% cannot be expressed" figure is: **it is not
-86% of a schema problem.** For the 39 cards still unshipped, the binding constraint
-is `reduce()` and `state.ts`, not the schema. Their specifications are now written
-down, quarantined, and each one names the engine change it waits on — which is
-what makes the next iteration a matter of implementing rather than inventing.
+**The lesson, and the reason the next iteration looked different: the schema was
+never the binding constraint.** So the next iteration went into the reducer — items
+2, 3 and 4 of §3 — and produced **+4 playable cards measured by playing them**,
+because the shapes it needed were already declared and inert. The remaining 36 are
+not expressible because of what `reduce()` still cannot *do*, and each one now says
+which mechanism it waits on rather than "the engine does not do this".
+
+The honest reading of the old "86% cannot be expressed" figure is therefore still
+**not an 86% schema problem**. For the 36 cards still unreducible, the binding
+constraint is `reduce()` and `state.ts`: a cost modifier (G5), a phase machine
+(G13), a decision over players (G1, and a client wire-format change), a price field
+(G15), zone scoping (G16), or card movement (G20). Each is specified, quarantined,
+and names the engine change it waits on.
+
 
 ### 0.3 What the previous revision got wrong, in the corpus itself
 
@@ -161,12 +247,21 @@ turn state machine.
 
 ### G4 — no per-unit scaling (`forEach`)
 
-**State: (c).** Cards: RED BLOODED (shipped as a fixed pair), THOUGHTS AND PRAYERS,
-JUST BREATHE. *"2 resources for each of their discarded voters"* reads board state at
-resolution time.
+**State: (a) for a count read at resolution time, still (c) for a count read off an
+EVENT.** `n` may be `{ of: 'volatile-voters' }` and `gain` / `lose` may carry `per`,
+so *"as many as there are"* is expressible against a player's own board.
 
-**Reducer ask:** resolve the multiplier in `applyEffect` before pushing anything, and
-push N choices rather than one — the same read-the-player-state plumbing G14 needs.
+**Card gained: IF YOU LIKE PIÑA COLADA** (with G15). ERADICATING GERMS is a standing
+obligation rather than a per-card read.
+
+**Still (c), and the reason is a missing FIELD rather than a missing computation.**
+RED BLOODED's *"any 2 resources for EACH of their discarded voters"* and THOUGHTS AND
+PRAYERS' *"any 2 resources for each of THEIR voters inside a Volatile Area"* both need
+**the read aimed at one player and the payout at another** — and the real card also
+wants 2 per unit, where `n` is a count and `per` is a multiplier on a `res`. There is
+no field that separates "whose state do I read" from "who does this land on"; adding
+one is the ask. JUST BREATHE computes its *zone* from the board, which is G16.
+
 
 ### G5 — no player RESTRICTION
 
@@ -221,14 +316,22 @@ Volatile-Area prohibition.
 
 ### G9 — no `duration`
 
-**State: (b).** Cards: PYTHONPOST, SNOOP B-O-DOUBLE-T, THE BIG FREEZE, GROWING
-DISSENT, DON'T KISS THE BABIES, KHAKI TERROR, ON THE "HIGH" SEAS — 6 cards, and the
-single largest engine change the corpus exposes. `'this-turn'` is accepted by the
-validator, because that is what the engine already does (resolve once, discard); the
-other three values are refused.
+**State: (a). CLOSED.** `GameState.liveEffects` carries each effect's owner, its
+trigger, its condition, its effect list, and its lifetime as two ABSOLUTE turn
+numbers computed at install. `advanceTurn` drops what has run out and then re-applies
+what is still in force. See §0bis for the rulings and for the visibility decision.
 
-**Ask:** a live-effects list on `GameState`, re-applied on each event, with expiry
-ticked in `advanceTurn()`. §3.
+**Cards gained: GROWING DISSENT** (with G14). ERADICATING GERMS moves from a one-shot
+to its real recurring obligation, *"discard an open Voter Card every turn
+(mandatory)"*.
+
+**Still (b), and the reason is now G5 rather than G9:** PYTHONPOST and
+SNOOP B-O-DOUBLE-T are *surcharges* — *"you have to pay an extra resource for every
+Conspiracy Card that you buy"* — and a cost modifier is **not an effect**. A lasting
+effect can now carry a clause, but a clause that changes what a purchase *costs* is a
+different mechanism, and putting it in `Effect[]` would make `applyEffect` a
+cost-modifier resolver. That is G5's `Restriction`, not this gap.
+
 
 ### G10 — no tokens-on-a-card counter
 
@@ -272,25 +375,62 @@ real product.** This is the largest remaining gap by reach.
 
 ### G14 — no `when`: effects that trigger on other events
 
-**State: (b).** Cards: LAB-GROWN EARWORM, POWER TRIP, GREAT LEADER BAD ECONOMY,
-QUANTUM WRISTBAND, WHY THE LONG FACE?, THE GRETA EFFECT — 6 cards, and it composes
-with G9 because both need the same live-effects list.
+**State: (a). CLOSED.** `fireTriggers` is the registry, and it is consulted at the
+places that raise events rather than at every caller: `INFLUENCE` (`on-voter-influenced`
+then `on-purchase`), `BUY_CONSPIRACY` (`on-purchase`), `GERRYMANDER` (`on-gerrymander`),
+and `setArea` (`on-volatile-placement`, `on-majority-formed`) — and `setArea` is the
+only thing in the engine that changes a peg, so the three powers and `resolveChoice`'s
+voter branch get the two board events for free rather than by remembering to.
 
-**Ask:** a trigger registry on `GameState` that `INFLUENCE`, `BUY_CONSPIRACY`,
-`GERRYMANDER`, `PLACE_VOTERS` and `setArea` consult. §3.
+**Cards gained: POWER TRIP** (faithful but for the dropped *"non-majority"*, and
+slightly weaker because each opponent picks which of their own) and
+**LAB-GROWN EARWORM** — whose reduction is *strictly stronger* than the printed card
+and is flagged as needing a ruling; see §0b.2. GROWING DISSENT is G9 + G14 together.
+
+**Re-entrancy is bounded three ways**, all tested rather than asserted: one effect
+per wave and never the same `LiveEffect.id` twice in one cascade (`consumed` is an
+*argument* threaded through the loop, never state — R2); `TRIGGER_MAX_WAVES` on top,
+which is what a cycle among live effects would beat; and no effect op can reach
+`setArea`, so a hook cannot wake a hook through the board. That last one is derived
+from `applyEffect`'s own source text, for the same reason the op registry is.
+
+**Still (b) or (c), and the reason is not the trigger registry any more:**
+GREAT LEADER BAD ECONOMY and WHY THE LONG FACE? both need *"pick an opponent"* or
+*"the player after you"* — G1, which is a decision over players and therefore a new
+`Choice` kind and a client wire-format change. THE GRETA EFFECT is a *payout*
+modifier, the same shape as G9's surcharges. QUANTUM WRISTBAND is an auction, G13.
+
 
 ### G15 — no value computed from your own current state
 
-**State: (b).** Cards: JUMLA, HOLO SAPIENS, IF YOU LIKE PIÑA COLADA, DOSTI BANI RAHE,
-THE BIG FREEZE. The `n` of every op is a literal; a price that is a function of the
-seller's own board cannot be one.
+**State: (a) for `n` and `per`, still (b) for PRICES.** `n` is now
+`number | ComputedCount` and `gain` / `lose` carry `per`, both resolved by
+`resolveCount` / `resolveDelta` **before** anything is pushed — which is what makes
+the widening safe. `Choice.count` is still a `number` at the point it is constructed
+and every loop bound is a resolved number, so a computed value can never reach the
+engine as one. The guarantee this gap originally wanted from the type system now
+comes from the reducer, and `reducer-parity.test.ts` asserts it from the source.
 
-**Ask:** resolve `n` before `applyEffect` pushes anything — which is why it shares
-G14's plumbing. Note the type deliberately does **not** widen `n` to a union:
-`reduce.ts` pushes `effect.n` straight into a `Choice.count` typed `number`, and
-widening the type would let a computed count into the engine where TypeScript would
-otherwise have stopped it. The schema accepts the computed form; the validator
-refuses the card.
+**Card gained: IF YOU LIKE PIÑA COLADA** — `"per": {"of": "held-of-each-resource"}` on
+a `res` of 1 in each resource *is* *"double all the resources on your player mat"*,
+and the cap still applies on top, which is the card's own second sentence.
+
+**`ideologue-level` reads CARDS, NOT RESOURCES**, and that is the load-bearing
+detail. §6 is explicit that the balance checker's D3 models the Ideologue ladder as a
+RESOURCE PROXY and over-reports on cards paying 3 or more. `powers.ts` `hasPower` is
+`cardsOf(player, ideologue) >= rules.level3` — a count of Ideology **Cards** answered.
+A computed value that agreed with the checker and disagreed with the engine would be
+the wrong way round, so `computedValue` counts cards and
+`computed-values.test.ts` pins the difference with a player holding 4 Funds and one
+answered card, which the proxy scores as Level 3 and the engine as Level 1.
+
+**Still (b), and the blocker is a FIELD, not arithmetic:** JUMLA and HOLO SAPIENS are
+dynamic *prices* (*"as many resources as the Ideologue level this card is on"*), and
+`Effect` has nowhere to put a price — `discount` grants a Helping Hands use rather
+than setting a cost. DOSTI BANI RAHE needs a turn trigger on a seat other than the
+owner. THE BIG FREEZE is a cap change or a per-turn donation, and a cap change is a
+`PlayerState` field, not an effect.
+
 
 ### G16 — no zone-scoped operation
 
@@ -335,12 +475,24 @@ the blind-answer invariant before it.
 
 ### G22 — no "during your next turn" scope
 
-**State: (b).** Cards: DON'T KISS THE BABIES, GENDER TROUBLE, SNOOP B-O-DOUBLE-T,
-DOSTI BANI RAHE, THE BIG FREEZE, MOVEMENT ANXIETY DISORDER. **G9 and G22 are one
-change** and are specified together.
+**State: (a). CLOSED — the same change as G9.** Each `LiveEffect` carries `activeFrom`
+and `expiresAt` as absolute turn numbers, computed at install from the seat order
+(`state.ts` `ownerNextTurn` and `roundEndTurn`) and checked by `isInForce`. Nothing
+at expiry time needs to know whose turn it is, and nothing at install time reads a
+clock, so a replay from seed + action log reproduces the list exactly.
 
-**Ask:** the same live-effects list as G9, each entry carrying the owning player, a
-start turn and an expiry turn, evaluated at the top of that player's turn.
+`'next-turn'` means *live through the owner's next turn, gone at the boundary after
+it*, and `timing: 'next-turn'` means *dormant until then*. `timing: 'after-this-turn'`
+is the one value still refused, and the reason is recorded rather than guessed at: it
+would need a queue of effects to run between `advanceTurn` and the next player's
+first action, and nothing in the corpus needs one.
+
+**Cards still waiting on this gap** are not waiting on the *scope* any more. DON'T
+KISS THE BABIES and SNOOP B-O-DOUBLE-T are surcharges (G5), GENDER TROUBLE is a
+`no-power` restriction (G5), MOVEMENT ANXIETY DISORDER needs a token counter on a
+card (G10) so it can expire after three discards rather than on a turn, and DOSTI
+BANI RAHE needs a trigger on somebody else's turn.
+
 
 ### G23 — `IdeologyCard` has no notion of the card's second face
 
@@ -374,19 +526,30 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 
 | # | change | where | unblocks | cost |
 |---|---|---|---|---|
-| 1 | loop `resolveTargets` in the `gerrymander` case | `reduce.ts` `applyEffect` | G8 — NEW FACE WHO DIS / SUBMERGED | one line |
-| 2 | live-effects list on `GameState` + expiry ticked in `advanceTurn` | `state.ts`, `reduce.ts` | **G9 + G22 (12 cards)**, and the substrate for 3 and 4 | large |
-| 3 | trigger registry consulted by `INFLUENCE` / `BUY_CONSPIRACY` / `GERRYMANDER` / `PLACE_VOTERS` / `setArea` | `reduce.ts` | **G14 (6 cards)** on top of 2 | medium |
-| 4 | resolve `n` (and `per` multipliers) against player state before pushing | `reduce.ts` | **G15 (5 cards)** and **G4 (3)** | medium |
-| 5 | `PlayerState.restrictions` + every action consults it | `state.ts`, `reduce.ts` | **G5 (5 cards)** — §4 | large |
+| ~~1~~ | ~~loop `resolveTargets` in the `gerrymander` case~~ | — | **DONE** | — |
+| ~~2~~ | ~~live-effects list on `GameState` + expiry ticked in `advanceTurn`~~ | — | **DONE** — G9 + G22, the substrate for 3 and 4 | — |
+| ~~3~~ | ~~trigger registry consulted by `INFLUENCE` / `BUY_CONSPIRACY` / `GERRYMANDER` / `PLACE_VOTERS` / `setArea`~~ | — | **DONE** — G14 | — |
+| ~~4~~ | ~~resolve `n` (and `per` multipliers) against player state before pushing~~ | — | **DONE** — G15 + G4 | — |
+| 5 | `PlayerState.restrictions` + every action consults it | `state.ts`, `reduce.ts` | **G5 (5 cards)** — §4. **The largest remaining lever: 3 of the 5 (PYTHONPOST, SNOOP B-O-DOUBLE-T, DON'T KISS THE BABIES) are surcharges, and a surcharge is a *cost* modifier, which no amount of `Effect` work can express.** | large |
 | 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **G13 (5 cards)**, incl. BLOCK and DEFLECT | largest |
-| 7 | `target` on `steal-any`, `evict`, `discard-voter`, `convert-voter`, `draw-conspiracy`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G1, G2, **G-new (3 cards)** | small |
-| 8 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **G20 (5 cards)** | medium |
-| 9 | `draw-card` with `from: 'draw' \| 'discard'` and a `'choose-card'` Choice | `state.ts`, `reduce.ts` | **G17 (4 cards)** | small |
+| 7 | `'chosen-player'` on `EffectTarget`, via a new `Choice` kind | `cards.ts`, `state.ts`, `reduce.ts`, **client** | G1 (2), G-new (1), and it is the last thing standing between 3 more trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM) | small, but a **wire-format change the client owns** |
+| 8 | `target` on `evict`, `discard-voter`, `convert-voter`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G-new (3 cards) | small |
+| 9 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **G20 (5 cards)** | medium |
+| 10 | `draw-card` with `from: 'draw' \| 'discard'` and a `'choose-card'` Choice | `state.ts`, `reduce.ts` | **G17 (4 cards)** | small |
+| 11 | a `price` field: a computed cost the *seller* reads, distinct from `discount` | `cards.ts`, `reduce.ts` | G15's JUMLA / HOLO SAPIENS, and the honest half of G3 | medium |
 
-Order 1, 7 and 9 are each under a day and together are worth about 8 cards. Order 2
-is the one that unblocks the most (12 cards, and it is the substrate for two more
-gaps). Order 6 is the most valuable per card and the most expensive.
+**Where the leverage is now.** Items 1–4 are done and bought 4 cards. Of what is
+left, **item 5 is the only one where a single mechanism unlocks several cards at
+once**: `Restriction` is one type, and PYTHONPOST, SNOOP B-O-DOUBLE-T and DON'T KISS
+THE BABIES are all the same clause over it — *"all purchases cost 1 extra resource in
+your turn"*. Item 6 buys 5 cards for the largest single piece of work in the list.
+Item 7 is cheap in the engine but needs a new `Choice` kind, and **a `Choice` kind is
+a wire-format change the client owns**, so it is not one decision.
+
+**The shortest route to the next playable card** is not on this table: it is a
+`read`-vs-`target` split on a computed value, which is half of G4 and would make
+THOUGHTS AND PRAYERS faithful rather than approximate.
+
 
 ---
 
