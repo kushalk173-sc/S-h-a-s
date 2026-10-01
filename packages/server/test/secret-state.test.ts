@@ -24,9 +24,18 @@
  *           layer 1 walks the two projection functions, and a new message could
  *           easily carry state without passing through either of them.
  *
- *   LAYER 3  The type system. `blindPromptFor` admits only `{question, labels,
+*   LAYER 3  The type system. `blindPromptFor` admits only `{question, labels,
  *           order}` — no `Delta`, no `Ideologue`, no `CardID`, no number. Asserted
  *           both at compile time (below) and structurally at runtime.
+ *
+ *   LAYER 4  The one deliberately viewer-scoped projection: `playableConspiracies`,
+ *           the ids/names/text of the VIEWER'S OWN Conspiracy Cards that `reduce`
+ *           will currently accept. D25 forbids shipping a hand; it does not forbid
+ *           a player knowing which of their own cards they may play — which is the
+ *           only thing that makes the mechanic usable at all. This layer asserts
+ *           the list against the ENGINE as its oracle (offered === what `reduce`
+ *           accepts), that it names nothing held by any other seat anywhere in the
+ *           payload, and that it is recomputed rather than cached.
  *
  * Plus a fourth thing this suite found that the type system cannot see: the
  * engine's own ANSWER error path, and the log lines. See the last two tests.
@@ -181,6 +190,108 @@ if (process.env['SHASN_DEBUG_CORPUS'] === '1') {
   for (const [i, s] of CORPUS.entries()) {
     const b = s.phase === 'answer' ? blindPromptFor(s, CARDS, s.activePlayer) : null;
     console.log(i, s.phase, 'active=' + s.activePlayer, 'pending=' + s._pendingCard, 'order=' + (b?.order ?? '-'));
+  }
+}
+
+// ─────────────────── the conspiracy corpus, and why it is separate ───────────────────
+
+/**
+ * A real three-player game in which EVERY SEAT HAS BOUGHT CONSPIRACY CARDS.
+ *
+ * It cannot be `CORPUS`. `nextAction` above never buys, so every hand in `CORPUS`
+ * is empty and `playableConspiracies` is `[]` in every state of it — the assertions
+ * below would pass against a projection that computed nothing at all. A leak test
+ * whose fixture cannot fail is a decoration, so this corpus is built to make the
+ * field non-empty: seats are given a staggered opening (rules-reference.md:92-93,
+ * and the only legal way for a player to have resources at all), and each seat
+ * spends them on the top Conspiracy Card every time it is on move.
+ *
+ * Because the deck is shuffled and each purchase takes the current top, the seats
+ * end up holding DIFFERENT cards, which is the whole point: cross-contamination is
+ * only observable when the answers differ.
+ *
+ * Real dispatch through `reduce`, not a hand-written state, for the same reason as
+ * `playedCorpus`: a fixture written by hand proves only that the projection is
+ * clean of the fields somebody remembered.
+ */
+function conspiracyCorpus(steps: number): readonly GameState[] {
+  let s = setup({
+    players: ['p1', 'p2', 'p3'],
+    names: { p1: 'One', p2: 'Two', p3: 'Three' },
+    cards: CARDS,
+    seed: 0x5eed17,
+    // Staggered opening, so seat 1 can afford a 4-resource Conspiracy on turn one
+    // and so does seat 3 on its own turn. The engine does not guess a split.
+    startResources: [{ funds: 8 }, { funds: 6, clout: 2 }, { funds: 5, media: 3 }],
+    ...decksOf(CARDS),
+  });
+  const corpus: GameState[] = [s];
+  const order = [...s.turnOrder];
+  let attempts = 0;
+  while (corpus.length < steps && !s.finished && attempts < steps * 14) {
+    attempts += 1;
+    const me = order[attempts % order.length] as PlayerID;
+    const a = nextConspiracyAction(s, me);
+    if (a === null) continue;
+    let r = reduce(s, me, a, { rules: ctx.rules, cards: CARDS });
+    // Cannot afford the Conspiracy? End the turn instead. `reduce` is pure, so
+    // probing here costs nothing and there is no fixture bookkeeping to drift.
+    if (!r.ok && a.type === 'BUY_CONSPIRACY') {
+      r = reduce(s, me, { type: 'END_TURN' }, { rules: ctx.rules, cards: CARDS });
+    }
+    if (!r.ok) continue;
+    s = r.state;
+    corpus.push(s);
+  }
+  return corpus;
+}
+
+function nextConspiracyAction(s: GameState, me: PlayerID) {
+  if (s.finished) return null;
+  if (s.phase === 'answer') return s.activePlayer === me ? ({ type: 'ANSWER', side: 0 } as const) : null;
+  if (s.phase === 'headlines') {
+    return s.activePlayer === me ? ({ type: 'ACK_HEADLINE' } as const) : null;
+  }
+  if (s.phase !== 'actions' || s.activePlayer !== me) return null;
+
+  const choice = s.choices.find((c) => c.player === me);
+  if (choice !== undefined) {
+    const c = choice.choice;
+    if (c.kind === 'steal-any') {
+      return {
+        type: 'RESOLVE_CHOICE',
+        choiceId: choice.id,
+        pick: { kind: 'steal', from: c.from ?? me, res: { funds: c.count } },
+      } as const;
+    }
+    if (c.kind === 'gain-any' || c.kind === 'lose-any') {
+      return {
+        type: 'RESOLVE_CHOICE',
+        choiceId: choice.id,
+        pick: { kind: 'resources', res: { funds: c.count } },
+      } as const;
+    }
+    return { type: 'RESOLVE_CHOICE', choiceId: choice.id, pick: { kind: 'areas', areaIds: [] } } as const;
+  }
+  return { type: 'BUY_CONSPIRACY', pay: { funds: 4 } } as const;
+}
+
+const CONSPIRACY_CORPUS = conspiracyCorpus(20);
+
+/** The ids this player actually holds, read straight off the server-side state. */
+function handOf(s: GameState, pid: PlayerID): readonly string[] {
+  return s.players[pid]?.conspiracies ?? [];
+}
+
+if (process.env['SHASN_DEBUG_CORPUS'] === '1') {
+  for (const [i, s] of CONSPIRACY_CORPUS.entries()) {
+    console.log(
+      'C',
+      i,
+      s.phase,
+      'active=' + s.activePlayer,
+      s.turnOrder.map((p) => `${p}:[${handOf(s, p).join(',')}]`).join(' '),
+    );
   }
 }
 
@@ -443,6 +554,303 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
       if (other === undefined) continue;
       expect(blindPromptFor(s, CARDS, other)).toBeNull();
       expect(answerSideFor(s, CARDS, other, 0)).toBeNull();
+    }
+  });
+});
+
+describe('LAYER 4 — the viewer-sent playable-conspiracy list', () => {
+  /**
+   * THE ORACLE. What the engine itself would accept, asked of the engine.
+   *
+   * Every assertion in this block is written against this rather than against a
+   * second transcription of the `PLAY_CONSPIRACY` guards. A test that re-states the
+   * rules next to the code under test proves the two transcriptions agree today and
+   * says nothing about whether either is right; asking `reduce` puts the reducer in
+   * charge, so this block cannot pass by agreeing with a bug in `broadcast.ts`.
+   */
+  function engineAllows(s: GameState, viewer: PlayerID, cardId: string): boolean {
+    return reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS }).ok;
+  }
+
+  function offered(s: GameState, viewer: PlayerID | null): readonly string[] {
+    return viewFor(s, CARDS, viewer).playableConspiracies.map((c) => c.id);
+  }
+
+  it('has a corpus in which several players hold DIFFERENT conspiracies at once', () => {
+    // Without this the rest of the block is vacuous: with empty hands every list is
+    // empty, and "no cross-contamination" is true of a projection that computes
+    // nothing. Two seats holding disjoint, non-empty sets is the minimum fixture
+    // that can distinguish a correct projection from one that unions the table.
+    let witnessed = 0;
+    for (const s of CONSPIRACY_CORPUS) {
+      const filled = s.turnOrder.filter((p) => handOf(s, p).length >= 1);
+      if (filled.length < 2) continue;
+      // Disjointness: if the seats share a card the fixture cannot catch a union.
+      const union = new Set(filled.flatMap((p) => handOf(s, p)));
+      if (union.size !== filled.flatMap((p) => handOf(s, p)).length) continue;
+      witnessed += 1;
+    }
+    expect(witnessed, 'no state had two seats holding disjoint conspiracies').toBeGreaterThanOrEqual(3);
+    // Both phase windows must appear, because the rules differ between them: during
+    // `answer` a conspiracy is out of turn for ANYONE (p19), during `actions` it is
+    // the active player's alone. A corpus with only one of them tests half a guard.
+    expect(CONSPIRACY_CORPUS.some((s) => s.phase === 'answer')).toBe(true);
+    expect(CONSPIRACY_CORPUS.some((s) => s.phase === 'actions')).toBe(true);
+    expect(CONSPIRACY_CORPUS.some((s) => offered(s, s.activePlayer).length > 0)).toBe(true);
+    expect(CONSPIRACY_CORPUS.some((s) => offered(s, null).length > 0)).toBe(false);
+  });
+
+  it('offers EXACTLY the cards the engine will accept — no more, and no fewer', () => {
+    // This is the load-bearing pair. Sound (nothing offered that is refused) is
+    // what stops the picker showing a button that does nothing, which is §9.10's
+    // prohibited control. Complete (nothing omitted that is accepted) is what stops
+    // the picker hiding a card the player legally owns and therefore cannot play.
+    let nonEmptySeen = 0;
+    for (const [i, s] of CONSPIRACY_CORPUS.entries()) {
+      for (const viewer of [...s.turnOrder, 'p_not_a_seat', '']) {
+        const mine = offered(s, viewer);
+        const legal = handOf(s, viewer).filter((id) => engineAllows(s, viewer, id));
+        expect(
+          [...mine].sort(),
+          `state ${i} (${s.phase}, active ${s.activePlayer}), viewer ${String(viewer)}`,
+        ).toEqual([...legal].sort());
+        if (mine.length > 0) nonEmptySeen += 1;
+      }
+    }
+    // If nothing was ever offered, the equality above is `[] === []` twenty times
+    // over and proves nothing at all.
+    expect(nonEmptySeen, 'the corpus never produced a non-empty list').toBeGreaterThan(5);
+  });
+
+  it('NO VIEWER can learn another player\'s conspiracy — the whole payload, not just the list', () => {
+    // The critical assertion, and it is deliberately wider than the field. It walks
+    // the serialised payload for every viewer in every state of a corpus where three
+    // seats hold three different cards, and asserts no OTHER seat's id appears
+    // anywhere in it. Checking only `playableConspiracies` would pass while the same
+    // id was duplicated into some other corner of `ClientState`; checking the string
+    // is what makes "this view carries only what its owner owns" a fact about the
+    // payload rather than about one field of it.
+    for (const [i, s] of CONSPIRACY_CORPUS.entries()) {
+      for (const viewer of [null, ...s.turnOrder]) {
+        const json = JSON.stringify(viewFor(s, CARDS, viewer));
+        for (const other of s.turnOrder) {
+          if (other === viewer) continue;
+          for (const id of handOf(s, other)) {
+            expect(json.includes(id), `state ${i}: viewer ${String(viewer)} was handed ${other}'s card ${id}`).toBe(
+              false,
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it('offers a seat only ids that seat actually holds', () => {
+    // The same property as a set identity rather than a substring scan, so a
+    // regression that invented an id fails here first with a readable message.
+    for (const s of CONSPIRACY_CORPUS) {
+      for (const viewer of s.turnOrder) {
+        const hand = new Set(handOf(s, viewer));
+        for (const c of viewFor(s, CARDS, viewer).playableConspiracies) {
+          expect(hand.has(c.id), `${viewer} was offered ${c.id}, which it does not hold`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('a spectator, a non-seat, and the empty-string viewer all get an EMPTY list', () => {
+    // A spectator has no hand, so there is nothing it may play. This is the case a
+    // viewer-scoped branch written carelessly gets wrong, and it is the reason
+    // `viewFor` takes `PlayerID | null` rather than a placeholder id.
+    for (const s of CONSPIRACY_CORPUS) {
+      expect(viewFor(s, CARDS, null).playableConspiracies).toEqual([]);
+      expect(viewFor(s, CARDS, 'p_not_a_seat').playableConspiracies).toEqual([]);
+      expect(viewFor(s, CARDS, '').playableConspiracies).toEqual([]);
+    }
+  });
+
+  it('the list is EMPTY outside the two play windows, and during `headlines` for everyone', () => {
+    // p19 scopes a Conspiracy to the `actions` window and to the `answer` window.
+    // The Headline queue is neither, and `reduce` refuses it there — so a list that
+    // stayed populated through the queue would offer a card whose effect could
+    // mutate the board while headlines were still pending (the R9 defect).
+    for (const s of CONSPIRACY_CORPUS) {
+      if (s.phase === 'actions' || s.phase === 'answer') continue;
+      for (const viewer of s.turnOrder) {
+        expect(offered(s, viewer), `${viewer} in phase ${s.phase}`).toEqual([]);
+      }
+    }
+  });
+
+  it('during `actions` only the ACTIVE player is offered anything', () => {
+    // The turn guard. During the active player's own turn the other seats must see
+    // nothing, even though they are holding cards — otherwise the list becomes a
+    // window onto every other seat's holdings.
+    let checked = 0;
+    for (const s of CONSPIRACY_CORPUS) {
+      if (s.phase !== 'actions') continue;
+      checked += 1;
+      for (const viewer of s.turnOrder) {
+        if (viewer === s.activePlayer) continue;
+        expect(offered(s, viewer), `${viewer} is not the active player`).toEqual([]);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('during `answer` EVERY holder is offered, including the seat that is not on move', () => {
+    // p19: "before the next player answers, ANY player may play a Conspiracy Card".
+    // So the answer window is the one place the list is NOT turn-scoped, and this
+    // is the assertion that would fail if the turn guard were copied too eagerly.
+    let witnessed = 0;
+    for (const s of CONSPIRACY_CORPUS) {
+      if (s.phase !== 'answer') continue;
+      for (const viewer of s.turnOrder) {
+        if (viewer === s.activePlayer) continue;
+        const mine = offered(s, viewer);
+        if (mine.length === 0) continue;
+        witnessed += 1;
+        expect(mine, `${viewer} is out of turn in the answer window`).toEqual(handOf(s, viewer));
+      }
+    }
+    expect(witnessed, 'no out-of-turn answer-window offer was ever witnessed').toBeGreaterThan(0);
+  });
+
+  it('the list is COMPUTED, never cached: playing a card removes it from the next view', () => {
+    // The requirement that turns a projection into a live one. Take a state where
+    // the viewer is offered something, actually play it through `reduce`, project
+    // again, and the card must be gone — with no invalidation step that could be
+    // forgotten, because there is no cache to invalidate.
+    let exercised = 0;
+    for (const s of CONSPIRACY_CORPUS) {
+      const viewer = s.activePlayer;
+      const before = offered(s, viewer);
+      const cardId = before[0];
+      if (cardId === undefined) continue;
+      const played = reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS });
+      expect(played.ok).toBe(true);
+      if (!played.ok) continue;
+      const after = offered(played.state, viewer);
+      expect(after, 'the played card is still on offer').not.toContain(cardId);
+      expect(after.length).toBe(Math.max(0, before.length - 1));
+      exercised += 1;
+      if (exercised >= 4) break;
+    }
+    expect(exercised, 'no card was ever actually played').toBeGreaterThanOrEqual(2);
+  });
+
+  it('handing a card to another seat takes it out of the giver\'s list immediately', () =>
+    // The second direction of "not cached": a TRADE moves a card between hands, and
+    // a projection that remembered anything about the previous state would still be
+    // offering it to the player who gave it away.
+    {
+      let exercised = 0;
+      for (const s of CONSPIRACY_CORPUS) {
+        if (s.phase !== 'actions' || s.activePlayer !== s.turnOrder[0]) continue;
+        const me = s.turnOrder[0];
+        const them = s.turnOrder[1];
+        if (me === undefined || them === undefined) continue;
+        const cardId = offered(s, me)[0];
+        if (cardId === undefined) continue;
+        const traded = reduce(
+          s,
+          me,
+          {
+            type: 'TRADE',
+            withPlayer: them,
+            // p12: both sides must exchange at least one resource, and both parties
+            // must be able to afford their side, so a bare card swap is refused.
+            give: { funds: 1 },
+            receive: { funds: 1 },
+            giveCards: [cardId],
+            receiveCards: [],
+          },
+          { rules: ctx.rules, cards: CARDS },
+        );
+        if (!traded.ok) continue;
+        expect(offered(traded.state, me), 'the giver still sees the card they traded away').not.toContain(cardId);
+        expect(handOf(traded.state, them)).toContain(cardId);
+        exercised += 1;
+        if (exercised >= 2) break;
+      }
+      expect(exercised, 'no TRADE of a conspiracy ever committed').toBeGreaterThanOrEqual(1);
+    });
+
+  it('still ships no hand: players[].conspiracies is empty for EVERY seat, owner included', () => {
+    // The D25 invariant, re-asserted in the states where the new field is NON-EMPTY.
+    // Without this, "we send the viewer their playable cards" could quietly become
+    // "we send the viewer their hand" — and the two are different rulings.
+    let nonEmpty = 0;
+    for (const s of CONSPIRACY_CORPUS) {
+      for (const viewer of [null, ...s.turnOrder]) {
+        const view = viewFor(s, CARDS, viewer);
+        if (view.playableConspiracies.length > 0) nonEmpty += 1;
+        for (const pid of s.turnOrder) {
+          expect(view.players[pid]?.conspiracies, `viewer ${String(viewer)} sees ${pid}'s hand`).toEqual([]);
+        }
+      }
+    }
+    expect(nonEmpty, 'no viewer was ever offered a card, so this would be vacuous').toBeGreaterThan(5);
+  });
+
+  it('names the cards, and only from the index — never an id with no readable card', () => {
+    // The client has no card database, so `name` and `text` have to come from here.
+    // Asserting they are the PRINTED strings, not ids dressed up as labels, is what
+    // stops a future refactor sending `t-con-0007` as the "name".
+    for (const s of CONSPIRACY_CORPUS) {
+      for (const viewer of s.turnOrder) {
+        for (const c of viewFor(s, CARDS, viewer).playableConspiracies) {
+          const card = CARDS.conspiracy[c.id];
+          expect(card).toBeDefined();
+          expect(c.name).toBe(card?.name);
+          expect(c.text).toBe(card?.text);
+          expect(c.name, 'the name must not be the id').not.toBe(c.id);
+        }
+      }
+    }
+  });
+
+  it('LAYER 2: no rendered MESSAGE carries another seat\'s conspiracy either', () => {
+    // `renderAll` is what the handler can put on a socket. Walking only `viewFor`
+    // would leave room for a second send path that inlined a whole hand, so the
+    // cross-contamination assertion is repeated over the exhaustive render.
+    let checked = 0;
+    for (const s of CONSPIRACY_CORPUS) {
+      for (const viewer of [null, ...s.turnOrder]) {
+        for (const msg of renderAll(s, { rules: ctx.rules, cards: CARDS }, viewer)) {
+          const json = JSON.stringify(msg);
+          for (const other of s.turnOrder) {
+            if (other === viewer) continue;
+            for (const id of handOf(s, other)) {
+              expect(json.includes(id), `${msg.t} leaked ${other}'s ${id} to ${String(viewer)}`).toBe(false);
+            }
+          }
+          // A spectator's render carries no conspiracy id whatsoever, not even its
+          // own — there is no own.
+          if (viewer === null) {
+            for (const pid of s.turnOrder) {
+              for (const id of handOf(s, pid)) {
+                expect(json.includes(id), `${msg.t} leaked ${pid}'s ${id} to a spectator`).toBe(false);
+              }
+            }
+          }
+          checked += 1;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('the ROOM path agrees with the bare projection, for every viewer', () => {
+    // The same argument layer 1 makes about `viewFor`: walk what `Room.viewFor`
+    // actually hands the fan-out, which is what the server sends.
+    for (const s of CONSPIRACY_CORPUS) {
+      const room = roomFor(s);
+      for (const viewer of [null, ...s.turnOrder]) {
+        expect(room.viewFor(viewer).state.playableConspiracies.map((c) => c.id)).toEqual(
+          offered(s, viewer),
+        );
+      }
     }
   });
 });

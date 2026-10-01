@@ -45,4 +45,18 @@ export const LEAK_PATHS = {
    * to its owner turns a bluffing mechanic into a solved one.
    */
   conspiracyHand: 'players[].conspiracies',
+
+  /**
+   * The ONE narrow exception to the rule above, and it is not an exception to the
+   * hand: `playableConspiracies` is a per-VIEWER list of that viewer's own cards,
+   * narrowed to the ones `reduce` will accept for a `PLAY_CONSPIRACY` right now. It
+   * is empty whenever the viewer could not play one, and it never contains a card
+   * held by anybody else.
+   *
+   * It is listed here because it is the field a future refactor is most likely to
+   * "simplify" — widen it to the whole hand, hoist it out of the phase/turn guards,
+   * or compute it once per match instead of per projection. Each of those is a
+   * regression this file's block in `secret-state.test.ts` fails on.
+   */
+  playableConspiracies: 'playableConspiracies[]',
 } as const;
