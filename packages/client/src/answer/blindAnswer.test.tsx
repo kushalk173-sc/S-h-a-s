@@ -26,8 +26,17 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { fireEvent, render } from '@testing-library/react';
-import { BlindAnswer, hashSeed, orderedSides, presentationOrder } from './BlindAnswer';
+import {
+  BlindAnswer,
+  commitLabel,
+  commitStatus,
+  hashSeed,
+  orderedSides,
+  presentationOrder,
+  type CommitState,
+} from './BlindAnswer';
 // `?raw` gives the stylesheet source itself, so the symmetry audit reads the
 // file that ships rather than a processed approximation of it. Bundler-native,
 // so it works under any cwd.
@@ -100,6 +109,14 @@ function sides(container: HTMLElement): HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>('.blind-answer__side')];
 }
 
+/**
+ * `jest-dom` is not a dependency of this package, so the two matchers this file
+ * needs are read straight off the DOM rather than added for six assertions.
+ */
+function isDisabled(el: Element): boolean {
+  return (el as HTMLButtonElement).disabled;
+}
+
 function styleSnapshot(el: HTMLElement): Record<string, string> {
   const cs = window.getComputedStyle(el);
   const out: Record<string, string> = {};
@@ -157,7 +174,7 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
           labelA={LABEL_A}
           labelB={LABEL_B}
           seed={1}
-          committed={side}
+          selected={side}
         />,
       );
       const chosen = sides(container).find(
@@ -320,19 +337,30 @@ describe('the presentation order is seed-derived and actually varies', () => {
 });
 
 describe('no payout can reach the DOM', () => {
-  it('renders nothing but the scenario and the two labels', () => {
+  it('renders nothing but the scenario, the two labels, and the two step labels', () => {
     const { container } = render(
       <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
     );
-    // The scenario, the two labels, and the confirm control. Nothing else.
+    // The scenario, the two labels, and the ONE commit control with its status
+    // line. Nothing else. The expectation is built from the same parts rather
+    // than hard-coded prose, so a rewording that did not add information cannot
+    // silently pass, and a rewording that DID add a number could not pass either.
     expect(container.querySelector('[data-testid="scenario"]')?.textContent).toBe(QUESTION);
     const labels = sides(container).map((s) => s.textContent);
     expect([...labels].sort()).toEqual([LABEL_A, LABEL_B].sort());
-    // The full text is exactly those three, in that structure, plus the word
-    // "Confirm". `textContent` concatenates without separators, so the
-    // expectation is built from the same parts rather than hard-coded prose.
     const text = (container.textContent ?? '').replace(/\s+/g, ' ').trim();
-    expect(text).toBe(`${QUESTION}${labels.join('')}Confirm`);
+    // `textContent` concatenates without separators, so the expectation is built
+    // from the same parts rather than hard-coded prose — a rewording that added
+    // information could not pass, and one that added a number could not either.
+    expect(text).toBe(
+      [
+        QUESTION,
+        'CHOOSE ONE',
+        ...labels,
+        commitLabel('idle'),
+        commitStatus('idle'),
+      ].join(''),
+    );
     // Not a single digit anywhere on the prompt: no cost, no payout, no count,
     // no turn number, no resource total.
     expect(text).not.toMatch(/\d/);
@@ -386,18 +414,285 @@ describe('no payout can reach the DOM', () => {
     expect(markup).not.toContain('style=');
   });
 
-  it('reports only the wire side on commit — never a value', () => {
-    const onCommit = vi.fn();
+  it('reports only the wire side on selection — never a value', () => {
+    const onSelect = vi.fn();
     const { container } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} onCommit={onCommit} />,
+      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} onSelect={onSelect} />,
     );
     for (const el of sides(container)) fireEvent.click(el);
-    const reported = onCommit.mock.calls.map((c) => c[0]).sort();
+    const reported = onSelect.mock.calls.map((c) => c[0]).sort();
     // Exactly the two wire sides, once each. Not numbers, not objects.
     expect(reported).toEqual(['A', 'B']);
-    for (const arg of onCommit.mock.calls.flat()) {
+    for (const arg of onSelect.mock.calls.flat()) {
       expect(['A', 'B']).toContain(arg);
     }
+  });
+});
+
+/**
+ * THE REGRESSION GATE FOR THE TWO-COMMIT-CONTROLS DEFECT.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * THE DEFECT. `BlindAnswer` rendered a button labelled "Confirm" which, after a
+ * click, read "Answer committed" — but that click only SELECTED a side.
+ * `AnswerScreen` rendered a second control, "COMMIT ANSWER", and that was the one
+ * that actually dispatched `ANSWER` to the server. So a player who pressed
+ * "Confirm" was told, by the most safety-critical screen in the game, that their
+ * answer had been committed when it had not been sent. The premise of the whole
+ * mechanic is that nothing about the payout is visible before the commit; a
+ * control that lies about having committed is the same class of failure one step
+ * along.
+ *
+ * WHY THIS IS A TEST AND NOT A WORDING REVIEW. Every assertion below is about
+ * behaviour — which callback fires, what the label says, whether the control is
+ * disabled — rather than about the presence of a substring. A future edit that
+ * reintroduced a second committing control, or moved the commit back into local
+ * state, fails here instead of in a screenshot.
+ */
+describe('exactly one control commits, and it is the only one that says so', () => {
+  it('pressing a side SELECTS and never commits — the defect itself', () => {
+    const onCommit = vi.fn();
+    // The component is CONTROLLED: it holds no state of its own, so the harness
+    // stands in for `AnswerScreen` and mirrors the real wiring. This is the
+    // point of the prop contract — the old defect was a component that decided
+    // for itself that it had committed.
+    function Harness() {
+      const [selected, setSelected] = useState<'A' | 'B' | null>(null);
+      return (
+        <BlindAnswer
+          question={QUESTION}
+          labelA={LABEL_A}
+          labelB={LABEL_B}
+          seed={1}
+          selected={selected}
+          commitState={selected === null ? 'idle' : 'ready'}
+          onSelect={setSelected}
+          onCommit={onCommit}
+        />
+      );
+    }
+    const { container, getByTestId } = render(<Harness />);
+    const commit = getByTestId('commit-answer');
+    // Nothing chosen: the commit control is dead, and says why.
+    expect(isDisabled(commit)).toBe(true);
+    expect(commit.textContent).toBe(commitLabel('idle'));
+
+    // THE WHOLE POINT: pressing the selection control does NOT commit.
+    fireEvent.click(sides(container)[0]!);
+    expect(onCommit, 'pressing a side must never send anything').not.toHaveBeenCalled();
+
+    // It selected — the tick is on exactly one side — and it did not CLAIM to
+    // have committed. The label is still the unsent one, with no "committed",
+    // "sent" or "recorded" anywhere on the screen.
+    expect(container.querySelectorAll('[data-testid="chosen-check"]')).toHaveLength(1);
+    expect(commit.textContent).toBe(commitLabel('ready'));
+    expect(container.textContent).not.toMatch(/committed|recorded/i);
+    expect(container.textContent).not.toMatch(/\bsent\b/i);
+
+    // And NOW the control is live — which is the only honest progression: a
+    // selection arms the commit, and the commit is still the player's to press.
+    expect(isDisabled(commit)).toBe(false);
+  });
+
+  it('the component renders exactly one button that can send, and it is the commit', () => {
+    const onSelect = vi.fn();
+    const onCommit = vi.fn();
+    const { container } = render(
+      <BlindAnswer
+        question={QUESTION}
+        labelA={LABEL_A}
+        labelB={LABEL_B}
+        seed={1}
+        selected="A"
+        commitState="ready"
+        onSelect={onSelect}
+        onCommit={onCommit}
+      />,
+    );
+
+    // Three buttons: two sides, one commit. Anything more is a second path out.
+    const buttons = [...container.querySelectorAll('button')];
+    expect(buttons).toHaveLength(3);
+    const committing = buttons.filter((b) =>
+      /commit|send/i.test(b.textContent ?? ''),
+    );
+    expect(committing, 'only the commit control may use commit/send wording').toHaveLength(1);
+
+    // Only the commit button is wired to the sending callback. Pressing both
+    // sides fires `onSelect` twice and `onCommit` zero times.
+    fireEvent.click(sides(container)[0]!);
+    fireEvent.click(sides(container)[1]!);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onCommit).not.toHaveBeenCalled();
+
+    // The commit control sends, and takes no side argument — the caller owns the
+    // mapping, so there is no way for the component to send the wrong one.
+    fireEvent.click(container.querySelector('[data-testid="commit-answer"]')!);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith();
+  });
+
+  it('the two steps never share a word: "choose" selects, "commit" sends', () => {
+    const { container, getByTestId } = render(
+      <BlindAnswer
+        question={QUESTION}
+        labelA={LABEL_A}
+        labelB={LABEL_B}
+        seed={1}
+        selected="A"
+        commitState="ready"
+      />,
+    );
+    const choose = getByTestId('choose-label').textContent ?? '';
+    const commit = getByTestId('commit-answer').textContent ?? '';
+    expect(choose).toMatch(/choose/i);
+    expect(commit).toMatch(/commit/i);
+    // No shared verb. "Confirm" is the word that caused it: it reads as a synonym
+    // for committing, so it may not appear anywhere on this screen.
+    const all = (container.textContent ?? '').toLowerCase();
+    expect(all, '"Confirm" may not appear on the blind answer').not.toContain('confirm');
+  });
+
+  it('commit state comes from the caller, so a failed dispatch cannot claim success', () => {
+    const onCommit = vi.fn();
+    // The prop is the ONLY source of commit state. Rendered in `ready` — a side
+    // chosen, nothing sent — the button is live and says nothing about success.
+    const { getByTestId, rerender } = render(
+      <BlindAnswer
+        question={QUESTION}
+        labelA={LABEL_A}
+        labelB={LABEL_B}
+        seed={1}
+        selected="A"
+        commitState="ready"
+        onCommit={onCommit}
+      />,
+    );
+    expect(getByTestId('commit-answer').textContent).toBe(commitLabel('ready'));
+    expect(isDisabled(getByTestId('commit-answer'))).toBe(false);
+
+    // A frame IN FLIGHT is not a commit. The label must not claim it is sent.
+    rerender(
+      <BlindAnswer
+        question={QUESTION}
+        labelA={LABEL_A}
+        labelB={LABEL_B}
+        seed={1}
+        selected="A"
+        commitState="sending"
+        onCommit={onCommit}
+      />,
+    );
+    const inFlight = getByTestId('commit-answer');
+    expect(isDisabled(inFlight)).toBe(true);
+    expect(inFlight.textContent).toMatch(/sending/i);
+    expect(inFlight.textContent, 'a frame in flight is not a committed answer')
+      .not.toMatch(/sent|recorded|committed/i);
+    // And it cannot be pressed twice.
+    fireEvent.click(inFlight);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('once the server has it, the control is dead and says so unambiguously', () => {
+    const onSelect = vi.fn();
+    const onCommit = vi.fn();
+    const { container, getByTestId } = render(
+      <BlindAnswer
+        question={QUESTION}
+        labelA={LABEL_A}
+        labelB={LABEL_B}
+        seed={1}
+        selected="A"
+        commitState="committed"
+        onSelect={onSelect}
+        onCommit={onCommit}
+      />,
+    );
+    const commit = getByTestId('commit-answer');
+    expect(isDisabled(commit)).toBe(true);
+    expect(commit.getAttribute('aria-disabled')).toBe('true');
+    expect(commit.textContent).toBe(commitLabel('committed'));
+    expect(getByTestId('commit-status').textContent).toBe(commitStatus('committed'));
+
+    // Dead means dead: neither the commit nor the selection responds.
+    fireEvent.click(commit);
+    fireEvent.click(sides(container)[1]!);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    // The selection is locked too, so a late click cannot restate it.
+    for (const side of sides(container)) expect(isDisabled(side)).toBe(true);
+  });
+
+  it('labels every state, and none of them says committed while in flight', () => {
+    const states: readonly CommitState[] = ['idle', 'ready', 'sending', 'committed'];
+    const labels = states.map(commitLabel);
+    expect(new Set(labels).size, 'two states sharing a label is how this recurs').toBe(3);
+    // Exactly ONE state may use the "it is in" wording, and it must be the
+    // server-confirmed one.
+    for (const [i, label] of labels.entries()) {
+      if (i === states.indexOf('committed')) {
+        expect(label).toMatch(/sent|recorded/i);
+      } else {
+        expect(label).not.toMatch(/sent|recorded|committed/i);
+      }
+    }
+    // Every state's status line names a step, and none leaks a number.
+    for (const state of states) {
+      const status = commitStatus(state);
+      expect(status.length).toBeGreaterThan(0);
+      expect(status).not.toMatch(/\d/);
+      expect(status).not.toMatch(/Funds|Clout|Media|Trust|₹/);
+    }
+  });
+
+  it('a keyboard user gets the same single commit affordance', () => {
+    const onCommit = vi.fn();
+    const { container, getByTestId } = render(
+      <BlindAnswer
+        question={QUESTION}
+        labelA={LABEL_A}
+        labelB={LABEL_B}
+        seed={1}
+        selected="A"
+        commitState="ready"
+        onCommit={onCommit}
+      />,
+    );
+
+    // The sides are real buttons with `aria-pressed`, so a screen reader reads
+    // the selection state as pressed/not-pressed rather than as a styled class —
+    // which is also what keeps the chosen state identical on both sides.
+    // Looked up BY WIRE SIDE, not by position: which side is 'A' is the
+    // seed-derived order, and a test that assumed position would be asserting a
+    // fixed left/right layout — the exact thing §1.2 forbids.
+    const bySide = new Map(sides(container).map((s) => [s.getAttribute('data-wire-side'), s]));
+    // `selected="A"` above, so A is the pressed one and B is not.
+    const chosen = bySide.get('A');
+    const unchosen = bySide.get('B');
+    expect(chosen?.tagName).toBe('BUTTON');
+    expect(chosen?.getAttribute('aria-pressed')).toBe('true');
+    expect(unchosen?.getAttribute('aria-pressed')).toBe('false');
+
+    // The commit control is a real button with a name and a live-region status,
+    // so the whole step is reachable and announced without sight or a mouse.
+    const commit = getByTestId('commit-answer');
+    expect(commit.tagName).toBe('BUTTON');
+    expect(commit.textContent?.trim()).not.toBe('');
+    expect(commit.getAttribute('aria-disabled')).toBe('false');
+    expect(getByTestId('commit-status').getAttribute('role')).toBe('status');
+
+    // The panel is a labelled group, so the two sides are announced as one
+    // question with two options rather than as two loose buttons.
+    const panel = getByTestId('panel');
+    expect(panel.getAttribute('role')).toBe('group');
+    const labelledBy = panel.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    expect(container.querySelector(`#${labelledBy}`)).not.toBeNull();
+
+    // Every interactive element is a native button, so Space and Enter both fire
+    // it and nothing depends on a key handler that might be missed.
+    const interactive = [...container.querySelectorAll('[onclick], [tabindex]')];
+    expect(interactive).toHaveLength(0);
   });
 });
 
@@ -434,8 +729,14 @@ describe('the stylesheet itself contains no side-differentiating rule', () => {
       .map((m) => (m[1] ?? '').trim())
       .filter((s) => s.includes('.blind-answer__side'));
     expect(selectors.length).toBeGreaterThanOrEqual(4);
+    // The permitted state qualifiers are all things BOTH sides share: the pointer
+    // being over either, the keyboard being on either, either being the chosen
+    // one, and either being locked because the answer is in flight. `:disabled`
+    // qualifies because it is driven by the single `locked` flag above the
+    // commit control — it is a statement about the ANSWER, not about a side.
+    // Nothing here may distinguish A from B.
     const allowed =
-      /^\.blind-answer__side(:hover|:focus|:focus-visible|\[aria-pressed='true'\])?(\s+\.blind-answer__label)?$/;
+      /^\.blind-answer__side(:hover|:focus|:focus-visible|:disabled|\[aria-pressed='true'\])?(\s+\.blind-answer__label)?$/;
     for (const selector of selectors) {
       // Only the parts that actually target a side are constrained. A grouped
       // rule such as `.side, .confirm` in the reduced-motion block is fine:

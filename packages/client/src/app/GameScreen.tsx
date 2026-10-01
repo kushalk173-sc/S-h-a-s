@@ -332,9 +332,15 @@ export function GameScreen({ store }: GameScreenProps) {
    * silently-dead button, which is why it is `send(fn)` and not `c.dispatch(a)`
    * inline: the caller never learns whether the press landed, so every caller
    * routes through here where the refusal is raised once.
+   *
+   * IT RETURNS THE BOOLEAN, because one caller needs it. `AnswerScreen` cannot
+   * say "sending your answer" unless the frame actually left the socket; a press
+   * that never left must re-arm the control rather than show an in-flight state
+   * that resolves to nothing. Every other caller ignores the return value, which
+   * is legal against a `void`-returning signature.
    */
-  const dispatch = useCallback((action: Action) => {
-    send((c) => c.dispatch(action));
+  const dispatch = useCallback((action: Action): boolean => {
+    return send((c) => c.dispatch(action));
   }, []);
 
   /**
@@ -668,6 +674,8 @@ export function GameScreen({ store }: GameScreenProps) {
           state={state}
           prompt={store.blind as BlindPrompt}
           you={you as PlayerID}
+          viewId={store.viewId}
+          errorAt={store.error === null ? null : store.error.at}
           picker={app.picker}
           onCommit={(displayIndex) => dispatch(actions.answer(displayIndex))}
           onRedrawRequest={() =>

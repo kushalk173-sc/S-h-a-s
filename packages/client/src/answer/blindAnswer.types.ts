@@ -24,17 +24,23 @@ import './blindAnswer.css';
 type Props = ComponentProps<typeof BlindAnswer>;
 
 /**
- * The complete, closed set of things this component can be told. Six fields.
- * Four are strings, one is a number that is provably the PRNG cursor, and one
- * is a callback whose argument is the WIRE side — never a value.
+ * The complete, closed set of things this component can be told. Eight fields.
+ *
+ * Four are strings, one is a number that is provably the PRNG cursor, one is a
+ * callback whose argument is the WIRE side — never a value — one is another
+ * callback that takes NO arguments at all, and the last two are a nullable side
+ * and a four-value union of server-derived states. None of them is a resource,
+ * a payout, an Ideologue, or a quantity.
  */
 const EXHAUSTIVE: Props = {
   question: 'string',
   labelA: 'string',
   labelB: 'string',
   seed: 0,
-  onCommit: (_side) => undefined,
-  committed: null,
+  onSelect: (_side) => undefined,
+  selected: null,
+  commitState: 'idle',
+  onCommit: () => undefined,
 };
 void EXHAUSTIVE;
 
@@ -102,21 +108,36 @@ const committedIsOnlyASide: Props = {
   labelB: 'b',
   seed: 1,
   // Valid — this is the whole legal set.
-  committed: 'A',
+  selected: 'A',
   // @ts-expect-error — nothing else, and in particular not a value.
   payout: 7,
 };
 void committedIsOnlyASide;
 
-const onCommitGetsASideNotAValue: Props = {
+const onSelectGetsASideNotAValue: Props = {
   question: 'q',
   labelA: 'a',
   labelB: 'b',
   seed: 1,
-  // @ts-expect-error — the callback receives the wire side, not a payout.
-  onCommit: (side: number) => side,
+  // @ts-expect-error — the selection callback receives the wire side, not a
+  // payout. Note the name: it SELECTS. It is not the commit path, which is what
+  // makes "pressing a side must not mark the answer committed" checkable here
+  // as well as at the DOM level.
+  onSelect: (side: number) => side,
 };
-void onCommitGetsASideNotAValue;
+void onSelectGetsASideNotAValue;
+
+const commitStateIsAServerDerivedUnion: Props = {
+  question: 'q',
+  labelA: 'a',
+  labelB: 'b',
+  seed: 1,
+  // @ts-expect-error — `commitState` is one of four literals. There is no way to
+  // hand this component a fifth state, and in particular no way to invent
+  // 'committed' from a local click: the caller owns it.
+  commitState: 'sent-with-the-payout',
+};
+void commitStateIsAServerDerivedUnion;
 
 // ── 4. Labels are plain strings, so no side can arrive pre-styled. ────────
 const labelsArePlainStrings: Props = {

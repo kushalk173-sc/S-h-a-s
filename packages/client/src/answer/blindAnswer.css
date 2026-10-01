@@ -187,7 +187,23 @@
   color: var(--seal);
 }
 
-.blind-answer__confirm {
+/* STEP ONE'S OWN LABEL. Naming the step is what stops "choose" and "commit"
+   being read as the same verb: this file once had a `Confirm` button whose
+   label became "Answer committed" on a click that only SELECTED a side, while
+   the real dispatch lived in another component entirely. */
+.blind-answer__choose {
+  font: var(--type-tooltip);
+  font-weight: 700;
+  color: var(--ink-500);
+  letter-spacing: 0.14em;
+  text-align: center;
+  margin: 0 0 var(--sp-3);
+}
+
+/* THE ONE COMMIT CONTROL. Styled like every other primary button in the
+   product so it reads as the send, with the selection check-glyph reserved
+   entirely for "this is the one you picked". */
+.blind-answer__commit {
   display: block;
   margin: var(--sp-6) auto 0;
   font: var(--type-button);
@@ -200,22 +216,43 @@
   transition: background var(--dur-90) var(--ease-board);
 }
 
-.blind-answer__confirm:hover:not(:disabled) {
+.blind-answer__commit:hover:not(:disabled) {
   background: var(--seal-deep);
   border-color: var(--seal-deep);
 }
 
-.blind-answer__confirm:disabled {
-  /* §9.2: never make an action unavailable by low contrast alone. */
+.blind-answer__commit:disabled {
+  /* §9.2: never make an action unavailable by low contrast alone — and the
+     status line below carries WHY it is unavailable, which is §9.10's rule
+     that a control which cannot act says so. */
   background: var(--unavail-fill);
   border-color: var(--ink-300);
   color: var(--unavail-ink);
   cursor: not-allowed;
 }
 
+/* The commit state, announced. `role="status"` in the markup makes this a live
+   region, so a screen-reader user learns that the answer was sent without
+   having to go looking for it — the same information the button's own label
+   carries, so neither audience is worse served. */
+.blind-answer__status {
+  font: var(--type-tooltip);
+  color: var(--ink-500);
+  text-align: center;
+  margin: var(--sp-3) 0 0;
+}
+
+/* A side stops being selectable once the answer is in flight or in: the engine
+   has one answer per card, so a second selection is a state with no meaning.
+   Identical on both sides, like every other state here. */
+.blind-answer__side:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .blind-answer__side,
-  .blind-answer__confirm {
+  .blind-answer__commit {
     transition-duration: 80ms;
   }
 }

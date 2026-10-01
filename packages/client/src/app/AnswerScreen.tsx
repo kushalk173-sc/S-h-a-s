@@ -34,12 +34,13 @@
  *    is opacity, deliberately.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ClientState, Pool } from '@shasn/engine';
 import type { PlayerID, Resource } from '@shasn/engine';
 
 import { BlindAnswer } from '../answer/BlindAnswer.tsx';
+import type { CommitState } from '../answer/BlindAnswer.tsx';
 import type { BlindPrompt } from '../net/index.ts';
 
 import { committedSideToDisplayIndex, promptToProps } from './blindWire.ts';
@@ -51,8 +52,22 @@ export type AnswerScreenProps = {
   readonly state: ClientState;
   readonly prompt: BlindPrompt;
   readonly you: PlayerID;
+  /**
+   * The server's state ENVELOPE version (`net/protocol.ts`), not a `ClientState`
+   * field. It is the client's only trustworthy proof that the server has spoken
+   * since we sent `ANSWER`, and it is what `committed` below is measured
+   * against.
+   */
+  readonly viewId: number;
+  /** The server's last error, and its monotonic counter. See `commitStateOf`. */
+  readonly errorAt: number | null;
   readonly picker: PickerDraft | null;
-  readonly onCommit: (displayIndex: 0 | 1) => void;
+  /**
+   * Send the answer. Returns whether the frame actually LEFT the socket, so the
+   * caller can tell "in flight" from "never sent" — a press that did not reach
+   * the table must not leave the UI claiming the answer is on its way.
+   */
+  readonly onCommit: (displayIndex: 0 | 1) => boolean;
   readonly onRedrawRequest: () => void;
   readonly onPick: (next: Readonly<Record<string, number>>) => void;
   readonly onRedrawConfirm: (pay: Readonly<Record<string, number>>) => void;
@@ -61,8 +76,29 @@ export type AnswerScreenProps = {
 
 export function AnswerScreen(props: AnswerScreenProps) {
   const { prompt, state, you } = props;
-  const [committed, setCommitted] = useState<'A' | 'B' | null>(null);
   const me = state.players[you];
+
+  /**
+   * THE SELECTION IS LOCAL, AND THAT IS CORRECT. §6.1 of `app/store.ts` draws
+   * the line the whole client runs on: pending intent is local, applied state is
+   * the server's. Which side a player has picked is intent — nothing has been
+   * sent, nothing can be wrong, and there is no game state for it to desync
+   * from. It is called `selected`, not `committed`, because that distinction is
+   * the defect this screen was fixed for.
+   */
+  const [selected, setSelected] = useState<'A' | 'B' | null>(null);
+
+  /**
+   * `sending` is a CLAIM ABOUT THE WIRE, NOT ABOUT THE GAME. It is set only when
+   * `send()` reports the frame actually left, and it is cleared the moment the
+   * server proves otherwise — by refusing (`errorAt` moves) or by simply not
+   * taking the answer (a newer `viewId` with the turn still `answer`).
+   *
+   * This state is why there is a `sending` label at all: without it, either the
+   * button stays live and can be double-submitted, or it goes dead and a failed
+   * dispatch strands the player. With it, the honest third option exists.
+   */
+  const [sending, setSending] = useState(false);
 
   /**
    * A redraw replaces the card, and therefore the two labels, and a new question
@@ -79,8 +115,99 @@ export function AnswerScreen(props: AnswerScreenProps) {
   const [lastPromptKey, setLastPromptKey] = useState(promptKey);
   if (lastPromptKey !== promptKey) {
     setLastPromptKey(promptKey);
-    if (committed !== null) setCommitted(null);
+    if (selected !== null) setSelected(null);
+    if (sending) setSending(false);
   }
+
+  /**
+   * THE SERVER'S ANSWER, AND ONLY THE SERVER'S.
+   *
+   * `sentAtView` is stamped at the instant we dispatch and is never written
+   * again for the same prompt. `committed` therefore becomes true only when BOTH
+   * halves of the following are true:
+   *
+   *   1. a NEWER `viewId` has arrived — the server has spoken since the dispatch,
+   *      so this is observed state rather than an assumption; and
+   *   2. the server's own `phase` is no longer `answer` — the engine moved the
+   *      turn on, which only `reduce.ts:523` does after a successful `ANSWER`.
+   *
+   * There is no optimistic path. A press that did not land leaves `committed`
+   * false and the control live, and a press the server refused flips it back via
+   * the `errorAt` guard below. This is the fix for the defect one level up from
+   * the duplicated button: a component that only read a local flag would report
+   * success for an action the server never took.
+   */
+  const sentAtView = useRef<number | null>(null);
+  const committed =
+    sentAtView.current !== null && props.viewId > sentAtView.current && state.phase !== 'answer';
+
+  /**
+   * A REFUSAL PUTS THE ANSWER BACK IN THE PLAYER'S HANDS.
+   *
+   * `net/store.ts` stamps every error with a monotonic counter precisely so a
+   * repeated identical error still registers as new. Comparing against the
+   * counter observed at dispatch time means only errors caused BY this answer can
+   * clear `sending` — an unrelated error from earlier in the match cannot leave
+   * the answer half-sent.
+   */
+  const errorAtDispatch = useRef<number | null>(null);
+  const [lastErrorAt, setLastErrorAt] = useState(props.errorAt);
+  if (lastErrorAt !== props.errorAt) {
+    setLastErrorAt(props.errorAt);
+    const since = errorAtDispatch.current;
+    if (sending && props.errorAt !== null && since !== null && props.errorAt > since) {
+      setSending(false);
+    }
+  }
+
+  /**
+   * The four states the component renders, derived — never stored as a claim.
+   * `idle` is "no side chosen", `ready` is "chosen and still the player's to
+   * send", and the last two are server-driven.
+   */
+  const commitState: CommitState = committed
+    ? 'committed'
+    : sending
+      ? 'sending'
+      : selected === null
+        ? 'idle'
+        : 'ready';
+
+  const commit = useCallback(() => {
+    if (selected === null || sending || committed) return;
+    const landed = props.onCommit(committedSideToDisplayIndex(selected));
+    if (!landed) return; // `session.ts:send` already raised a visible refusal.
+    sentAtView.current = props.viewId;
+    errorAtDispatch.current = props.errorAt;
+    setSending(true);
+  }, [selected, sending, committed, props]);
+
+  /**
+   * AN ANSWER THE SERVER NEVER TOOK IS NOT AN ANSWER IN FLIGHT.
+   *
+   * If the server has spoken since we sent — a newer `viewId` — and the turn is
+   * STILL `answer`, then `ANSWER` was not accepted. Anything else (a frame that
+   * was refused without an error frame, a peer action that resolved nothing)
+   * lands here, and the honest outcome is to re-arm the control rather than sit
+   * on a "SENDING…" that will never resolve. The selection is kept: the player
+   * chose deliberately and nothing about the card changed.
+   *
+   * This is the same "adjust during render" pattern as the prompt key above, and
+   * for the same reason: an effect would paint one frame claiming the answer was
+   * on its way when the server had already said it was not.
+   */
+  const [stalledAtView, setStalledAtView] = useState<number | null>(null);
+  if (
+    sending &&
+    stalledAtView !== null &&
+    props.viewId > stalledAtView &&
+    state.phase === 'answer' &&
+    lastErrorAt === props.errorAt
+  ) {
+    setStalledAtView(null);
+    setSending(false);
+  }
+  if (sending && stalledAtView === null) setStalledAtView(props.viewId);
 
   // A screen that takes the viewport must put the keyboard somewhere useful, or
   // a keyboard player is left tabbing from the document root (§8.1, SC 2.4.3).
@@ -107,19 +234,35 @@ export function AnswerScreen(props: AnswerScreenProps) {
           QUESTION
         </p>
 
+        {/*
+          THE ANSWER COMPONENT OWNS THE COMMIT CONTROL, AND IT IS THE ONLY ONE.
+
+          It used to be the other way round: `BlindAnswer` rendered a "Confirm"
+          button that read "Answer committed" while only selecting a side, and
+          the `COMMIT ANSWER` button that actually dispatched lived down here
+          beside the redraw offer. A player who pressed "Confirm" was told the
+          answer was in when it was not, on the one screen in the game whose
+          premise is that nothing is visible until it is. So the real control
+          moved into the component, next to the selection it sends, and the one
+          down here is gone.
+        */}
         <BlindAnswer
           question={wire.question}
           labelA={wire.labelA}
           labelB={wire.labelB}
           seed={wire.seed}
-          committed={committed}
-          onCommit={(side) => setCommitted(side)}
+          selected={selected}
+          commitState={commitState}
+          onSelect={setSelected}
+          onCommit={commit}
         />
 
-        {/* The commit control is the answer component's own; this bar carries the
-            redraw offer (§5.3.5) and the honest statement that the payout is not
-            shown. Nothing before the commit is derived from the card's contents,
-            which is the promise the copy makes. */}
+        {/* The redraw offer (§5.3.5), and the honest statement that the payout is
+            not shown. This bar is a PAYMENT control, not a hint about the card,
+            which is why it is the one piece of chrome the spec allows here — and
+            it deliberately contains no second commit affordance. Nothing before
+            the commit is derived from the card's contents, which is the promise
+            the copy makes. */}
         <div
           className="row"
           style={{ justifyContent: 'center', maxWidth: '46rem', margin: '0 auto' }}
@@ -128,22 +271,11 @@ export function AnswerScreen(props: AnswerScreenProps) {
             type="button"
             className="btn"
             onClick={props.onRedrawRequest}
-            disabled={props.picker !== null}
+            disabled={props.picker !== null || sending || committed}
+            aria-disabled={props.picker !== null || sending || committed}
             data-testid="redraw-offer"
           >
             REDRAW — {UI_RULES.redrawCost} RESOURCES
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={committed === null || props.picker !== null}
-            aria-disabled={committed === null}
-            onClick={() => {
-              if (committed !== null) props.onCommit(committedSideToDisplayIndex(committed));
-            }}
-            data-testid="commit-answer"
-          >
-            COMMIT ANSWER
           </button>
         </div>
 
