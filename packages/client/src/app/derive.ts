@@ -363,19 +363,25 @@ export function marketView(state: ClientState, player: PlayerID): readonly Marke
 
 /** The six decision shapes, with the sentence a player needs to act on each. */
 export function choiceHeadline(choice: Choice): string {
+  // `resource(s)` is built once so all three resource headlines pluralise the
+  // same way the voter ones already did: a cap discard of 1 read "Discard 1
+  // resources" in the browser, which is the sort of small wrongness that makes a
+  // printed rulebook feel untrustworthy.
+  const res = (n: number): string => `resource${n === 1 ? '' : 's'}`;
+  const voter = (n: number): string => `voter${n === 1 ? '' : 's'}`;
   switch (choice.kind) {
     case 'gain-any':
-      return `Take ${choice.count} resources of your choice`;
+      return `Take ${choice.count} ${res(choice.count)} of your choice`;
     case 'lose-any':
-      return `Discard ${choice.count} resources`;
+      return `Discard ${choice.count} ${res(choice.count)}`;
     case 'steal-any':
-      return `Take ${choice.count} resources from another player`;
+      return `Take ${choice.count} ${res(choice.count)} from another player`;
     case 'evict-voter':
-      return `Evict ${choice.count} voter${choice.count === 1 ? '' : 's'} from the board`;
+      return `Evict ${choice.count} ${voter(choice.count)} from the board`;
     case 'discard-voter':
-      return `Discard ${choice.count} opponent voter${choice.count === 1 ? '' : 's'}`;
+      return `Discard ${choice.count} opponent ${voter(choice.count)}`;
     case 'convert-voter':
-      return `Convert ${choice.count} opponent voter${choice.count === 1 ? '' : 's'} to yours`;
+      return `Convert ${choice.count} opponent ${voter(choice.count)} to yours`;
   }
 }
 

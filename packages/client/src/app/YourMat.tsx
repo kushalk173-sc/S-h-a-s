@@ -59,7 +59,6 @@ export type YourMatProps = {
   /** The ONE region allowed a `SEAL` frame at a time (§5.0). */
   readonly framed: boolean;
   readonly onSelectGroup: (groupId: string) => void;
-  readonly onBuyMarket: (index: number) => void;
   readonly onRedraw: () => void;
   readonly onGerry: () => void;
   readonly onPower: (power: string) => void;
@@ -70,10 +69,6 @@ export type YourMatProps = {
    * a player proposing to nobody is not a state the game has.
    */
   readonly onTradeWith: (player: PlayerID) => void;
-  /** Buy the top Conspiracy Card. The cost is printed on its back, so it is public. */
-  readonly onBuyConspiracy: () => void;
-  /** Which player is holding an armed market modifier, if any. Shown, not hidden. */
-  readonly armedSlot: number | null;
 };
 
 /** Resource strip + the single combined cap meter. */
@@ -393,29 +388,6 @@ export function YourMat(props: YourMatProps) {
           </h3>
           <PowersTray state={state} you={you} disabled={!actionable} onPower={props.onPower} />
 
-          <h3 className="panel__title" style={{ marginTop: 'var(--sp-3)' }}>
-            HQ MAT · MARKET
-          </h3>
-          <MarketStrip state={state} you={you} disabled={!actionable} onBuy={props.onBuyMarket} />
-          <p className="panel__note panel__note--quiet">
-            {state.conspiracyTopCost === null
-              ? 'No Conspiracy Card is purchasable.'
-              : `Top Conspiracy Card: any ${state.conspiracyTopCost} resources · ${state.conspiracyRemaining} left.`}
-          </p>
-
-          {state.conspiracyTopCost === null ? null : (
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={props.onBuyConspiracy}
-              disabled={!actionable}
-              aria-disabled={!actionable}
-              data-testid="buy-conspiracy"
-            >
-              BUY THE TOP CONSPIRACY CARD — ANY {state.conspiracyTopCost}
-            </button>
-          )}
-
           {/* §5.7: a trade is with a NAMED person. One button per opponent, and a
               spectator or a solo player gets the reason rather than no buttons. */}
           {state.turnOrder.filter((id) => id !== you).length === 0 ? null : (
@@ -437,13 +409,6 @@ export function YourMat(props: YourMatProps) {
                   </button>
                 ))}
             </div>
-          )}
-
-          {props.armedSlot === null ? null : (
-            <p className="panel__note" data-testid="armed-modifier">
-              A power is armed on market card {props.armedSlot + 1}. Buy that card to spend it, or
-              press the power again to cancel.
-            </p>
           )}
 
           <div className="row" style={{ marginTop: 'var(--sp-3)' }}>
@@ -475,4 +440,71 @@ export function YourMat(props: YourMatProps) {
 /** Free-slot counts per zone, for the placement bar's arithmetic strip. */
 export function zoneFreeSlots(state: ClientState): readonly { id: string; name: string; free: number }[] {
   return state.zones.map((z) => ({ id: z.id, name: z.name, free: freeSlotsIn(state, z.id) }));
+}
+
+export type MarketPanelProps = {
+  readonly state: ClientState;
+  readonly you: PlayerID;
+  readonly disabled: boolean;
+  readonly onBuy: (index: number) => void;
+  readonly onBuyConspiracy: () => void;
+  /** Which market slot holds an armed power, if any. Shown, not hidden. */
+  readonly armedSlot: number | null;
+};
+
+/**
+ * THE HQ MARKET, AS ITS OWN PANEL.
+ *
+ * This file's header has always said the market is "a separate panel in the same
+ * column", and §5.13 requires it to be its own tab beside Board, Mat and Log. It
+ * used to be a `<h3>` section inside `YourMat`, which made that tab unimplementable:
+ * the phone tab bar had four buttons and the shell had only THREE tabpanels
+ * (`board`, `mat`, `log`), so pressing MARKET matched no panel, every panel went
+ * `display:none`, and the player was looking at a blank screen with a working tab
+ * bar. Found by clicking all four tabs in a browser.
+ *
+ * Two panels, one per concern, is also §9.5's shape: deliberating over your
+ * resources and deciding which Voter Card to buy are different jobs, and putting
+ * a 3-slot market strip in the middle of the mat pushed the powers tray below the
+ * fold on a short desktop window.
+ */
+export function MarketPanel({
+  state,
+  you,
+  disabled,
+  onBuy,
+  onBuyConspiracy,
+  armedSlot,
+}: MarketPanelProps) {
+  const me = state.players[you];
+  if (me === undefined) return null;
+  return (
+    <section className="panel" aria-label="HQ market" data-testid="market-panel">
+      <h2 className="panel__title">HQ MAT · MARKET</h2>
+      <MarketStrip state={state} you={you} disabled={disabled} onBuy={onBuy} />
+      <p className="panel__note panel__note--quiet">
+        {state.conspiracyTopCost === null
+          ? 'No Conspiracy Card is purchasable.'
+          : `Top Conspiracy Card: any ${state.conspiracyTopCost} resources · ${state.conspiracyRemaining} left.`}
+      </p>
+      {state.conspiracyTopCost === null ? null : (
+        <button
+          type="button"
+          className="btn btn--sm"
+          onClick={onBuyConspiracy}
+          disabled={disabled}
+          aria-disabled={disabled}
+          data-testid="buy-conspiracy"
+        >
+          BUY THE TOP CONSPIRACY CARD — ANY {state.conspiracyTopCost}
+        </button>
+      )}
+      {armedSlot === null ? null : (
+        <p className="panel__note" data-testid="armed-modifier">
+          A power is armed on market card {armedSlot + 1}. Buy that card to spend it, or press the
+          power again to cancel.
+        </p>
+      )}
+    </section>
+  );
 }

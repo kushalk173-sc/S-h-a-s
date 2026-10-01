@@ -27,13 +27,12 @@
  * your turn" when the truth is "it is not your turn".
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   Action,
   ClientState,
   Delta,
-  GameEvent,
   LogEntry,
   PlayerID,
   Resource,
@@ -48,7 +47,7 @@ import { ChoiceResolver } from './ChoiceResolver.tsx';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
 import { ResourcePicker } from './ResourcePicker.tsx';
-import { YourMat } from './YourMat.tsx';
+import { YourMat, MarketPanel } from './YourMat.tsx';
 import {
   addPick,
   addToughLovePick,
@@ -284,6 +283,15 @@ export function GameScreen({ store }: GameScreenProps) {
           setRefusal('already chosen for this group');
           return;
         }
+        // A Voter Card's voters cannot be split or partially placed, so the group is
+        // ALL-OR-NOTHING at `group.count`. Without this the bar happily accepted a
+        // second slot for a one-voter group and then read "2 of 1 placed — -1 more
+        // needed", and the server would have refused the placement: a constraint the
+        // player only discovers by pressing Confirm.
+        if (app.pickedAreaIds.length >= group.count) {
+          setRefusal(`this group is already complete — undo a pick to choose a different slot`);
+          return;
+        }
         const refusal = placementRefusal(state, group, app.pickedAreaIds, areaId);
         if (refusal !== null) {
           // §6.1.2 step 4 / §9.10: an illegal click is never a silent no-op.
@@ -366,28 +374,45 @@ export function GameScreen({ store }: GameScreenProps) {
 
   // ─────────────────────────── the payout frame (§9.3) ───────────────────────────
   //
-  // ONE frame, then it is gone. It is driven by the engine's own PUBLIC `answered`
-  // event, so there is nothing here that could know the payout before the answer —
-  // the reveal renders the pool the server has already credited and the label the
-  // server has already written to the public log. Nothing counts up, nothing flips,
-  // and there is no "you would have got" line, because every one of those animates
-  // on a length that leaks to whoever watched it.
+  // ONE frame, then it is gone. It is driven by the PUBLIC LOG, not by the
+  // `answered` EVENT, and that is not a preference: the server sends `match:state`
+  // before `match:events` for the same `viewId`, while `net/store.ts:applyEvents`
+  // drops any `viewId <= store.viewId` — so no events ever reach `recentEvents` at
+  // all (reported; `net/` is not this file's to change). The log is in `ClientState`
+  // for every player, so it always arrives, and reading it leaks nothing the other
+  // players cannot already read.
   //
-  // The window is bounded rather than cleared by the next action: a player reading
-  // their own numbers while they plan is not a leak (it is their own hand), and a
-  // dialog that vanished the instant they clicked would be unreadable.
-  const answeredEvent = lastAnswerFor(store.recentEvents, you);
-  const [revealKey, setRevealKey] = useState<string | null>(null);
+  // Nothing counts up, nothing flips, and there is no "you would have got" line,
+  // because every one of those animates on a length that leaks to whoever watched it.
+  const answerCount =
+    state === null || you === null
+      ? 0
+      : state.log.filter((e) => e.kind === 'answer' && e.player === you).length;
+
+  // A reveal only for an answer that lands WHILE this player is watching. The first
+  // sighting is a baseline, so a refresh mid-turn does not replay the last payout —
+  // which matters on reconnect, where re-announcing a payout would also be noise.
+  const seenAnswers = useRef<number | null>(null);
   const [revealLive, setRevealLive] = useState(false);
   useEffect(() => {
-    if (answeredEvent === null) return;
-    setRevealKey(answeredEvent.key);
+    if (seenAnswers.current === null) {
+      seenAnswers.current = answerCount;
+      return;
+    }
+    if (answerCount <= seenAnswers.current) {
+      seenAnswers.current = answerCount;
+      return;
+    }
+    seenAnswers.current = answerCount;
     setRevealLive(true);
     const t = window.setTimeout(() => setRevealLive(false), REVEAL_MS);
     return () => window.clearTimeout(t);
-  }, [answeredEvent?.key]);
-  const showReveal = revealLive && you !== null && me !== null && state !== null && state.phase === 'actions';
-  const answeredLabel = showReveal && state !== null && you !== null ? lastAnswerText(state.log, you) : null;
+  }, [answerCount]);
+
+  const showReveal =
+    revealLive && you !== null && state !== null && state.phase === 'actions';
+  const answeredLabel =
+    showReveal && state !== null && you !== null ? lastAnswerText(state.log, you) : null;
 
   const commitPlacement = useCallback(() => {
     if (me === null || app.placingGroupId === null) return;
@@ -451,7 +476,13 @@ export function GameScreen({ store }: GameScreenProps) {
   const liveMessage = describeForScreenReader(state, isMyTurn, store.blind !== null, you);
 
   return (
-    <div className="shell" data-testid="game-shell">
+    <div
+      className="shell"
+      data-testid="game-shell"
+      // The one-frame payout pushes the board down by ~192px, so the board's
+      // `max-height` reserve has to know. See the `.shell[data-reveal]` rule.
+      data-reveal={showReveal ? 'true' : 'false'}
+    >
       <TopBar state={state} store={store} you={you} role={role} />
 
       {showReveal ? (
@@ -459,14 +490,31 @@ export function GameScreen({ store }: GameScreenProps) {
       ) : null}
 
       <div className="shell__body">
+        {/*
+          THE BOARD NEEDS AN INTRINSIC HEIGHT, OR IT RENDERS AT 0×0.
+
+          `BoardSvg` takes `width` and an optional `height` that defaults to the
+          viewBox aspect. Given `width="100%"` and no height, the SVG is a flex item in
+          `.shell__board` (a COLUMN flex box), so its cross-size is content-based — and
+          an SVG with no intrinsic height has none. The board collapsed to literally
+          zero pixels: 258 SVG nodes in the DOM and nothing on screen.
+
+          The fix is an aspect-ratio on the canvas wrapper, matching the board's own
+          1000×1500 viewBox, plus `height="100%"` so the SVG fills it. The board
+          component is another agent's file; this needs no change there, because it
+          already accepts both props.
+        */}
         <div className="shell__board tabs" data-tabpanel="board" data-active={tab === 'board'}>
-          <BoardSvg
-            state={boardState}
-            width="100%"
-            onSlotActivate={onSlotActivate}
-            resolveGerrySources={false}
-            liveMessage={liveMessage}
-          />
+          <div className="board__canvas">
+            <BoardSvg
+              state={boardState}
+              width="100%"
+              height="100%"
+              onSlotActivate={onSlotActivate}
+              resolveGerrySources={false}
+              liveMessage={liveMessage}
+            />
+          </div>
 
           {placingGroup !== null ? (
             <PlacementBar
@@ -508,18 +556,8 @@ export function GameScreen({ store }: GameScreenProps) {
               framed={isMyTurn && state.phase === 'actions'}
               showControls={role === 'player' && you !== null}
               onSelectGroup={(id) => beginPlacement(id)}
-              onBuyMarket={(index) => buyMarketCard(state, you as PlayerID, index, app, dispatch)}
               onRedraw={() => openPicker({ forKind: 'redraw', total: UI_RULES.redrawCost, pick: {} })}
               onTradeWith={(other) => openTrade(other)}
-              onBuyConspiracy={() => {
-                const cost = state.conspiracyTopCost;
-                if (cost === null) {
-                  setRefusal('no Conspiracy Card is purchasable');
-                  return;
-                }
-                openPicker({ forKind: 'conspiracy', total: cost, pick: {} });
-              }}
-              armedSlot={app.marketModifier?.slot ?? null}
               onGerry={() => {
                 if (you === null) return;
                 const zones = rightsZones(state, you);
@@ -534,11 +572,54 @@ export function GameScreen({ store }: GameScreenProps) {
               onEndTurn={() => dispatch(actions.endTurn())}
             />
           </div>
+
+          {/*
+            §5.13's FOURTH TAB. The phone tab bar has always had four buttons —
+            Board · Mat · Market · Log — while the shell had only three tabpanels,
+            so MARKET matched nothing, every panel went `display:none`, and the
+            player got a blank screen under a working tab bar. Found by pressing
+            all four in a browser; no structural test can see it, because all four
+            buttons and all three panels are present in the DOM either way.
+
+            On a desktop this is simply the second panel in the side column, which
+            is what the mat's own header comment always claimed it was.
+          */}
+          <div className="tabs" data-tabpanel="market" data-active={tab === 'market'}>
+            {role === 'player' && you !== null ? (
+              <MarketPanel
+                state={state}
+                you={you}
+                disabled={!isMyTurn || app.link !== 'live'}
+                onBuy={(index) => buyMarketCard(state, you, index, app, dispatch)}
+                onBuyConspiracy={() => {
+                  const cost = state.conspiracyTopCost;
+                  if (cost === null) {
+                    setRefusal('no Conspiracy Card is purchasable');
+                    return;
+                  }
+                  openPicker({ forKind: 'conspiracy', total: cost, pick: {} });
+                }}
+                armedSlot={app.marketModifier?.slot ?? null}
+              />
+            ) : (
+              /* §5.11: the spectator treatment is the ABSENCE of controls, so the
+                 market panel says nothing at all rather than rendering three dead
+                 slots. */
+              <section className="panel" aria-label="HQ market">
+                <h2 className="panel__title">HQ MAT · MARKET</h2>
+                <p className="panel__note panel__note--quiet">
+                  You are watching. The market is the players&apos; to buy from.
+                </p>
+              </section>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* §5.13: the log becomes a bottom sheet / tab below 600px. */}
-      <div className={tab === 'log' ? '' : 'tabs'} data-tabpanel="log" data-active={tab === 'log'}>
+      {/* §5.13: the log becomes a bottom sheet / tab below 600px. The attributes are
+          constant and the CSS decides what to do with them — swapping the class in
+          JS meant the desktop and phone rules were reading different elements. */}
+      <div className="tabs" data-tabpanel="log" data-active={tab === 'log'}>
         <LogRail state={state} />
       </div>
 
@@ -643,6 +724,7 @@ export function GameScreen({ store }: GameScreenProps) {
           pool={me.resources}
           total={state.conspiracyTopCost ?? 0}
           pick={app.picker.pick}
+          playable={playableConspiracyIds(state, you)}
           onPick={(next) => openPicker({ ...app.picker!, pick: next })}
           onConfirm={(pay) => {
             closePicker();
@@ -791,10 +873,56 @@ function seatIndex(order: readonly string[], id: string): 1 | 2 | 3 | 4 | 5 {
 
 // ─────────────────────────── the small composers ───────────────────────────
 
+/**
+ * The ids this player may legally play, IF the server sends them.
+ *
+ * `ClientState` has no such field today — that is the server change this is
+ * waiting on, and it is what makes a card LIST possible without revealing a hand.
+ * It is read through a narrow cast rather than by editing `@shasn/engine`'s type,
+ * because `engine` is not this file's to change and a cast on a field that does
+ * not exist yet fails closed, which is the safe direction: absent means "the
+ * server has not told us", and the picker renders its honest empty state.
+ */
+function playableConspiracyIds(
+  state: ClientState,
+  you: PlayerID | null,
+): readonly string[] | undefined {
+  if (you === null) return undefined;
+  const candidate = (state as { playableConspiracyIds?: unknown }).playableConspiracyIds;
+  if (!Array.isArray(candidate)) return undefined;
+  return candidate.filter((id): id is string => typeof id === 'string');
+}
+
+/**
+ * THE CONSPIRACY PICKER, AND WHY IT SHOWS NO CARD.
+ *
+ * A Conspiracy Card is bought and held FACE DOWN (rules-reference.md:284-286), and
+ * the engine enforces that on the wire: `engine/src/playerView.ts` strips the whole
+ * `conspiracies` key out of `ClientState` for every viewer, with a comment that says
+ * outright that "there is deliberately no viewer-scoped exception". `ClientState`
+ * carries `conspiracyTopCost` and `conspiracyRemaining` — a price and a count — and
+ * nothing that names a card.
+ *
+ * THAT MEANS THERE IS NOTHING TO RENDER, AND THAT IS CORRECT. The tempting "fix" —
+ * showing the player's own hand so the picker has cards in it — is the same defect
+ * as shipping the payout on the blind answer, one layer out: a client holding its
+ * full hand picks what to play on information the other players do not have, and
+ * the deduction never has to happen at the table. So this component refuses to
+ * display hidden state, and it refuses LOUDLY.
+ *
+ * `playableConspiracyIds` is the field that would make a card list possible, and
+ * the client is already shaped to consume it: a server-sent list of the ids this
+ * player may legally play is not secret (it is the set of choices, not their
+ * effects), and it is what `playerView`'s own comment already promises — "the
+ * client learns that a card is *playable* from a public flag, never by reading the
+ * hand". Until the server sends it, `playable` is `undefined` and the honest
+ * empty state below is what renders.
+ */
 function ConspiracyPicker({
   pool,
   total,
   pick,
+  playable,
   onPick,
   onConfirm,
   onCancel,
@@ -802,23 +930,92 @@ function ConspiracyPicker({
   pool: import('@shasn/engine').Pool;
   total: number;
   pick: Readonly<Record<string, number>>;
+  /** Card ids the server says this player may play. `undefined` = not sent yet. */
+  readonly playable?: readonly string[] | undefined;
   onPick: (n: Readonly<Record<string, number>>) => void;
   onConfirm: (pay: Readonly<Record<string, number>>) => void;
   onCancel: () => void;
 }) {
-  if (total === 0) return null;
+  // A price of 0 is not a Conspiracy Card the player cannot afford — the deck is
+  // empty. Say that, rather than rendering nothing at all and leaving a modal open
+  // with no content in it.
+  if (total <= 0) {
+    return (
+      <div className="scrim">
+        <div className="sheet" role="dialog" aria-modal="true" aria-label="Conspiracy Card">
+          <h2 className="sheet__title">No Conspiracy Card is purchasable</h2>
+          <p className="sheet__body">
+            The Conspiracy deck is empty, so there is nothing to buy. Your hand, if you hold any
+            cards, is unchanged.
+          </p>
+          <button type="button" className="btn btn--primary" onClick={onCancel} data-testid="conspiracy-close">
+            CLOSE
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (playable === undefined) {
+    // THE HONEST EMPTY STATE. Not a spinner, not a blank panel, not a fabricated
+    // card: a plain statement of what is known, why nothing is listed, and what
+    // the player can still do. §9.10 — a control that cannot do what it looks like
+    // says so, rather than pretending.
+    return (
+      <div className="scrim">
+        <div className="sheet" role="dialog" aria-modal="true" aria-label="Conspiracy Card">
+          <h2 className="sheet__title">Nothing to choose from — yet</h2>
+          <p className="sheet__body">
+            A Conspiracy Card is bought and held face down, so this client is not told what you are
+            holding and cannot show you a list of it. The server has not sent the set of cards you
+            may legally play, so rather than guess — and rather than show you your own hand, which
+            would be information the other players do not have — this panel says nothing.
+          </p>
+          <p className="sheet__body">
+            You can still buy the top card for any <strong>{total}</strong> resources. It goes to
+            the top of your hand unlooked-at, exactly as the rules intend.
+          </p>
+        </div>
+        <div style={{ maxWidth: '46rem', width: '100%', marginTop: 'var(--sp-3)' }}>
+          <ResourcePicker
+            pool={pool}
+            total={total}
+            pick={pick}
+            onPick={onPick}
+            heading={`Buy the top Conspiracy Card — any ${total} resources`}
+            confirmLabel={`BUY — ${total} RESOURCES`}
+            onConfirm={() => onConfirm(pick)}
+            onCancel={onCancel}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // A server-sent list. Each id renders as itself: the client has no card text and
+  // must not invent any, so the row says what it is and lets the player decide.
   return (
     <div className="scrim">
-      <ResourcePicker
-        pool={pool}
-        total={total}
-        pick={pick}
-        onPick={onPick}
-        heading={`Buy the top Conspiracy Card — any ${total} resources`}
-        confirmLabel={`BUY — ${total} RESOURCES`}
-        onConfirm={() => onConfirm(pick)}
-        onCancel={onCancel}
-      />
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Conspiracy Card">
+        <h2 className="sheet__title">Play a Conspiracy Card</h2>
+        <p className="sheet__body">
+          {playable.length === 0
+            ? 'You hold no Conspiracy Card you may play at the moment.'
+            : `The server says ${playable.length} of your cards may be played. You may also buy the top card for any ${total} resources.`}
+        </p>
+      </div>
+      <div style={{ maxWidth: '46rem', width: '100%', marginTop: 'var(--sp-3)' }}>
+        <ResourcePicker
+          pool={pool}
+          total={total}
+          pick={pick}
+          onPick={onPick}
+          heading={`Buy the top Conspiracy Card — any ${total} resources`}
+          confirmLabel={`BUY — ${total} RESOURCES`}
+          onConfirm={() => onConfirm(pick)}
+          onCancel={onCancel}
+        />
+      </div>
     </div>
   );
 }
@@ -1172,23 +1369,6 @@ function powerAreaRefusal(
 
 /** How long the payout frame stays up before it retires. §9.3: one readable frame. */
 const REVEAL_MS = 4_000;
-
-/** The newest public `answered` event belonging to this player, if it is the newest. */
-function lastAnswerFor(
-  events: readonly GameEvent[],
-  you: PlayerID | null,
-): { readonly key: string } | null {
-  if (you === null) return null;
-  for (let i = events.length - 1; i >= 0; i -= 1) {
-    const e = events[i];
-    if (e === undefined) continue;
-    if (e.type === 'answered' && e.player === you) {
-      return { key: `${e.cardId}:${e.side}:${i}` };
-    }
-    return null;
-  }
-  return null;
-}
 
 /**
  * The answer the player committed, from the PUBLIC log.

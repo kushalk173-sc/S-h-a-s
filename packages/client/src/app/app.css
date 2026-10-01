@@ -76,6 +76,48 @@
   min-width: 0;
 }
 
+/**
+ * The board's own box, with the board's own shape.
+ *
+ * Without this the SVG is a content-sized flex item in a COLUMN flex box and has no
+ * intrinsic height, so it renders at 0x0 — the whole board is in the DOM and none of
+ * it is on screen. 1000x1500 is `BOARD_WIDTH`/`BOARD_HEIGHT` from
+ * `board/geometry.ts`, which is where the viewBox comes from, and `max-height` keeps
+ * a tall viewport from pushing the mat (§9.5) below the fold on a desktop.
+ */
+.board__canvas {
+  width: 100%;
+  aspect-ratio: 1000 / 1500;
+  max-height: calc(100vh - 190px);
+  margin-inline: auto;
+  min-width: 0;
+}
+
+/*
+   * THE PAYOUT FRAME MUST NOT PUSH THE BOARD OFF THE SCREEN.
+   *
+   * Measured in a browser at 1440x960, 1920x1080 and 1280x720: with no frame the
+   * board sits at top 77px and its bottom is inside the viewport. The moment the
+   * one-frame reveal mounts ABOVE it, the board moves to top 269px and its bottom
+   * lands at 1039 / 1159 / 799 respectively — below the fold in all three. The
+   * `- 190px` reserve covers the topbar and the shell padding, and the reveal is
+   * a further ~192px the reserve knows nothing about.
+   *
+   * So the reserve is widened while the frame is up. It is tightened only for
+   * those four seconds (§9.3's single readable frame) rather than permanently,
+   * because permanently shrinking the board by 190px to accommodate a transient
+   * is the wrong trade for the other ~170 seconds of every turn.
+   */
+.shell[data-reveal='true'] .board__canvas {
+  max-height: calc(100vh - 390px);
+}
+
+.board__canvas > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .shell__side {
   display: flex;
   flex-direction: column;
@@ -223,20 +265,32 @@
   text-align: center;
 }
 
-/* §9.2: unavailability is FORM (hatch) + a still-readable label, never a fade.
-   The hatch is a 45° repeating gradient, which is the one sanctioned exception
-   to "no gradients" — it is a texture, carries no tone, and is the established
-   unavailability channel in this design (see the board's `#shasn-hatch`). */
+/* §9.2: unavailability is FORM (hatch) + a READABLE label, never a fade and never
+   a low-contrast one. Two changes from the original, both found by looking at the
+   rendered button rather than at the CSS:
+
+   1. The label is `--ink-700`, not `--unavail-ink`. The hatch and the border and
+      `cursor: not-allowed` and `aria-disabled` all already say "unavailable";
+      encoding it a second time in the ink is what made "COMMIT ANSWER" and every
+      locked power unreadable in the browser. §9.2's rule is that unavailable must
+      not be MERELY low-contrast — dimming the text and calling it a state is the
+      anti-pattern, not the compliance.
+   2. The stripes are `--paper-000`, LIGHTER than `--unavail-fill`, not
+      `--table-900`. A near-black stripe under mid-grey text destroys local contrast
+      no matter what the average ratio says: at a 6px period the glyphs are chopped.
+      A light stripe keeps >= 5.8:1 on both the stripe and the fill.
+
+   --ink-700 on --unavail-fill = 5.86:1; on --paper-000 = 9.9:1. No new colour. */
 .btn--unavail,
 .btn:disabled {
   background-color: var(--unavail-fill);
   background-image: repeating-linear-gradient(
     45deg,
-    transparent 0 4px,
-    var(--table-900) 4px 6px
+    transparent 0 6px,
+    var(--paper-000) 6px 8px
   );
   background-blend-mode: normal;
-  color: var(--unavail-ink);
+  color: var(--ink-700);
   border-color: var(--ink-300);
   cursor: not-allowed;
 }
@@ -483,10 +537,10 @@
   background-color: var(--unavail-fill);
   background-image: repeating-linear-gradient(
     45deg,
-    transparent 0 4px,
-    var(--table-900) 4px 6px
+    transparent 0 6px,
+    var(--paper-000) 6px 8px
   );
-  color: var(--unavail-ink);
+  color: var(--ink-700);
   cursor: not-allowed;
 }
 
@@ -497,7 +551,9 @@
 }
 
 .mkt--unavail .mkt__cost {
-  color: var(--unavail-ink);
+  /* The cost is the thing a player plans against, so it stays at the readable ink
+     even when the card itself is unavailable. Same reasoning as `.btn:disabled`. */
+  color: var(--ink-700);
 }
 
 .mkt__voters {
@@ -946,10 +1002,10 @@
   background-color: var(--unavail-fill);
   background-image: repeating-linear-gradient(
     45deg,
-    transparent 0 4px,
-    var(--table-900) 4px 6px
+    transparent 0 6px,
+    var(--paper-000) 6px 8px
   );
-  color: var(--unavail-ink);
+  color: var(--ink-700);
   border-color: var(--ink-300);
   cursor: not-allowed;
 }
@@ -1000,10 +1056,6 @@
    56px, TABLE_900, PAPER_300 top edge, four 44x44 items. `END TURN` is a
    persistent bar pinned above it: it is the one control that must never require
    a scroll on a phone. */
-
-.tabs {
-  display: none;
-}
 
 .tabbar {
   display: none;
@@ -1090,13 +1142,32 @@
     padding: var(--sp-2) var(--sp-3);
   }
 
+  /*
+   * THE LOG IS A TAB BELOW 600px, SO IT MUST NOT BE `display: none` HERE.
+   *
+   * This rule hid `.shell__log`, which is the rail element, and below 600px the
+   * log is the `[data-tabpanel="log"]` region — so hiding the rail left that panel
+   * with a 0x0 box. Pressing LOG on a phone then matched no visible panel at all:
+   * a blank screen under a working tab bar. §5.13 and §5.12 both ask for the log
+   * to be the fourth tab, and §9.5 asks for nothing a player needs to be off-
+   * screen; the log is where the public resolution of every card is written.
+   *
+   * The rail keeps its desktop shape (fixed height, scrolls) and becomes the tab's
+   * body below 600px. Its height is relaxed so a phone shows more than one line.
+   */
   .shell__log {
-    display: none;
+    height: auto;
+    max-height: 60vh;
+    border-top: none;
   }
 
   /* Only the selected tab's region is shown. The board tab is the default so a
-     cold load shows the board rather than a wall of numbers. */
-  .tabs [data-tabpanel]:not([data-active='true']) {
+     cold load shows the board rather than a wall of numbers.
+
+     The selector is on the panel ITSELF, not a descendant: the panels carry both
+     classes (`className="shell__board tabs"`), so `.tabs [data-tabpanel]` matches
+     nothing and every panel would stay visible at once on a phone. */
+  [data-tabpanel]:not([data-active='true']) {
     display: none;
   }
 
