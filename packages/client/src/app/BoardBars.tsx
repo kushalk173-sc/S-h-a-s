@@ -68,9 +68,13 @@ export function PlacementBar(props: PlacementBarProps) {
 
   const receipt = placementConsequence(state, props.you, picks);
   const ready = picks.length === group.count;
+  // Clamped, so an over-full draft can never render "-1 more needed here". The
+  // click that produced it is refused upstream, but a bar that prints a negative
+  // count is worse than one that prints nothing.
+  const moreNeeded = Math.max(0, group.count - picks.length);
+  const overPicked = picks.length > group.count;
   const lockedName = locked === null ? null : state.zones.find((z) => z.id === locked)?.name ?? null;
   const lockedFree = locked === null ? 0 : state.zones.find((z) => z.id === locked)?.areas.filter((a) => a.peg === null).length ?? 0;
-  const moreNeeded = group.count - picks.length;
 
   /** The refusal fades after 1.2s (§6.1.2 step 4), then the line returns to the constraint. */
   const [refusalLive, setRefusalLive] = useState(false);
@@ -126,7 +130,9 @@ export function PlacementBar(props: PlacementBarProps) {
             ? group.sameZone
               ? 'Pick a slot. The first pick fixes the zone — the rest must join it.'
               : 'Pick up to ' + group.count + ' empty slots. They may go in any zones.'
-            : `${lockedName} — ${lockedFree} free slot${lockedFree === 1 ? '' : 's'}, ${moreNeeded} more needed here.`}
+            : overPicked
+              ? 'Too many slots chosen — UNDO to pick a different one.'
+              : `${lockedName} — ${lockedFree} free slot${lockedFree === 1 ? '' : 's'}, ${moreNeeded} more needed here.`}
       </p>
 
       {/* §6.1.4: the consequence is spelled out BEFORE the click, because after the

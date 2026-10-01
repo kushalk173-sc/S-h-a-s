@@ -179,10 +179,26 @@ un-narrowed so it is still correct when loaded standalone.
 PLAN.md §9 risk #2: *"If one side of a card is strictly better, players optimise instead
 of deliberating and the entire premise collapses."* This is the check that protects the
 premise, so it gets a real dominance relation rather than a total-sum comparison. A
-totals-only checker is wrong twice over: it flags legitimate trade-offs
-(`{funds: 3}` vs `{trust: 3}` is a 3-resource difference and a perfectly good card), and
-it misses the real failures (`{funds: 3}` vs `{funds: 2, media: 1}` is 0-sum and yet an
-upgrade for anyone who needs Funds).
+totals-only checker is wrong in two opposite directions:
+
+- **It flags legitimate trade-offs.** `{funds: 3}` vs `{trust: 3}` is the largest
+  componentwise gap a card can hold — 3 Funds against 0 Funds, 3 Trust against 0
+  Trust — and its totals are identical, 3 against 3. It is a perfectly good card:
+  the choice is which resource you need, which is the deliberation the game is made
+  of.
+- **It misses 0-sum structural failures.** `{funds: 3}` vs `{funds: 2, media: 1}` pays
+  3 on each side, so totals are silent, and so is `PURE_UPGRADE`: `media` is 0 on the
+  first side and 1 on the second, so the second side is *not* ≥ the first
+  componentwise. It is not an upgrade. What is wrong with it is the power-threshold
+  cliff — 3 Funds is `RULES.level3`, so the first side unlocks that Ideologue's Level
+  3 power, which pays out every turn for the rest of the game, while the second side
+  does not. That is worth far more than the 1 resource the totals differ by, and it
+  is invisible to any total-sum or componentwise comparison.
+
+> An earlier draft of this README claimed the second example *was* a pure upgrade. It
+> is not, and the claim cannot be rescued: if X ≥ Y componentwise and X ≠ Y then
+> ΣX > ΣY strictly, so **a pure upgrade is never 0-sum**. `test/balance.test.ts` pins
+> both the identity and the worked example.
 
 | code | condition | severity |
 |---|---|---|
@@ -224,11 +240,26 @@ with a human in it, not silently in a playtest.
 ### D3 is a count, not a per-direction test
 
 A side "buys" a power unlock for each `resource@threshold` pair its payout reaches
-(`RULES.level3`, `RULES.level5`). A cliff exists only when one side buys **strictly more**
-than the other. The naive per-direction test — "X pays 3 of something Y pays none of" —
-reports `{trust: 3}` vs `{funds: 3}` as dominated **twice**, when in fact both sides buy
-exactly one unlock and the choice of which is real deliberation. Equal counts, even with
-entirely different sets, are not dominance.
+(`RULES.level3`, `RULES.level5`) — **scoped to that side's own Ideologue resource**,
+because `IDEOLOGUE_RESOURCE[i]` is the only resource whose accumulation a side of
+Ideologue `i` feeds toward a power unlock. A Capitalist side paying 3 Media has not
+gained a Showstopper card and unlocks nothing. A cliff exists only when one side buys
+**strictly more** than the other. The naive per-direction test — "X pays 3 of something
+Y pays none of" — reports `{trust: 3}` vs `{funds: 3}` as dominated **twice**, when in
+fact both sides buy exactly one unlock and the choice of which is real deliberation.
+Equal counts, even with entirely different sets, are not dominance.
+
+Scoping each side to its own resource is what stops the count from being gamed by
+padding: counting every resource a side touches, a `{funds: 3, media: 3}` Capitalist
+side scored 2 against a `{trust: 5}` Idealist side's 2, so the card came out *level*
+and clean — when in truth the Idealist side buys the Level 5 unlock and the
+Capitalist side buys only Level 3.
+
+**What D3 is and is not.** The engine's actual unlock test is a count of Ideology
+*Cards* held (`powers.ts`, `hasPower`), not of resources paid. This checker runs on one
+card with no manifestos, so it uses the resource proxy the rules supply for that
+ladder. It is a proxy, deliberately scoped and deliberately conservative; refine it
+here, not in the engine, if it misreports on real play.
 
 ### The resource-blind heuristic
 

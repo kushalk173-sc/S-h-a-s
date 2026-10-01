@@ -10,6 +10,17 @@ refer to the printed page numbers in the rulebook, not PDF sheet indices.
 Nothing in this file is guesswork. Where the rulebook is genuinely silent, the entry
 is marked **[NOT IN RULEBOOK]** and the engine's chosen behaviour is stated.
 
+> **Second reconciliation, 2026-09-30 — see §19.** The engine repair and the card pipeline
+> have since landed, and three things changed state: the **§16 #7 majority-tie question
+> dissolved** (it is unreachable by construction), the **§16 #8 defect was fixed** (R5),
+> and **§12's Conspiracy hands were ruled PRIVATE** — which overturns `ARCHITECTURE.md`
+> §8.1 **D25** and is load-bearing for the game's central mechanic. D6 (§11, gerrymander
+> into a Volatile Area) is **still deliberately unresolved**, both readings documented.
+> **Separately and most consequentially: 43 of the 50 real X-cards recovered from
+> Memesys' player-aids (86%) cannot be expressed in the current card schema** — so §11
+> and §12 below transcribe real card effects the engine **cannot yet evaluate**. Read
+> them as faithful transcription awaiting schema coverage (M2b), not as implemented.
+
 **Reconciled 2026-09-30 against the code**, after `docs/ENGINE-AUDIT.md` §6b found nine
 places where this file and `packages/engine` disagree (D1–D9). Each correction below is
 tagged **[CORRECTED 2026-09-30]** with its D-number and the adjudication. Where the audit's
@@ -358,6 +369,37 @@ like its neighbours.
 - Two players playing simultaneously → resolve in turn order.
 - May be bought and held, or used immediately. Multiple purchases per turn allowed.
 
+> ### ✅ RULED 2026-09-30 — Conspiracy hands are PRIVATE (D25 overturned)
+>
+> **The line above decides it, and it is the reason this section is load-bearing beyond
+> transcription.** *"May be **bought and held**"* is the rulebook's own word for a private
+> possession. A card you *hold* is a card whose contents are unknown — to you and to
+> everyone else. Contrast the Ideology/manifesto case, where answered cards sit **face up**
+> at the table and the manifesto genuinely is public information.
+>
+> `docs/ARCHITECTURE.md` §8.1 **D25** originally ruled the hands **public**, on the grounds
+> that a conspiracy is visible to opponents at a physical table. **That ruling has been
+> overturned** — it generalised "visible at a physical table" into a general policy, and
+> the rulebook draws the line the other way. `docs/ENGINE-AUDIT.md` **R1** independently
+> rated the leak HIGH and observed that the original leak test only inspected `_`-prefixed
+> fields, so **the leak would have passed its own test**. Two agents reached the same
+> conclusion from different directions before any code was written.
+>
+> **What ships:** `playerView` strips **every** player's `conspiracies`, **including the
+> viewer's own** — there is deliberately no viewer-scoped exception
+> (`packages/engine/src/playerView.ts:60,68-79`).
+>
+> **Why it matters more than a normal secrecy rule:** Shasn's premise is that you act on
+> information you do not have. A Conspiracy Card is bought top-of-pile (`:354`) and kept.
+> A client holding its own hand can decide for itself what to play — the same failure as
+> shipping the answer payout, one layer out. **The moment the payload contains the hand,
+> the mechanic is gone**, and no amount of rendering discipline recovers it.
+>
+> **The cost, recorded honestly:** a player cannot be shown their own hand and must still
+> be able to use it. The correct UI is therefore driven by a **server-sent list of the
+> card ids a player may legally play**, not by the contents of the hand — and that list
+> **does not exist yet** (`PLAN.md` §7 M5). Full argument: `ARCHITECTURE.md` **§8.1.1**.
+
 ---
 
 ## 13. Coalitions (official site, `shasnthegame.com/pages/coalitions`)
@@ -493,8 +535,8 @@ gerrymander. *Harbor* — +1 resource for every voter you gerrymander **out of**
 | 4 | Whether voters may still be placed into a zone after its majority forms | **Yes.** p8: "placing any more voters in this zone after the first 6 will not earn any additional points and will be kept with the blank side up." |
 | 5 | Whether a broken majority can be re-formed by another player | **Yes.** p9 explicitly contemplates majorities changing hands; the 2-player Zone Requirement rules say "if a majority exchanges hands". |
 | 6 | Volatile Area positions per zone | W and E hold 2 each; the other seven hold 1 each — counted off the printed board (11 total, "every zone has at least one"). **[D9 — the COUNTS agree with the code**: `gen-board.mjs` sets 2 for west and east, 1 for the rest, and the generated board has exactly 11. Note the limits of that agreement: the *counts* are confirmed, but `AUTHENTIC-SHASN-REFERENCE.md` §13 item 7 records that the **precise position of each cog within its zone is still unconfirmed** at available image resolution. So the totals are settled and the geometry is not.] |
-| 7 | **What happens when two players meet a zone's majority requirement in the same zone** | **NOT SETTLED — needs a ruling.** The rulebook is silent: it settles ties for *gerrymandering rights* ("ties give nobody rights", §10) and says nothing about majority ties. **A genuine gap, not an oversight.** The code currently lets board-scan order decide, silently, with no tie handling — while `gerrymanderRights` in the same package correctly returns `null` on a tie. Two functions, one package, two answers to the same question. Both majorities are reachable (north_west is 6/11, so 6+6 is legal). Decided wrongly this silently is the worst case: an intermittent, geometry-dependent outcome in a 4-hour game. Needs a ruling **and** a pinned test (audit test 29); see `PLAN.md` §6 row 12. |
-| 8 | **How are ties in the final score broken?** | **NOT SETTLED.** §1 says the engine "reports a tie" and that p20's privilege rule is social and out of scope for a digital implementation — that is a defensible reading of the *tie-break* rule, but not a ruling on *reporting*. The code's `winners()` currently returns **every** player when all scores are 0, because it floors the best score at 0 (audit R5). If that is not the intent, an empty board declares every seat a winner. Cheap to fix, but it should be a decision (audit test 31; `PLAN.md` §6 row 12). |
+| 7 | **What happens when two players meet a zone's majority requirement in the same zone** | **RULED 2026-09-30: UNREACHABLE — the question dissolves.** Every zone is exactly `2 × majority − 1` areas (north_west is 6 of 11, and so on), so two players meeting a majority simultaneously is impossible by construction. The code defect this row was opened for — `board.ts` letting `Map` scan order silently award the majority (audit R4) — therefore **cannot execute**, and is pinned by a **geometry test** asserting the odd capacity rather than a behaviour test. *Superseded reading, kept for the audit trail: the rulebook is silent on majority ties (it settles gerrymandering ties at §10 — "ties give nobody rights" — and says nothing here), and `gerrymanderRights` returns `null` on a tie while `recount` did not; that disagreement is what R4 named.* See §19. |
+| 8 | **How are ties in the final score broken?** | **DEFECT FIXED 2026-09-30; the policy question remains open.** The audit's R5 — `winners()` floored the best score at 0, so with an empty board it returned **every** player and the `game-over` event reported all seats as winners — is **closed with a regression test**. What the *tie-break policy* should be is still not settled by the rulebook: §1 says the engine "reports a tie" and p20's privilege rule is social and out of scope for a digital implementation. **An empty board must no longer declare every seat a winner; how a genuine 2-way tie is *displayed* is still open.** See §19. |
 | 9 | Whether a player may **decline** the staggered starting resources (§4 step 3) | **UNVERIFIED.** p7 says player *n* receives *n* resources of their choice. Whether "of their choice" includes *none* is not addressed. It decides whether `setup()` requires a `startResources` argument from every seat or can run a per-seat choice loop (audit §4.5). Re-read p7. |
 
 ---
@@ -552,4 +594,52 @@ something the code does not do:
   that §16 did not list, despite the audit listing them as unsettled in §6d.
 - **§16 #9 added:** whether a player may decline the staggered starting resources is
   unverified, and it decides the shape of `setup()`'s signature.
+
+---
+
+## 19. Second reconciliation — what the code settled (added 2026-09-30)
+
+The engine repair and the card pipeline have now landed. Two items in §16 were open
+questions when the audit wrote them; **both have since been ruled on in code**, and this
+file's §16 rows are corrected accordingly. Recorded as a separate ledger rather than
+appended to §18 so the audit-time dispositions stay readable as what they were.
+
+| §16 row | Was | Now | Evidence |
+|---|---|---|---|
+| **#7 — zone majority ties** | "**NOT SETTLED — needs a ruling.**" with the code letting board-scan order decide, and the audit's R4 flagged as a live MEDIUM defect. | **RULED: unreachable, and therefore moot.** Every zone is exactly `2 × majority − 1` areas, so two players meeting a majority simultaneously is **impossible by construction** — the board-scan-order path R4 identified cannot execute. It is now **pinned by a geometry test** asserting the odd capacity, which is a *stronger* guarantee than a behaviour test could be. | `ARCHITECTURE.md` §2.1; R4 disposition. **Note the shape of this outcome:** the defect was real, the fix was a proof, and "no code change" is the correct fix for an unreachable path. |
+| **#8 — final-score ties** | "**NOT SETTLED.**" The audit's R5 — `winners()` floors the best score at 0, so an empty board declared *every* seat a winner. | **RULED and FIXED.** R5 is closed with a regression test. What the tie-break *policy* is remains a design matter, but the defect this row was opened for is gone. | `ARCHITECTURE.md` §2.1; R5 disposition. |
+| **§12 (p19) — Conspiracy hands** | *not a row in this file*; the question was carried by `ENGINE-AUDIT.md` R1 and `ARCHITECTURE.md` D25, which disagreed. | **RULED: conspiracy hands are PRIVATE.** §12's own wording decides it — "May be **bought and held**, or used immediately" (`:359`). `bought and held` describes a private possession. D25's contrary "visible at a physical table" argument did not survive translation to a machine-readable client payload. | `playerView.ts:60,68-79`; `ARCHITECTURE.md` **§8.1.1** (full argument); `PLAN.md` §5. **Load-bearing for the game's central mechanic.** |
+
+### What this file still does NOT settle, deliberately
+
+These remain open and are **not** to be closed by inference:
+
+- **§11 / D6 — does a voter gerrymandered *into* a Volatile Area trigger a Headline?**
+  Still **UNRESOLVED, both readings documented**, nothing guessed. The code currently
+  treats a gerrymandered voter as a placement and queues a Headline for it. Settle by
+  re-reading p18 directly. (§11, and `PLAN.md` §6 row 8.)
+- **§16 #1 — the resource cost distribution across our own cards.** A writing task, not a
+  rules question. Now materially different: see the note below.
+- **§16 #2 — card text for the 108 Ideology / 20 Conspiracy / 20 Headline cards.**
+  Original writing, and now gated on schema coverage rather than on prose.
+- **§16 #9 — may a player decline the staggered starting resources?** Still unverified
+  against p7. **Partly mooted by the repair:** `setup()` now takes `startResources` from
+  the caller per seat rather than inventing a split, so the question is a caller/UI
+  decision rather than an engine-shape decision.
+- **§14 — which board ships for 2 players.** Unresolved in both directions, as recorded in
+  §18. The 9-zone board is unaffected and ships regardless.
+
+### ⚠ The constraint that moved, 2026-09-30
+
+**§16 #2 ("write the real cards") is no longer blocked on writing.** 60 cards have been
+authored. It is now blocked on **schema coverage**: `packages/cards/KNOWN-GAPS.md` records
+that **43 of the 50 real X-cards recovered with complete official text (86%) cannot be
+expressed in the current card schema at all**, against a 40% prediction. The gaps this
+file's rules vocabulary implies are the gaps in `KNOWN-GAPS.md` — chiefly that p19-style
+"this turn" scope, `when`-style triggers, and five *phase-changing* effects (`block`,
+`deflect`, `auction`, `vote`, `pass-card`) have no representation.
+
+**The practical consequence for this document:** §12 and §11 describe real card effects
+that the engine cannot currently evaluate. Reading them as "implemented" would be wrong.
+They are transcribed rules, faithfully, awaiting a schema that can hold them (M2b).
 

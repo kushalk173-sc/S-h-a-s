@@ -1,15 +1,115 @@
 # Digital Shasn — Build Plan
 
-Status: **draft; code exists, engine repair in flight**
+Status: **engine ✅ · server ✅ · cards ✅ (60 shipped) · board ✅ · client 🔧 written,
+does not compile · schema evolution ⬜ not started**
 Owner: kushalk
 Last updated: 2026-09-30
 
-Reconciled 2026-09-30 against four documents that partly supersede sections below:
-`docs/ENGINE-AUDIT.md` (read-only audit of `packages/engine`), `docs/ARCHITECTURE.md`
-(server, secret-state and milestone design), `docs/AUTHENTIC-SHASN-REFERENCE.md` (fidelity
-research on the real product), `docs/UI-SPEC.md` (board and client design). Where they
-disagree with this file, the disagreement is now written down here rather than silently
-resolved.
+> **Reconciled against the code 2026-09-30, third pass.** The two earlier passes each
+> made optimistic claims the code did not support — the second claimed "M1 DONE, 50 tests
+> passing" when the engine did not compile at all. **This pass verifies every status
+> below against the code or against test output, and marks unverifiable work as
+> unverifiable.** Where a document and the code disagree, the code wins and the
+> disagreement is written down rather than resolved silently.
+>
+> **Verified commands:**
+> - `npm run typecheck` (root) → **exit 0**
+> - `npm run typecheck --workspace @shasn/client` → **FAILS, 14 errors, all in
+>   `src/app/GameScreen.tsx`**
+> - `npm test` (root) → **exit 0 — 412 passing**: engine 179, server 101, cards 61,
+>   client 71
+>
+> Reconciled 2026-09-30 against four documents that partly supersede sections below:
+> `docs/ENGINE-AUDIT.md` (read-only audit of `packages/engine`), `docs/ARCHITECTURE.md`
+> (server, secret-state and milestone design), `docs/AUTHENTIC-SHASN-REFERENCE.md` (fidelity
+> research on the real product), `docs/UI-SPEC.md` (board and client design). Where they
+> disagree with this file, the disagreement is now written down here rather than silently
+> resolved.
+
+---
+
+## 0. SHIP LOG
+
+A dated record of what actually landed, **with the evidence for each claim**, so the next
+agent or the human can tell verified work from claims. Every row is traceable to a
+command, a file, or a named document. Where something is *claimed* but *unverified*, the
+row says so — that is the point of this log.
+
+### 2026-09-30 — engine repair (M0r/M1) · ✅ VERIFIED
+
+| # | What landed | Evidence |
+|---|---|---|
+| 1 | Engine compiles | `npm run typecheck` from repo root → **exit 0** |
+| 2 | 179 engine tests pass | `npm test --workspace @shasn/engine` → **179 passing** |
+| 3 | `index.ts` fixed — all 13 live modules re-exported | `packages/engine/src/index.ts:10-21`; the 6 dead paths are gone |
+| 4 | `reduce()` is **pure** — ids from `GameState._idSeq`, not module-level `let` | `state.ts:268`, `reduce.ts:91-101`, `setup.ts:173`. **Closes CRITICAL R2**, and it is what makes the action log authoritative |
+| 5 | Clients can no longer mint resources | `deltaError()` at `resources.ts:49-60`; **8 call sites across 7 actions** in `reduce.ts` (`:484,752,754,796,963,1078,1088,1101`). Rejects negative, non-integer, non-finite. **Closes CRITICAL R3** |
+| 6 | `playerView` strips **all 11** `_` fields | `ServerOnlyKeys` union, `playerView.ts:23-34`; strip is by prefix, structural |
+| 7 | `playerView` strips **every player's Conspiracy hand, including the viewer's own** | `playerView.ts:60,68-79`. No `pid === viewer` branch, by design. **Closes R1; settles D25 against the original ruling** (§5, `ARCHITECTURE.md` §8.1.1) |
+| 8 | `setup()` builds a legal opening state | Turn-1 soft-lock gone; market dealt, `round` set, staggered start implemented. **Closes B2** |
+| 9 | R5, R7, R9, R10, R11, R12 ruled and fixed | Each with a rulebook citation and a regression test, per `ARCHITECTURE.md` §2.1 |
+| 10 | **R4 proven dead code, not fixed** | Every zone is exactly `2 × majority − 1`, so a majority tie is unreachable. Pinned by a **geometry** test — a stronger guarantee than a behaviour test |
+| 11 | **D6 left explicitly unresolved** | Both readings documented, nothing guessed (`rules-reference.md` §18, `PLAN.md` §6 row 8) |
+
+### 2026-09-30 — server (M3) · ✅ VERIFIED
+
+| # | What landed | Evidence |
+|---|---|---|
+| 12 | Hand-rolled `ws` server; **boardgame.io never installed** | `packages/server/src/`; absent from every `package.json` in the repo |
+| 13 | Action-log-authoritative store, **two** implementations | `store.ts` (`InMemoryMatchStore`, log is truth + `replay()`), `store-postgres.ts` (`PostgresMatchStore`); `main.ts` selects on `SHASN_DATABASE_URL` |
+| 14 | Lobby / join / reconnect / resume / spectators | `lobby.ts`, `session.ts`, `room.ts` |
+| 15 | Runtime message validation | `validate.ts` (`decode*`) |
+| 16 | **Three-layer secret-state gate** | (a) `playerView` applied at exactly one place, `broadcast.ts`; (b) `test/render-all.ts` — `never`-checked, renders every projection; (c) `scripts/check-secrets.mjs` CI grep, wired into `typecheck` so running only tests cannot skip it |
+| 17 | 101 server tests pass | `npm test --workspace @shasn/server` → **101 passing** |
+| 18 | Seeded per-card answer ordering (`order: 'ab'\|'ba'`) | Computed in `broadcast.ts` from `_seed`, **never `Math.random`** — replay determinism holds |
+
+### 2026-09-30 — cards (M2) · ✅ VERIFIED, with a caveat that outranks it
+
+| # | What landed | Evidence |
+|---|---|---|
+| 19 | **60 cards** across 3 decks | 60 card ids in 6 deck files: `core/voter` 12, `et2040` 8+8+8, `in2020` 12+6+6 |
+| 20 | Provenance **0 verbatim / 15 adapted / 45 inferred** | Counted off `"provenance"` in the deck files. **Zero verbatim is deliberate**, not an oversight (§8 legal) |
+| 21 | Schema + validator + balance checker | `schema/card.schema.json`, `src/{schema,validate,balance,effect-ops}.ts`, `BALANCE_TOLERANCE_TOTAL = 1`. **61 tests** |
+| 22 | ⛔ **43 of the 50 real recovered cards (86%) cannot be expressed** | `packages/cards/KNOWN-GAPS.md` §0; 24 gaps G0–G24. Predicted 40% — the true figure is worse than double. **This is why "M2 done" is not "corpus fine". M2b.** |
+
+### 2026-09-30 — board (M4) · 🟡 VERIFIED IN PART
+
+| # | What landed | Evidence |
+|---|---|---|
+| 23 | SVG board, 9 zones, **129** real hit targets, 1000×1500 viewBox | `board/BoardSvg.tsx` + one `VoterSlot` per `AreaSpec`; slot count asserted in tests |
+| 24 | **Contour-map ground**, unfilled zone interiors | `contours.ts` — concentric rings clipped to `COASTLINE`. The generator made a coastline; the real board is a contour texture |
+| 25 | Peg legend as a **10 × 7 matrix** | `board/pegMatrix.ts` |
+| 26 | Roving tabindex — one tab stop for 129 slots | D20; keyboard model in `board/` |
+| 27 | `BlindAnswer` with a **type-level proof** no payout can reach the DOM | `answer/blindAnswer.types.ts` + `blindAnswer.test.tsx` |
+| 28 | 2-player support | ⛔ **not done** — blocked on §6 row 7, unresolved |
+
+### 2026-09-30 — client shell (M5) · 🔧 WRITTEN, **NOT WORKING**
+
+| # | What landed | Evidence |
+|---|---|---|
+| 29 | `app/` written in full | `App.tsx`, `Lobby.tsx`, `GameScreen.tsx`, `AnswerScreen.tsx`, `Panels.tsx`, `YourMat.tsx`, `ResourcePicker.tsx`, `ChoiceResolver.tsx`, `BoardBars.tsx`, `derive.ts`, `store.ts`, `session.ts`, `blindWire.ts` |
+| 30 | Wired to the server — **not a stub** | `App.tsx` → `net/store.ts` → `session.ts` → `connection.ts`. `GameScreen` reads `store.state` (a `ClientState`) and dispatches through `connection().dispatch(...)` |
+| 31 | ⛔ **Does not compile** | `npm run typecheck --workspace @shasn/client` → **14 errors, all in `src/app/GameScreen.tsx`**. A separate agent is fixing this in parallel |
+| 32 | ⛔ **Never run against a live server** | No session exists in which `GameScreen` rendered a real `match:state`. **Wiring unverified, not absent** |
+| 33 | 71 client tests pass | `npm test --workspace @shasn/client` → **71 passing** (board + `BlindAnswer` + transport) |
+
+### 2026-09-30 — documentation (this pass) · ✅
+
+| # | What landed | Evidence |
+|---|---|---|
+| 34 | **D25 ruled: Conspiracy hands are PRIVATE** | Overturned the original ruling. p19 (`rules-reference.md:359`) "bought and **held**"; `ENGINE-AUDIT.md` R1 rated the leak HIGH; the physical-table argument does not translate to a machine-readable payload. Full argument `ARCHITECTURE.md` §8.1.1. **Load-bearing for the central mechanic** |
+| 35 | §6.4.3 worked example corrected | It compared `trust:2` against `trust:0` **across opposite sides** and called a 0-sum pair a "pure upgrade" — impossible, since X ≥ Y with X ≠ Y implies ΣX > ΣY. **Code says the card is totals-clean and fires `POWER_THRESHOLD_CLIFF`.** Corrected to the verdict the checker produces, which is a better example |
+| 36 | §6.4's **D3 definition** corrected to match the code | Doc said "an *ideologue* `i` … `ΣX[i] ≥ level3`" — an Ideologue index compared against a Resource index. Code counts **threshold crossings** (`balance.ts:191-200`), because the per-direction test reports a cliff twice on `{trust:3}` vs `{funds:3}`, a perfectly symmetric card |
+| 37 | This log, §7 statuses, M2b, §9 re-rank | — |
+
+**Claims in this repository that are still NOT verified by anything.** Listed so they are
+not mistaken for shipped:
+- The client's server-wiring (row 32) — **no live session**
+- The secret-state contract **as actually sent** — only the projections are tested; the
+  human devtools check has never been done
+- M6, M7, M2b, M1.5 — nothing built
+- The coalition type change (§6 row 11) — deferred, now against a *tested* engine
+- §6 row 7 (which board ships for 2 players) and §6 row 8 (D6) — unresolved by design
 
 ---
 
@@ -106,7 +206,7 @@ the engine is deterministic). The client renders `order[0]` in the left cell.
 | Rules engine | Pure TypeScript, zero runtime deps | `apply(state, action) → state`. Deterministic. Testable in Node with no browser, no server, no network. Upheld — `docs/ARCHITECTURE.md` §8.1 D2/D3 and §3.2 both rely on it. |
 | Multiplayer | **Hand-rolled WebSocket server on `ws`** — was boardgame.io, **reversed 2026-09-30** | See "Two deliberate reversals" below. `docs/ARCHITECTURE.md` §3.1, §8.1 D1. |
 | Client | React 18.3 + TypeScript, **SVG** board | 9 zones of discrete peg slots is vector work. Free hit targets, CSS transitions, and real a11y labels. Canvas gives none of that. Upheld (`ARCHITECTURE.md` §5.1, §8.1 D2). |
-| Shared types | `@shasn/shared` — ~250 lines of wire types + guards | New in `ARCHITECTURE.md` §1.2 / §8.1 D10. The client/server contract is where a silent mismatch is catastrophic, and the secret-state gate lives on it. |
+| Shared types | **No `packages/shared` package** — protocol defined in `server/src/protocol.ts`, mirrored type-only at `client/src/net/protocol.ts` | `ARCHITECTURE.md` §1.2 argued for a 4th package. It was **never created** — the milestones needing it were scoped to `packages/server/**` and `packages/client/src/net/**` and couldn't add one. The property it was buying was obtained another way: `server/test/protocol-parity.test.ts` asserts the two copies are **mutually assignable**, so drift is a compile error. D10 is **deferred, not reversed** |
 | Cards | JSON in-repo + JSON Schema | Cards are content. They belong in git, reviewable in PRs, validated in CI. Upheld (`ARCHITECTURE.md` §8.1 D3). |
 | Persistence | **Postgres, action log authoritative** — was "in-memory first", **reversed 2026-09-30** | See "Two deliberate reversals" below. `ARCHITECTURE.md` §3.6, §8.1 D4. |
 | Hosting | Fly.io or Railway, **single machine** | Stateful WebSockets. Vercel's serverless model fights this. Agreed and unchanged (`ARCHITECTURE.md` §3.7). |
@@ -136,9 +236,32 @@ budgeted 2, no lobby/reconnect for free, and a team of one maintaining it.
 match is 4–6 hours and must survive one. A game that only persists at the end loses four
 hours on the first deploy. Because the engine is deterministic and seeded,
 `(seed, rules, cards, actionLog)` reconstructs any state — so a 24-hour match is a
-*replay*, not a restore. Snapshot every 10 actions and on every phase change, written
-behind the dispatch path. Cost accepted: a `rulesVersion`/`cardsVersion` drift is a
+*replay*, not a restore. Cost accepted: a `rulesVersion`/`cardsVersion` drift is a
 correctness bug rather than a warning, so replay refuses to run on a mismatch.
+
+> **Shipped, with two corrections to the plan's own wording (2026-09-30).**
+>
+> 1. **The action log is written *synchronously* per action, not "behind the dispatch
+>    path".** The shipped `InMemoryMatchStore` appends the log entry synchronously and the
+>    Postgres store awaits its write. This departs from the plan and
+>    `ARCHITECTURE.md` §3.6, which specified a write-behind queue. **The shipped
+>    behaviour is better and I would not change it back**, for a reason the plan did not
+>    anticipate: a fire-and-forget append means a crash in the 50 ms between "accept the
+>    action" and "persist the action" loses a move the players were told was accepted. A
+>    silently short match is worse than a stalled one, and a stall is visible and
+>    retryable. **Cost accepted: a slow database adds latency to dispatch.** If that shows
+>    up in playtesting, the fix is a bounded queue with an explicit "not yet durable"
+>    state in the protocol — *not* a silent fire-and-forget.
+> 2. **"Snapshot every 10 actions and on every phase change" is NOT implemented.** The
+>    fields exist (`snapshot?`, `snapshotAtSeq`), `rulesVersion()`/`cardsVersion()` are
+>    computed, and `replay()` refuses a mismatch via `ReplayMismatch` — but nothing yet
+>    *writes* a snapshot. Log-authoritative replay is correct without it, so this is a
+>    performance item. **M7.**
+>
+> This reversal also only became *true* because R2 was fixed: with module-level `let`
+> counters, `reduce` was impure and a replay would **not** have reproduced the game. The
+> persistence design was sound in principle and unsound in fact until the engine repair.
+> `ARCHITECTURE.md` §3.6 says this and is right to.
 
 **What survives from the original boardgame.io risk note, and is now trivially true:**
 the rules engine has zero knowledge of the transport. It is a pure reducer in its own
@@ -167,26 +290,37 @@ shasn/
 │   │   │   ├── reduce.ts         # the reducer
 │   │   │   ├── setup.ts          # 2..5 players, staggered start, market
 │   │   │   └── playerView.ts     # the secret-state projection
-│   │   └── test/                  # EMPTY as of 2026-09-30 — see §7 M1
-│   ├── shared/         # wire types + guards (ARCHITECTURE.md §1.2)
-│   ├── cards/           # JSON decks + schema + balance checker
+│   │   └── test/                  # 11 files, 179 tests — all green
+│   ├── cards/           # JSON decks + schema + balance checker  ✅ 60 cards
 │   │   ├── schema/card.schema.json
-│   │   ├── decks/
-│   │   └── scripts/validate.ts
-│   ├── server/          # hand-rolled ws: MatchRunner, broadcast, store, resume
-│   └── client/          # React + SVG
+│   │   ├── decks/{core,et2040,in2020}/
+│   │   ├── scripts/validate.ts
+│   │   └── KNOWN-GAPS.md         # G0–G24 — 43/50 real cards unexpressible
+│   ├── server/          # hand-rolled ws: MatchRunner, broadcast, store, resume  ✅
+│   └── client/          # React + SVG  🔧 app/ written, does not compile
 ├── docs/                # ENGINE-AUDIT, ARCHITECTURE, UI-SPEC, rules-reference,
 │                        # AUTHENTIC-SHASN-REFERENCE
 ├── PLAN.md
 └── package.json         # npm workspace
 ```
 
-> The module list above is the engine **as it exists**, not as originally sketched.
-> `zones.ts`, `capital.ts`, `manifesto.ts`, `gerrymander.ts`, `conspiracy.ts` and
-> `apply.ts` were folded into the modules shown during a refactor; the barrel
-> (`index.ts`) was never updated and still points at six of them
-> (`docs/ENGINE-AUDIT.md` §2 B1). `packages/server` is the hand-rolled server from §3,
-> not a boardgame.io adapter.
+> **Corrected 2026-09-30 against the tree.** Three deltas from the sketch above:
+>
+> 1. **`packages/shared/` was never created.** The milestones that needed it were scoped
+>    to `packages/server/**` and `packages/client/src/net/**` and could not add a
+>    package. The protocol lives in `server/src/protocol.ts` and is mirrored type-only
+>    at `client/src/net/protocol.ts`, with `server/test/protocol-parity.test.ts`
+>    asserting the two are **mutually assignable** — so drift is a compile error.
+>    `ARCHITECTURE.md` §1.2 D10 is deferred, not reversed.
+> 2. **`packages/engine/test/` is no longer empty.** It holds **11 files and 179
+>    passing tests**. The barrel `index.ts` is also fixed — it re-exports all 13 live
+>    modules, so the six dead paths this note used to describe (`./config`, `./capital`,
+>    `./zones`, `./manifesto`, `./gerrymander`, `./apply`) are gone. Both of those
+>    "still broken" claims are now historical.
+> 3. **The engine module list above is accurate as written.** The original sketch was
+>    behind the refactor that folded `zones.ts`, `capital.ts`, `manifesto.ts`,
+>    `gerrymander.ts`, `conspiracy.ts` and `apply.ts` into the modules shown;
+>    `packages/server` is the hand-rolled server from §3, not a boardgame.io adapter.
 
 ---
 
@@ -232,37 +366,58 @@ type GameState = {
 most important line of defence.
 
 > **The block above is the original sketch, and it is now behind the code.** Per
-> `docs/ENGINE-AUDIT.md` §5.1, the shipped `GameState` carries **ten** server-only
+> `docs/ENGINE-AUDIT.md` §5.1, the shipped `GameState` carries **eleven** server-only
 > fields, not three: `_pendingCard`, `_ideologyDraw`, `_ideologyDiscard`, `_voterDraw`,
 > `_voterDiscard`, `_conspiracyDraw`, `_conspiracyDiscard`, `_headlineDraw`,
-> `_headlineDiscard`, `_seed` — the deck count went from three to four when Voter Cards
-> were split out, and `_seed` was added. A leaked `_seed` plus the already-revealed
-> cards reconstructs every remaining draw, so it is the one people forget. Zones are
-> also not the peg records sketched above: pegs live at `areas[i].peg`, and a `Zone` is
+> `_headlineDiscard`, `_seed`, **`_idSeq`** — the deck count went from three to four when
+> Voter Cards were split out, `_seed` was added, and `_idSeq` was added by the R2 repair
+> (it is what makes `reduce` pure — see below). A leaked `_seed` plus the already-revealed
+> cards reconstructs every remaining draw, so it is the one people forget. Zones are also
+> not the peg records sketched above: pegs live at `areas[i].peg`, and a `Zone` is
 > `{id name majority capacity neighbours areas majorityHolder}`.
 >
 > Two consequences for the assertion above. First, it must be **structural and
 > recursive** — strip by `_` prefix and walk the whole graph — not a hand-maintained key
-> list; the current `Omit<GameState, '_deck' | '_pending' | '_conspiracyDeck'>` names
-> three fields that do not exist and omits all ten that do, and still typechecks
-> (`ENGINE-AUDIT` §2 B3). Second, `_`-prefix is **not sufficient on its own**:
-> `PlayerState.conspiracies` is a hidden hand and is not `_`-prefixed, so it is
-> currently shipped to every client including its owner (risk R1, HIGH). The test as
-> written would pass while that leak ships. Full contract: `docs/ARCHITECTURE.md` §4.
+> list; the old `Omit<GameState, '_deck' | '_pending' | '_conspiracyDeck'>` named three
+> fields that did not exist and omitted all ten that did, and still typechecked
+> (`ENGINE-AUDIT` §2 B3). **Both are fixed**: `ServerOnlyKeys` now declares the real
+> eleven (`playerView.ts:23-34`) and the strip is by prefix. Second, `_`-prefix is **not
+> sufficient on its own**: `PlayerState.conspiracies` is a hidden hand and is not
+> `_`-prefixed. **Also fixed** — see the resolution note below. Full contract:
+> `docs/ARCHITECTURE.md` §4.
 >
-> **Note — an unresolved disagreement between two of our own documents, on Conspiracy
-> hands.** `docs/ARCHITECTURE.md` §8.1 **D25** says conspiracy hands are **public**, on the
-> grounds that they are visible at a physical table and that "the bluffing lives in the
-> *answer*, not the hand". `docs/ENGINE-AUDIT.md` **R1** says the opposite and rates it
-> HIGH: the rulebook has cards being "bought and held" (`rules-reference.md` §12), and
-> shipping every opponent's hand to every client is the same class of defect as the
-> blind-answer leak the module's own docstring calls "the single most important function in
-> this package" — except that module's reasoning, and its test, only consider `_`-prefixed
-> fields, so **the leak passes its own test**. I side with the audit: physical visibility
-> is a property of the table, not a security model, and "an attacker enumerates your hand"
-> is the correct threat model for an online game where the hand is not physically visible.
-> Flagged rather than resolved here because the fix lands in `packages/engine`, which this
-> pass does not touch. **It must be settled before M3 ships, not after.**
+> **R2 is what made `reduce` pure.** Ids used to come from module-level `let` counters,
+> which made `reduce` impure and therefore meant a replay from `(seed, actionLog)` did
+> **not** reproduce the game — the property the whole persistence design rests on
+> (§3, `ARCHITECTURE.md` §3.6). Ids now come from `GameState._idSeq`
+> (`reduce.ts:91-101`, `state.ts:268`, seeded at `setup.ts:173`). That is why `_idSeq`
+> is the eleventh server-only field.
+>
+> > ### ✅ RESOLVED 2026-09-30 — Conspiracy hands are PRIVATE. The code was right.
+> >
+> > An earlier version of this note recorded an **unresolved disagreement** between
+> > `ARCHITECTURE.md` §8.1 **D25** ("conspiracy hands are **public**") and
+> > `ENGINE-AUDIT.md` **R1** (they are private, rated HIGH), and said it was "flagged
+> > rather than resolved" because the fix lands in `packages/engine`.
+> >
+> > **The fix has landed and the disagreement is closed — against D25.**
+> > `playerView` strips **every** player's `conspiracies`, **including the viewer's own**
+> > (`playerView.ts:60,68-79`); there is deliberately no `pid === viewer` branch.
+> > `PRIVATE_PLAYER_KEYS = ['conspiracies']` is walked by the leak test, which is what
+> > closes the audit's sting — that the original test only inspected `_` fields and so
+> > **the leak would have passed its own test**.
+> >
+> > D25's physical-table argument did not survive translation to a digital client, and
+> > p19 settles it: a Conspiracy Card "may be **bought and held**, or used immediately"
+> > (`rules-reference.md:359`). **Load-bearing for the central mechanic** — a client
+> > holding its hand can decide for itself what to play, which is the same failure as
+> > shipping the answer payout, one layer out. The cost is real and is still open: the
+> > conspiracy UI must be driven by a server-sent list of *legally playable* card ids,
+> > and that does not exist yet.
+> >
+> > Full argument, including why two physical-table arguments (this one and
+> > `manifesto`-is-public) point in opposite directions and the rulebook draws the line:
+> > **`ARCHITECTURE.md` §8.1.1.**
 
 ### Card schema
 
@@ -299,10 +454,10 @@ by `docs/ENGINE-AUDIT.md`, `docs/ARCHITECTURE.md` and `docs/AUTHENTIC-SHASN-REFE
 | 6 | Capital cap value | **RESOLVED, and the reading matters.** **12, total across all four resources**, not per pool. p12 says you must *choose* which excess to discard, which is only meaningful if the cap is a single number. `rules-reference.md` §16 #3 carries the argument; the code implements the total reading and the §6 wording was stale (corrected — `ENGINE-AUDIT.md` D1). | — |
 | 7 | **Which board ships for 2 players** — `rules-reference.md` §14 says 2-Player Mode "requires the separate 2–3 player board" (7 zones, 14 Zone Requirements), but the Essential Edition contents list **one** "Double-Sided Game Board" and the official render is captioned **"DUAL LAYERED BOARD"**. `docs/AUTHENTIC-SHASN-REFERENCE.md` §6.1 reads that as *one sheet, two faces, 2-player variant printed on the reverse* — which would reconcile it, but nothing confirms the reverse carries the 7-zone layout or whether it supports **3** players as well as 2. | **UNRESOLVED.** Do not implement §14 until settled. The 9-zone board is unaffected and ships regardless. | M4 (2p support only) |
 | 8 | **Does a voter gerrymandered *into* a Volatile Area trigger a Headline?** | **UNRESOLVED.** p18 says placing a voter in a Volatile Area triggers one and that a peg there is permanent; §10 forbids gerrymandering *out of* a volatile but permits placing in. Nothing says whether a *move* counts as a placement. The code currently treats it as one and queues a Headline. Two readings, either defensible. | Settle by re-reading p18 directly, then pin with `ENGINE-AUDIT.md` test 48. Blocks M6 |
-| 9 | **Card schema cannot express phase-changing effects** | `Effect[]` has 12 ops and **cannot represent roughly 40% of real Conspiracy/Headline card effects**. Five of them are not effects at all — `block`, `deflect`, `auction`, `vote`, `pass-card` change the *phase*, not a resource or a voter. There is also no `duration` field, so "this turn / this round / rest of game" is inexpressible. Affects the Ideology schema least (that one is already a correct match) and X-cards most. | M2 schema |
+| 9 | **Card schema cannot express most real card effects** — **this is now the project's #1 risk and it has its own milestone, M2b** | `Effect[]` cannot represent **86%** of real Conspiracy/Headline card effects: **43 of the 50** real cards recovered from Memesys' player-aids cannot be expressed at all (`packages/cards/KNOWN-GAPS.md` §0). **Far worse than the 40% originally predicted** — §5.4's estimate was made before the recovered cards were analysed against the schema, and the exotic effects live in the Headline/Conspiracy decks, which are the only two we have text for. 24 gaps are enumerated (G0–G24): `duration`/scope (11 cards), `when`/triggers (6), `PlayerState` restrictions (5 — a *state* change, not a card change), five phase-changing ops that **do not belong in an `Effect[]` at all** (5), dynamic values read off own state (5), deck search (4), zone-scoped ops (3). **Cheapest first win: a one-line `gerrymander` target field.** | ⛔ **M2b — first-class, before M6.** See §9 risk #1 and `ARCHITECTURE.md` §6.5. |
 | 10 | **Auctions are a rules system with no representation** | p12/p34: bid above your cap without holding the funds, settle with an **IOU token**, and **no purchases until the bid is paid in full**. There is no `Phase` for it, no debt field, and no way for the action vocabulary to say "you owe 3". The doc never claimed it was implemented; the risk is that it is silently absent from a milestone. | Decide scope: out of v1, or add `PlayerState.debts`. Blocks M6 |
-| 11 | **Coalitions cannot be represented without a breaking type change** | Official add-on (p13 of the official site): split a zone's majority in a negotiated ratio, formalised by exchanging an Ideology Card, rights to the larger partner only. `Zone.majorityHolder` is a **single** `PlayerID \| null` — structurally one player per zone. **Decide the type change now, not after M1**, while the engine is already being repaired. | M1/M0r (type), M6 (play) |
-| 12 | **Zone majority ties, and end-game scoring ties** | A genuine gap, not an oversight: §16 lists six unsettled points and neither tie is among them, so the rulebook is silent. `recount` today lets board-scan order silently decide a simultaneous majority (R4), while `gerrymanderRights` correctly returns `null` on a tie — two functions in one package disagreeing about what a tie means. `winners()` also returns *every* player when all scores are 0 (R5). | Needs a ruling; pin with tests 29 and 31 |
+| 11 | **Coalitions cannot be represented without a breaking type change** | Official add-on (p13 of the official site): split a zone's majority in a negotiated ratio, formalised by exchanging an Ideology Card, rights to the larger partner only. `Zone.majorityHolder` is a **single** `PlayerID \| null` — structurally one player per zone. **The "decide the type change now, not after M1" window has closed and nothing was done:** M1 is complete and `Zone.majorityHolder` is still a single holder. It is now a breaking change against a *tested, working* engine rather than a free choice during repair. Not urgent — coalitions are not in v1 — but the deferral is now a decision, not an oversight. | M6+ (the type change) |
+| 12 | **Zone majority ties, and end-game scoring ties** — **both now settled, in opposite ways** | The rulebook is silent on both (§16 lists six unsettled points and neither tie is among them). **R5 (`winners()` returned *every* player when all scores are 0) was ruled on and FIXED**, with a regression test. **R4 was proven dead code, not fixed:** every zone is exactly `2 × majority − 1` areas, so a majority tie is **unreachable by construction** — the `Map`-scan-order path that was the defect cannot occur. It is pinned by a **geometry test** asserting the odd capacity, which is a stronger guarantee than a behaviour test would have been. | ✅ **CLOSED.** Both pinned. |
 
 **How the numbers now reach the engine.** The placeholder caveat below used to be the
 safety net; it is mostly retired. Rows 1, 2, 3 and 6 are real extracted values, read from
@@ -319,46 +474,70 @@ The rulebook PDF is public on Google Drive and on BGG filepage 212891; the game 
 
 **Sequencing authority moved on 2026-09-30.** `docs/ARCHITECTURE.md` §7 re-plans M2–M7
 because the dependency reality is different from the queue below: only the *server*
-milestone is blocked by the engine repair, and the single file it waits on is
-`playerView.ts`. M4 (board) and M2 (cards) have **zero** engine dependencies and can run
-today. The milestone list below is kept in this file because it is the project's own
+milestone was blocked by the engine repair, and the single file it waited on was
+`playerView.ts`. M4 (board) and M2 (cards) had **zero** engine dependencies and could run
+immediately. The milestone list below is kept in this file because it is the project's own
 vocabulary; where the two disagree, ARCHITECTURE.md §7 wins on sequencing and §7.2 holds
 the current sizes.
 
-### M0 — Scaffold · ½ day ✅ DONE (one box corrected)
+> **Naming note, 2026-09-30 — this pass renumbers, deliberately.** An earlier version of
+> this section called **M5 "Conspiracies + headlines"**, which collided with
+> `ARCHITECTURE.md` §7, where **M5 is "Client panels"** and conspiracies/headlines is
+> **M6**. Two documents using "M5" for different milestones is how a status like "M5
+> done" becomes meaningless, so this file now adopts `ARCHITECTURE.md`'s numbering:
+> **M5 = client shell, M6 = conspiracies/headlines/interrupts, M7 = hardening**, with
+> **M2b** inserted for the schema work. The old M5 content did not vanish — it is M6.
+
+### M0 — Scaffold · ½ day ✅ DONE
 - [x] `git init`, **npm** workspace, TS config, vitest
 - [x] `engine` package created
-- [ ] ~~engine package with a passing test suite~~ — **this box was ticked in error and is
-      now unticked.** `packages/engine/test/` contains **0 files** and `npx vitest run`
-      exits 1 with `No test files found` (`docs/ENGINE-AUDIT.md` §2, §3).
-- [ ] CI lint+test (deferred — no remote yet)
+- [x] engine package with a passing test suite — ⚠ **this box was ticked in error in an
+      earlier pass and then correctly unticked** (at that time `packages/engine/test/`
+      contained 0 files and `vitest run` exited 1). It is **re-ticked now, for real**:
+      `packages/engine/test/` holds **11 files and 179 passing tests**. Kept as a visible
+      record because a box that was ticked falsely once should be re-earned visibly.
+- [ ] CI lint+test (deferred — no remote yet) — ⚠ note the local substitute that *does*
+      exist: `packages/server`'s `typecheck` script runs `check-secrets.mjs` after
+      `tsc --noEmit`, so the secret grep cannot be skipped by running tests alone
 
 > Changed from the original plan: **npm workspaces, not pnpm.** pnpm wasn't
 > installed and npm 11 handles workspaces fine. One less global dependency.
 
-### M1 — Rules engine · 2–3 days · 🔧 NOT DONE — repair in progress
+### M1 — Rules engine · 2–3 days · ✅ DONE AND VERIFIED
 
-**This milestone was previously marked "✅ DONE — 50 tests passing, `tsc --noEmit` clean".
-That claim was false and is withdrawn.** Ground truth at audit time
-(`docs/ENGINE-AUDIT.md`, read-only, 16 errors listed verbatim in its §2):
-`npm run typecheck` = **16 errors**; `packages/engine/test/` = **0 files**; `npx vitest
-run` exits 1. A repair is in flight right now (`ARCHITECTURE.md` §7.3 calls it **M0r**),
-run in parallel by another agent. **Do not treat M1 as done, or any figure below as
-green, until `npm run typecheck --workspace @shasn/engine` exits 0 and the named tests
-pass.**
+> **Status reconciled 2026-09-30 against the code, not against the plan.** `npm run
+> typecheck` from the repo root **exits 0**. `npm test --workspace @shasn/engine`
+> reports **179 passing**. The engine compiles, the reducer is pure, the secret-state
+> projection is correct, and there is a real regression suite.
+>
+> **Two earlier versions of this section were wrong and the correction is preserved
+> above them rather than deleted:**
+> - Round 1 claimed *"✅ DONE — 50 tests passing, `tsc --noEmit` clean"*. **False.**
+>   Ground truth at audit time was 16 typecheck errors, `packages/engine/test/` empty,
+>   `vitest run` exiting 1. That claim is withdrawn.
+> - Round 2 said *"🔧 NOT DONE — repair in progress"* with an empty test suite.
+>   **Also now stale.** The repair landed.
+>
+> **Neither claim was harmless.** The first would have let a milestone be closed on a
+> package that did not compile; the second would have let a working engine be scheduled
+> for repair. A milestone is DONE here only when a command exits 0.
 
-Defects the repair is addressing, from `ENGINE-AUDIT.md` §2:
+What the repair closed, from `ENGINE-AUDIT.md` §2 and R1–R12:
 
-| id | file | Class |
-|---|---|---|
-| B1 | `index.ts` | 6 dead export paths (`./config`, `./capital`, `./zones`, `./manifesto`, `./gerrymander`, `./apply` — all deleted in the refactor) and 9 of the 13 real modules missing from the barrel |
-| B2 | `setup.ts` | **Rewrite the function**, not a patch: wrong in **nine** ways, five compile-visible and four silent. The worst are behavioural — no `_pendingCard` at setup means a **turn-1 soft-lock** (no legal move exists), the HQ market is never dealt, `round` is never set, and `staggeredStart` is unimplemented |
-| B3 | `playerView.ts` | `Omit` names 3 fields that don't exist and omits all 10 that do; plus the real bug — opponents' Conspiracy hands are shipped (R1) |
-| B4 | `reduce.ts:901` | One type annotation. No behaviour change; do **not** "fix" it by mutating `headlineQueue` in place |
-| R1–R12 | across the package | 12 logic bugs the compiler cannot see. Two are CRITICAL: **R2**, module-level `let` counters make `reduce` impure, so a replay from seed + action log does **not** reproduce the game; and **R3**, no `Delta` is validated non-negative, so **a client can mint resources** |
+| id | file | Class | Disposition |
+|---|---|---|---|
+| B1 | `index.ts` | 6 dead export paths + 9 of 13 real modules missing from the barrel | ✅ **fixed** — now re-exports all 13 live modules |
+| B2 | `setup.ts` | **Rewrite**, not a patch: wrong in **nine** ways. Worst were behavioural — no `_pendingCard` at setup (**turn-1 soft-lock**), market never dealt, `round` never set, `staggeredStart` unimplemented | ✅ **fixed** — `setup()` now builds a legal opening state |
+| B3 | `playerView.ts` | `Omit` named 3 non-existent fields and omitted all 11 real ones; plus R1 | ✅ **fixed** — real `ServerOnlyKeys` union, structural strip, **Conspiracy hands stripped from everyone including the owner** |
+| B4 | `reduce.ts:901` | One type annotation. No behaviour change | ✅ fixed |
+| **R2** | `reduce.ts` | **CRITICAL** — module-level `let` counters made `reduce` impure, so a replay from `(seed, actionLog)` did **not** reproduce the game | ✅ **fixed** — ids now come from `GameState._idSeq` |
+| **R3** | `reduce.ts` | **CRITICAL** — no `Delta` validated non-negative, so **a client could mint resources** | ✅ **fixed** — `deltaError()` rejects negatives and non-integers at **8 call sites across 7 actions** (`reduce.ts:484,752,754,796,963,1078,1088,1101`) |
+| R4 | `board.ts` | **MEDIUM** — a majority tie was decided by board-scan order | ✅ **proven dead code.** Every zone is exactly `2 × majority − 1`, so a tie is unreachable. Pinned by a **geometry test**, which is a stronger guarantee than a behaviour test |
+| R5 | `board.ts` | **LOW** — `winners()` returned *every* player when all scores were 0 | ✅ **fixed**, with a regression test |
+| R7, R9, R10, R11, R12 | across the package | logic bugs the compiler cannot see | ✅ **each ruled on and fixed**, each with a rulebook citation and a regression test |
+| D6 | `rules-reference.md` §11 | gerrymandering a voter *into* a Volatile Area — does it trigger a Headline? | ⬜ **Left UNRESOLVED on purpose**, both readings documented (§6 row 8) |
 
-M1 checklist. **Ticks below mean the module exists, not that the behaviour has been
-tested** — the test suite is empty, so nothing here is verified yet:
+M1 checklist:
 
 - [x] `RulesConfig` with every open-question value as a named constant — now `RULES` in
       `src/rules.ts`
@@ -367,84 +546,209 @@ tested** — the test suite is empty, so nothing here is verified yet:
 - [x] Manifesto: ideology accumulation → power unlocks + archetype
 - [x] Gerrymander legality + execution
 - [x] Win/end detection (all zones locked **or** all slots filled)
-- [ ] `playerView` correct — the type is wrong and the strip leaks (B3/R1)
-- [ ] `setup()` produces a legal `GameState` — it does not today (B2)
-- [ ] Structural secret-leak test — **does not exist.** The only test in the M1 exit
-      criteria is a full game to completion, and it is not merely untested but
-      **unreachable**: `setup()` cannot build a legal state, so a full game cannot be
-      constructed at all (`ENGINE-AUDIT.md` §6c)
-- [ ] The 135-test suite specified in `ENGINE-AUDIT.md` §3, of which **13 are expected to
-      fail on first run** against the current source — that is the correct starting state,
-      they are the regression tests for the fixes above
+- [x] `playerView` correct — real 11-field `Omit`, structural strip, R1 closed
+- [x] `setup()` produces a legal `GameState`
+- [x] Structural secret-leak test — **exists**, and also walks the graph for
+      unprefixed private keys via `PRIVATE_PLAYER_KEYS`
+- [x] Regression suite — **179 tests, not the 135 the audit specified.** The extra 44
+      are the per-defect regression tests above. `ARCHITECTURE.md` §2.1 records this as
+      the repair's one cost overrun, and it bought the verification.
 
 ### M1.5 — Legal · 0 days engineering · NEW
 - [ ] Send the one email to Memesys (see §8). Day one, in parallel with everything else.
       Exit criterion: sent, and a `docs/licence.md` note recording the date and the ask.
 
-### M2 — Cards · 1 day build + the long content pole
-- [ ] JSON Schema + CI validation — **and settle §6 row 9 first**, the schema cannot
-      express phase-changing effects or durations
-- [ ] 40 seed cards, one setting
-- [ ] Balance checker: flag any card where one side strictly dominates (severity is split
-      into errors and warnings on purpose — `ARCHITECTURE.md` §6.4)
-- [x] ~~`playerView` + the secret-leak test~~ — claimed done in M1; it is not (§2 B3)
+### M2 — Cards · 1 day build + the long content pole · ✅ DONE, and overshot
+- [x] JSON Schema + CI validation — one `schema/card.schema.json` covering all four card
+      types; kind-narrowing done at validation time in `src/schema.ts`
+- [x] **60 seed cards**, not the planned 40, across **3 decks**: `core/voter.json` (12),
+      `et2040/{ideology: 8, conspiracy: 8, headline: 8}`, `in2020/{ideology: 12,
+      conspiracy: 6, headline: 6}`
+- [x] Balance checker — `src/balance.ts`, `BALANCE_TOLERANCE_TOTAL = 1`, with
+      `PURE_UPGRADE` / `POWER_THRESHOLD_CLIFF` / `EMPTY_SIDE` as **errors** and
+      `TOTAL_SKEW` / `SAME_IDEOLOGUE_SKEW` / `RESOURCE_BLIND_LEAN` / `IDEOLOGUE_SKEW` as
+      warnings. 61 tests.
+- [x] `playerView` + the secret-leak test — claimed done in M1 and was not; **now
+      genuinely done** (see M1)
 
-### M3 — Server · 3 days · **not boardgame.io**
-- [ ] Hand-rolled `ws` server: lobby, seat management, `MatchRunner`, broadcast, store
-- [ ] Reconnect/resume with a rotating `resumeToken` — not a `matchID` as credential
-- [ ] Action log persisted from the first action; snapshot every 10 actions and on phase
-      change, behind the dispatch path (§3)
-- [ ] **The secret-state gate lives in this milestone, and it is one file:** `playerView`.
-      Everything else on Lane B can be built against fixtures.
-- [ ] Send the randomised `order: 'ab' | 'ba'` on the blind prompt (§2 A′, `UI-SPEC` B1)
-- [ ] **Exit criterion: two browsers, real game, payouts confirmed absent from devtools** —
-      a manual step on purpose. The automated tests prove the projections are correct;
-      only a human reading the wire proves they are the ones actually sent.
+**Provenance, counted off the deck files — 0 verbatim / 15 adapted / 45 inferred:**
 
-### M4 — Board UI · 4–5 days
-- [ ] SVG board, 9 zones, peg slots as real hit targets. **Fidelity constraint:** the real
-      board is a topographic contour map whose zone interiors are *unfilled* — the land
-      texture runs through them and only the borders are drawn
-      (`docs/AUTHENTIC-SHASN-REFERENCE.md` §6.1). The generator produced a *coastline*;
-      the real thing is a contour texture.
-- [ ] Answer prompt (payouts hidden **and** order randomised per card), spend panel,
-      manifesto tray
+| | count | where |
+|---|---:|---|
+| `verbatim` | **0** | deliberate. Rules are not copyrightable; card text is (`§8`). A verbatim deck would be the one artefact that could pull the repo down. |
+| `adapted` | **15** | `in2020/ideology` 8, `et2040/conspiracy` 4, `et2040/headline` 3 — each names the dropped clause in its `source` field |
+| `inferred` | **45** | authored here, register per `AUTHENTIC-SHASN-REFERENCE.md` §8.2 |
+
+**And the thing that makes this milestone's success a trap:**
+
+> ⛔ **60 cards ship, and the schema cannot express most real ones.** **43 of the 50**
+> real cards recovered from Memesys' official player-aids (**86%**) **cannot be written
+> at all** in the current schema — against a predicted 40%. 24 gaps are enumerated in
+> `packages/cards/KNOWN-GAPS.md` as G0–G24. **The 61 green tests are evidence that the
+> corpus and the schema agree with each other, not that the corpus represents the game.**
+> This is promoted to **M2b** below.
+
+### M2b — Card schema evolution · ⬜ NOT STARTED · **new, first-class, before M6**
+- [ ] Add `duration` / scope (`this turn`, `next turn`, `rest of game`) — **G9 + G22, 11
+      cards.** `KNOWN-GAPS.md` calls G9 *the single highest-value fix*.
+- [ ] Add `when` / trigger clauses — **G14, 6 cards**
+- [ ] Add `PlayerState.restrictions` — **G5, 5 cards.** ⚠ **This is a state change, not a
+      card change** — "you may not buy Conspiracies next turn" needs a field on
+      `PlayerState`, so it is an engine change and touches `playerView`'s private-key
+      reasoning. Sequence it deliberately.
+- [ ] Give the five phase-changing ops (`block`, `deflect`, `auction`, `vote`,
+      `pass-card`) a home **outside `Effect[]`** — **G13, 5 cards.** They change the
+      *phase*; no amount of `Effect` vocabulary expresses them.
+- [ ] Support dynamic values read off own state — **G15, 5 cards**
+- [ ] **First move, deliberately small: a one-line `gerrymander` target field.** Not
+      because it is the biggest gap but because it is the only one with a one-line fix,
+      and the point of the first move is to prove the schema-change loop works end to end
+      against a live corpus.
+
+**Why this is before M6 and not after:** M6 is Conspiracies and Headlines — precisely the
+content that needs `duration`, triggers and phase-changing ops. Building M6 against the
+current schema means building a UI for effects the engine cannot evaluate. **Sequencing
+note:** every gap entry cites the real card and the exact clause, so this is a checklist
+with evidence behind it, not a research task.
+
+### M3 — Server · 3 days · **not boardgame.io** · ✅ DONE AND VERIFIED
+- [x] Hand-rolled `ws` server: lobby, seat management, `MatchRunner`, broadcast, store
+- [x] Reconnect/resume with a rotating `resumeToken` — not a `matchID` as credential
+- [x] Action-log-authoritative store with **two** implementations —
+      `InMemoryMatchStore` (`store.ts`, log is truth + `replay()`) and
+      `PostgresMatchStore` (`store-postgres.ts`, one JSONB row per match), selected by
+      `main.ts` on `SHASN_DATABASE_URL`. **boardgame.io was never installed.**
+- [x] The secret-state gate, in one file: `playerView`, applied at exactly one place
+      (`broadcast.ts`) — plus `test/render-all.ts`, which is `never`-checked and renders
+      every projection, and `scripts/check-secrets.mjs` as a CI grep wired into
+      `typecheck` so it cannot be skipped by running only the tests
+- [x] Randomised `order: 'ab' | 'ba'` on the blind prompt — seed-derived in
+      `broadcast.ts`, never `Math.random`, so replay determinism holds
+- [x] Runtime message validation (`validate.ts`, `decode*`), lobby/join/reconnect/resume/
+      spectators, protocol-parity test against the client's mirrored types
+- [x] **101 tests passing**
+- [ ] ⚠ **Snapshot cadence not implemented.** `snapshot?` / `snapshotAtSeq` exist on the
+      type and `rulesVersion()`/`cardsVersion()` are computed and `replay()` refuses a
+      mismatch via `ReplayMismatch` — but nothing yet *writes* a snapshot every 10
+      actions. Log-authoritative replay is correct without it, so this is a performance
+      item, not a correctness one. **M7.**
+- [ ] ⚠ **The human exit criterion was never performed:** *"two browsers, real game,
+      payouts confirmed absent from devtools."* The automated tests prove the projections
+      are correct; only a human reading the wire proves they are the ones actually sent.
+      **This cannot be marked done from a test run**, and it blocks M7's release gate.
+
+### M4 — Board UI · 4–5 days · 🟡 SUBSTANTIALLY DONE AND VERIFIED
+- [x] SVG board, 9 zones, 129 peg slots as real hit targets — `BoardSvg.tsx` + one
+      `VoterSlot` per `AreaSpec`, 1000×1500 viewBox
+- [x] **Fidelity constraint honoured:** the real board is a topographic contour map whose
+      zone interiors are *unfilled*. The generator produced a *coastline*; `contours.ts`
+      now renders concentric contour rings clipped to `COASTLINE`, so the texture runs
+      through the zones and only the borders are drawn. Volatile Areas are rosettes, not
+      a colour wash (`VolatileRosette.tsx`).
+- [x] Peg legend as a **10 × 7 matrix** (`pegMatrix.ts`) — the real board's encoding
+- [x] Keyboard navigable — roving tabindex, **one tab stop for 129 slots** (D20)
+- [x] Answer prompt with a **type-level proof** that no payout can reach the DOM
+      (`answer/blindAnswer.types.ts` + `blindAnswer.test.tsx`)
+- [ ] Spend panel / manifesto tray as *separate* components — subsumed by `app/` in M5
 - [ ] Lock animation, gerrymander drag
-- [ ] Keyboard navigable — roving tabindex, one tab stop for 129 slots
-- [ ] 2-player support blocked on §6 row 7
+- [ ] 2-player support blocked on §6 row 7 (UNRESOLVED — do not implement)
 
-### M5 — Conspiracies + headlines · 2 days
+### M5 — Client panels + app shell · 3 days · 🔧 WRITTEN, **NOT WORKING**
+
+> **This is the one milestone whose plan text and reality disagree in the *opposite*
+> direction from the last pass, so read it carefully.** An earlier reconciliation claimed
+> M5 was "not started" and that "no game screen renders a `ClientState`". **Both claims
+> were false.** The work is written; what is missing is that it compiles.
+
+- [x] `app/App.tsx` — `useSyncExternalStore` over the net store, one connect effect, a
+      switch on phase → `ReconnectScreen` / `LobbyScreenHarness` / `GameScreen`
+- [x] `app/Lobby.tsx` — create/join/ready/start/spectate
+- [x] `app/GameScreen.tsx` — the whole §5.0 shell **is written**: board + mat + log,
+      `AnswerScreen`, `HeadlineDialog`, `ChoiceResolver`, `ConspiracyPicker`,
+      `TradeComposer`, `PlacementBar`/`GerryBar`, `END TURN`, the §5.13 phone tab bar,
+      and the `aria-live` sentence
+- [x] `app/{Panels,YourMat,ResourcePicker,ChoiceResolver,BoardBars,AnswerScreen}.tsx` —
+      all compile clean
+- [x] `app/{derive,store,session,blindWire}.ts` — the `ClientState` → board projection,
+      app-local interaction state, the singleton connection
+- [x] `net/{protocol,connection,store,index}.ts` — tested
+- [x] `board/*` and `answer/*` — see M4
+- [ ] ⛔ **`tsc --noEmit` fails: 14 errors, all in `src/app/GameScreen.tsx`.** The app
+      shell does not build. A separate agent is on this in parallel.
+- [ ] ⛔ **Never run against a live server.** No session exists in which `GameScreen`
+      rendered a real `match:state`. **The wiring is unverified, not absent.**
+- [ ] `ConspiracyPicker` (`GameScreen.tsx:496-508`) renders **no card and no hand** — it
+      is a `ResourcePicker` for paying a blind cost. That is a *direct consequence of the
+      D25 reversal*: the correct fix is a **server-sent list of legally-playable
+      conspiracy ids**, which does not exist yet. See §5's resolved note.
+- [ ] No `a11y` script in `packages/client/package.json`, so the exit criterion
+      `npm run a11y --workspace @shasn/client` **cannot currently be run at all**.
+- [ ] The no-optimism reference-equality test (`ARCHITECTURE.md` §7.8) — **not verified
+      to exist.**
+
+**Why the 14 errors are good news, stated plainly:** they are mechanical, not
+architectural. Reading `GameScreen.tsx`, they are type-only names re-exported at `:911`
+(`Resource`, `SeatCount`, `WireSeatCount`) with no import in scope, an unused-import
+alias at `:74`, and `as never` casts standing in for real `ZoneID` narrowing. **The
+structure matches §5's design.** The fix is a typing pass, not a rewrite.
+
+### M6 — Conspiracies, headlines, interrupts · 2 days · ⬜ NOT STARTED
 - [ ] Conspiracy purchase + play
-- [ ] Headline resolution order — §6 row 5 is now **resolved** (one per volatile
-      placement, in placement order, at end of turn); row 8 is the open sub-case
-- [ ] ~~Interrupt/out-of-turn action framework~~ — **see the note below before scheduling
-      this as framework work.**
+- [ ] Headline resolution order — §6 row 5 is **resolved** (one per volatile placement,
+      in placement order, at end of turn); **row 8 stays open** (does a gerrymander *into*
+      a Volatile Area trigger a Headline? — D6, both readings documented)
+- [ ] **`InterruptStrip`** — "Asha played a Conspiracy out of turn", visible to all players
+- [ ] ⚠ **Blocked by M2b.** M6 is Conspiracies and Headlines — exactly the content that
+      needs `duration`, triggers and phase-changing ops. Building it against the current
+      schema means building a UI for effects the engine cannot evaluate.
+- [ ] ~~Interrupt/out-of-turn action framework~~ — **see the open note below. Not built.
+      Deliberately not closed.**
 
-> **Note — where I think the architect is wrong (or at least premature).** `ARCHITECTURE.md`
-> §8.1 D5 drops the general interrupt framework entirely and argues that `reduce`'s two
-> turn-gate exceptions plus `PendingChoice` already *are* the out-of-turn mechanism. On
-> reading the code I am not yet convinced, and I am recording the disagreement rather than
-> silently adopting it. `PendingChoice` is a channel for *decisions the engine already owes
-> a player*; an interrupt framework is a channel for *actions nobody owes anyone*. The
-> difference shows up in exactly the case D5 accepts as its cost: a player with no pending
-> decision has nothing to be "interrupted into", so `PendingChoice` cannot express it, and
-> the architect's own residual risk — no timed window, so a 5-player async table can be
-> ambushed — is a *table-experience* problem that a queue would have addressed. My
-> position: do not build the framework in M5, but **keep it as an explicit M6+ item with a
-> 5-player playtest as its trigger**, rather than closing it as decided. The architect
-> flags D5 as its least-confident decision and I agree that a playtest, not more analysis,
-> is what settles it — I am only declining to close it in the meantime.
+> ### ⚠ OPEN DISAGREEMENT — D5, "no interrupt framework". UNRESOLVED. Keep it that way.
+>
+> `ARCHITECTURE.md` §8.1 **D5** drops the general interrupt framework entirely, arguing
+> that `reduce`'s two turn-gate exceptions plus `PendingChoice` already *are* the
+> out-of-turn mechanism.
+>
+> **I am not convinced, and I am recording the disagreement rather than silently adopting
+> it or silently closing it.** `PendingChoice` is a channel for *decisions the engine
+> already owes a player*; an interrupt framework is a channel for *actions nobody owes
+> anyone*. The difference shows up in exactly the case D5 accepts as its cost: a player
+> with no pending decision has nothing to be "interrupted into", so `PendingChoice`
+> cannot express it — and the architect's own residual risk, no timed window, so a
+> 5-player async table can be ambushed, is a *table-experience* problem that a queue would
+> have addressed.
+>
+> **State of play, 2026-09-30:** no interrupt framework has been built. The engine ships
+> D5's two turn-gate exceptions and `PendingChoice`, and that is all. `ARCHITECTURE.md`
+> §8.2 now also carries this as **open**, and names the same disconfirmation I do: a
+> 5-player playtest, not more architecture argument.
+>
+> **Position: do not build the framework in M6, but keep it as an explicit M6+ item with
+> a 5-player playtest as its trigger, rather than closing it as decided.** The architect
+> flags D5 as its least-confident decision and I agree that a playtest, not more
+> analysis, is what settles it — I am only declining to close it in the meantime.
 
-### M6/M7 — NEW, condensed
-- **M6 Conspiracies, headlines, interrupts** — mostly rendering, not framework
-  construction (`ARCHITECTURE.md` §7.9). Depends on §6 rows 8, 10, 11.
-- **M7 Hardening + release gate** — leak fuzzing, balance `--strict`, and a deliberate
-  **kill-the-server-mid-game-and-resume** test, which is what turns §9 risk #5 from a
-  mitigation into a verified property (`ARCHITECTURE.md` §7.10).
+### M7 — Hardening + release gate · 2 days · ⬜ NOT STARTED
+- [ ] Property-based leak fuzzing (`test/leak-fuzz.test.ts`) — must also fuzz the
+      **unprefixed** private keys, or it re-opens R1
+- [ ] Balance `--strict` clean, with every warning argued in a PR
+- [ ] **Kill-the-server-mid-game-and-resume** test — this is what turns §9 risk #5 from a
+      mitigation into a verified property
+- [ ] Snapshot cadence (§3.6) — written every 10 actions and on phase change
+- [ ] `docs/RELEASE-CHECKLIST.md`
+- [ ] ⚠ **M3's human exit criterion must be performed here and cannot be automated:**
+      two browsers, a real game, payouts and conspiracy hands confirmed absent from
+      devtools. This is the one gate that no test run can satisfy, and it is the reason
+      "tests pass" is not the same claim as "the game is safe".
 
-**Playable alpha: ~2 focused weeks. 4–6 weeks part-time** — still roughly right, but note
-that the card corpus (§9 risk #1, §10) runs past it and is the only item that does not
-compress. Ship with 40 cards.
+**Playable alpha: ~2 focused weeks. 4–6 weeks part-time** — **still roughly right, but
+the estimate no longer holds for one reason.** The engine, server, board and cards are
+done or nearly done; the two things between this and playable are the **14 compile
+errors** in the client (hours, not days) and **M2b schema evolution** (§9 risk #1), which
+is not on the original critical path at all and is now the thing most likely to decide
+whether this game can represent the real game. **Ship with 60 cards, and understand that
+the binding constraint is schema coverage, not card count.**
 
 ---
 
@@ -509,35 +813,77 @@ art and text are Memesys' and are covered by everything above.
 
 Ranked by real risk, not by how hard the code is. **This register survived review, and
 the architect independently relies on it** — §3 above exists because of #5, and M2's
-"ship with 40 cards" exists because of #1 (`ARCHITECTURE.md` §8.1 D4, D14). Re-ranked
-against what is now known, #1 has gone from "expensive" to "the long pole with nothing
-recovered", and #3 has gone from "one careless broadcast" to "the class of bug we just
-found twice in code we believed was finished".
+"ship a bounded corpus" exists because of #1 (`ARCHITECTURE.md` §8.1 D4, D14).
 
-1. **The card corpus.** ~100+ dilemmas per setting that are genuinely hard,
-   genuinely balanced, and not a partisan tract. This is writing, not
-   engineering, and it is most of the project. **See §10 for what we actually
-   have, which is close to nothing.**
-2. **Payout balance.** If one side of a card is strictly better, players optimize
-   instead of deliberating and the entire premise collapses.
-3. **Secret-state leaks.** One careless broadcast and the blind-answer mechanic
-   is gone. Hence the structural leak test — which is currently in M1/M0r, not M2,
-   and does not exist yet (§7).
-4. **Interrupt timing.** Out-of-turn plays are where digital board games
-   traditionally break. **Now contested:** `ARCHITECTURE.md` §8.1 D5 proposes
-   building no interrupt framework at all; see the note in §7 M5. Still on the list
-   because the disagreement is unresolved, not because the answer is known.
-5. **Session length.** 4–6 hours at 5 players. Async play isn't a nice-to-have,
-   it's survival. **This risk has been *accepted and designed for*, not deferred:**
-   the action log is the source of truth and a snapshot is only a cache, so a long
-   match is replayable rather than losable (§3). What remains is proving it — a
-   deliberate kill-the-server-mid-game test is in M7.
+> **Re-ranked 2026-09-30, third pass, against what is now built.** #1 has changed
+> *character*, not just size: it was "the corpus is expensive and we have recovered
+> nothing", and it is now **"the schema cannot express the corpus we recovered"** — a
+> sharper and more dangerous risk, because it is invisible to every test we have. #3 has
+> fallen from "one careless broadcast" to **largely closed** (the three-layer gate ships
+> and R1 is fixed), with one manual gate outstanding.
+
+1. **⛔ THE CARD SCHEMA, not the corpus. (promoted, and now #1 by a wide margin.)**
+   **43 of the 50 real cards recovered from Memesys' official player-aids — 86% — cannot
+   be expressed at all** in the current schema. Predicted 40%; the true figure is worse
+   than double, because the exotic effects live in the Headline and Conspiracy decks and
+   those are the only two we have text for. 24 gaps enumerated as G0–G24 in
+   `packages/cards/KNOWN-GAPS.md`: `duration`/scope (11 cards), `when`/triggers (6),
+   `PlayerState.restrictions` (5 — a *state* change, not a card change), five
+   phase-changing ops that do not belong in an `Effect[]` at all (5), dynamic values read
+   off own state (5), deck search (4), zone-scoped ops (3). **Cheapest first win is a
+   one-line `gerrymander` target field.**
+   **Why this is worse than "the corpus is expensive":** a 61-test green suite does not
+   see it. The tests prove the corpus and the schema agree; they cannot prove the schema
+   matches the game. Writing card #61 against this schema produces a 61st card with the
+   same limitation as the first 60 — and M6 (Conspiracies/Headlines) is exactly the
+   content that needs the missing vocabulary. **This is M2b, first-class, before M6.**
+2. **The card corpus as writing.** Still real and still the long pole — ~100+ dilemmas
+   per setting that are genuinely hard, genuinely balanced, and not a partisan tract.
+   This is writing, not engineering. **But it has changed rank** because the constraint
+   moved: 60 cards ship and the game is *not blocked on having more of them*. It is
+   blocked on being able to *express* the ones we have. See §10 for what we recovered.
+3. **Secret-state leaks.** One careless broadcast and the blind-answer mechanic is gone.
+   **Largely closed, and the closure is three-layered:** the type-level contract
+   (`ServerOnlyKeys`, 11 fields), a structural test that walks the whole object graph,
+   and a CI grep (`scripts/check-secrets.mjs`, wired into `typecheck` so it cannot be
+   skipped by running only tests) plus a `never`-checked `test/render-all.ts`. R1 — the
+   Conspiracy hand — is **fixed** by decision (§5, D25). **One gate remains open and no
+   test can close it:** a human reading devtools on a live game. That is M7's release
+   criterion.
+4. **Interrupt timing.** Out-of-turn plays are where digital board games traditionally
+   break. **Still contested and deliberately left open:** `ARCHITECTURE.md` §8.1 D5
+   proposes building no interrupt framework at all. See the OPEN DISAGREEMENT note in
+   §7 M6 — it is on the list because the disagreement is unresolved, not because the
+   answer is known.
+5. **Session length.** 4–6 hours at 5 players. Async play isn't a nice-to-have, it's
+   survival. **Accepted and designed for**, not deferred: the action log is the source of
+   truth and a snapshot is only a cache, so a long match is replayable rather than losable
+   (§3) — and that is now *true*, not aspirational, because R2 made `reduce` pure. What
+   remains is proving it: the kill-the-server-mid-game test is M7, and the snapshot
+   cadence itself is not yet written.
+
+**Not on this list, and worth saying so:** the engine no longer belongs here. It was the
+top risk for two passes while it did not compile; `npm run typecheck` exits 0 and 179
+tests pass. Risk that has been *paid down* should leave the register, or the register
+stops being a register.
 
 ---
 
 ## 10. What we actually know about the real cards
 
 Short version, because §9 risk #1 is the project and this is the state of its input.
+
+> ### ⚠ Read the two numbers below together, or the picture is badly wrong.
+>
+> | Recovered | Shipped | Unshippable |
+> |---:|---:|---:|
+> | **50** real X-cards with complete official text | **60** cards (15 adapted, 45 inferred, **0 verbatim**) | **43 of the 50 (86%)** |
+>
+> **The recovery effort worked and it bought us less than it looks like.** We have
+> verbatim text for 50 real cards and we can only *use* 7 of them. §9 risk #1 is no longer
+> "we have nothing" — it is **"we have the text and no way to express it"**, which is a
+> schema problem, not a writing problem, and a much more tractable one. The 24 gaps are
+> enumerated in `packages/cards/KNOWN-GAPS.md`; the milestone is **M2b**.
 
 **Recovered: 55 cards verbatim, from Memesys' own official player-aids.** Not fan wikis,
 not forum speculation — the "X Cards Explained" documents Memesys published *as player

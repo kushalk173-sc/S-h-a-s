@@ -95,6 +95,98 @@ describe('dominance: D1 PURE_UPGRADE — the failure a totals checker misses', (
   });
 });
 
+/**
+ * Pins the arithmetic of the header comment in `src/balance.ts`.
+ *
+ * The comment once claimed `{funds:3}` vs `{funds:2, media:1}` "is 0-sum and yet
+ * a pure upgrade for anyone who needs funds". The first half is true and the second
+ * half is false: `media` is 0 on side A and 1 on side B, so side B is NOT >= side A
+ * componentwise. These assertions make the wrong claim unrepresentable, so it cannot
+ * creep back into a comment as if it were a worked example.
+ */
+describe('the corrected arithmetic behind the header comment', () => {
+  const A: Record<string, number> = { funds: 3 };
+  const B: Record<string, number> = { funds: 2, media: 1 };
+
+  /** Componentwise `x >= y` on every resource, with at least one strict. */
+  const dominates = (x: Record<string, number>, y: Record<string, number>): boolean => {
+    const keys = ['funds', 'trust', 'media', 'clout'];
+    let strict = false;
+    for (const k of keys) {
+      const xv = x[k] ?? 0;
+      const yv = y[k] ?? 0;
+      if (xv < yv) return false;
+      if (xv > yv) strict = true;
+    }
+    return strict;
+  };
+
+  const sum = (d: Record<string, number>): number =>
+    ['funds', 'trust', 'media', 'clout'].reduce((n, k) => n + (d[k] ?? 0), 0);
+
+  it('the worked example IS 0-sum', () => {
+    expect(sum(A)).toBe(3);
+    expect(sum(B)).toBe(3);
+    expect(sum(A)).toBe(sum(B));
+  });
+
+  it('the worked example is NOT a pure upgrade in either direction', () => {
+    // media: A = 0, B = 1 — so B is short nothing, but A is short one Media, and
+    // A is not short anything B has either. Neither side dominates.
+    expect(A.media ?? 0).toBe(0);
+    expect(B.media ?? 0).toBe(1);
+    expect(dominates(A, B)).toBe(false);
+    expect(dominates(B, A)).toBe(false);
+  });
+
+  it('a pure upgrade can NEVER be 0-sum — the identity the bad claim rested on', () => {
+    // if X >= Y componentwise and X != Y then sum(X) > sum(Y), strictly. Enumerated
+    // rather than asserted, so the whole small space of 0-3 payouts is covered.
+    const space = [0, 1, 2, 3];
+    let compared = 0;
+    for (const f of space)
+      for (const t of space)
+        for (const m of space)
+          for (const cl of space) {
+            const x = { funds: f, trust: t, media: m, clout: cl };
+            for (const g of space)
+              for (const u of space)
+                for (const v of space)
+                  for (const w of space) {
+                    const y = { funds: g, trust: u, media: v, clout: w };
+                    compared += 1;
+                    if (dominates(x, y)) expect(sum(x)).toBeGreaterThan(sum(y));
+                    if (dominates(y, x)) expect(sum(y)).toBeGreaterThan(sum(x));
+                  }
+          }
+    expect(compared).toBe(4 ** 8);
+  });
+
+  it('the good-card example is 3 apart per resource and EQUAL in total', () => {
+    // `{funds:3}` vs `{trust:3}`: the two sides differ by 3 on Funds and by 3 on
+    // Trust, as large a componentwise gap as a card can have — and their TOTALS are
+    // identical, 3 against 3. So this card is invisible to a totals checker AND to
+    // a componentwise checker, and it is the good one. (Saying "a 3-resource
+    // difference" without "per resource" is what made this comment wrong before.)
+    const G: Record<string, number> = { trust: 3 };
+    expect(Math.abs((A.funds ?? 0) - (G.funds ?? 0))).toBe(3);
+    expect(Math.abs((A.trust ?? 0) - (G.trust ?? 0))).toBe(3);
+    expect(sum(A)).toBe(3);
+    expect(sum(G)).toBe(3);
+    expect(sum(A)).toBe(sum(G));
+    expect(dominates(A, G)).toBe(false);
+    expect(dominates(G, A)).toBe(false);
+  });
+
+  it('and the checker agrees with both: the good card is clean', () => {
+    const good = card(
+      { answer: 'Yes. Move the money to the schools this year.', ideologue: 'capitalist', pays: { funds: 3 } },
+      { answer: 'No. Keep the money where it already clears fastest.', ideologue: 'idealist', pays: { trust: 3 } },
+    );
+    expect(codes(analyseIdeologyCard(good, 'test'))).toEqual([]);
+  });
+});
+
 describe('dominance: D2 TOTAL_SKEW and the tolerance band', () => {
   it(`tolerates a gap of exactly BALANCE_TOLERANCE_TOTAL (${BALANCE_TOLERANCE_TOTAL})`, () => {
     const c = card(
@@ -144,6 +236,64 @@ describe('dominance: D3 POWER_THRESHOLD_CLIFF — overrides the band', () => {
     const cliff = analyseIdeologyCard(c, 'test').find((f) => f.code === 'POWER_THRESHOLD_CLIFF');
     expect(cliff?.message).toContain(`buys 2 power unlock(s) (clout@${RULES.level3} + clout@${RULES.level5})`);
     expect(cliff?.message).toContain(`against side 1 (idealist)'s 1 (trust@${RULES.level3})`);
+  });
+
+  // ── the two halves of the corrected header comment, as executable assertions ──
+
+  it(`MUST flag the header's own worked example: {funds:${RULES.level3}} vs {funds:${RULES.level3 - 1}, media:1}`, () => {
+    // This is the corrected form of case 2 in the file header. It is 0-sum, so
+    // TOTAL_SKEW is silent; it is NOT componentwise dominated, so PURE_UPGRADE is
+    // silent. The ONLY thing the checker can see is the cliff: 3 Funds is
+    // RULES.level3, so side 0 buys the Capitalist Level 3 power and side 1, whose
+    // own Ideologue resource is Media and which pays 1 of it, buys nothing.
+    const c = card(
+      { answer: 'Yes. Release the tender figures in full.', ideologue: 'capitalist', pays: { funds: 3 } },
+      { answer: 'No. Release the figures two at a time, in summary.', ideologue: 'showstopper', pays: { funds: 2, media: 1 } },
+    );
+    const findings = analyseIdeologyCard(c, 'test');
+    expect(codes(findings)).not.toContain('TOTAL_SKEW');
+    expect(codes(findings)).not.toContain('PURE_UPGRADE');
+    const cliff = findings.find((f) => f.code === 'POWER_THRESHOLD_CLIFF');
+    expect(cliff).toBeDefined();
+    expect(cliff?.severity).toBe('error');
+    expect(cliff?.side).toBe(0);
+    expect(cliff?.message).toContain(`buys 1 power unlock(s) (funds@${RULES.level3})`);
+    expect(cliff?.message).toContain('against side 1 (showstopper)\'s 0 (none)');
+  });
+
+  it('MUST NOT flag the same-total trade-off that does NOT straddle a threshold', () => {
+    // The un-cliffed sibling of the example above: identical total, identical
+    // shape, 2 Funds and 2 Media instead of 3 and 1. Nothing crosses
+    // RULES.level3 on either side's own resource and neither side dominates, so
+    // this is the card the game is made of and it must stay silent.
+    const c = card(
+      { answer: 'Yes. Release the tender figures in full.', ideologue: 'capitalist', pays: { funds: 2, media: 1 } },
+      { answer: 'No. Release the figures two at a time, in summary.', ideologue: 'showstopper', pays: { media: 2, funds: 1 } },
+    );
+    expect(codes(analyseIdeologyCard(c, 'test'))).toEqual([]);
+  });
+
+  it('does not let a side pad its crossing count with resources it does not own', () => {
+    // A count is gameable if a side is allowed to score unlocks for other
+    // Ideologues. Capitalist {funds:3, media:3} scores only funds@3 — it has not
+    // gained a Showstopper card, so media@3 is not an unlock it can spend. Idealist
+    // {trust:5} scores trust@3 + trust@5. Unscoped, the two counts came out 2 and 2
+    // and this card was called clean while the Idealist side quietly held the Level
+    // 5 power and the Capitalist side held only Level 3.
+    const c = card(
+      { answer: 'Yes. Publish the register and the commentary together.', ideologue: 'capitalist', pays: { funds: 3, media: 3 } },
+      { answer: 'No. Publish the register and let the commentary follow.', ideologue: 'idealist', pays: { trust: 5 } },
+    );
+    const findings = analyseIdeologyCard(c, 'test');
+    // Totals 6 against 5: inside the band, so D2 stays silent too.
+    expect(codes(findings)).not.toContain('TOTAL_SKEW');
+    const cliff = findings.find((f) => f.code === 'POWER_THRESHOLD_CLIFF');
+    expect(cliff).toBeDefined();
+    expect(cliff?.side).toBe(1);
+    expect(cliff?.message).toContain(`buys 2 power unlock(s) (trust@${RULES.level3} + trust@${RULES.level5})`);
+    expect(cliff?.message).toContain(`against side 0 (capitalist)'s 1 (funds@${RULES.level3})`);
+    // The padding resource is named nowhere in the finding.
+    expect(cliff?.message).not.toContain('media@');
   });
 });
 

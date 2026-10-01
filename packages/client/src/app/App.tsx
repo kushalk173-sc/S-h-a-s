@@ -26,7 +26,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { GameScreen } from './GameScreen.tsx';
 import { LobbyScreenHarness } from './Lobby.tsx';
 import { ReconnectScreen } from './Panels.tsx';
-import { connection, netState, requestSync, subscribeNetStore } from './session.ts';
+import { connection, netState, requestSync, resumeIfHeld, subscribeNetStore } from './session.ts';
 import { useApp } from './store.ts';
 
 import './app.css';
@@ -41,6 +41,15 @@ export function App() {
     // development, so this must be safe to run more than once.
     connection().connect();
   }, []);
+
+  // A REFRESH MID-GAME REACQUIRES THE SEAT. Keyed on `link` rather than mount,
+  // because at mount the socket is still CONNECTING and the frame would be dropped —
+  // which is the same race the lobby's room-list request had. See `resumeIfHeld`
+  // for why the transport does not do this itself.
+  useEffect(() => {
+    if (app.link !== 'live') return;
+    resumeIfHeld();
+  }, [app.link]);
 
   // While the link is down and we believe we have a seat, the shell must not
   // render a board the server has not confirmed. `net/store.ts` drops the state

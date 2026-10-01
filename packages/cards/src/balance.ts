@@ -7,13 +7,42 @@
  * than a total-sum comparison.
  *
  * WHY TOTAL-SUM COMPARISON IS NOT ENOUGH (docs/ARCHITECTURE.md 6.4):
- *   - It flags legitimate trade-offs. `{funds:3}` vs `{trust:3}` is a 3-resource
- *     difference and a perfectly good card — the choice is "which resource do I
- *     need", which is the deliberation the game is made of.
- *   - It misses the real failures. `{funds:3}` vs `{funds:2, media:1}` is 0-sum and
- *     yet a pure upgrade for anyone who needs funds. And a card paying 3 of one
- *     resource on side A and 2 on side B straddles the level-3 power threshold,
- *     so A is worth far more than 1 resource.
+ *
+ * Two failures, in opposite directions. They are easy to conflate and must be kept
+ * apart, because only one of them is a defect.
+ *
+ *   1. IT FLAGS LEGITIMATE TRADE-OFFS. `{funds:3}` vs `{trust:3}` is as large a
+ *      componentwise gap as a card can hold — 3 Funds against 0 Funds, 3 Trust
+ *      against 0 Trust — and its TOTALS are identical, 3 against 3. It is a
+ *      perfectly good card: the question the player is answering is "which
+ *      resource do I need", and that choice is the deliberation the game is made
+ *      of. Note that this card is invisible to a totals checker *and* to a
+ *      componentwise one; a total-sum checker flags it only by accident, and
+ *      "3-resource difference" without "per resource" is how this bullet went
+ *      wrong the first time.
+ *
+ *   2. IT MISSES STRUCTURAL FAILURES THAT ARE 0-SUM. `{funds:3}` vs
+ *      `{funds:2, media:1}` pays out 3 on each side, so totals are silent — and so
+ *      is D1, because `media` is 0 on the first side and 1 on the second, so the
+ *      second side is NOT >= the first componentwise. It is not a pure upgrade.
+ *      Ideologue resource thresholds do not rescue the claim either: the two sides
+ *      pay different resources, so they feed different Ideologues and do not even
+ *      sit on the same power ladder.
+ *
+ *      What is actually wrong with that card is a POWER THRESHOLD CLIFF. 3 Funds
+ *      is `RULES.level3`, so a side paying 3 of a resource unlocks that Ideologue's
+ *      Level 3 power, which pays out every turn for the rest of the game (RULES
+ *      p15). A card paying 3 of a resource on one side and 2 on the other is worth
+ *      a whole power, not the 1 resource its totals differ by. No total-sum
+ *      comparison and no componentwise comparison can see that, which is what D3
+ *      exists for.
+ *
+ * THE EXAMPLE THAT WAS HERE BEFORE WAS WRONG. An earlier draft read: *"`{funds:3}`
+ * vs `{funds:2, media:1}` is 0-sum and yet a pure upgrade for anyone who needs
+ * funds"*. It was 0-sum; it was not a pure upgrade. A pure upgrade can never be
+ * 0-sum: if X >= Y componentwise and X != Y then sum(X) > sum(Y) strictly. The
+ * corrected claim in (2) is the real one, and `test/balance.test.ts` pins both the
+ * identity and the worked example so the bad version cannot creep back.
  */
 
 import {
@@ -46,7 +75,7 @@ import { type CorpusIdeologyCard, type CorpusVoterCard } from './corpus.js';
  *  - **2 resources is not free.** 17% of your pool, and precisely the difference
  *    between being able to afford the 4-resource redraw (RULES p21) and not. At
  *    the margin — which is where Shasn is played — two resources is a turn.
- *  - **D1 and D3 override the band entirely.** A 0-sum PURE_UPGRADE and a
+ *  - **D1 and D3 override the band entirely.** A 1-resource PURE_UPGRADE and a
  *    1-resource POWER_THRESHOLD_CLIFF are both worse than a 3-resource symmetric
  *    card, because they remove the decision rather than tilting it. A tolerance
  *    band on totals must never mask a structural defect.
@@ -169,9 +198,24 @@ function isPureUpgrade(x: IdeologySide, y: IdeologySide): boolean {
  * D3 — POWER THRESHOLD CLIFF.
  *
  * RULES p15: 3 cards of an Ideologue unlock its Level 3 power and 5 unlock Level
- * 5, and an unlocked power pays out every turn for the rest of the game. So a
- * card that carries you over a threshold is worth several resources immediately
- * and forever, which is why a 1-resource gap here outranks the tolerance band.
+ * 5, and an unlocked power pays out every turn for the rest of the game. So a card
+ * that carries you over a threshold is worth several resources immediately and
+ * forever, which is why a 1-resource gap here outranks the tolerance band.
+ *
+ * WHAT IS ACTUALLY MEASURED, precisely, because the header comment has to be true:
+ * the engine's unlock test is `cardsOf(player, ideologue) >= level` — a count of
+ * Ideology CARDS, not of resources (`packages/engine/src/powers.ts`, `hasPower`).
+ * This checker is run on one card in isolation with no manifestos, so it uses the
+ * resource proxy the rules give for that ladder: `IDEOLOGUE_RESOURCE[i]` is the
+ * resource an Ideologue's answers feed (RULES p11/p33), and a side paying
+ * `RULES.level3` or `RULES.level5` of it is treated as buying the corresponding
+ * unlock. Two consequences, both deliberate:
+ *   - the crossing is scoped to the side's OWN Ideologue resource. A Capitalist
+ *     side paying 3 Media has not gained a Showstopper card and unlocks nothing, so
+ *     crediting it with `media@3` would manufacture an unlock out of a side that
+ *     feeds no Ideologue at all.
+ *   - it remains a proxy, not the engine's rule. See KNOWN-GAPS.md; if the proxy
+ *     over- or under-reports on real play, refine it here rather than in the engine.
  *
  * Modelled as a COUNT of threshold crossings rather than as "this side pays 3 of
  * something the other does not", because the naive per-direction test is wrong in
@@ -181,20 +225,27 @@ function isPureUpgrade(x: IdeologySide, y: IdeologySide): boolean {
  * cliff TWICE and declares a card dominated that is in fact perfectly symmetric —
  * both sides buy one unlock, and the choice of which unlock is real deliberation.
  *
- * So: crossings(X) is the set of `resource@threshold` pairs X's payout reaches, and
- * a cliff exists only when |crossings(X)| > |crossings(Y)|. Equal counts, even
+ * So: crossings(X) is the set of `resource@threshold` pairs X's own Ideologue
+ * resource reaches, and a cliff exists only when |crossings(X)| > |crossings(Y)|. Equal counts, even
  * when the sets are entirely different, are not dominance. A side that buys two
  * unlocks against an opponent's one is a real cliff, and that is what this finds:
- * `{clout: 5}` crosses clout@3 and clout@5, so it beats `{trust: 4}`, which
- * crosses only trust@3 — even though neither resource appears on the other side.
+ * `{clout: 5}` (Supremo) crosses clout@3 and clout@5, so it beats `{trust: 4}`
+ * (Idealist), which crosses only trust@3 — even though neither resource appears on
+ * the other side.
+ *
+ * Scoping each side to its own resource is what keeps the count honest. Counting
+ * every resource a side touches instead lets a side pad its count with unlocks it
+ * does not own, and a count can be gamed by padding: `{funds: 3, media: 3}` on a
+ * Capitalist side used to score 2 against `{trust: 5}` on an Idealist side's 2, so
+ * the comparison came out level and the card was called clean when in truth the
+ * Idealist side buys the Level 5 unlock and the Capitalist side buys only Level 3.
  */
 function thresholdCrossings(side: IdeologySide): Set<string> {
+  const res = ownResource(side.ideologue);
+  const v = side.pays[res] ?? 0;
   const out = new Set<string>();
-  for (const res of RESOURCES) {
-    const v = side.pays[res] ?? 0;
-    for (const threshold of [RULES.level3, RULES.level5] as const) {
-      if (v >= threshold) out.add(`${res}@${threshold}`);
-    }
+  for (const threshold of [RULES.level3, RULES.level5] as const) {
+    if (v >= threshold) out.add(`${res}@${threshold}`);
   }
   return out;
 }

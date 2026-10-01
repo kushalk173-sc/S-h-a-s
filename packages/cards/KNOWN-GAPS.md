@@ -498,7 +498,50 @@ the next person who implements from it.
 
 ---
 
-## 3. What is NOT a gap
+## 3. D3 models a resource PROXY, not the engine's power-unlock rule
+
+`POWER_THRESHOLD_CLIFF` in `src/balance.ts` is the check that makes the file worth more
+than a totals comparison, so its fidelity is worth stating plainly.
+
+**The engine's real rule.** `packages/engine/src/powers.ts` `hasPower()` is
+`cardsOf(player, spec.ideologue) >= rules.level3` — a count of Ideology **Cards**
+answered, not of resources paid. `IDEOLOGUE_RESOURCE[i]` tells you which resource an
+Ideologue's answers *feed* (the passive bonus, `passiveBonus()`), but it is not what
+unlocks a power. Nothing about a card's `pays` block changes which powers a player
+holds.
+
+**What D3 actually measures.** The balance checker runs on one card in isolation, with
+no manifestos, so it cannot count cards. It uses the resource proxy the rules supply
+for that ladder: a side paying `RULES.level3` of its own Ideologue resource is treated
+as buying the Level 3 unlock, `RULES.level5` the Level 5.
+
+**Consequences, both deliberate.**
+- The crossing is scoped to `IDEOLOGUE_RESOURCE[side.ideologue]`. An earlier version
+  counted *every* resource a side touched, so a Capitalist side paying `{funds:3,
+  media:3}` scored two unlocks it does not own. A count is gameable by padding, and
+  this made it gameable: `{funds:3, media:3}` (2) against `{trust:5}` (2) compared
+  level and called the card clean while the Idealist side held the Level 5 power and
+  the Capitalist side held only Level 3.
+- It remains a proxy. A player who answers three Capitalist cards unlocks Prospecting
+  whatever those cards paid; a player who answers one Capitalist card paying 3 Funds
+  unlocks nothing. The proxy therefore **over-reports** cliffs on cards whose sides
+  pay 3 or more.
+
+**Minimal change, if the proxy misreports on real play:** replace `thresholdCrossings`
+with a function that takes the answering player's manifesto counts and flags a card
+only when it would be the 3rd or 5th card of its Ideologue *for a player who is
+actually on that threshold*. That is a manifest-relative check, so it cannot run on a
+card in isolation and it moves this check out of `src/balance.ts` into wherever a
+player state is in scope.
+
+**Status:** none of the 20 shipped Ideology Cards pays 3 or more of any resource, so
+the shipped decks produce zero crossings under either the scoped or the unscoped
+version, and the checker result is unchanged. The fix is a correctness fix with no
+effect on the corpus as shipped.
+
+---
+
+## 4. What is NOT a gap
 
 Recorded so the next iteration does not waste time on them.
 

@@ -1,0 +1,344 @@
+/**
+ * Lobbies and the room registry.
+ *
+ * A lobby is a pre-game waiting room with 2–5 seats. It becomes a match when the
+ * host starts it, and the room that comes out is seeded once and never reseeded.
+ *
+ * Two things are deliberately cheap here and the cost is recorded rather than paid
+ * later:
+ *
+ *  - Seat reclaim is a 24-hour grace window. That means an abandoned seat can block
+ *    a table for a day. The alternative — a short window — punishes exactly the
+ *    four-hour session this feature exists for. A lobby vote-to-kick is the fix
+ *    and is about an hour of work.
+ *
+ *  - Nothing here is persisted. A lobby is minutes long; a *match* is hours, and
+ *    the match is what goes to the store. Persisting lobbies would be storing
+ *    something whose loss costs nothing.
+ */
+
+import { randomBytes } from 'node:crypto';
+
+import { PLAYER_COLOURS, setup, type Ctx, type PlayerID } from '@shasn/engine';
+
+import { newId, newPlayerId, Room, type Seat } from './room.ts';
+import type { Lobby, LobbySeat, LobbySummary, SeatCount } from './protocol.ts';
+import { decksOf, type MatchStore } from './store.ts';
+
+export type LobbyErrorCode = 'LOBBY_FULL' | 'LOBBY_CLOSED' | 'NOT_IN_LOBBY' | 'NOT_HOST' | 'SEAT_TAKEN';
+
+export class LobbyError extends Error {
+  constructor(
+    readonly code: LobbyErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'LobbyError';
+  }
+}
+
+export type LobbyMember = {
+  readonly playerId: PlayerID;
+  readonly name: string;
+  connected: boolean;
+  ready: boolean;
+  /** Present once the lobby has been dealt into a match. */
+  matchId: string | null;
+};
+
+export type LobbyRecord = {
+  readonly lobbyId: string;
+  name: string;
+  readonly isPrivate: boolean;
+  hostId: PlayerID;
+  readonly maxPlayers: SeatCount;
+  readonly members: Map<PlayerID, LobbyMember>;
+  readonly createdAt: number;
+};
+
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 5;
+
+/**
+ * The one place a match seed is minted.
+ *
+ * `crypto.randomBytes`, not `Math.random`, and a positive 31-bit int so the value
+ * survives a JSON round trip into a Postgres column without a sign surprise. The
+ * seed is the single number the whole game's randomness derives from, so its
+ * quality is load-bearing; it just must not be guessable, which is why it is not
+ * a timestamp either.
+ */
+export function newSeed(): number {
+  return randomBytes(4).readUInt32BE(0) & 0x7fffffff;
+}
+
+export class LobbyHub {
+  readonly #lobbies = new Map<string, LobbyRecord>();
+  readonly #rooms = new Map<string, Room>();
+  readonly #store: MatchStore;
+  readonly #ctx: Ctx;
+  readonly #now: () => number;
+
+  constructor(ctx: Ctx, store: MatchStore, now: () => number = () => Date.now()) {
+    this.#ctx = ctx;
+    this.#store = store;
+    this.#now = now;
+  }
+
+  get rooms(): ReadonlyMap<string, Room> {
+    return this.#rooms;
+  }
+
+  get store(): MatchStore {
+    return this.#store;
+  }
+
+  getLobby(lobbyId: string): LobbyRecord | undefined {
+    return this.#lobbies.get(lobbyId);
+  }
+
+  allLobbies(): readonly LobbyRecord[] {
+    return [...this.#lobbies.values()];
+  }
+
+  // ─────────────────────────── lobbies ───────────────────────────
+
+  createLobby(opts: {
+    name: string;
+    maxPlayers: SeatCount;
+    isPrivate: boolean;
+    now: number;
+  }): { lobby: LobbyRecord; playerId: PlayerID } {
+    const lobbyId = newId('l', 8);
+    const playerId = newPlayerId();
+    const lobby: LobbyRecord = {
+      lobbyId,
+      name: opts.name,
+      isPrivate: opts.isPrivate,
+      hostId: playerId,
+      maxPlayers: opts.maxPlayers,
+      members: new Map([
+        [
+          playerId,
+          { playerId, name: opts.name, connected: true, ready: false, matchId: null } satisfies LobbyMember,
+        ],
+      ]),
+      createdAt: opts.now,
+    };
+    this.#lobbies.set(lobbyId, lobby);
+    return { lobby, playerId };
+  }
+
+  /**
+   * Join a lobby as a *new* player, or reclaim an existing seat.
+   *
+   * Reclaiming is what makes a refresh survivable in the pre-game phase too: the
+   * caller presents a resume token, and if it verifies against the lobby's record
+   * the original `playerId` comes back rather than a new seat being minted.
+   */
+  joinLobby(opts: {
+    lobbyId: string;
+    name: string;
+    now: number;
+  }): { lobby: LobbyRecord; playerId: PlayerID } {
+    const lobby = this.#lobbies.get(opts.lobbyId);
+    if (lobby === undefined) throw new LobbyError('LOBBY_CLOSED', 'that room no longer exists');
+    if (lobby.members.size >= lobby.maxPlayers) {
+      throw new LobbyError('LOBBY_FULL', 'that room is full');
+    }
+    const playerId = newPlayerId();
+    lobby.members.set(playerId, {
+      playerId,
+      name: opts.name,
+      connected: true,
+      ready: false,
+      matchId: null,
+    });
+    return { lobby, playerId };
+  }
+
+  leaveLobby(lobbyId: string, playerId: PlayerID): void {
+    const lobby = this.#lobbies.get(lobbyId);
+    if (lobby === undefined) return;
+    lobby.members.delete(playerId);
+    if (lobby.hostId === playerId) {
+      // Host leaves: the longest-present remaining member inherits, or the room
+      // closes if nobody is left. Handing the room to nobody would strand it.
+      const next = [...lobby.members.keys()].sort(
+        (a, b) => (a < b ? -1 : a > b ? 1 : 0),
+      )[0];
+      if (next === undefined) this.#lobbies.delete(lobbyId);
+      else lobby.hostId = next;
+    }
+  }
+
+  setReady(lobbyId: string, playerId: PlayerID, ready: boolean): void {
+    const lobby = this.#lobbies.get(lobbyId);
+    const member = lobby?.members.get(playerId);
+    if (lobby === undefined || member === undefined) {
+      throw new LobbyError('NOT_IN_LOBBY', 'you are not in that room');
+    }
+    member.ready = ready;
+  }
+
+  setConnected(lobbyId: string, playerId: PlayerID, connected: boolean): void {
+    const member = this.#lobbies.get(lobbyId)?.members.get(playerId);
+    if (member !== undefined) member.connected = connected;
+  }
+
+  listLobbies(viewerId: PlayerID | null): readonly LobbySummary[] {
+    const out: LobbySummary[] = [];
+    for (const l of this.#lobbies.values()) {
+      if (l.isPrivate && !l.members.has(viewerId ?? '')) continue;
+      out.push({
+        lobbyId: l.lobbyId,
+        name: l.name,
+        isPrivate: l.isPrivate,
+        seated: l.members.size,
+        maxPlayers: l.maxPlayers,
+        inProgress: l.members.size > 0 && [...l.members.values()].some((m) => m.matchId !== null),
+      });
+    }
+    return out;
+  }
+
+  lobbyView(lobby: LobbyRecord, viewerId: PlayerID | null): Lobby {
+    const seats: LobbySeat[] = [...lobby.members.values()].map((m) => ({
+      seatId: m.playerId,
+      playerId: m.playerId,
+      name: m.name,
+      ready: m.ready,
+      connected: m.connected,
+      you: m.playerId === viewerId,
+    }));
+    return {
+      lobbyId: lobby.lobbyId,
+      name: lobby.name,
+      isPrivate: lobby.isPrivate,
+      hostId: lobby.hostId,
+      maxPlayers: lobby.maxPlayers,
+      seats,
+      matchId: [...lobby.members.values()].find((m) => m.matchId !== null)?.matchId ?? null,
+    };
+  }
+
+  // ─────────────────────────── rooms ───────────────────────────
+
+  /**
+   * Deal a lobby into a live match.
+   *
+   * The seed is minted exactly once, here, and handed to `setup`. Everything after
+   * this is a replay of `(seed, rules, cards, actionLog)`, which is why a restart
+   * mid-game is a non-event rather than a lost table.
+   */
+  async startMatch(lobbyId: string, now: number): Promise<Room> {
+    const lobby = this.#lobbies.get(lobbyId);
+    if (lobby === undefined) throw new LobbyError('LOBBY_CLOSED', 'that room no longer exists');
+    if (lobby.members.size < MIN_PLAYERS) {
+      throw new LobbyError('LOBBY_CLOSED', 'at least two players are needed');
+    }
+
+    const seatIds = [...lobby.members.keys()];
+    const names: Record<PlayerID, string> = {};
+    const seats: Seat[] = seatIds.map((id, i) => {
+      const member = lobby.members.get(id);
+      if (member === undefined) throw new LobbyError('LOBBY_CLOSED', 'that seat no longer exists');
+      names[id] = member.name;
+      return {
+        playerId: id,
+        name: member.name,
+        colour: PLAYER_COLOURS[i] ?? '#888888',
+        // A placeholder until the server hands the socket its real token in the
+        // same turn that seats it. There is a brief window in which a seat holds a
+        // hash of a token nobody was ever told, and it verifies nothing.
+        resumeHash: '',
+        connected: member.connected,
+        lastSeen: now,
+        ready: true,
+      };
+    });
+
+    const seed = newSeed();
+    const state = setup({
+      players: seatIds,
+      names,
+      cards: this.#ctx.cards,
+      seed,
+      ...decksOf(this.#ctx.cards),
+      // p7: player n receives n resources of their choice. The choice is the
+      // player's, so it is not invented here — seats start on zero and earn.
+    });
+
+    const matchId = newId('m', 9);
+    const room = new Room({
+      matchId,
+      ctx: this.#ctx,
+      store: this.#store,
+      seed,
+      state,
+      seats,
+      now,
+    });
+
+    // The store is written BEFORE the room is announced. Order matters: a room
+    // that exists in memory but not on disk is a match that a deploy silently
+    // deletes, which is the entire failure this design exists to prevent. Every
+    // subsequent action appends to the log this call creates.
+    await this.#store.create(
+      {
+        matchId,
+        seed,
+        rules: this.#ctx.rules,
+        cards: this.#ctx.cards,
+        players: seats.map((s) => ({
+          id: s.playerId,
+          name: s.name,
+          colour: s.colour,
+          resumeHash: s.resumeHash,
+        })),
+        now,
+      },
+      state,
+    );
+
+    this.#rooms.set(matchId, room);
+    for (const id of seatIds) {
+      const m = lobby.members.get(id);
+      if (m !== undefined) m.matchId = matchId;
+    }
+    return room;
+  }
+
+  /**
+   * Rehydrate every stored match at boot.
+   *
+   * A `rulesVersion` or `cardsVersion` mismatch throws out of `replay` and is
+   * caught here: the match is left unstarted and logged, rather than being
+   * "restored" under rules that differ from the ones the players are mid-way
+   * through. Diverging silently is strictly worse than not starting.
+   */
+  async restoreAll(): Promise<{ restored: number; skipped: string[] }> {
+    const ids = await this.#store.list();
+    let restored = 0;
+    const skipped: string[] = [];
+    for (const id of ids) {
+      const stored = await this.#store.get(id);
+      if (stored === null) continue;
+      try {
+        const room = await Room.restore({ matchId: id, ctx: this.#ctx, store: this.#store, stored });
+        this.#rooms.set(id, room);
+        restored += 1;
+      } catch (err) {
+        // The message names the match and the two hashes. It never names a card.
+        skipped.push(`${id}: ${(err as Error).message}`);
+      }
+    }
+    return { restored, skipped };
+  }
+
+  removeRoom(matchId: string): void {
+    this.#rooms.delete(matchId);
+  }
+}
+
+export { isSeatCount } from './validate.ts';

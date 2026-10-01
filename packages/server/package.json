@@ -1,0 +1,30 @@
+{
+  "name": "@shasn/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Authoritative Shasn match server. Hand-rolled on `ws`; boardgame.io is deliberately not used (its history persists the answer key).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "lint:secrets": "node scripts/check-secrets.mjs",
+    "typecheck": "tsc --noEmit && node scripts/check-secrets.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shasn/cards": "*",
+    "@shasn/engine": "*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
