@@ -4,7 +4,7 @@
   "cards": [
     {
       "id": "hl-et2040-001",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. Two clauses are not expressible: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state (REF 5.5), and 'every player' needs `target` on gerrymander, which cards.ts gained for this (KNOWN-GAPS G8) but reduce.ts does not yet honour — so a targeted gerrymander is rejected by the validator rather than played. The card as shipped therefore gives YOU the extra move. See KNOWN-GAPS.md G5 and G8.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. Two clauses are not expressible: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state (REF 5.5), and 'every player' needs `target` on gerrymander (KNOWN-GAPS G8). reduce() now honours that target, so the card is free to say `target: 'everyone'` and mean it; it ships in the `you` reading until then. See KNOWN-GAPS.md G5 and G8.",
       "provenance": "adapted",
       "name": "New Face Who Dis",
       "text": "You may Gerrymander 1 of your majority or non-majority voters this turn, under the normal Gerrymandering rules. It does not have to happen now.",
@@ -102,6 +102,41 @@
       "name": "Good Gig Well Played",
       "text": "Draw the top Conspiracy Card and keep it. It is yours to play whenever you choose.",
       "effects": [{ "op": "draw-conspiracy", "n": 1 }]
+    },
+    {
+      "id": "hl-et2040-012",
+      "source": "original; register per REF 8.2. JUST BREATHE (REF 4.3, scribd 915391789) is recorded as NOT REPRESENTABLE in decks/SOURCES.md: moving voters out of the zone where you hold the most of them is G16, a zone computed from board state. This card is the nearest expressible reading.",
+      "provenance": "inferred",
+      "name": "Tide Warnings",
+      "text": "Evict 1 voter from the board. Then strike 1 more voter belonging to an opponent, permanently.",
+      "effects": [{ "op": "evict", "n": 1 }, { "op": "discard-voter", "n": 1 }]
+    },
+    {
+      "id": "hl-et2040-013",
+      "source": "original; register per REF 8.2. THE SECOND READING archetype (hl-et2040-005) reskinned.",
+      "provenance": "inferred",
+      "name": "Three Day Weekend",
+      "text": "Every opponent gains 1 resource of their choice from the Public Reserve. You then gain 2 Trust.",
+      "effects": [
+        { "op": "gain-any", "n": 1, "target": "each-opponent" },
+        { "op": "gain", "res": { "trust": 2 } }
+      ]
+    },
+    {
+      "id": "hl-et2040-014",
+      "source": "original; register per REF 8.2. THE FOUR HORSEMEN (REF 4.3) is the recovered card whose purchase-lock clause is G5; this is the same tax without the lock, reskinned as a budget that pays for its own consultation.",
+      "provenance": "inferred",
+      "name": "The Policy Review",
+      "text": "Pay 2 Media to the Public Reserve for the review. Then get 2 discounts on purchases this turn.",
+      "effects": [{ "op": "lose", "res": { "media": 2 } }, { "op": "discount", "n": 2 }]
+    },
+    {
+      "id": "hl-et2040-015",
+      "source": "original; register per REF 8.2. Refuses to restate any recovered card: WHY THE LONG FACE (REF 4.3) scales off the caster's own purchases, which is G14 and G22, and this deck does not ship a card that reads as a trigger it does not have.",
+      "provenance": "inferred",
+      "name": "Silicon Rain",
+      "text": "Take 3 resources of your choice from the Public Reserve. Then gain 1 voter.",
+      "effects": [{ "op": "gain-any", "n": 3 }, { "op": "voters", "n": 1 }]
     }
   ]
 }

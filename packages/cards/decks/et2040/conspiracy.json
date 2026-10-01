@@ -74,6 +74,42 @@
       "cost": 4,
       "effects": [{ "op": "discount", "n": 1 }, { "op": "refresh-market" }],
       "excludeInTwoPlayer": true
+    },
+    {
+      "id": "ct-et2040-009",
+      "source": "original; register per REF 8.2. PYTHONPOST (REF 4.1, scribd 814006944) and its twin SNOOP B-O-DOUBLE-T (REF 4.3, scribd 915391789) are recorded as NOT REPRESENTABLE in decks/SOURCES.md: a rest-of-game purchase surcharge is G9 and G5, and neither may be shipped as a one-shot that reads as permanent.",
+      "provenance": "inferred",
+      "name": "Dry Dock",
+      "text": "Gain 2 resources of your choice from the Public Reserve. Then gain 1 voter.",
+      "cost": 4,
+      "effects": [{ "op": "gain-any", "n": 2 }, { "op": "voters", "n": 1 }]
+    },
+    {
+      "id": "ct-et2040-010",
+      "source": "original; register per REF 8.2. THE WET SEASON ARGUMENT archetype (ct-et2040-007) reskinned, per REF 8.2 rule 7.",
+      "provenance": "inferred",
+      "name": "The Long Commute",
+      "text": "Evict 2 voters from the board. Then gain 2 resources of your choice from the Public Reserve.",
+      "cost": 5,
+      "effects": [{ "op": "evict", "n": 2 }, { "op": "gain-any", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-011",
+      "source": "original; register per REF 8.2. Budget Hai Patra Nahi archetype (ct-in2020-003) reskinned: the card spends as much as it takes, so the resource count nets to zero against a cap of 12.",
+      "provenance": "inferred",
+      "name": "Load Shedding, Properly Explained",
+      "text": "Pay 2 Funds to the Public Reserve to keep the district dark for one night, then take 2 resources of your choice from it.",
+      "cost": 4,
+      "effects": [{ "op": "lose", "res": { "funds": 2 } }, { "op": "gain-any", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-012",
+      "source": "original; register per REF 8.2. SELECTIVE ACCESS MEMORY (REF 4.2.1, scribd 915391788) is recorded as NOT REPRESENTABLE in decks/SOURCES.md: choosing a card out of the discard pile, in any order, is G17. This card is the nearest expressible reading, and it draws from the deck rather than the discard pile.",
+      "provenance": "inferred",
+      "name": "Server Space",
+      "text": "Draw the top Conspiracy Card and keep it. You also get 2 discounts on purchases this turn.",
+      "cost": 4,
+      "effects": [{ "op": "draw-conspiracy", "n": 1 }, { "op": "discount", "n": 2 }]
     }
   ]
 }

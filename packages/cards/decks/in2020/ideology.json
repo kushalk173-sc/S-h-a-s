@@ -232,6 +232,389 @@
           "pays": { "clout": 2, "trust": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-in2020-013",
+      "source": "original; register per REF 8.2. REF 8.2 rule 3 (question at most 12 words, answer at most 15 after the Yes/No) is the authoring constraint here; the situation carries the satire and the wording stays flat.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the tender be reopened every year or awarded once?",
+      "sides": [
+        {
+          "answer": "No. Award it once and the work is finished before anyone can challenge the price.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Reopen it every year and the price falls to the lowest bidder's comfort.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-014",
+      "source": "original; register per REF 8.2. The recovered question pool contains no procurement question at all, which is the register's largest silence.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a defaulting contractor be allowed to bid again?",
+      "sides": [
+        {
+          "answer": "No. A record of failure is the only collateral anyone has ever offered.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Ban them and the next contractor is worse, and the file says so.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-015",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the toll be raised to fund the bridge that replaced it?",
+      "sides": [
+        {
+          "answer": "Yes. The bridge is a longer-lived asset than the toll ever was.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. The toll was the only part of that road anyone could point at.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-016",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should land records be digitised before the next election?",
+      "sides": [
+        {
+          "answer": "Yes. Digitise it now and the next sale is clean enough to tax.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Digitise it now and the next sale is fast enough to be invisible.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-017",
+      "source": "original; register per REF 8.2. Welfare questions recovered at REF 8.1 items 6 and 8 are all-or-nothing; this one is about the boundary of a scheme that already exists.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should free bus travel be extended to the district?",
+      "sides": [
+        {
+          "answer": "No. Extend it and the ticket-holding commuters are paying for the rest.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Extend it and the road fills with people counted nowhere else.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-018",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the pension age rise with life expectancy?",
+      "sides": [
+        {
+          "answer": "No. Lower it instead and pay for it out of the same accounts.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Tie it to expectancy and the ledger finally means something.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-019",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the minister appear on the news every week?",
+      "sides": [
+        {
+          "answer": "No. Once a quarter is enough, and the audit confirms it either way.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Weekly is cheap, and nobody checks what was said by Tuesday.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-020",
+      "source": "original; register per REF 8.2. REF 8.2 rule 4 forbids a joke in the answer; the joke here is entirely in the situation.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the press conference be streamed before it is edited?",
+      "sides": [
+        {
+          "answer": "No. Edit it first and the sentence survives the week.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Stream it raw and the clip does the work of a campaign.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-021",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the campaign advertise the number of schools opened?",
+      "sides": [
+        {
+          "answer": "No. Advertise the accounts and the schools will read the advertisement.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Advertise the number and the arithmetic waits for the next election.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-022",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the protest permit be decided by the court or the police?",
+      "advisory": "mature",
+      "sides": [
+        {
+          "answer": "No. By the court, and the refusal acquires a signature.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. By the police, and the crowd still turns up on the day.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-023",
+      "source": "original; register per REF 8.2. REF 8.2 rule 8 permits references to real subjects; no individual is named, the question is the register's ordinary register of consequence rather than of person.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a deserter's name be published after the war ends?",
+      "sides": [
+        {
+          "answer": "No. Publish it and the next recruitment is only a rumour.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Publish it and the next recruitment is at least accurate.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-024",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the minister's statements be archived with their dates?",
+      "sides": [
+        {
+          "answer": "No. Archive them and the ministry becomes a museum by Friday.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. Archive them with dates and the archive becomes the story.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-025",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the opposition be given more time on the news?",
+      "sides": [
+        {
+          "answer": "No. Equal time and the argument stops being an argument.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. More airtime and the argument survives the week.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-026",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the rally be allowed on the main road?",
+      "sides": [
+        {
+          "answer": "Yes. Allow it and the road learns what it is for.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Redirect it and the footage is better.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-027",
+      "source": "original; register per REF 8.2. REF 8.2 rule 7 requires campaign variety; this is the enumeration question the recovered pool never reaches.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the census count the people who sleep in the district?",
+      "sides": [
+        {
+          "answer": "Yes. Count them where they sleep and the number is honest.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Count them where they vote and the number is convenient.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-028",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the free lunch continue through the summer holidays?",
+      "sides": [
+        {
+          "answer": "Yes. The building is empty and the kitchen is not.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. End it in June and July stops being visible.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-029",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the examination results be published with the schools named?",
+      "sides": [
+        {
+          "answer": "Yes. Name the schools and the parents will actually read them.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Name the schools and the parents read nothing else.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-030",
+      "source": "original; register per REF 8.2.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the memorial be built where the crowd was standing?",
+      "advisory": "mature",
+      "sides": [
+        {
+          "answer": "Yes. Where they stood, so the ground keeps the argument.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Where it photographs cleanly, and the ground stays quiet.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-031",
+      "source": "REF 8.1 item 9 recovers the stem 'SHOULD WE [STOP] AERIAL BOMBING DEVELOPED COUNTRIES?' legible in the official 432-card marketing render, but the verb is bracketed by the researcher as an inference and REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: one word, the verb, which is supplied here. No answer side was legible at all; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should we stop aerial bombing developed countries?",
+      "sides": [
+        {
+          "answer": "No. They are our largest export market and markets are not bombed.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Stop it and the footage stops being a reason to continue.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-032",
+      "source": "REF 8.1 item 10 recovers the stem 'SHOULD KASHMIRI FARMERS BE GIVEN THE RIGHT TO FLY […]?' legible only up to the word FLY; REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: the object of 'fly' — 'drones' is supplied here and is authored, not recovered. No answer side was legible at all; both answers are authored in the REF 8.2 register.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should Kashmiri farmers be given the right to fly drones?",
+      "advisory": "mature",
+      "sides": [
+        {
+          "answer": "No. Every licence issued is one more reason to withdraw it.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Issue it and watch who stops appearing at the border.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
     }
   ]
 }

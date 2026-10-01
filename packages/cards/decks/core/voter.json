@@ -85,6 +85,48 @@
       "provenance": "inferred",
       "cost": { "funds": 3, "clout": 2 },
       "voters": 3
+    },
+    {
+      "id": "vo-core-013",
+      "source": "original; structure per REF 5.5, costs inferred. NO VERBATIM VOTER CARD EXISTS TO IMPORT: REF 0 claims 'the full print-and-effect text of 3 Voter Cards' was recovered, but REF 3 (the section that owns Voter Cards) is [UNKNOWN] throughout and REF 10 item 3 records the 60-card cost distribution as NOT FOUND. Nothing in the reference document contains a Voter Card's printed cost, so every card in this file is authored. See decks/SOURCES.md.",
+      "provenance": "inferred",
+      "cost": { "trust": 2 },
+      "voters": 1
+    },
+    {
+      "id": "vo-core-014",
+      "source": "original; structure per REF 5.5, costs inferred. See vo-core-013 on the absent verbatim Voter Cards.",
+      "provenance": "inferred",
+      "cost": { "clout": 2 },
+      "voters": 1
+    },
+    {
+      "id": "vo-core-015",
+      "source": "original; structure per REF 5.5, costs inferred. See vo-core-013 on the absent verbatim Voter Cards.",
+      "provenance": "inferred",
+      "cost": { "media": 3 },
+      "voters": 2
+    },
+    {
+      "id": "vo-core-016",
+      "source": "original; structure per REF 5.5, costs inferred. See vo-core-013 on the absent verbatim Voter Cards.",
+      "provenance": "inferred",
+      "cost": { "trust": 2, "funds": 1 },
+      "voters": 2
+    },
+    {
+      "id": "vo-core-017",
+      "source": "original; structure per REF 5.5, costs inferred. See vo-core-013 on the absent verbatim Voter Cards.",
+      "provenance": "inferred",
+      "cost": { "funds": 2, "media": 2 },
+      "voters": 3
+    },
+    {
+      "id": "vo-core-018",
+      "source": "original; structure per REF 5.5, costs inferred. See vo-core-013 on the absent verbatim Voter Cards.",
+      "provenance": "inferred",
+      "cost": { "clout": 3, "funds": 1 },
+      "voters": 3
     }
   ]
 }

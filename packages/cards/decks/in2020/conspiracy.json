@@ -55,6 +55,45 @@
       "text": "Gain 2 voters, which you may place in different zones. Then gain 1 resource of your choice.",
       "cost": 5,
       "effects": [{ "op": "voters", "n": 2 }, { "op": "gain-any", "n": 1 }]
+    },
+    {
+      "id": "ct-in2020-007",
+      "source": "original; register per REF 8.2 rule 5. The A Grave Inheritance archetype (REF 4.2.1) reduced to the eviction alone, because the conditional payment and the per-opponent iteration are G2.",
+      "provenance": "inferred",
+      "name": "Sadak Ka Hisab",
+      "text": "Evict 2 voters from the board, and gain 1 resource of your choice from the Public Reserve.",
+      "cost": 4,
+      "effects": [{ "op": "evict", "n": 2 }, { "op": "gain-any", "n": 1 }]
+    },
+    {
+      "id": "ct-in2020-008",
+      "source": "original; register per REF 8.2 rule 5. COUGH IT UP (REF 4.1, scribd 814006944) is recorded as NOT REPRESENTABLE in decks/SOURCES.md: `evict` has no `target`, and the conditional bonus is G2.",
+      "provenance": "inferred",
+      "name": "Kharcha Uthao",
+      "text": "Every opponent gains 1 resource of their choice from the Public Reserve. You then gain 2 Media.",
+      "cost": 4,
+      "effects": [
+        { "op": "gain-any", "n": 1, "target": "each-opponent" },
+        { "op": "gain", "res": { "media": 2 } }
+      ]
+    },
+    {
+      "id": "ct-in2020-009",
+      "source": "original; register per REF 8.2 rule 5. The QUIET REDRAFTING archetype (ct-et2040-006) reskinned, per REF 8.2 rule 7.",
+      "provenance": "inferred",
+      "name": "Chhoti Si Chori",
+      "text": "Take 1 resource of your choice from a chosen opponent. Then get 2 discounts on purchases this turn.",
+      "cost": 4,
+      "effects": [{ "op": "steal-any", "n": 1 }, { "op": "discount", "n": 2 }]
+    },
+    {
+      "id": "ct-in2020-010",
+      "source": "original; register per REF 8.2 rule 5. The Singularity branch of REF 4.2.1 at a smaller count, so the deck does not hand out 2 free voters every third draw.",
+      "provenance": "inferred",
+      "name": "Pet Ka Register",
+      "text": "Gain 2 Funds from the Public Reserve. Then gain 2 voters, which you may place in different zones.",
+      "cost": 5,
+      "effects": [{ "op": "gain", "res": { "funds": 2 } }, { "op": "voters", "n": 2 }]
     }
   ]
 }

@@ -154,6 +154,235 @@
           "pays": { "clout": 2, "media": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-et2040-009",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. The orbital-ownership question is the register's answer to REF 5.4's finding that the 2040 cards treat private ownership of infrastructure as the default setting.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the orbital platform be sold to the highest bidder?",
+      "sides": [
+        {
+          "answer": "Yes. Sell it and it is built twice as fast.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Sell it and it belongs to whoever can afford the paperwork.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-010",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the settlement on the coast be legalised or demolished?",
+      "sides": [
+        {
+          "answer": "Yes. Legalise it and the tax base doubles by Tuesday.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Legalise it and the next settlement arrives before the ink dries.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-011",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. Distinct from ig-et2040-001, which asks who owns the cure; this one asks who pays for the water.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the desalination plant run on the municipal budget?",
+      "sides": [
+        {
+          "answer": "No. Fund it from the water bill, which is honest about who uses it.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Run it on the budget, so the cost is visible to everyone it feeds.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-012",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the drought be announced before the reservoirs are dry?",
+      "sides": [
+        {
+          "answer": "No. Announce it when it is a fact and the panic is only a rumour.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Announce it early and the queue is somebody else's photograph.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-013",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the broadcast carry the migration numbers every night?",
+      "sides": [
+        {
+          "answer": "No. Carry them monthly, once the number has stopped moving.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Carry them nightly and the number becomes the argument.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-014",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the space launch be televised live?",
+      "sides": [
+        {
+          "answer": "No. Televise the rehearsal and the real one stands a chance.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Live, and the failure is worth exactly what the launch is.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-015",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the voting roll include the people who moved offshore?",
+      "sides": [
+        {
+          "answer": "No. Leave them off it and the poll stays a poll.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Include them and the government has to answer across an ocean.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-016",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. Pairs with ig-et2040-001, which asks about the price of the same cure; this one asks about the body it enters.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the cure be compulsory for anyone entering the district?",
+      "advisory": "trigger",
+      "sides": [
+        {
+          "answer": "Yes. Compel them and the queue is short by Thursday.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Compel them and the next variant arrives from somewhere nobody checked.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-017",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the council publish the minutes before or after the vote?",
+      "sides": [
+        {
+          "answer": "No. After. The vote is not improved by having been read aloud.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. Before. The reading is half of what the meeting is for.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-018",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the state of emergency be renewed by default?",
+      "sides": [
+        {
+          "answer": "Yes. Renew it by default and the state keeps the tools it needs.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Renew it by default and nobody remembers what the emergency was.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-019",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the seawall be named after the engineer or the town?",
+      "sides": [
+        {
+          "answer": "No. Name it after the town. Names are cheaper to defend.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Name it after the engineer and the wall becomes an argument.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-020",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the climate curriculum be taught in every school?",
+      "sides": [
+        {
+          "answer": "Yes. Every school, including the ones that would rather not.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Teach it in some schools and it becomes a school trip.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
     }
   ]
 }

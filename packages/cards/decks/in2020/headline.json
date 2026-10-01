@@ -60,6 +60,45 @@
       "name": "Khaki Terror",
       "text": "Donate 1 Funds, 1 Clout, 1 Media and 1 Trust to the Public Reserve. Anything you are not holding is simply not donated.",
       "effects": [{ "op": "lose", "res": { "funds": 1, "clout": 1, "media": 1, "trust": 1 } }]
+    },
+    {
+      "id": "hl-in2020-008",
+      "source": "original; register per REF 8.2 rule 5. The QUIETLY THE CEILING MOVED archetype (hl-et2040-004) reskinned, per REF 8.2 rule 7.",
+      "provenance": "inferred",
+      "name": "Bijli Ka Hisaab",
+      "text": "Every opponent discards 1 Funds to the Public Reserve. You then gain 2 Clout.",
+      "effects": [
+        { "op": "lose", "res": { "funds": 1 }, "target": "each-opponent" },
+        { "op": "gain", "res": { "clout": 2 } }
+      ]
+    },
+    {
+      "id": "hl-in2020-009",
+      "source": "original; register per REF 8.2 rule 5. The AN HONEST INSTITUTION archetype (hl-et2040-007) reskinned.",
+      "provenance": "inferred",
+      "name": "Pani Ki Kammi",
+      "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 2 Trust from the Public Reserve.",
+      "effects": [{ "op": "refresh-market" }, { "op": "gain", "res": { "trust": 2 } }]
+    },
+    {
+      "id": "hl-in2020-010",
+      "source": "original; register per REF 8.2 rule 5. The LONG WINTER SHORT LEDGER archetype (hl-et2040-006) reskinned.",
+      "provenance": "inferred",
+      "name": "Sarkar Ki Charcha",
+      "text": "Every opponent gains 1 resource of their choice. You then gain 2 voters, which you may place in different zones.",
+      "effects": [
+        { "op": "gain-any", "n": 1, "target": "each-opponent" },
+        { "op": "voters", "n": 2 }
+      ]
+    },
+    {
+      "id": "hl-in2020-011",
+      "source": "original; register per REF 8.2 rule 5. GUMASTA NAHI SALAAM NAHI archetype (ct-in2020-004) reskinned as a Headline; per REF 4.4 item 2 a steal is not player-targeted and this is the nearest expressible reading.",
+      "provenance": "inferred",
+      "name": "Chhoti Si Kasam",
+      "text": "Take 1 resource of your choice from a chosen opponent. Then gain 2 Media.",
+      "effects": [{ "op": "steal-any", "n": 1 }, { "op": "gain", "res": { "media": 2 } }],
+      "excludeInTwoPlayer": true
     }
   ]
 }
