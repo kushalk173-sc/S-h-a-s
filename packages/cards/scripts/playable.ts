@@ -1,0 +1,589 @@
+/**
+ * HOW MANY RECOVERED CARDS CAN ACTUALLY BE PLAYED?
+ *
+ * `npm run validate` answers a weaker question: is this card well-formed? It says
+ * nothing about whether a player can reach a position from which the card resolves.
+ * That gap is not academic -- a card that passes every validator and then sits in a
+ * hand because the engine refuses it at `reduce()` is exactly the "card that lies"
+ * `src/executable.ts` exists to prevent, one layer further out.
+ *
+ * So this script takes the ~50 recovered real cards from `decks/SOURCES.md` §4 and,
+ * for each one, writes the LARGEST honest effect list today's vocabulary can carry
+ * (`reduction`) and then PLAYS it through the real reducer. A card counts as playable
+ * only if `reduce()` accepts it and the resulting state differs from the opening
+ * position in the way the card says.
+ *
+ * `reduction: null` means no expressible effect list exists at all -- there is no op
+ * for any part of the card, so there is nothing to play. Those are counted separately
+ * from cards whose reduction the reducer REFUSES, because they are different
+ * failures and they need different engine work.
+ *
+ * The whole point is that `playable` is computed by calling `reduce()`, not by asking
+ * the validator. Read the per-gap table at the bottom as the handoff.
+ *
+ * Reads the decks and the engine source. Writes nothing.
+ */
+
+import {
+  loadCorpus,
+  toEngineConspiracyCard,
+  toEngineHeadlineCard,
+  toEngineIdeologyCard,
+  toEngineVoterCard,
+  type Corpus,
+} from '../src/corpus.js';
+import { unexecutedEffectProblems } from '../src/executable.js';
+import { RULES, type CardIndex, type Effect } from '../src/engine.js';
+
+import { reduce } from '../../engine/src/reduce';
+import { setup } from '../../engine/src/setup';
+import type { AreaID, ChoiceScope, GameState, PlayerID } from '../../engine/src/state';
+
+/** Sum of a signed pool. `state.ts` owns it; mirrored here rather than imported as a value. */
+const deltaTotal = (d: { funds?: number; clout?: number; media?: number; trust?: number }): number =>
+  (d.funds ?? 0) + (d.clout ?? 0) + (d.media ?? 0) + (d.trust ?? 0);
+
+// ─────────────────────────── the 50 recovered cards ───────────────────────────
+
+/**
+ * One row per recovered card, from `decks/SOURCES.md` §4.
+ *
+ * `reduction` is what a corpus owner would write TODAY: the biggest honest subset of
+ * the card's real text. `gap` is the KNOWN-GAPS id blocking the dropped remainder.
+ * Both are hand-authored from the REF text; the PLAYABILITY VERDICT is not -- it is
+ * whatever `reduce()` says about the reduction, below.
+ */
+type Probe = {
+  readonly name: string;
+  readonly ref: string;
+  readonly kind: 'conspiracy' | 'headline';
+  /** The largest effect list today's vocabulary carries. `null` = no expressible subset. */
+  readonly reduction: readonly Effect[] | null;
+  /** The gap blocking the rest of the card. */
+  readonly gap: string;
+  /** Why `reduction` is null, when it is. */
+  readonly note?: string;
+};
+
+const PROBES: readonly Probe[] = [
+  // ── Earth 2040 Conspiracy Cards, REF §4.2.1 ────────────────────────────────
+  { name: 'A Grave Inheritance', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'steal-any', n: 2, target: 'each-opponent' }], gap: 'G2' },
+  { name: 'Block', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13', note: 'out-of-turn reactive cancellation' },
+  { name: 'Cut, Copy, and Paste', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G16/G22', note: 'zone-scoped, spans two turns' },
+  { name: 'Deep Thoughts', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G20', note: "borrow an opponent's powers" },
+  { name: 'Deflect', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13', note: 'retargeting a partial effect' },
+  { name: 'Eradicating Germs', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'refresh-market' }], gap: 'G3/G17' },
+  { name: 'Holo Sapiens', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'dynamic price, card moves, expiry' },
+  { name: 'If You Like Pina Colada', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G4', note: 'mat-wide doubling with a cap check' },
+  { name: 'Lab-Grown Earworm', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G14', note: "trigger on ANOTHER player's purchase" },
+  { name: 'Power Trip', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G14', note: 'trigger' },
+  { name: 'Quantum Wristband', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13/G14', note: 'auction of 3 headlines, IOU bids' },
+  { name: 'Selective Access Memory', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'draw-conspiracy', n: 1, from: 'discard' }], gap: 'G17', note: 'top of the discard pile only; "any order" needs a new Choice kind' },
+  { name: 'Singularity', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'voters', n: 2 }], gap: 'G6' },
+  { name: 'The Greta Effect', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G14', note: 'persistent payout debuff, N-target' },
+  { name: 'The Psychohistorian', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'draw-conspiracy', n: 2 }], gap: 'G7/G19' },
+  { name: 'Thoughts and Prayers', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G4', note: 'scales off an opponent board pegs' },
+
+  // ── India Conspiracy Cards, REF §4.2.2 ───────────────────────────────────
+  { name: 'Chai-Paani', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'unknown', note: 'base effect never recovered' },
+  { name: 'Jumla', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'value read off a card; card is a movable object' },
+  { name: 'Cult-ivating Obedience', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'G-new/G20', note: 'convert own voters, transfer a card' },
+
+  // ── Headline Cards, all campaigns, REF §4.1 ───────────────────────────────
+  { name: 'GREAT LEADER, BAD ECONOMY', ref: '4.1', kind: 'headline', reduction: null, gap: 'G9/G14', note: 'rest-of-game trigger on another player' },
+  { name: 'DOSTI BANI RAHE', ref: '4.1', kind: 'headline', reduction: null, gap: 'G15/G22', note: "your power read on their turn" },
+  { name: 'KHAKI TERROR', ref: '4.1', kind: 'headline', reduction: [{ op: 'lose', res: { funds: 1, clout: 1, media: 1, trust: 1 } }], gap: 'G5/G10' },
+  { name: 'GROWING DISSENT', ref: '4.1', kind: 'headline', reduction: null, gap: 'G9/G14', note: 'rest-of-game trigger' },
+  { name: 'A CALL FROM KARACHI', ref: '4.1', kind: 'headline', reduction: null, gap: 'G13/G17/G20', note: 'auction, deck search, card moving' },
+  { name: 'STAY IN YOUR LIMITS', ref: '4.1', kind: 'headline', reduction: null, gap: 'G18/G2', note: '"converts 2 voters of the player to their LEFT" — directional seat targeting, plus a conditional bonus' },
+  { name: 'POLO RETREAT', ref: '4.1', kind: 'headline', reduction: null, gap: 'G20', note: "borrow another player's L3 powers" },
+  { name: 'NEXT BILLION DATA POINTS', ref: '4.1', kind: 'headline', reduction: null, gap: 'G13', note: 'a vote, with no self-votes and a re-vote' },
+  { name: 'PYTHONPOST', ref: '4.1', kind: 'headline', reduction: null, gap: 'G9/G5', note: 'rest-of-game purchase surcharge' },
+  { name: 'SUBMERGED', ref: '4.1', kind: 'headline', reduction: [{ op: 'gerrymander', n: 1, target: 'everyone' }], gap: 'G9', note: 'the grant is wiped by advanceTurn' },
+  { name: 'COUGH IT UP', ref: '4.1', kind: 'headline', reduction: [{ op: 'evict', n: 1, target: 'each-opponent' }], gap: 'G2', note: 'the conditional bonus is dropped' },
+  { name: "NERO'S GUESTS", ref: '4.1', kind: 'headline', reduction: null, gap: 'G16', note: 'zone-scoped, all-or-nothing' },
+  { name: 'ON THE "HIGH" SEAS', ref: '4.1', kind: 'headline', reduction: null, gap: 'G11', note: 'hostage object holding 4 pegs' },
+  { name: 'A COWARD OR A JOURNALIST?', ref: '4.1', kind: 'headline', reduction: null, gap: 'G12/G20', note: 'donate an Ideology Card down the seat order' },
+  { name: 'BLESSINGS OF PARENTS PAST', ref: '4.1', kind: 'headline', reduction: null, gap: 'G17/G20', note: 'two-player resolution order' },
+
+  // ── Headline Cards, Earth 2040, REF §4.3 ──────────────────────────────────
+  { name: '404', ref: '4.3', kind: 'headline', reduction: null, gap: 'G18', note: 'swaps who answers which card' },
+  // REF 4.3 reads "Discard 2 of your OWN voters [OR] Donate 1 of your voters to the
+  // player to your right". Neither branch is expressible: the first needs a decision
+  // that reaches the chooser's own pegs (G-new), the second a directional seat
+  // (G18). What the corpus ships as `hl-et2040-003` is the opponents' reading, which
+  // `discard-voter` with no target already performs -- so that is probed here, and
+  // the reading that does NOT work is recorded as the gap.
+  { name: "Ain't No Cure For Love", ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 2 }], gap: 'G-new/G1', note: 'the shipped opponents reading; the printed own-voters branch is G-new' },
+  { name: 'As Clear As Water', ref: '4.3', kind: 'headline', reduction: null, gap: 'G17/G18/G20', note: 'reveal a hand, top up from the draw pile' },
+  { name: 'Brave New Worlds', ref: '4.3', kind: 'headline', reduction: null, gap: 'G18', note: 'every player answers, suppressing income' },
+  { name: 'Card Games', ref: '4.3', kind: 'headline', reduction: null, gap: 'G12/G20', note: 'same card as A COWARD OR A JOURNALIST?' },
+  { name: "Don't Kiss The Babies", ref: '4.3', kind: 'headline', reduction: null, gap: 'G5', note: 'a purchase surcharge is a cost modifier' },
+  { name: 'Fatality', ref: '4.3', kind: 'headline', reduction: null, gap: 'G1', note: 'donate voters to a NAMED opponent, placed now' },
+  { name: 'Fuelling The News', ref: '4.3', kind: 'headline', reduction: null, gap: 'G17/G20', note: 'draw 3 headlines, keep 1, give 2' },
+  { name: 'Gender Trouble', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G22', note: 'a power is unavailable next turn' },
+  { name: 'Good Gig Well Played', ref: '4.3', kind: 'headline', reduction: [{ op: 'draw-conspiracy', n: 1 }], gap: 'G17/G20', note: 'keep-one branch; the discard fallback is dropped' },
+  { name: 'Higgs Moron', ref: '4.3', kind: 'headline', reduction: null, gap: 'G10/G12', note: 'tokens on a card, timed pass' },
+  { name: 'Just Breathe', ref: '4.3', kind: 'headline', reduction: null, gap: 'G16', note: 'the zone is computed from board state' },
+  { name: 'Married With Bits', ref: '4.3', kind: 'headline', reduction: [{ op: 'voters', n: 1, target: 'each-opponent' }], gap: 'G1', note: '2 opponents and the opt-out are dropped' },
+  { name: 'Movement Anxiety Disorder', ref: '4.3', kind: 'headline', reduction: null, gap: 'G9/G22', note: 'next 3 gerrymanders discard' },
+  { name: 'New Face Who Dis', ref: '4.3', kind: 'headline', reduction: [{ op: 'gerrymander', n: 1, target: 'everyone' }], gap: 'G5/G9', note: 'the Volatile-Area ban is dropped; same card as SUBMERGED' },
+  { name: 'Red Blooded', ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 1, target: 'each-opponent' }], gap: 'G4/G-new' },
+  { name: 'Snoop B-O-Double-T', ref: '4.3', kind: 'headline', reduction: null, gap: 'G9/G5', note: 'rest-of-game surcharge; same card as PYTHONPOST' },
+  { name: 'The Big Freeze', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G9/G15/G22', note: 'four gaps at once' },
+  { name: 'The Four Horsemen', ref: '4.3', kind: 'headline', reduction: [{ op: 'lose-any', n: 2 }], gap: 'G5', note: 'the purchase lock is dropped' },
+  { name: 'Why The Long Face?', ref: '4.3', kind: 'headline', reduction: null, gap: 'G14/G22', note: 'trigger with a duration' },
+];
+
+// ─────────────────────────── the harness ───────────────────────────
+
+const corpus: Corpus = loadCorpus();
+
+const INDEX: CardIndex = {
+  ideology: Object.fromEntries(corpus.ideology.map((c) => [c.id, toEngineIdeologyCard(c)])),
+  voter: Object.fromEntries(corpus.voter.map((c) => [c.id, toEngineVoterCard(c)])),
+  conspiracy: Object.fromEntries(corpus.conspiracy.map((c) => [c.id, toEngineConspiracyCard(c)])),
+  headline: Object.fromEntries(corpus.headline.map((c) => [c.id, toEngineHeadlineCard(c)])),
+};
+const CTX = { rules: RULES, cards: INDEX };
+
+/** A synthetic id for each probe card, so nothing here needs a deck file. */
+const probeId = (p: Probe) => `probe-${p.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+
+/**
+ * A legal opening position, built from fixture decks rather than the corpus.
+ *
+ * Same reason `test/card-playback.test.ts` owns its decks: a probe measures the
+ * REDUCER's opinion of an effect list, so the position must not move underneath it
+ * when somebody edits a deck file. Pegs are placed so the voter-targeting ops
+ * (`evict`, `discard-voter`, `convert-voter`) have something to reach, which is the
+ * whole question for five of these cards.
+ */
+/** A tiny Ideology deck, declared here so the position cannot drift with the corpus. */
+const FIXTURE_IDEOLOGY = [
+  {
+    id: 'probe-ig-a',
+    campaign: 'probe',
+    question: 'Does the probe reach the board?',
+    sides: [
+      { answer: 'Yes.', ideologue: 'capitalist' as const, pays: { funds: 1 } },
+      { answer: 'No.', ideologue: 'idealist' as const, pays: { trust: 1 } },
+    ],
+  },
+] as const;
+
+/**
+ * Route one card through the path its kind really takes, and settle what it raises.
+ *
+ * Returns `null` if the reducer refused it. Note what is NOT compared here: resolving
+ * a Headline draws the next one off the headline pile and resolving a Conspiracy
+ * moves that card to its discard pile, so EVERY probe changes the state. Deciding
+ * "did the card do anything" therefore has to be differential against the control
+ * below rather than against the opening position.
+ */
+function resolve(p: Probe, base: GameState): GameState | { readonly error: string } {
+  const id = probeId(p);
+
+  // TWO headlines are queued on purpose. With one, `ACK_HEADLINE` drains the queue
+  // into `advanceTurn`, which resets the incoming player's `powerUses` and can end the
+  // game outright -- so a one-deep queue measures the turn boundary rather than the
+  // card. Control and probe share the depth, so the differential is unaffected either
+  // way; two is simply the depth at which the card is the only thing that moved.
+  const active: GameState = {
+    ...base,
+    phase: 'headlines',
+    activeHeadline: id,
+    headlineQueue: [{ areaId: '', by: 'p1' }, { areaId: '', by: 'p1' }],
+  };
+  const result =
+    p.kind === 'headline'
+      ? reduce(active, 'p1', { type: 'ACK_HEADLINE' }, PROBE_CTX)
+      : reduce(
+          {
+            ...base,
+            players: {
+              ...base.players,
+              p1: { ...base.players.p1!, conspiracies: [...base.players.p1!.conspiracies, id] },
+            },
+          },
+          'p1',
+          { type: 'PLAY_CONSPIRACY', cardId: id },
+          PROBE_CTX,
+        );
+
+  if (!result.ok) return { error: result.error };
+  const settled = settleChoices(result.state);
+  if ('error' in settled) return settled;
+  return settled.state;
+}
+
+/**
+ * The probe's own answer to "how do I know this harness can report a failure?"
+ *
+ * A measurement that has only ever produced PLAYED is indistinguishable from a
+ * measurement that cannot fail. The control is a card whose reduction is a `gain` of
+ * nothing, routed through the identical path. If the harness cannot report it as a
+ * no-op, the fingerprint is not measuring anything and every other verdict is void.
+ */
+const CONTROL: Probe = {
+  name: 'CONTROL — a card that does nothing',
+  ref: 'n/a',
+  kind: 'headline',
+  reduction: [{ op: 'gain', res: {} }],
+  gap: 'n/a',
+};
+
+const ALL_PROBE_CARDS: readonly Probe[] = [...PROBES, CONTROL];
+
+/** The state the harness produces when a card does nothing, for comparison. */
+function controlState(): GameState | { readonly error: string } {
+  const out = resolve(CONTROL, opening());
+  if ('error' in out) return out;
+  return out;
+}
+
+const PROBE_INDEX: CardIndex = {
+  ...INDEX,
+  ideology: {
+    ...INDEX.ideology,
+    ...Object.fromEntries(FIXTURE_IDEOLOGY.map((c) => [c.id, c])),
+  },
+  conspiracy: {
+    ...INDEX.conspiracy,
+    ...Object.fromEntries(
+      ALL_PROBE_CARDS.filter((p) => p.kind === 'conspiracy' && p.reduction !== null).map((p) => [
+        probeId(p),
+        { id: probeId(p), name: p.name, text: `probe: ${p.name}`, cost: 4, effects: p.reduction ?? [] },
+      ]),
+    ),
+  },
+  headline: {
+    ...INDEX.headline,
+    ...Object.fromEntries(
+      ALL_PROBE_CARDS.filter((p) => p.kind === 'headline' && p.reduction !== null).map((p) => [
+        probeId(p),
+        { id: probeId(p), name: p.name, text: `probe: ${p.name}`, effects: p.reduction ?? [] },
+      ]),
+    ),
+  },
+};
+const PROBE_CTX = { rules: RULES, cards: PROBE_INDEX };
+
+/**
+ * A legal opening position, built from fixture decks rather than the corpus.
+ *
+ * Same reason `test/card-playback.test.ts` owns its decks: a probe measures the
+ * REDUCER's opinion of an effect list, so the position must not move underneath it
+ * when somebody edits a deck file. Pegs are placed so the voter-targeting ops
+ * (`evict`, `discard-voter`, `convert-voter`) have something to reach, which is the
+ * whole question for five of these cards.
+ */
+function opening(): GameState {
+  const s = setup({
+    players: ['p1', 'p2', 'p3'],
+    cards: PROBE_CTX.cards,
+    seed: 4242,
+    // 6 total, under the cap of 12, so a `gain` never triggers a cap discard that
+    // would sit in `choices` in front of the decision being measured.
+    startResources: [
+      { funds: 3, clout: 1, media: 1, trust: 1 },
+      { funds: 3, clout: 3, media: 3, trust: 3 },
+      { funds: 3, clout: 3, media: 3, trust: 3 },
+    ],
+    ideologyDeck: FIXTURE_IDEOLOGY.map((c) => c.id),
+    voterDeck: corpus.voter.slice(0, 6).map((c) => c.id),
+    conspiracyDeck: corpus.conspiracy.slice(0, 3).map((c) => c.id),
+    headlineDeck: corpus.headline.slice(0, 3).map((c) => c.id),
+  });
+
+  // Put a peg on the board for every seat: the voter ops resolve against
+  // `state.zones`, and a card whose reduction targets opponents needs there to BE
+  // opponents with voters. Empty board would make them resolve to nothing and the
+  // probe would pass for the wrong reason.
+  const areas = s.zones.flatMap((z) => z.areas).filter((a) => !a.volatile).slice(0, 3);
+  const seeded: GameState = {
+    ...s,
+    zones: s.zones.map((z) => ({
+      ...z,
+      areas: z.areas.map((a) => {
+        const slot = areas.findIndex((c) => c.id === a.id);
+        if (slot < 0) return a;
+        const owner = (['p1', 'p2', 'p3'] as const)[slot]!;
+        return { ...a, peg: { owner, majority: false } };
+      }),
+    })),
+  };
+
+  const answered = reduce(seeded, 'p1', { type: 'ANSWER', side: 0 }, PROBE_CTX);
+  if (!answered.ok) throw new Error(`probe opening could not answer: ${answered.error}`);
+
+  // One Conspiracy Card already in the discard pile. SELECTIVE ACCESS MEMORY reaches
+  // into that pile, and a freshly-built game has an empty one -- without this the
+  // probe would call a working card a no-op, which is the one wrong answer a
+  // playability measurement must never give.
+  const withDiscard: GameState = {
+    ...answered.state,
+    _conspiracyDiscard: [corpus.conspiracy[0]?.id ?? 'probe-ig-a'],
+  };
+
+  if (withDiscard.choices.length > 0) {
+    throw new Error('probe opening left a pending decision; the measurement would be about the wrong thing');
+  }
+  return withDiscard;
+}
+
+/**
+ * A cheap, total fingerprint of the parts of the state an effect can move.
+ *
+ * Deliberately EXCLUDED, each for a stated reason:
+ *  - the log and the turn/round counters, which every `reduce()` advances;
+ *  - the discard piles and `activeHeadline`, which move as a matter of course when
+ *    a card resolves;
+ *  - `_headlineDraw`, which is drained by the QUEUE, not by any effect. There is no
+ *    op that draws a Headline -- that is exactly why Fuelling The News is G17 -- so
+ *    including it would report every headline probe as having done something.
+ */
+function fingerprint(s: GameState): string {
+  return JSON.stringify({
+    pools: s.turnOrder.map((id) => s.players[id]?.resources),
+    pending: s.turnOrder.map((id) => s.players[id]?.pending),
+    conspiracies: s.turnOrder.map((id) => s.players[id]?.conspiracies),
+    manifesto: s.turnOrder.map((id) => s.players[id]?.manifesto),
+    manifestoCards: s.turnOrder.map((id) => s.players[id]?.manifestoCards),
+    gerrymandered: s.turnOrder.map((id) => s.players[id]?.powerUses.gerrymandered),
+    helpingHands: s.turnOrder.map((id) => s.players[id]?.powerUses.helpingHands),
+    pegs: s.zones.flatMap((z) => z.areas).map((a) => (a.peg ? `${a.id}:${a.peg.owner}` : null)),
+    market: s.market.map((m) => m.cardId),
+    draw: { i: s._ideologyDraw, v: s._voterDraw, c: s._conspiracyDraw },
+  });
+}
+
+/**
+ * Answer every decision the card raised, as the player it was raised to.
+ *
+ * A card that hands its player a choice -- `steal-any`, `lose-any`, `evict` -- has
+ * not finished resolving while that choice is still pending, so measuring the state
+ * before it is answered would under-report the card. And "can a player actually make
+ * this pick" is part of playability: if no legal pick exists, the card dead-ends and
+ * that is a refusal.
+ *
+ * The picks are greedy and deterministic -- take funds first, take the first legal
+ * areas -- because the question is "does a legal resolution exist", not which one a
+ * player would prefer.
+ */
+function settleChoices(s: GameState): { readonly state: GameState } | { readonly error: string } {
+  let state = s;
+  for (let guard = 0; guard < 12 && state.choices.length > 0; guard += 1) {
+    const pending = state.choices[0];
+    if (pending === undefined) break;
+    const player = state.players[pending.player];
+    if (player === undefined) return { error: `a decision was raised for ${pending.player}, who is not in the game` };
+
+    const c = pending.choice;
+    let result: ReturnType<typeof reduce> | null = null;
+
+    if (c.kind === 'gain-any' || c.kind === 'lose-any') {
+      // Spread over funds first, then the rest, so the pick is legal against the
+      // pool the chooser actually holds.
+      let remaining = c.count;
+      const res: Record<string, number> = {};
+      for (const r of ['funds', 'clout', 'media', 'trust'] as const) {
+        if (remaining === 0) break;
+        const take = Math.min(remaining, player.resources[r]);
+        if (take > 0) {
+          res[r] = take;
+          remaining -= take;
+        }
+      }
+      if (remaining > 0 && c.kind === 'gain-any') {
+        // Not enough held to spread; draw from the Public Reserve for the rest.
+        res.funds = (res.funds ?? 0) + remaining;
+        remaining = 0;
+      }
+      result = reduce(state, pending.player, {
+        type: 'RESOLVE_CHOICE',
+        choiceId: pending.id,
+        pick: { kind: 'resources', res },
+      }, PROBE_CTX);
+    } else if (c.kind === 'steal-any') {
+      const victim = c.from ?? state.turnOrder.find((id) => id !== pending.player);
+      const target = victim === undefined ? undefined : state.players[victim];
+      if (target === undefined || victim === undefined) {
+        return { error: 'a theft was raised with no eligible victim' };
+      }
+      let remaining = Math.min(c.count, deltaTotal(target.resources));
+      const res: Record<string, number> = {};
+      for (const r of ['funds', 'clout', 'media', 'trust'] as const) {
+        if (remaining === 0) break;
+        const take = Math.min(remaining, target.resources[r]);
+        if (take > 0) {
+          res[r] = take;
+          remaining -= take;
+        }
+      }
+      if (remaining > 0) return { error: 'a theft was raised that nobody could pay' };
+      result = reduce(state, pending.player, {
+        type: 'RESOLVE_CHOICE',
+        choiceId: pending.id,
+        pick: { kind: 'steal', from: victim, res },
+      }, PROBE_CTX);
+    } else {
+      // evict / discard-voter / convert-voter: pick the areas the engine itself
+      // says are legal, discovered by asking for one too many and reading the count.
+      const legal = legalAreas(state, pending.player, c.kind, c.scope, c.count);
+      if (legal.length === 0) return { error: `no legal target for ${c.kind}` };
+      result = reduce(state, pending.player, {
+        type: 'RESOLVE_CHOICE',
+        choiceId: pending.id,
+        pick: { kind: 'areas', areaIds: legal },
+      }, PROBE_CTX);
+    }
+
+    if (result === null) return { error: 'no pick was constructed for the raised decision' };
+    if (!result.ok) return { error: result.error };
+    state = result.state;
+  }
+  if (state.choices.length > 0) return { error: 'the card raised a decision that would not clear' };
+  return { state };
+}
+
+/** The areas `resolveChoice` will accept, mirroring its guards exactly. */
+function legalAreas(s: GameState, playerId: PlayerID, kind: string, scope: ChoiceScope, n: number): AreaID[] {
+  const out: AreaID[] = [];
+  for (const z of s.zones) {
+    for (const a of z.areas) {
+      if (out.length >= n) return out;
+      if (a.peg === undefined || a.peg === null) continue;
+      if (a.volatile) continue;
+      if (scope === 'own' && a.peg.owner !== playerId) continue;
+      if (scope === 'others' && a.peg.owner === playerId) continue;
+      if (kind === 'convert-voter' && a.peg.owner === playerId) continue;
+      out.push(a.id);
+    }
+  }
+  return out;
+}
+
+type PlayedVerdict = { readonly how: 'played'; readonly changed: boolean };
+type Verdict =
+  | PlayedVerdict
+  | { readonly how: 'refused'; readonly why: string }
+  | { readonly how: 'inexpressible'; readonly why: string }
+  | { readonly how: 'unexecutable'; readonly why: string };
+
+const isPlayed = (v: Verdict): v is PlayedVerdict => v.how === 'played';
+
+/**
+ * Play one probe card and report what the reducer did with it.
+ *
+ * Three separate failure modes, deliberately not collapsed:
+ *  - `unexecutable`: the effect list is one `unexecutedEffectProblems` rejects, so
+ *    the card cannot even be shipped. A schema-level fact.
+ *  - `refused`: the list is shippable but `reduce()` rejects it from a real opening
+ *    position, or it raises a decision no player can answer. THIS is the case schema
+ *    acceptance cannot see, and the reason this script exists.
+ *  - `played` with `changed: false`: the reducer accepted it and moved nothing the
+ *    control did not also move. Also a lie, and also invisible to the validator.
+ */
+function play(p: Probe, base: GameState, controlPrint: string): Verdict {
+  if (p.reduction === null) {
+    return { how: 'inexpressible', why: p.note ?? 'no expressible effect list' };
+  }
+
+  const unexecuted = p.reduction.flatMap((e) => unexecutedEffectProblems(e, ''));
+  if (unexecuted.length > 0) {
+    return { how: 'unexecutable', why: unexecuted.map((u) => u.message).join('; ') };
+  }
+
+  const after = resolve(p, base);
+  if ('error' in after) return { how: 'refused', why: after.error };
+  return { how: 'played', changed: fingerprint(after) !== controlPrint };
+}
+
+// ─────────────────────────── the control verdict ───────────────────────────
+
+const BASE = opening();
+const CONTROL_STATE = controlState();
+const controlSound: true | string =
+  'error' in CONTROL_STATE
+    ? `CONTROL FAILED: the harness could not route a no-op card at all (${CONTROL_STATE.error})`
+    : fingerprint(CONTROL_STATE) === fingerprint(BASE)
+      ? true
+      : 'CONTROL FAILED: a card that does nothing moved the state, so the fingerprint is not measuring effects';
+
+const rows = PROBES.map((p) => {
+  if ('error' in CONTROL_STATE) {
+    return { p, v: { how: 'refused', why: 'the control failed; no verdict is trustworthy' } as Verdict };
+  }
+  return { p, v: play(p, BASE, fingerprint(CONTROL_STATE)) };
+});
+
+const pad = (s: string, n: number) => s.padEnd(n);
+const played = rows.filter((r): r is { p: Probe; v: PlayedVerdict } => isPlayed(r.v));
+const silent = played.filter((r) => !r.v.changed);
+const refused = rows.filter((r) => r.v.how === 'refused');
+const inexpressible = rows.filter((r) => r.v.how === 'inexpressible');
+const unexecutable = rows.filter((r) => r.v.how === 'unexecutable');
+
+console.log('shasn cards — how many recovered cards can actually be PLAYED?');
+console.log('─'.repeat(96));
+console.log('measured by driving each reduction through the real reduce(), not by schema acceptance\n');
+
+console.log(`${pad('card', 32)} ${pad('REF', 6)} ${pad('verdict', 14)} gap`);
+console.log('─'.repeat(96));
+for (const { p, v } of rows) {
+  const label =
+    v.how === 'played' ? (v.changed ? 'PLAYED' : 'played, NO-OP') : v.how.toUpperCase();
+  console.log(`${pad(p.name, 32)} ${pad(`§${p.ref}`, 6)} ${pad(label, 14)} ${p.gap}`);
+}
+
+console.log('\n' + '─'.repeat(96));
+console.log(`recovered cards probed        ${rows.length}`);
+console.log(`  PLAYED, and moved state      ${played.length - silent.length}`);
+console.log(`  played but did nothing       ${silent.length}`);
+console.log(`  reducer REFUSED at play      ${refused.length}`);
+console.log(`  not expressible at all       ${inexpressible.length}`);
+console.log(`  expressible, not executable  ${unexecutable.length}`);
+
+console.log('\nper blocking gap (first gap named on the card), by verdict');
+console.log('─'.repeat(96));
+const byGap = new Map<string, { played: number; silent: number; refused: number; none: number }>();
+for (const { p, v } of rows) {
+  const key = p.gap.split('/')[0]!.trim();
+  const row = byGap.get(key) ?? { played: 0, silent: 0, refused: 0, none: 0 };
+  if (v.how === 'played') {
+    if (v.changed) row.played += 1;
+    else row.silent += 1;
+  } else if (v.how === 'refused') row.refused += 1;
+  else row.none += 1;
+  byGap.set(key, row);
+}
+console.log(`${pad('gap', 10)} ${pad('played', 8)} ${pad('no-op', 8)} refused  inexpressible`);
+for (const [gap, r] of [...byGap].sort((a, b) => b[1].played - a[1].played || a[0].localeCompare(b[0]))) {
+  console.log(`${pad(gap, 10)} ${pad(String(r.played), 8)} ${pad(String(r.silent), 8)} ${pad(String(r.refused), 8)} ${r.none}`);
+}
+
+if (silent.length > 0) {
+  console.log('\nplayed but changed nothing — these are cards that would ship and lie:');
+  for (const { p } of silent) console.log(`  ${p.name} (${p.gap})`);
+}
+if (refused.length > 0) {
+  console.log('\nrefused by reduce() at play time — schema-acceptable, unplayable:');
+  for (const { p, v } of refused) console.log(`  ${p.name} (${p.gap}): ${v.how === 'refused' ? v.why : ''}`);
+}
+if (unexecutable.length > 0) {
+  console.log('\nexpressible in the schema, refused by the executability registry:');
+  for (const { p } of unexecutable) console.log(`  ${p.name} (${p.gap})`);
+}
+
+// The control goes last so its verdict is the last thing on the screen: if the
+// harness cannot detect a card that does nothing, nothing above it means anything.
+console.log('\nnegative control');
+console.log('─'.repeat(96));
+if (controlSound === true) {
+  console.log('CONTROL (a card that does nothing) reported NO-OP, so the fingerprint measures');
+  console.log('something. Every verdict above is a real state change, not bookkeeping.');
+} else {
+  console.log(controlSound);
+  process.exitCode = 1;
+}
