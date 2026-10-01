@@ -19,7 +19,11 @@
  * board are byte-identical, which is what makes the build output diffable.
  */
 
-/** Deterministic 32-bit LCG (Numerical Recipes constants). */function lcg(seed: number): () => number {
+import { COASTLINE } from './geometry';
+import type { Point } from './types';
+
+/** Deterministic 32-bit LCG (Numerical Recipes constants). */
+function lcg(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
     s = (Math.imul(1664525, s) + 1013904223) >>> 0;

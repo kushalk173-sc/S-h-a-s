@@ -30,6 +30,12 @@ export type ZoneLabelProps = {
   readonly zone: BoardZone;
   /** `ZoneSpec.label` — where the block is anchored. */
   readonly anchor: Point;
+  /**
+   * The unmodified `ZoneSpec.label`, kept so the group can report whether the
+   * block had to move off it. A label that had to dodge its own slots is
+   * recorded, not hidden — see `labelAnchors` in `./useBoardGeometry`.
+   */
+  readonly declaredAnchor?: Point;
   /** Pegs in this zone, majority or not. */
   readonly pegsFilled: number;
   /** Seat fill token of the majority holder, or null. */
@@ -54,6 +60,7 @@ export type ZoneLabelProps = {
 export function ZoneLabel({
   zone,
   anchor,
+  declaredAnchor,
   pegsFilled,
   holderFill,
   holderName,
@@ -65,6 +72,33 @@ export function ZoneLabel({
 }: ZoneLabelProps) {
   const [x, y] = anchor;
   const { majority, capacity } = zone;
+  const moved =
+    declaredAnchor !== undefined &&
+    (Math.abs(declaredAnchor[0] - x) > 0.5 || Math.abs(declaredAnchor[1] - y) > 0.5);
+
+  /**
+   * THE LABEL HALO — a defect found by rendering.
+   * --------------------------------------------
+   * On the rendered board the label lockup was printed straight through its own
+   * constituency's voter dots and pegs: `CENTRAL 5/9 5/9` had pegs on both
+   * numerals, and the full board put a jade peg through the `W` of `WEST`.
+   * Moving the anchor off the dots fixes 6 of 9 zones, but North and South are
+   * 21-slot grids with 61-unit row spacing, so no point in either zone clears a
+   * 184-unit-wide footprint — no anchor move can save those two.
+   *
+   * The cartographic answer, and the one that does not hide information, is a
+   * halo: `paint-order: stroke` paints the stroke UNDER the fill, so each glyph
+   * gets a paper-coloured outline that separates it from whatever is behind it
+   * while the glyph's own shape — and therefore its legibility — is untouched.
+   * A solid backing plate would also work and would be worse: it would occlude
+   * voter dots, which are the board's primary information.
+   */
+  const halo = {
+    paintOrder: 'stroke' as const,
+    stroke: 'var(--map-land)',
+    strokeWidth: 5,
+    strokeLinejoin: 'round' as const,
+  };
 
   // The printed fraction. It is a static board element, not a computed HUD:
   // the number is printed on the physical board, so it never changes colour or
@@ -92,6 +126,31 @@ export function ZoneLabel({
     zone.majorityHolder !== null && holderName !== null ? `held by ${holderName}` : 'unheld',
   ].join(', ');
 
+  /**
+   * THE VERTICAL STACK — a defect found by rendering.
+   * ---------------------------------------------
+   * §4.4 draws the block as name / fraction+tally / holder / progress rule, and
+   * the original implementation put the holder baseline at y=54 and the
+   * progress rule at y=62. TYPE_ZONE_HOLDER is 19 units, so the holder's
+   * descenders reach y≈59 and the 4-unit rule starts at 62 — and on the
+   * rendered full board the seat-coloured rule was drawn straight THROUGH
+   * `● ME` in West. Worse, the tie and rights lines were positioned relative to
+   * `showHolder`, so dropping the holder line below the 500px floor moved them
+   * onto the progress rule: every zone in the gerrymander render had
+   * `⊘ NO RIGHTS` sitting on its own progress rule.
+   *
+   * The stack below is fixed, non-overlapping, and — importantly — IDENTICAL
+   * whether or not the holder line is shown, so nothing shifts when the board
+   * crosses the 500px floor.
+   */
+  const Y_NAME = 0;
+  const Y_FRACTION = 32;
+  const Y_HOLDER = 56;
+  const Y_RULE = 70;
+  const Y_TIE = 94;
+  const Y_RIGHTS = 114;
+  const Y_ONE_ZONE = 134;
+
   return (
     <g
       className="shasn-zone-label"
@@ -100,15 +159,24 @@ export function ZoneLabel({
       aria-label={zoneLabel}
       data-zone-id={zone.id}
       data-testid="zone-label"
+      data-anchor-moved={moved ? 'true' : 'false'}
     >
       {/* The seal disc. Required, not decorative: it is the only element of the
           majority lockup that survives greyscale AND is unambiguous at the
           12px rendered size of TYPE_ZONE_HOLDER — and on a narrow board, where
-          the holder line is dropped, the disc is the whole signal. */}
+          the holder line is dropped, the disc is the whole signal.
+
+          A defect found by rendering: this was parked at a hard-coded
+          `cx=-78, cy=-30`, "before the name". But the name is centred and
+          centred text has no fixed left edge — `NORTH EAST` at 24 SVG px is
+          about 200 units wide, so a disc at x=-78 landed INSIDE the name, and
+          on the majority render `SOUTH EAST` had a crimson disc sitting on the
+          `E`. It now sits on its own line above the name, centred, so its
+          position cannot depend on how long the zone's name is. */}
       {holderFill !== null ? (
         <circle
-          cx={-78}
-          cy={-30}
+          cx={0}
+          cy={Y_NAME - 30}
           r={SEAL_DISC_R}
           fill={holderFill}
           stroke="var(--paper-000)"
@@ -121,11 +189,13 @@ export function ZoneLabel({
           things in the product permitted to be uppercase (§3.2). */}
       <text
         textAnchor="middle"
+        y={Y_NAME}
         fontFamily="var(--font-display)"
         fontSize="var(--board-type-zone-name)"
         fontWeight={700}
         letterSpacing="0.06em"
         fill="var(--ink-900)"
+        {...halo}
         data-role="zone-name"
       >
         {zone.name.toUpperCase()}
@@ -137,14 +207,15 @@ export function ZoneLabel({
           produces the misread where a player thinks 8/17 means 8 from winning. */}
       <text
         textAnchor="middle"
-        y={32}
+        y={Y_FRACTION}
         fontFamily="var(--font-numeric)"
         fontSize="var(--board-type-zone-fraction)"
+        {...halo}
         data-role="zone-fraction"
       >
         {fractionTspans}
         <tspan
-          dx={10}
+          dx={12}
           fontSize="var(--board-type-zone-holder)"
           fontWeight={700}
           fill="var(--ink-700)"
@@ -159,11 +230,12 @@ export function ZoneLabel({
       {showHolder && holderFill !== null && holderName !== null ? (
         <text
           textAnchor="middle"
-          y={54}
+          y={Y_HOLDER}
           fontFamily="var(--font-ui)"
           fontSize="var(--board-type-zone-holder)"
           fontWeight={700}
           fill={holderFill}
+          {...halo}
           data-role="zone-holder"
         >
           {`● ${holderName.toUpperCase()}`}
@@ -174,10 +246,11 @@ export function ZoneLabel({
       {tied ? (
         <text
           textAnchor="middle"
-          y={showHolder ? 72 : 54}
+          y={Y_TIE}
           fontFamily="var(--font-ui)"
           fontSize="var(--board-type-zone-holder)"
           fill="var(--ink-500)"
+          {...halo}
           data-role="no-rights"
         >
           <tspan aria-hidden="true">⊘ </tspan>
@@ -190,11 +263,12 @@ export function ZoneLabel({
       {showRightsBadge ? (
         <text
           textAnchor="middle"
-          y={showHolder ? 90 : 72}
+          y={Y_RIGHTS}
           fontFamily="var(--font-ui)"
           fontSize="var(--board-type-zone-holder)"
           fontWeight={700}
           fill={hasRights ? 'var(--positive)' : 'var(--ink-500)'}
+          {...halo}
           data-role="rights-badge"
         >
           {hasRights ? '⚑ RIGHTS' : '⊘ NO RIGHTS'}
@@ -204,19 +278,20 @@ export function ZoneLabel({
       {oneZoneLocked ? (
         <text
           textAnchor="middle"
-          y={showHolder ? 108 : 90}
+          y={Y_ONE_ZONE}
           fontFamily="var(--font-ui)"
           fontSize="var(--board-type-zone-holder)"
           fontWeight={700}
           fill="var(--positive)"
+          {...halo}
           data-role="one-zone"
         >
           ONE ZONE
         </text>
       ) : null}
 
-      {/* The progress rule. */}
-      <g transform={`translate(0 62)`} aria-hidden="true">
+      {/* The progress rule. Its own line, clear of every text row above. */}
+      <g transform={`translate(0 ${Y_RULE})`} aria-hidden="true">
         <rect
           x={-PROGRESS_RULE_W / 2}
           y={0}

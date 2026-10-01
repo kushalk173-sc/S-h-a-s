@@ -12,8 +12,12 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { BOARD, BOARD_HEIGHT, BOARD_WIDTH, COASTLINE, TOTAL_AREAS } from './geometry';
 import {
+  LABEL_HALF_H,
+  LABEL_HALF_W,
+  VOLATILE_INK_R,
   buildGeometry,
   flattenSlots,
+  labelAnchors,
   minCentreDistance,
   nearestSlot,
   pointInPolygon,
@@ -689,5 +693,125 @@ describe('<BoardSvg />', () => {
     expect(PEG_R).toBe(17);
     // 2r + hit rect would collide if the hit rect were ≥ the min distance.
     expect(HIT_RECT).toBeLessThan(geometry.minCentreDistance);
+  });
+});
+
+/**
+ * THE ZONE LABEL MUST CLEAR THE INK, NOT THE SLOT'S CENTRE.
+ *
+ * A defect found by cropping the real render at 4x and reading the pixels:
+ * NORTH's tally chip `0/21` had a Volatile rosette drawn straight through it �
+ * the cog's ring cutting `0/2`, its asterisk sitting on the `1`. The printed
+ * fraction is the board's primary information, so a cog through it is an
+ * unreadable board, not a cosmetic overlap.
+ *
+ * The cause was in the anchor search, and it was a real modelling error rather
+ * than a tolerance that was simply too small. `labelAnchors` counted a slot as
+ * an obstacle only when the slot's CENTRE fell inside the label's footprint.
+ * That is right for a voter dot, which is essentially all at its centre, and
+ * wrong for a rosette: `VolatileRosette` draws a ring reaching
+ * `VOLATILE_INK_R` units out from that centre, so a label could be placed
+ * "clear of every slot" and still have a cog through its numerals. The geometry
+ * said clear and the pixels said otherwise, which is the only kind of evidence
+ * worth acting on for a board.
+ */
+describe('the zone label anchor reserves room for a rosette, not just for a dot', () => {
+  const slots = flattenSlots(BOARD);
+  const anchors = labelAnchors(BOARD, slots);
+
+  it('agrees with the rosette about how far its own ink reaches', () => {
+    // If these two drift apart the anchor search silently under-reserves again.
+    // `VolatileRosette`'s default `outerRadius` is 27.
+    expect(VOLATILE_INK_R).toBe(27);
+  });
+
+it('clears the rosette ink from the two zones the play session reported', () => {
+    // NORTH and NORTH WEST are the two measured with a cog on the glyphs. Named
+    // so a regression names itself.
+    for (const id of ['north', 'north_west']) {
+      const anchor = anchors.get(id);
+      expect(anchor, `${id} must have an anchor`).toBeDefined();
+      if (anchor === undefined) continue;
+      const [ax, ay] = anchor;
+      const hits = slots.filter(
+        (s) =>
+          s.volatile &&
+          s.zoneId === id &&
+          Math.abs(s.x - ax) - VOLATILE_INK_R <= LABEL_HALF_W &&
+          Math.abs(s.y - ay) - VOLATILE_INK_R <= LABEL_HALF_H,
+      );
+      expect(hits.map((s) => s.areaId), `${id} must have no rosette on its label`).toEqual([]);
+    }
+  });
+
+  it('does not make the two geometrically impossible zones any worse', () => {
+    /*
+     * AN HONEST LIMIT, PINNED SO IT CANNOT DECAY.
+     *
+     * `central` and `south_west` cannot be fully cleared, and no amount of work
+     * on this function will change that. `labelAnchors` only moves a label to a
+     * point inside its own polygon with at most one sample point of overhang;
+     * `central` is a 200x240 diamond and `south_west` a narrow wedge, so the
+     * measured result is that `central`'s best candidate is its ORIGINAL spec
+     * anchor (0 units of movement — there is nowhere else legal to put it) and
+     * `south_west` still has a rosette inside the box after moving 100 units.
+     *
+     * So these two are carried by the paper halo rather than by geometry, which
+     * is the documented fallback and is why the halo exists at all. What this
+     * assertion does is pin the WORST remaining case: if a future change makes
+     * the intrusion larger, or moves a label further from its spec, this fails.
+     * Asserting zero here would be asserting a falsehood, and a gate that has
+     * to be deleted to go green is worse than no gate.
+     */
+    const worst: Record<string, { maxIntrusion: number; maxMove: number }> = {
+      central: { maxIntrusion: 92, maxMove: 0 },
+      south_west: { maxIntrusion: 51, maxMove: 100 },
+    };
+    for (const [id, limit] of Object.entries(worst)) {
+      const zone = BOARD.find((z) => z.id === id);
+      const anchor = anchors.get(id);
+      expect(zone, `${id} must exist`).toBeDefined();
+      expect(anchor, `${id} must have an anchor`).toBeDefined();
+      if (zone === undefined || anchor === undefined) continue;
+      const [ax, ay] = anchor;
+      let worstIntrusion = 0;
+      for (const s of slots) {
+        if (!s.volatile || s.zoneId !== id) continue;
+        const dx = LABEL_HALF_W - (Math.abs(s.x - ax) - VOLATILE_INK_R);
+        const dy = LABEL_HALF_H - (Math.abs(s.y - ay) - VOLATILE_INK_R);
+        if (dx > 0 && dy > 0) worstIntrusion = Math.max(worstIntrusion, Math.min(dx, dy));
+      }
+      expect(
+        worstIntrusion,
+        `${id}'s worst rosette intrusion grew past the measured limit`,
+      ).toBeLessThanOrEqual(limit.maxIntrusion);
+      expect(
+        Math.round(Math.hypot(ax - zone.label[0], ay - zone.label[1])),
+        `${id}'s label moved further from its spec than the measured limit`,
+      ).toBeLessThanOrEqual(limit.maxMove);
+    }
+  });
+
+  it('every label still stays inside its own constituency and near its spec anchor', () => {
+    // The rosette clearance must not be bought by moving a label somewhere it
+    // does not belong: that would be a worse defect than the one being fixed.
+    for (const zone of BOARD) {
+      const anchor = anchors.get(zone.id);
+      expect(anchor).toBeDefined();
+      if (anchor === undefined) continue;
+      expect(
+        pointInPolygon(anchor, zone.poly),
+        `${zone.id}'s anchor left its own constituency`,
+      ).toBe(true);
+      const [dx, dy] = zone.label;
+      expect(Math.hypot(anchor[0] - dx, anchor[1] - dy)).toBeLessThanOrEqual(150);
+    }
+  });
+
+  it('is deterministic, so two renders of the same board agree', () => {
+    const again = labelAnchors(BOARD, slots);
+    for (const zone of BOARD) {
+      expect(again.get(zone.id)).toEqual(anchors.get(zone.id));
+    }
   });
 });

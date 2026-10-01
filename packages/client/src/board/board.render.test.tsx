@@ -171,3 +171,65 @@ describe('<BoardHarness /> — the dev entry point', () => {
     unmount();
   });
 });
+
+/**
+ * PAINT ORDER, and why it is a gate rather than a taste call.
+ *
+ * A defect found by cropping the real render at 4× and reading the pixels
+ * rather than judging the whole board by eye: NORTH's tally chip `0/21` had a
+ * Volatile rosette drawn straight through it — the cog's ring cutting `0/2` and
+ * its asterisk sitting on the `1`.
+ *
+ * THE CAUSE WAS NOT THE OVERLAP. `ZoneLabel` already has the standard
+ * cartographic answer to a label over texture: a paper-coloured halo, which
+ * works because `paint-order: stroke` paints the outline UNDER the glyph fill.
+ * But the labels rendered at z5 and the 129 slots at z6–z8, so every rosette was
+ * painted over the halo afterwards. The mechanism was fine; it was simply being
+ * drawn before the thing it was meant to cover.
+ *
+ * WHY ASSERT DOCUMENT ORDER. SVG has no z-index: paint order IS document order,
+ * so "renders after" is a statement about sibling position and it is exactly
+ * checkable here. This asserts that every zone label precedes no rosette — i.e.
+ * that in document order the labels come LAST — and that the halo the fix relies
+ * on is actually declared on the label text.
+ */
+describe('zone labels paint over the slots, so their halo can do its job', () => {
+  const VOLATILE = storyState(buildStory('volatile'));
+
+  it('every zone label comes AFTER every rosette in document order', () => {
+    const { container, unmount } = render(<BoardSvg state={VOLATILE} />);
+    const labels = [...container.querySelectorAll('[data-testid="zone-label"]')];
+    const rosettes = [...container.querySelectorAll('[data-testid="volatile-rosette"]')];
+    expect(labels).toHaveLength(9);
+    expect(rosettes).toHaveLength(11);
+
+    // In SVG, document order IS paint order. The label must be a LATER sibling
+    // than the rosette, or the rosette's ink lands on the numerals and the halo
+    // cannot help — which is exactly the defect.
+    const lastRosette = rosettes[rosettes.length - 1];
+    const firstLabel = labels[0];
+    expect(lastRosette, 'there are rosettes to compare against').toBeDefined();
+    expect(firstLabel, 'there are labels to compare against').toBeDefined();
+    const lastRosettePos = [...container.querySelectorAll('*')].indexOf(lastRosette!);
+    const firstLabelPos = [...container.querySelectorAll('*')].indexOf(firstLabel!);
+    expect(lastRosettePos, 'no rosette may paint after the first zone label').toBeLessThan(
+      firstLabelPos,
+    );
+    unmount();
+  });
+
+  it('the halo the fix depends on is declared on the label text, under the fill', () => {
+    const { container, unmount } = render(<BoardSvg state={VOLATILE} />);
+    for (const role of ['zone-name', 'zone-fraction']) {
+      const el = container.querySelector(`[data-role="${role}"]`);
+      expect(el, `${role} must exist`).not.toBeNull();
+      expect(el?.getAttribute('paint-order')).toBe('stroke');
+      // A halo thick enough to separate ink from ink at the board's smallest
+      // rendered scale. 5 SVG units on a 1000-unit viewBox is 1.7px at a 340px
+      // board — thin, but it is an outline around a 17–28px glyph.
+      expect(Number(el?.getAttribute('stroke-width'))).toBeGreaterThanOrEqual(5);
+      expect(el?.getAttribute('stroke')).toBe('var(--map-land)');
+    }
+    unmount();
+  });
+});

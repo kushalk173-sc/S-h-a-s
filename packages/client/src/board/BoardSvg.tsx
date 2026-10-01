@@ -422,30 +422,7 @@ export function BoardSvg({
         );
       })}
 
-      {/* ── z5  Zone labels. ─────────────────────────────────────────────── */}
-      {specs.map((spec) => {
-        const zone = zoneById.get(spec.id);
-        if (zone === undefined) return null;
-        const rights = rightsIn(zone, state.activePlayerId);
-        const holder = zone.majorityHolder;
-        return (
-          <ZoneLabel
-            key={`label-${spec.id}`}
-            zone={zone}
-            anchor={spec.label}
-            pegsFilled={pegsFilled(zone)}
-            holderFill={holder === null ? null : seatOf(holder).fill}
-            holderName={holder === null ? null : seatOf(holder).name}
-            tied={rights.tied}
-            hasRights={rights.activeHasRights}
-            showHolder={!belowFloor}
-            showRightsBadge={state.mode === 'gerry'}
-            oneZoneLocked={state.lockedZoneId === spec.id}
-          />
-        );
-      })}
-
-      {/* ── z6–z8  The 129 slots. ────────────────────────────────────────── */}
+{/* ── z6–z8  The 129 slots. ────────────────────────────────────────── */}
       {specs.flatMap((spec) => {
         const zone = zoneById.get(spec.id);
         if (zone === undefined) return [];
@@ -494,7 +471,58 @@ export function BoardSvg({
         });
       })}
 
-      {/* ── z9  Floating chrome from the caller. ─────────────────────────── */}
+      {/*
+        * ── z9  Zone labels. DRAWN LAST, AND THAT IS THE FIX. ─────────────────
+        *
+        * A defect found by cropping the render at 4× and reading the pixels.
+        *
+        * The labels used to render at z5, BEFORE the 129 slots at z6–z8. That
+        * ordering silently defeated the one mechanism `ZoneLabel` relies on to
+        * stay readable over a busy background: the paper-coloured halo, which
+        * works because `paint-order: stroke` paints the outline UNDER the glyph
+        * fill. A halo under the rosette is worth nothing — the rosette's ring
+        * and asterisk were painted straight over the numerals afterwards.
+        *
+        * Measured on the real board: NORTH's tally chip `0/21` had a volatile
+        * rosette centred 26px away with a 21×14px overlap, and the magnified
+        * crop showed the cog's ring cutting through `0/2` with its asterisk on
+        * the `1`. The printed fraction is the board's primary information; a
+        * rosette drawn through it is not a cosmetic overlap.
+        *
+        * Rendered after the slots, the halo does what it was designed to do: the
+        * glyph keeps its shape, the rosette's own silhouette is still fully
+        * visible through and around it, and NOT ONE voter slot is occluded. That
+        * is why the fix is paint order and not a backing plate — a plate would
+        * hide a voter dot, and the dot is the information.
+        *
+        * SOUTH was measured clean (its rosette sits clear below the block), so
+        * the report that both zones overlapped was proximity, not a defect. Only
+        * NORTH and NORTH WEST had real overlap.
+        */}
+      {specs.map((spec) => {
+        const zone = zoneById.get(spec.id);
+        if (zone === undefined) return null;
+        const rights = rightsIn(zone, state.activePlayerId);
+        const holder = zone.majorityHolder;
+        return (
+          <ZoneLabel
+            key={`label-${spec.id}`}
+            zone={zone}
+            anchor={geometry.labelAnchors.get(spec.id) ?? spec.label}
+            declaredAnchor={spec.label}
+            pegsFilled={pegsFilled(zone)}
+            holderFill={holder === null ? null : seatOf(holder).fill}
+            holderName={holder === null ? null : seatOf(holder).name}
+            tied={rights.tied}
+            hasRights={rights.activeHasRights}
+            showHolder={!belowFloor}
+            showRightsBadge={state.mode === 'gerry'}
+            oneZoneLocked={state.lockedZoneId === spec.id}
+          />
+        );
+      })}
+
+      {/* ── z10  Floating chrome from the caller. ────────────────────────── */}
       {overlay}
 
       {/* The polite live region. State changes with no focus target announce
