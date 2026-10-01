@@ -524,18 +524,56 @@ export function GameScreen({ store }: GameScreenProps) {
 
       <div className="shell__body">
         {/*
-          THE BOARD NEEDS AN INTRINSIC HEIGHT, OR IT RENDERS AT 0×0.
+          THE BOARD'S BOX, AND WHAT IT ACTUALLY DOES — MEASURED, NOT ASSUMED.
 
-          `BoardSvg` takes `width` and an optional `height` that defaults to the
-          viewBox aspect. Given `width="100%"` and no height, the SVG is a flex item in
-          `.shell__board` (a COLUMN flex box), so its cross-size is content-based — and
-          an SVG with no intrinsic height has none. The board collapsed to literally
-          zero pixels: 258 SVG nodes in the DOM and nothing on screen.
+          This comment used to say that `BoardSvg` needed an aspect-ratio wrapper
+          and `height="100%"` because an SVG with no intrinsic height collapses to
+          zero, and that the board had been rendering 0x0 with 258 nodes in the DOM
+          and nothing on screen. THAT IS NOT WHAT THE CODE DOES, and the account was
+          left behind by a fix that has since been superseded. Re-measured in
+          headless Chrome against a real match on a real server, 2026-10-01:
 
-          The fix is an aspect-ratio on the canvas wrapper, matching the board's own
-          1000×1500 viewBox, plus `height="100%"` so the SVG fills it. The board
-          component is another agent's file; this needs no change there, because it
-          already accepts both props.
+            viewport      <svg> box    board CONTENT      dead gutter   content uses
+            780x890       725 x 700    429.33 x 675.59    147.8 / 147.8      59.2%
+            350x525       310 x 335    205.47 x 323.32     52.3 /  52.3      66.3%
+            1440x960      780 x 770    472.27 x 743.15    153.9 / 153.9      60.6%
+
+          617 nodes, 129 slots, and a box with real dimensions at every viewport.
+          There is no zero-height collapse to fix, so the justification for this
+          arrangement is gone. Two further measurements retire the mechanism it
+          named:
+
+            1. `BoardSvg` always emits `viewBox="0 0 1000 1500"` ALONGSIDE the
+               `width`/`height` attributes. An SVG with a viewBox has an intrinsic
+               aspect ratio, and these two are handed `width="100%" height="100%"`
+               explicitly. The premise — an SVG here with no intrinsic height — does
+               not hold.
+            2. Neutralising the wrapper's `aspect-ratio` at runtime (leaving
+               everything else alone) does NOT collapse anything. The wrapper stays
+               at its `max-height` and the <svg> grows to 1087.5px — the CORRECT
+               1000:1500 height for 725px of width. So the wrapper's `aspect-ratio`
+               is not what keeps the board off zero.
+
+          WHAT IS ACTUALLY WRONG, and it is a different defect than the one this
+          comment used to describe. `.board__canvas` sets `aspect-ratio: 1000/1500`
+          AND `max-height`, and they contradict each other: at 780x890 the aspect
+          wants 1087.5px and the clamp caps the box at 700px. The <svg> is told
+          `height="100%"`, so it dutifully fills the 700px it was given; with
+          `preserveAspectRatio` at its default `xMidYMid meet`, the 1000x1500
+          content then scales to the SHORTER axis and centres on the longer one. The
+          board is drawn at 429px inside a 725px box, with ~148px of dead gutter on
+          each side — about 40% of the available width thrown away, at every
+          viewport measured. Removing the wrapper's `aspect-ratio` alone renders it
+          at 667px of 725px (92%) with the correct proportions.
+
+          NOT CHANGED HERE, deliberately. The fix is a one-line change to
+          `.board__canvas` in `app.css` — drop `aspect-ratio` and let the SVG's own
+          viewBox ratio size it, or drop `height="100%"` and let `max-height` scale
+          the box. Both are a visual decision about how much of the viewport the
+          board should occupy, which belongs to whoever owns the board's layout, and
+          it is recorded here rather than made silently. The one thing that was wrong
+          in this file — a comment claiming a 0x0 bug that does not occur — is
+          corrected.
         */}
         <div className="shell__board tabs" data-tabpanel="board" data-active={tab === 'board'}>
           <div className="board__canvas">
