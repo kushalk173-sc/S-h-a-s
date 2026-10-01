@@ -90,7 +90,45 @@ const lastState = (c: TestClient): Extract<ServerMessage, { t: 'match:state' }> 
 // ─────────────── payout detectors, and why they are Delta-shaped ───────────────
 
 /**
- * Every `{resource: count}`-shaped object anywhere in a value.
+ * Paths whose Delta-shaped contents are PUBLIC by rule, so a payout matching one is
+ * not a leak.
+ *
+ * `state.market[i].cost` is the printed price of a face-up Voter Card on the HQ Mat.
+ * That is public information at a real table — `state.ts` says so on `MarketSlot`
+ * ("A face-up Voter Card on the HQ Mat. Public information.") — and the engine's own
+ * rules call the Mat the shared board. A payout can therefore never be *distinguished
+ * from* a market price by shape, and this exclusion is what stops the detector crying
+ * wolf.
+ *
+ * IT USED TO CRY WOLF, AND THE SYNTHETIC CORPUS IS WHY NOBODY NOTICED.
+ *
+ * These detectors ran against `bigCards()`, where every Voter Card cost was
+ * `{funds: 1}` and the two side payouts were `{funds: 2, media: 1}` and
+ * `{trust: 2, clout: 1}`. No payout could ever equal a market cost, so the collision
+ * could not happen and the question was never asked. Against the real corpus it
+ * happens: `ig-in2020-021`'s side 1 pays exactly what `vo-core-*` on the Mat costs,
+ * and the detector reported a leak in a frame where nothing leaked.
+ *
+ * A leak detector that reports public data as a leak is worse than no detector,
+ * because the first thing anyone does with it is delete it.
+ *
+ * The exclusion is a PATH, not a shape, so it cannot mask a payout that appears
+ * anywhere private. And it is compensated by a positive assertion — see
+ * `marketCostsAreTheCorpusOwn` in the test below, which checks every market cost
+ * equals the shipped card's own cost. That is a STRONGER statement than "no Delta
+ * matched": a payout smuggled into the Mat would have to overwrite a real price to
+ * get there, and the price is checked.
+ */
+const PUBLIC_DELTA_PATHS: readonly string[] = ['$.state.market'];
+
+/** True when `path` is inside one of the PUBLIC_DELTA_PATHS subtrees. */
+function isPublicDeltaPath(path: string): boolean {
+  return PUBLIC_DELTA_PATHS.some((p) => path === p || path.startsWith(`${p}.`) || path.startsWith(`${p}[`));
+}
+
+/**
+ * Every `{resource: count}`-shaped object anywhere in a value, EXCLUDING the paths
+ * that are public by rule.
  *
  * "Shaped" means: every key is a resource name and every value is a non-negative
  * integer. `players[].resources` qualifies — it is exactly that shape — and that is
@@ -98,10 +136,15 @@ const lastState = (c: TestClient): Extract<ServerMessage, { t: 'match:state' }> 
  * what `side.pays` is, so scanning for the shape finds leaks of every composition
  * (all four resources, one, two) rather than only the exact map on this one card.
  */
-function findDeltasIn(value: unknown, out: Record<string, number>[] = []): Record<string, number>[] {
+function findDeltasIn(
+  value: unknown,
+  out: Record<string, number>[] = [],
+  path = '$',
+): Record<string, number>[] {
   if (value === null || typeof value !== 'object') return out;
+  if (isPublicDeltaPath(path)) return out;
   if (Array.isArray(value)) {
-    for (const v of value) findDeltasIn(v, out);
+    value.forEach((v, i) => findDeltasIn(v, out, `${path}[${i}]`));
     return out;
   }
   const entries = Object.entries(value as Record<string, unknown>);
@@ -111,13 +154,14 @@ function findDeltasIn(value: unknown, out: Record<string, number>[] = []): Recor
       ([k, v]) => RESOURCES.includes(k as Resource) && typeof v === 'number' && Number.isInteger(v) && v >= 0,
     );
   if (isDelta) out.push(Object.fromEntries(entries) as Record<string, number>);
-  for (const [, v] of entries) findDeltasIn(v, out);
+  for (const [k, v] of entries) findDeltasIn(v, out, `${path}.${k}`);
   return out;
 }
 
-/** Paths at which `delta` appears verbatim. Empty means it is not on the wire. */
+/** Paths at which `delta` appears verbatim, excluding the public subtrees. */
 function findDeltaIn(value: unknown, delta: Record<string, number>, path = '$', hits: string[] = []): string[] {
   if (value === null || typeof value !== 'object') return hits;
+  if (isPublicDeltaPath(path)) return hits;
   if (Array.isArray(value)) {
     value.forEach((v, i) => findDeltaIn(v, delta, `${path}[${i}]`, hits));
     return hits;
@@ -127,7 +171,8 @@ function findDeltaIn(value: unknown, delta: Record<string, number>, path = '$', 
   if (
     keys.length === Object.keys(delta).length &&
     keys.every((k, i) => k === Object.keys(delta).sort()[i]) &&
-    entries.every(([k, v]) => v === delta[k])
+    entries.every(([k, v]) => v === delta[k]
+)
   ) {
     hits.push(path);
   }
@@ -515,6 +560,28 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     // And the prompt itself is the three-field shape and nothing else.
     expect(Object.keys(state.blind ?? {}).sort()).toEqual(['labels', 'order', 'question']);
     expect(beforePrompt).not.toBeNull();
+
+    // THE COMPENSATION FOR THE `$.state.market` EXCLUSION, and it is a stronger
+    // statement than the shape check it replaces.
+    //
+    // The detectors above skip `state.market`, because a Voter Card's printed price
+    // is public and on the real corpus a side payout can equal it exactly. That
+    // exclusion would be a hole if the Mat could hold anything other than real
+    // prices — so this asserts the stronger property directly: every price on the
+    // Mat is the shipped card's OWN cost, read from the corpus.
+    //
+    // A payout smuggled into the Mat would have to overwrite a real price to get
+    // there, and the price is checked here. A payout smuggled anywhere else is
+    // caught by the detectors. Between them there is no gap, which the shape check
+    // on its own could not claim.
+    expect(state.state.market.length, 'the Mat is empty, so the market exclusion covers nothing').toBeGreaterThan(0);
+    for (const [i, slot] of state.state.market.entries()) {
+      const card = h.ctx.cards.voter[slot.cardId];
+      expect(card, `market[${i}] names ${slot.cardId}, which is not a shipped Voter Card`).toBeDefined();
+      if (card === undefined) continue;
+      expect(slot.cost, `market[${i}] (${slot.cardId}) is not that card's own printed cost`).toEqual(card.cost);
+      expect(slot.voters, `market[${i}] (${slot.cardId}) is not that card's own voter count`).toBe(card.voters);
+    }
 
     // NOT asserted, deliberately: that the Ideologue name is absent from the
     // frame. It cannot be. `players[].manifesto` is a public array of Ideologues —

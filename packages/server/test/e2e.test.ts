@@ -1,8 +1,9 @@
 /**
- * End to end, over a real WebSocket.
+ * End to end, over a real WebSocket, on the cards the server actually ships.
  *
  * This is the acceptance criterion that says the thing is a GAME: two players, a
- * real socket each, a real server in between, and the match driven to `finished`.
+ * real socket each, a real server in between, and the match driven to `finished`
+ * on the shipped corpus.
  *
  * The reason it is worth writing when the reducer already has an integration test:
  * that one calls `reduce` directly, so it proves the rules and nothing else. This
@@ -10,18 +11,52 @@
  * room dispatches it, the store appends it, the fan-out projects it per recipient,
  * and the client acts on what it was sent. A projection bug, an auth bug or a
  * message-ordering bug all show up here and nowhere else.
+ *
+ * ON THE CORPUS, WHICH IS THE POINT OF THE 2026-10-01 REWRITE
+ *
+ * This file used to drive `bigCards()`: 240 Ideology Cards against the shipped 52,
+ * 18 Voter Cards against the shipped 18, and headlines that were all `gain media 1`.
+ * Two things were hidden by that, and both are now measured facts rather than
+ * suspicions:
+ *
+ *  - 52 Ideology Cards drawn one per turn is the number that decides whether a game
+ *    is winnable. At 240 the deck could never run out, so the shipped bug — `ANSWER`
+ *    never discarding the answered card, so the deck never recycled and every game
+ *    ended on turn 52 with 0 of 9 zones decided — was structurally invisible here.
+ *  - 26 headlines carrying 12 distinct effect ops produce effect-generated decisions
+ *    (`evict`, `discard-voter`, `steal-any`) that FREEZE a player. The driver this
+ *    file used to carry answered an unrecognised choice with an EMPTY area list,
+ *    which is legal only for a zero-voter ask, so on the real corpus it was refused
+ *    with `choose exactly 2`.
+ *
+ * The driver now lives in `./driver.ts`, shared with `test/winnable.test.ts`, and its
+ * own properties are asserted there. This file is about the TRANSPORT and the
+ * PROJECTION, not about how good the driver is.
+ *
+ * SYNCHRONISED ON `viewId`, NOT ON "A MESSAGE ARRIVED"
+ *
+ * The room's reply to an action is a `match:state` and possibly a `match:events`, so
+ * a loop that waits for "the next message" can consume the PREVIOUS action's events,
+ * decide again against a state that has already moved, and be refused for an action
+ * that was legal when it was chosen. That is a harness race, and it is exactly the
+ * sort of thing that makes an end-to-end test untrustworthy. So the loop waits for
+ * the room to commit past the `viewId` the decision was taken on.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { TestClient, advance, digest, startHarness, type Harness } from './fixtures.ts';
-import type { Action, ClientState } from '@shasn/engine';
+import { discardKeepingReserve, nextAction, targetZone } from './driver.ts';
+import type { ClientState } from '@shasn/engine';
 
 let h: Harness;
 let ada: TestClient;
 let bo: TestClient;
 let matchId: string;
 let seats: { client: TestClient; playerId: string }[] = [];
+
+/** Actions the driver needed. Reported, and bounded below. */
+let driverActions = 0;
 
 beforeAll(async () => {
   h = await startHarness({ dispatchRate: 4000 });
@@ -52,240 +87,27 @@ afterAll(async () => {
   await h?.close();
 });
 
-/**
- * A `Delta` totalling exactly `n`, drawn from what the player actually holds.
- *
- * `lose-any` and `gain-any` are checked with `deltaTotal(pick.res) !== c.count`, so
- * the pick has to total EXACTLY the requested number — taking `min(n, funds)` is
- * wrong the moment a player holds less than `n` in that one pool, which is most of
- * the time. A driver that gets this wrong fails with `discard exactly 3` and looks
- * like a server bug.
- */
-function takeExactly(n: number, pool: Readonly<Record<string, number>> | undefined): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (pool === undefined) return { funds: n };
-  let left = n;
-  for (const res of ['funds', 'clout', 'media', 'trust'] as const) {
-    if (left <= 0) break;
-    const take = Math.min(left, pool[res] ?? 0);
-    if (take > 0) {
-      out[res] = take;
-      left -= take;
-    }
-  }
-  if (left > 0) out['funds'] = (out['funds'] ?? 0) + left;
-  return out;
+/** Where a group of `need` voters should go, or `null` if nowhere will take them. */
+function chooseZone(s: ClientState, me: string, need: number): string | null {
+  return targetZone(s, me, need);
 }
 
-/**
- * A `lose-any` pick that KEEPS A PURCHASING RESERVE.
- *
- * THIS is what the old driver got wrong, and it is worth recording because the
- * failure looked like an engine bug and was not one.
- *
- * p12 asks for exactly `n` back, so the pick has to total `n` — and the obvious
- * `takeExactly(n, pool)` above walks the pools in `RESOURCES` order, which is Funds
- * first. So a player who crosses the cap sheds every Fund they have, keeps a
- * surplus of Clout, Media and Trust, and can never afford a Voter Card again.
- * Voter Cards are priced in Funds, so the board stops filling, no zone ever gains a
- * majority, and the game grinds on forever: the run reached turn 1315 with 90 of 129
- * areas pegged, eight of nine zones decided, and `south` and `south_east` sitting
- * empty because the one player who could still have won them was broke.
- *
- * The engine's own driver already had this fix and its docstring says why
- * (`packages/engine/test/driver.ts`, `pickFor`'s `lose-any` arm). This is the same
- * ruling, expressed against the client-side view the socket gives us: rank the pools
- * by surplus ABOVE the cheapest card on the Mat, and hold back a Funds reserve
- * worth buying one.
- */
-function discardKeepingReserve(
-  n: number,
-  pool: Readonly<Record<string, number>>,
-  market: readonly { cost: Readonly<Record<string, number>> }[],
-): Record<string, number> {
-  const total = (pool.funds ?? 0) + (pool.clout ?? 0) + (pool.media ?? 0) + (pool.trust ?? 0);
-  const want = Math.min(n, total);
-  // Cheapest price on the Mat, in Funds, because that is the currency the fixture
-  // prices Voter Cards in and so the one a reserve has to be held in.
-  const cheapest = market.reduce((k, m) => Math.min(k, m.cost.funds ?? 0), Number.POSITIVE_INFINITY);
-  const reserve = Number.isFinite(cheapest) ? cheapest : 0;
-
-  const out: Record<string, number> = {};
-  let left = want;
-
-  // 1. Everything that is not Funds, largest pool first. Clout, Media and Trust buy
-  //    nothing in this fixture, so they are the right things to lose and this is
-  //    where almost all of a large ask should come from.
-  const others: readonly ('clout' | 'media' | 'trust')[] = ['clout', 'media', 'trust'];
-  for (const r of [...others].sort((a, b) => (pool[b] ?? 0) - (pool[a] ?? 0))) {
-    const take = Math.min(left, pool[r] ?? 0);
-    if (take > 0) out[r] = take;
-    left -= take;
-  }
-
-  // 2. Funds, down to the reserve. The reserve is what the player KEEPS, so this is
-  //    the amount they may not spend — and it is why the driver does not go broke at
-  //    the cap and stop being able to buy.
-  const spendable = Math.min(left, Math.max(0, (pool.funds ?? 0) - reserve));
-  out['funds'] = spendable;
-  left -= spendable;
-
-  // 3. If the ask is still unmet the reserve has to go, because p12 wants EXACTLY
-  //    `want` back and `reduce` refuses a pick that totals anything else with
-  //    'discard exactly n'. Reaching here means the player held nothing but Funds,
-  //    in which case "keep a purchasing reserve" and "obey the cap" are the same
-  //    impossibility and the cap wins.
-  if (left > 0) out['funds'] = (out['funds'] ?? 0) + left;
-
-  return out;
-}
-
-/**
- * Where a group of `need` voters should go, or `null` if nowhere will take them.
- *
- * A driver that places into the first zone with room spreads its voters evenly and
- * wins no zone: with 69 majority voters needed across nine zones and 129 areas to
- * fill, "first free area in board order" reliably leaves every zone short of its
- * threshold. Preferring a zone this player can still take — and within that, the one
- * where they are closest — is what turns the board into a result. Same two-pass
- * shape as the engine's `targetZone`, including the fallback to any zone with room
- * so the endgame still fills the last slots toward p20's board-full ending.
- */
-function targetZone(s: ClientState, me: string, need: number): string | null {
-  let best: string | null = null;
-  let bestMine = -1;
-  for (const z of s.zones) {
-    // p10: a Voter Card's voters cannot be split across zones.
-    const free = z.areas.filter((a) => a.peg === null).length;
-    if (free < need) continue;
-    if (z.majorityHolder === me) continue; // already won; nothing to gain
-    const mine = z.areas.filter((a) => a.peg?.owner === me).length;
-    if (mine >= z.majority) continue;
-    const winnable = mine + free >= z.majority;
-    if (winnable && mine > bestMine) {
-      best = z.id;
-      bestMine = mine;
-    } else if (!winnable && best === null) {
-      best = z.id;
-    }
-  }
-  return best;
-}
-
-/**
- * Pick a legal action from an authoritative state, for `me`.
- *
- * The state comes from the SERVER's room, not from a client's cached copy. That is
- * a test-harness decision and it is deliberate: two sockets are never updated at
- * the same instant, so a driver that reads each client's last message will
- * occasionally act on a state one ply stale and be refused with "not your turn" —
- * a race in the harness that has nothing to do with the server. The transport is
- * still fully exercised, because the action goes out over a real socket and the
- * assertions read what the CLIENTS were actually sent.
- */
-function nextAction(s: ClientState, me: string): Action | null {
-  if (s.finished) return null;
-
-  // Choices are checked BEFORE turn order, and that ordering is the whole point
-  // of `PendingChoice` being the engine's out-of-turn decision channel. A player
-  // with an unresolved decision must act even when it is not their turn, and the
-  // engine will refuse everything else for them until they do ("resolve
-  // "Resource cap" first"). A driver that checks turn order first deadlocks the
-  // table on the first cap overflow — which is exactly what this did.
-  const mine = s.choices.find((c) => c.player === me);
-  if (mine !== undefined) {
-    const c = mine.choice;
-    const n = c.count ?? 0;
-    if (c.kind === 'gain-any') {
-      return { type: 'RESOLVE_CHOICE', choiceId: mine.id, pick: { kind: 'resources', res: takeExactly(n, undefined) } };
-    }
-    if (c.kind === 'lose-any') {
-      const pool = s.players[me]?.resources;
-      if (pool === undefined) return null;
-      // NOT `takeExactly`, and the reason is the whole reason this test can reach
-      // `finished` at all — see `discardKeepingReserve`.
-      return {
-        type: 'RESOLVE_CHOICE',
-        choiceId: mine.id,
-        pick: { kind: 'resources', res: discardKeepingReserve(n, pool, s.market) },
-      };
-    }
-    if (c.kind === 'steal-any') {
-      return { type: 'RESOLVE_CHOICE', choiceId: mine.id, pick: { kind: 'steal', from: c.from ?? me, res: takeExactly(n, undefined) } };
-    }
-    return { type: 'RESOLVE_CHOICE', choiceId: mine.id, pick: { kind: 'areas', areaIds: [] } };
-  }
-
-  if (s.activePlayer !== me) return null;
-  if (s.phase === 'answer') return { type: 'ANSWER', side: 0 };
-  if (s.phase === 'headlines') return { type: 'ACK_HEADLINE' };
-  if (s.phase !== 'actions') return null;
-
-  // Buy, place, end turn — in that order, because each is a separate action and
-  // the engine requires the group to be placed before END_TURN will be accepted.
-  const pool = s.players[me]?.resources;
-  // `canAfford` is PER-POOL, not against the total. Summing the cost and comparing
-  // it to the total is the classic version of this bug: a card costing 1 Fund is
-  // "affordable" for a player holding 0 Funds and 4 Clout, and the reducer
-  // correctly refuses it. The driver has to ask the same question the engine does.
-  const affordable = (cost: Readonly<Record<string, number>>): boolean => {
-    if (pool === undefined) return false;
-    return (Object.entries(cost) as [keyof typeof pool, number][]).every(([res, n]) => pool[res] >= n);
-  };
-
-  // Place what is already in hand BEFORE buying more. The old order bought first,
-  // so a player with funds bought until it had none and then placed whatever fitted,
-  // in whatever order the board offered — which is how eight zones get decided and
-  // the ninth never does. Placing first also means a card is never bought that
-  // cannot be placed, so no voters are silently discarded at end of turn (p10).
-  const group = s.players[me]?.pending[0];
-  if (group !== undefined) {
-    // One zone at a time: a Voter Card's voters may not be split across zones.
-    const zone = targetZone(s, me, group.count);
-    if (zone !== null) {
-      const free = s.zones.find((z) => z.id === zone)?.areas.filter((a) => a.peg === null).map((a) => a.id) ?? [];
-      if (free.length >= group.count) {
-        return { type: 'PLACE_VOTERS', groupId: group.id, areaIds: free.slice(0, group.count) };
-      }
-    }
-  }
-
-  // Buy the smallest card that both fits a zone this player can still win and is
-  // affordable. Smallest first, so a one-voter card is spent finishing a zone that
-  // has a single slot left rather than hoarded behind a three-voter card that cannot
-  // go there at all.
-  const slots = s.market
-    .map((slot, i) => ({ slot, i }))
-    .sort((a, b) => a.slot.voters - b.slot.voters);
-  for (const { slot, i } of slots) {
-    if (!affordable(slot.cost)) continue;
-    if (targetZone(s, me, slot.voters) === null) continue;
-    return { type: 'INFLUENCE', slot: i };
-  }
-
-  return { type: 'END_TURN' };
-}
-
-describe('the driver that has to finish a real game', () => {
+describe('the driver, on the corpus this test now uses', () => {
   it('the cap discard totals EXACTLY the ask, whatever the reserve wants to keep', () => {
     // p12 asks for exactly `n` back and `reduce` refuses anything else with
-    // `discard exactly n`, so a pick that totals more is a dead driver. The reserve
-    // is what the player KEEPS, so it is capped at the ask — and that cap is not
-    // cosmetic: without it a player holding 3 Funds against a 1-Fund ask shipped a
-    // pick of 2 for an ask of 1, and the run failed intermittently with
-    // 'server refused a scripted legal action ... discard exactly 1'.
+    // `discard exactly n`, so a pick that is short is illegal and a pick that is
+    // long is illegal. The reserve is what the player KEEPS, so it is capped at
+    // the ask — and that cap is not cosmetic: a player holding 3 Funds against a
+    // 1-Fund ask once shipped a pick of 2 for an ask of 1, and the run failed
+    // intermittently with 'server refused a scripted legal action ... discard
+    // exactly 1'.
     const mat = [{ cost: { funds: 1 } }];
     const cases: readonly { pool: Record<string, number>; want: number }[] = [
-      // 331 over the cap with 343 held: the shape that starved the old driver.
       { pool: { funds: 83, clout: 85, media: 82, trust: 93 }, want: 331 },
-      // The regression: a small ask, a comfortable pool, and a reserve that would
-      // otherwise overshoot it.
       { pool: { funds: 3, clout: 0, media: 0, trust: 0 }, want: 1 },
       { pool: { funds: 12, clout: 0, media: 0, trust: 0 }, want: 1 },
       { pool: { funds: 9, clout: 0, media: 0, trust: 0 }, want: 1 },
-      // Funds-heavy pools where the non-Funds reserves cannot cover the ask.
       { pool: { funds: 40, clout: 4, media: 4, trust: 4 }, want: 40 },
-      // Ask larger than the whole pool: clamped to what is held, as `reduce` does.
       { pool: { funds: 2, clout: 0, media: 0, trust: 0 }, want: 9 },
       { pool: { funds: 0, clout: 0, media: 0, trust: 0 }, want: 4 },
       { pool: { funds: 0, clout: 5, media: 0, trust: 0 }, want: 4 },
@@ -294,11 +116,7 @@ describe('the driver that has to finish a real game', () => {
       const pick = discardKeepingReserve(want, pool, mat);
       const total = (pick['funds'] ?? 0) + (pick['clout'] ?? 0) + (pick['media'] ?? 0) + (pick['trust'] ?? 0);
       const held = (pool['funds'] ?? 0) + (pool['clout'] ?? 0) + (pool['media'] ?? 0) + (pool['trust'] ?? 0);
-      expect(total, `pick ${JSON.stringify(pick)} for ask ${want} from ${JSON.stringify(pool)}`).toBe(
-        Math.min(want, held),
-      );
-      // And every part of it is actually held, which is the other half of what
-      // `reduce` checks (`canAfford`).
+      expect(total, `pick ${JSON.stringify(pick)} for ask ${want} from ${JSON.stringify(pool)}`).toBe(Math.min(want, held));
       for (const [res, n] of Object.entries(pick)) {
         expect(n, `${res} is negative in the pick`).toBeGreaterThanOrEqual(0);
         expect(n, `${res}:${n} is picked but not held`).toBeLessThanOrEqual(pool[res] ?? 0);
@@ -306,33 +124,17 @@ describe('the driver that has to finish a real game', () => {
     }
   });
 
-  it('the cap discard leaves enough Funds to buy the cheapest card on the Mat', () => {
-    // The property that makes the driver capable of finishing, asserted directly
-    // rather than inferred from a run that happens to finish. Before this, a driver
-    // that shed Funds first went broke at the cap and could never buy again — which
-    // is why a game ground to turn 1315 with two zones untouched.
-    const mat = [{ cost: { funds: 1 } }];
-    for (const pool of [
-      { funds: 83, clout: 85, media: 82, trust: 93 },
-      { funds: 40, clout: 4, media: 4, trust: 4 },
-      { funds: 13, clout: 0, media: 0, trust: 0 },
-    ]) {
-      const total = pool.funds + pool.clout + pool.media + pool.trust;
-      const pick = discardKeepingReserve(Math.max(0, total - 12), pool, mat);
-      const left = pool.funds - (pick['funds'] ?? 0);
-      expect(left, `driver went broke: kept ${left} Funds from ${JSON.stringify(pool)}`).toBeGreaterThanOrEqual(1);
-    }
-  });
-
   it('targetZone only ever names a zone that can take the voters and is worth taking', () => {
-    const s = ada.latestState().state;
+    const room = h.server.hub.rooms.get(matchId);
+    if (room === undefined) throw new Error('no room');
+    const s = room.viewFor(room.seatOrder[0] ?? '').state;
     for (const need of [1, 2, 3]) {
-      const zone = targetZone(s, s.turnOrder[0] ?? '', need);
+      const zone = chooseZone(s, s.turnOrder[0] ?? '', need);
       if (zone === null) continue;
       const z = s.zones.find((x) => x.id === zone);
       expect(z, `targetZone named a zone that does not exist: ${zone}`).toBeDefined();
-      // p10: a card's voters cannot be split across zones, so a zone with fewer free
-      // areas than the card holds is unusable and must never be named.
+      // p10: a card's voters cannot be split across zones, so a zone with fewer
+      // free areas than the card holds is unusable and must never be named.
       expect(z?.areas.filter((a) => a.peg === null).length ?? 0).toBeGreaterThanOrEqual(need);
       expect(z?.majorityHolder).not.toBe(s.turnOrder[0]);
     }
@@ -343,20 +145,20 @@ describe('a 2-player game runs to completion over a real socket', () => {
   /**
    * Wait until every seat's client has actually RECEIVED the room's current view.
    *
-   * The driving loop awaits the reply on the seat that acted. The other seat's
-   * broadcast was written by the server in the same tick, but a WebSocket
-   * `message` event lands on a later macrotask, so its client can still be one
-   * `viewId` behind when the loop exits. Reading `latestState()` at that instant
-   * compares a fresh board against a stale one and reports a difference that is
-   * not in the projection at all.
+   * The driving loop advances on the room's `viewId`, not on each client's message.
+   * The other seat's broadcast was written by the server in the same tick, but a
+   * WebSocket `message` event lands on a later macrotask, so its client can still be
+   * one `viewId` behind when the loop exits. Reading `latestState()` at that instant
+   * compares a fresh board against a stale one and reports a difference that is not
+   * in the projection at all.
    *
    * This is not a defect being papered over: it was measured before being fixed. A
-   * field-level walk of the two clients' states at the end of a real game showed
-   * Ada at `viewId 187` and Bo at `186`, differing in `phase` (`finished` vs
-   * `actions`), `finished`, `log` and every zone — and then, after one `match:sync`
-   * each, the SAME `viewId` and byte-identical digests. Every "difference" was the
-   * stale client. The leak detector below is only meaningful once both clients are
-   * looking at the same view, because otherwise it cannot tell a stale read from a
+   * field-level walk of the two clients' states at the end of a real game showed Ada
+   * at `viewId 187` and Bo at `186`, differing in `phase` (`finished` vs `actions`),
+   * `finished`, `log` and every zone — and then, after one `match:sync` each, the
+   * SAME `viewId` and byte-identical digests. Every "difference" was the stale
+   * client. The leak detector below is only meaningful once both clients are looking
+   * at the same view, because otherwise it cannot tell a stale read from a
    * viewer-scoped branch — which is precisely the distinction it exists to make.
    */
   async function settle(): Promise<void> {
@@ -375,8 +177,7 @@ describe('a 2-player game runs to completion over a real socket', () => {
       }
     }
     // The precondition every assertion below depends on, stated rather than assumed:
-    // both clients are now reading the SAME view, so any remaining difference is a
-    // real one.
+    // both clients are now reading the SAME view, so any remaining difference is real.
     for (const { client, playerId } of seats) {
       expect(client.latestState().viewId, `${playerId} is not on the room's view`).toBe(target);
     }
@@ -386,20 +187,22 @@ describe('a 2-player game runs to completion over a real socket', () => {
     const room = h.server.hub.rooms.get(matchId);
     if (room === undefined) throw new Error('no room');
 
-    // The loop advances on the SERVER'S REPLY, not on a timer.
-    //
-    // A `sleep` between actions makes the test timing-dependent, and a
-    // timing-dependent test is a flaky test: it passed four runs in a row and then
-    // failed on the run where every module was being transformed cold and each
-    // sleep was shorter than the server's turnaround. Waiting on the socket means
-    // the loop runs exactly as fast as the server answers.
     let actions = 0;
     for (let step = 0; step < 4000; step += 1) {
       const s = room.state;
       if (s.finished) break;
-
       const seat = seats.find((x) => x.playerId === s.activePlayer) ?? seats[0];
-      const action = nextAction(room.viewFor(s.activePlayer).state, s.activePlayer);
+      // The view the SEAT would be sent, not a client's cached copy: two sockets are
+      // never updated at the same instant, so a driver that reads each client's last
+      // message occasionally acts on a state one ply stale and is refused with "not
+      // your turn" — a race in the harness that has nothing to do with the server.
+      // The transport is still fully exercised, because the action goes out over a
+      // real socket and the assertions read what the CLIENTS were actually sent.
+      const view: ClientState = room.viewFor(s.activePlayer).state;
+      // `_pendingCard` is a ServerOnlyKey stripped from `ClientState`, so the driver
+      // is handed the card id from the room's authoritative state. Operator-side
+      // information; see `answerSide` in ./driver.ts.
+      const action = nextAction(view, s.activePlayer, { cards: h.ctx.cards, pendingCardId: s._pendingCard });
       if (action === null || seat === undefined) {
         throw new Error(
           `no legal action for ${s.activePlayer} in phase ${s.phase} — ` +
@@ -408,23 +211,45 @@ describe('a 2-player game runs to completion over a real socket', () => {
         );
       }
 
+      const before = room.viewId;
+      const errorsBefore = seat.client.all('error').length;
       seat.client.send({ t: 'match:action', action });
       actions += 1;
-      const reply = await seat.client.next();
-      if (reply.t === 'error') {
+      await waitForView(room, before);
+
+      const refused = seat.client.all('error').slice(errorsBefore)[0];
+      if (refused !== undefined) {
         throw new Error(
-          `server refused a scripted legal action (${action.type} for ${s.activePlayer} in ${s.phase}): ${reply.message}`,
+          `server refused a scripted legal action (${action.type} for ${s.activePlayer} in ${s.phase}): ${refused.message}\n` +
+            `  room.state.choices = ${JSON.stringify(s.choices.map((c) => `${c.id}:${c.player}:${c.choice.kind}`))}\n` +
+            `  view.choices       = ${JSON.stringify(view.choices.map((c) => `${c.id}:${c.player}:${c.choice.kind}`))}\n` +
+            `  pool               = ${JSON.stringify(s.players[s.activePlayer]?.resources)}`,
         );
       }
     }
+    driverActions = actions;
+
+    const decided = room.state.zones.filter((z) => z.majorityHolder !== null).length;
+    const pegs = room.state.zones.reduce((k, z) => k + z.areas.filter((a) => a.peg !== null).length, 0);
+    // The shipped corpus, 2 players. Reported so a regression is visible in the log
+    // even when the assertions below still pass.
+    console.log(
+      `E2E 2 players on the shipped corpus: seed ${room.seed} turn ${room.state.turn} ` +
+        `actions ${actions} pegs ${pegs}/129 majorities ${decided}/9`,
+    );
 
     expect(room.state.finished, 'the game did not finish within 4000 actions').toBe(true);
-    // The budget is not the assertion — a driver that needed 3999 actions to finish
-    // would be a driver that barely finishes. Pinned so a regression to "grinds on
-    // forever" fails here rather than as a timeout, and so the cost of the game is
-    // a number somebody is watching.
+    // The budget is not the assertion — a driver that needed 3999 actions would be a
+    // driver that barely finishes. Pinned so a regression to "grinds on forever" fails
+    // here rather than as a timeout, and so the cost of the game is a number somebody
+    // is watching. Measured 211-267 across 20 seeds; the in-process sweep in
+    // winnable.test.ts carries the distribution.
     expect(actions, 'the driver took implausibly many actions to reach a decided board').toBeLessThan(600);
-    expect(room.state.zones.filter((z) => z.majorityHolder !== null).length).toBe(9);
+    // A real win, not a full board. p20's board-full ending is legal but it is not a
+    // decided board, and at two seats the shipped corpus reaches nine majorities on
+    // 20 of 20 seeds.
+    expect(decided, `only ${decided} of 9 zones decided, on ${pegs} of 129 pegs`).toBe(9);
+    expect(pegs, 'nine majorities need at least 69 pegs').toBeGreaterThanOrEqual(69);
 
     await settle();
     expect(ada.latestState().state.finished).toBe(true);
@@ -437,8 +262,8 @@ describe('a 2-player game runs to completion over a real socket', () => {
   it('both players ended up with the SAME view, byte for byte', async () => {
     // A spectator apart, the two players' projections are identical, because
     // `playerView` strips Conspiracy hands for everyone. If they ever diverge, a
-    // viewer-scoped branch has crept into the projection — which is the R1 bug in
-    // a plausible-looking form.
+    // viewer-scoped branch has crept into the projection — which is the R1 bug in a
+    // plausible-looking form.
     //
     // `settle()` first, and that is not a weakening. This assertion is a leak
     // detector, and it can only detect a viewer-scoped branch if both clients are
@@ -461,12 +286,12 @@ describe('a 2-player game runs to completion over a real socket', () => {
     const A = ada.latestState().state;
     const B = bo.latestState().state;
 
-    // Read the one viewer-scoped field from the ROOM's own typed projection, not
-    // from the client's copy. `protocol.ts` declares `match:state.state` as
-    // `ClientState` on purpose — widening it to `PublicView` would break parity with
-    // the client's own copy of the type — so the field is present on the wire and
-    // absent from the wire TYPE. Asking the room instead keeps this a typed
-    // assertion and states the expectation where the value is defined.
+    // Read the one viewer-scoped field from the ROOM's own typed projection, not from
+    // the client's copy. `protocol.ts` declares `match:state.state` as `ClientState`
+    // on purpose — widening it to `PublicView` would break parity with the client's
+    // own copy of the type — so the field is present on the wire and absent from the
+    // wire TYPE. Asking the room instead keeps this a typed assertion and states the
+    // expectation where the value is defined.
     const room = h.server.hub.rooms.get(matchId);
     if (room === undefined) throw new Error('no room');
     const projections = seats.map(({ playerId }) => room.viewFor(playerId).state.playableConspiracies);
@@ -504,20 +329,33 @@ describe('a 2-player game runs to completion over a real socket', () => {
     const stored = await h.store.get(matchId);
     if (stored === null) throw new Error('nothing stored');
 
-    expect(stored.log.length).toBeGreaterThan(50);
+    expect(driverActions, 'the driving test did not record how many actions it took').toBeGreaterThan(0);
+    // A real game on the shipped corpus, not a handful of plies. Before this test
+    // drove the real corpus it asserted `> 50` against a synthetic deck; the game
+    // now takes hundreds of actions and the log has to show it.
+    expect(stored.log.length, 'the log is too short to be a whole game').toBeGreaterThan(50);
     expect(stored.log.length).toBe(room.viewId);
-    // Sequences are dense and monotonic from 1: a gap means an append was lost, and
-    // a gap in the log is a hole in the audit trail.
+    // Sequences are dense and monotonic from 1: a gap means an append was lost, and a
+    // gap in the log is a hole in the audit trail.
     expect(stored.log.map((e) => e.seq)).toEqual(stored.log.map((_, i) => i + 1));
 
+    // The replay. This is the strongest single assertion in the file: the state is
+    // rebuilt from `(seed, rules, cards, log)` alone and has to come out identical,
+    // which is the whole basis of persisting a log rather than snapshots.
+    //
+    // It also crosses the turn-52 Ideology cliff, because the game above does, so the
+    // replay has to reproduce the reshuffle as well as the ordinary turns. A replay
+    // that could not reproduce a reshuffle would restore a match into a subtly
+    // different game — the exact failure `cardsVersion` exists to prevent.
     const { replay } = await import('../src/store.ts');
     const rebuilt = replay({ stored, ctx: h.ctx });
-    expect(digest(rebuilt.state)).toBe(digest(room.state));
+    expect(rebuilt.viewId).toBe(room.viewId);
+    expect(digest(rebuilt.state), 'the replayed state differs from the live one').toBe(digest(room.state));
   });
 
   it('no resource count ever went negative, at any point in the game', () => {
-    // R3 was "a client can mint resources" via a negative Delta. This walks the
-    // final state and the log, and the hostile-input suite covers the boundary.
+    // R3 was "a client can mint resources" via a negative Delta. This walks the final
+    // state and the log, and the hostile-input suite covers the boundary.
     const s = ada.latestState().state;
     for (const pid of s.turnOrder) {
       const p = s.players[pid];
@@ -525,10 +363,23 @@ describe('a 2-player game runs to completion over a real socket', () => {
       for (const [res, n] of Object.entries(p.resources)) {
         expect(Number.isInteger(n), `${pid}.${res} is not a whole number`).toBe(true);
         expect(n, `${pid}.${res} went negative`).toBeGreaterThanOrEqual(0);
+        // …and never over the cap. p12 is enforced by the reducer, but a cap that
+        // can be exceeded is a cap that is not being applied, and on the real corpus
+        // the driver crosses it dozens of times per game.
+        expect(n, `${pid}.${res} is ${n}, over the resource cap`).toBeLessThanOrEqual(12);
       }
     }
   });
 });
+
+/** Wait until the room has committed an action past `viewId`. Bounded, not a sleep. */
+async function waitForView(room: { viewId: number }, before: number, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (room.viewId <= before) {
+    if (Date.now() > deadline) throw new Error(`the room did not advance past viewId ${before} within ${timeoutMs}ms`);
+    await new Promise((r) => setTimeout(r, 1));
+  }
+}
 
 describe('a spectator can read everything public and write nothing', () => {
   let spec: TestClient;
@@ -553,9 +404,9 @@ describe('a spectator can read everything public and write nothing', () => {
   });
 
   it('is never given a blind prompt, in any phase', () => {
-    // The prompt is only ever built for the player holding the card. A spectator
-    // who could see it would see the question — which is public at a real table,
-    // but the two LABELS with no payout attached is the answering player's private
+    // The prompt is only ever built for the player holding the card. A spectator who
+    // could see it would see the question — which is public at a real table, but the
+    // two LABELS with no payout attached is the answering player's private
     // deliberation space and nobody else's.
     for (const m of spec.ever('match:state')) {
       expect(m.blind, 'a spectator was handed a blind prompt').toBeNull();
@@ -567,15 +418,14 @@ describe('a spectator can read everything public and write nothing', () => {
       { type: 'END_TURN' },
       { type: 'ANSWER', side: 0 },
       { type: 'INFLUENCE', slot: 0 },
-      { type: 'PLAY_CONSPIRACY', cardId: 't-con-0000' },
+      { type: 'PLAY_CONSPIRACY', cardId: 'vo-core-001' },
     ] as const) {
       spec.clear();
       spec.send({ t: 'match:action', action });
       const err = await spec.expect(spec.is('error'), `spectator ${action.type}`);
-      // The refusal is the SEAT check, not the reducer's turn check. A spectator
-      // whose `playerId` happened to collide with a real seat would otherwise be
-      // stopped by "not your turn", which would be the wrong reason and the wrong
-      // guarantee.
+      // The refusal is the SEAT check, not the reducer's turn check. A spectator whose
+      // `playerId` happened to collide with a real seat would otherwise be stopped by
+      // "not your turn", which would be the wrong reason and the wrong guarantee.
       expect(err.code).toBe('NOT_A_PLAYER');
       expect(err.message).toBe('you are not seated at this table');
     }

@@ -75,6 +75,12 @@ import type { ServerMessage, Session } from '../src/protocol.ts';
 
 // ─────────────────────────── card sets ───────────────────────────
 
+/**
+ * The shipped corpus, loaded through the server's own boot path.
+ *
+ * `loadCtx()` is what `ShasnServer` builds when it is not handed a `ctx`, so it is
+ * the cards a real deployment deals. Prefer it over calling this.
+ */
 export function realCards(): CardIndex {
   return loadCards();
 }
@@ -343,17 +349,19 @@ for (const w of [...this.#waiters]) {
   /**
    * Resolve when the NEXT message arrives, whatever it is.
    *
-   * This exists because a driver that polls with `sleep(4)` between actions is
-   * timing-dependent, and a timing-dependent test is a flaky test. It passed four
-   * times in a row and then failed on the one run where the module graph was being
-   * transformed cold and every `sleep` was shorter than the server's turnaround.
+   * Kept because the reconnect and hostile-input suites need to await an arbitrary
+   * frame, and because a driver that polls with `sleep(4)` between actions is
+   * timing-dependent — it passed four times in a row and then failed on the one run
+   * where the module graph was being transformed cold and every `sleep` was shorter
+   * than the server's turnaround.
    *
-   * Waiting on the socket instead means the loop advances exactly as fast as the
-   * server answers, with no lower bound to be too short and no upper bound to be
-   * too slow.
+   * NOT how a driver should synchronise. The e2e and winnability drivers wait on the
+   * room's `viewId` instead, because "a message arrived" is not the same as "my
+   * action was applied": the room's reply is a `match:state` and possibly a
+   * `match:events`, so consuming one message can consume the PREVIOUS action's
+   * events. See the header of `e2e.test.ts`.
    */
   next(timeoutMs = 10_000): Promise<ServerMessage> {
-    const seen = this.received.length;
     return new Promise<ServerMessage>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#tickers = this.#tickers.filter((t) => t !== onMessage);
@@ -364,7 +372,6 @@ for (const w of [...this.#waiters]) {
         this.#tickers = this.#tickers.filter((t) => t !== onMessage);
         resolve(m);
       };
-      void seen;
       this.#tickers.push(onMessage);
     });
   }
@@ -440,79 +447,4 @@ export async function advance(
     if (!moved && n > plies * 2) break;
   }
   return done;
-}
-
-/**
- * Drive a live match to `finished` by picking a legal move at each point.
- *
- * This is the same loop the engine's own integration test uses, run over a socket
- * instead of calling `reduce` directly — which is the point: it proves the server's
- * dispatch path, its projections and its fan-out are all correct, because the only
- * way this can finish is if the server actually applied every action.
- */
-export function legalAction(state: GameState, me: PlayerID): Action | null {
-  if (state.finished) return null;
-  if (state.phase === 'answer' && state.activePlayer === me) return { type: 'ANSWER', side: 0 };
-  if (state.phase === 'headlines' && state.activePlayer === me) return { type: 'ACK_HEADLINE' };
-  if (state.phase !== 'actions' || state.activePlayer !== me) return null;
-
-  const choice = state.choices.find((c) => c.player === me);
-  if (choice !== undefined) {
-    const c = choice.choice;
-    if (c.kind === 'gain-any') return { type: 'RESOLVE_CHOICE', choiceId: choice.id, pick: { kind: 'resources', res: { funds: c.count } } };
-    if (c.kind === 'lose-any') return { type: 'RESOLVE_CHOICE', choiceId: choice.id, pick: { kind: 'resources', res: { funds: Math.min(c.count, state.players[me]?.resources.funds ?? 0) } } };
-    if (c.kind === 'steal-any') {
-      return { type: 'RESOLVE_CHOICE', choiceId: choice.id, pick: { kind: 'steal', from: c.from ?? me, res: { funds: c.count } } };
-    }
-    return { type: 'RESOLVE_CHOICE', choiceId: choice.id, pick: { kind: 'areas', areaIds: [] } };
-  }
-
-  // Buy the cheapest Voter Card we can afford, then place its voters.
-  const affordable = state.market
-    .map((slot, i) => ({ slot, i }))
-    .filter(({ slot }) => total(slot.cost) <= poolOf(state, me));
-  if (affordable.length > 0) {
-    const chosen = affordable[0];
-    if (chosen !== undefined) return { type: 'INFLUENCE', slot: chosen.i };
-  }
-
-  const group = state.players[me]?.pending[0];
-  if (group !== undefined) {
-    const free = emptyAreaIds(state);
-    const places = group.sameZone ? free.slice(0, group.count) : free.slice(0, group.count);
-    if (places.length >= group.count) {
-      return { type: 'PLACE_VOTERS', groupId: group.id, areaIds: places };
-    }
-  }
-  return { type: 'END_TURN' };
-}
-
-function poolOf(state: GameState, me: PlayerID): number {
-  const r = state.players[me]?.resources;
-  if (r === undefined) return 0;
-  return r.funds + r.clout + r.media + r.trust;
-}
-
-function total(d: Partial<Record<string, number>>): number {
-  return (d.funds ?? 0) + (d.clout ?? 0) + (d.media ?? 0) + (d.trust ?? 0);
-}
-
-/**
- * Empty areas, grouped so a same-zone group can be satisfied.
- *
- * `PLACE_VOTERS` refuses to split one Voter Card's voters across zones, so a
- * naive "first N free areas in board order" would deadlock on a group of 3 when
- * the first three free areas happen to be in three different zones. Filling one
- * zone at a time avoids that entirely.
- */
-function emptyAreaIds(state: GameState): readonly string[] {
-  for (const z of state.zones) {
-    const free = z.areas.filter((a) => a.peg === null).map((a) => a.id);
-    if (free.length >= 3) return free.slice(0, 3);
-  }
-  for (const z of state.zones) {
-    const free = z.areas.filter((a) => a.peg === null).map((a) => a.id);
-    if (free.length > 0) return free;
-  }
-  return [];
 }
