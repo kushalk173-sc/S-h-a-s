@@ -26,7 +26,8 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { CardIndex, GameState } from '@shasn/engine';
+import type { CardIndex, GameState, Resource } from '@shasn/engine';
+import { RESOURCES } from '@shasn/engine';
 
 import { replay, InMemoryMatchStore, cardsVersion, rulesVersion } from '../src/store.ts';
 import { advance, digest, TestClient, bigCards, startHarness, type Harness } from './fixtures.ts';
@@ -85,6 +86,54 @@ const lastState = (c: TestClient): Extract<ServerMessage, { t: 'match:state' }> 
   if (last === undefined) throw new Error('no match:state');
   return last;
 };
+
+// ─────────────── payout detectors, and why they are Delta-shaped ───────────────
+
+/**
+ * Every `{resource: count}`-shaped object anywhere in a value.
+ *
+ * "Shaped" means: every key is a resource name and every value is a non-negative
+ * integer. `players[].resources` qualifies — it is exactly that shape — and that is
+ * the point. A payout could only reach a client as such an object, because that is
+ * what `side.pays` is, so scanning for the shape finds leaks of every composition
+ * (all four resources, one, two) rather than only the exact map on this one card.
+ */
+function findDeltasIn(value: unknown, out: Record<string, number>[] = []): Record<string, number>[] {
+  if (value === null || typeof value !== 'object') return out;
+  if (Array.isArray(value)) {
+    for (const v of value) findDeltasIn(v, out);
+    return out;
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  const isDelta =
+    entries.length > 0 &&
+    entries.every(
+      ([k, v]) => RESOURCES.includes(k as Resource) && typeof v === 'number' && Number.isInteger(v) && v >= 0,
+    );
+  if (isDelta) out.push(Object.fromEntries(entries) as Record<string, number>);
+  for (const [, v] of entries) findDeltasIn(v, out);
+  return out;
+}
+
+/** Paths at which `delta` appears verbatim. Empty means it is not on the wire. */
+function findDeltaIn(value: unknown, delta: Record<string, number>, path = '$', hits: string[] = []): string[] {
+  if (value === null || typeof value !== 'object') return hits;
+  if (Array.isArray(value)) {
+    value.forEach((v, i) => findDeltaIn(v, delta, `${path}[${i}]`, hits));
+    return hits;
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  const keys = entries.map(([k]) => k).sort();
+  if (
+    keys.length === Object.keys(delta).length &&
+    keys.every((k, i) => k === Object.keys(delta).sort()[i]) &&
+    entries.every(([k, v]) => v === delta[k])
+  ) {
+    hits.push(path);
+  }
+  for (const [k, v] of entries) findDeltaIn(v, delta, `${path}.${k}`, hits);
+  return hits;
+}
 
 // ─────────────────────────── A. rehydration ───────────────────────────
 
@@ -432,18 +481,37 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     const frame = JSON.stringify(state);
     expect(frame.includes(pending!)).toBe(false);
     expect(frame.includes(String(room.state._seed))).toBe(false);
-    // The payout, structurally. `pays` is the field name on a card, so its
-    // absence is the assertion — a `"funds":2` substring is meaningless because
-    // a player's own pool legitimately contains those numbers.
+    // The payout, structurally. `pays` is the field name on a card, so its absence
+    // is the first assertion.
     expect(frame.includes('"pays"')).toBe(false);
-    for (const side of card.sides) {
-      for (const [res, n] of Object.entries(side.pays)) {
-        expect(
-          frame.includes(`"${res}":${n}`) === false,
-          `the frame carries a payout-shaped pair ${res}:${n}`,
-        ).toBe(true);
-      }
+
+    // …and then the payout as a UNIT, which is the assertion that had to be rewritten.
+    //
+    // The old version scanned the frame for each `"res":n` pair of each side's
+    // `pays` on its own. That was a sound instrument only while no player could
+    // legitimately hold the numbers a card pays. p7's staggered start broke that:
+    // seat 2 opens on 2 Funds, `bigCards`' side 0 pays `{funds: 2, media: 1}`, and
+    // `"funds":2` is now in the frame because Ada's own pool says so. The test
+    // failed on a substring that had nothing to do with a payout — and its own
+    // comment two lines up already said a bare `"funds":2` is meaningless.
+    //
+    // So the unit of assertion is the whole Delta, not its components. `side.pays`
+    // is a complete `{funds: 2, media: 1}` and a leak would ship it whole — there is
+    // no way to attach a payout to a side without shipping that object. Searching
+    // for the object is specific to THIS card's actual payouts AND immune to a
+    // player legitimately holding one of its numbers, because a `resources` bag is
+    // always all four keys and so is never equal to a two-key Delta.
+    for (const [i, side] of card.sides.entries()) {
+      expect(findDeltaIn(state, side.pays), `side ${i} of ${pending} is on the wire as a payout`).toEqual([]);
+      // …and the specific pairs are absent too, but only inside the one place a
+      // payout could hide: a Delta-shaped object. A bare pair elsewhere in the
+      // frame is a player's own pool and is not evidence of anything.
+      expect(
+        findDeltasIn(state).filter((d) => Object.entries(side.pays).every(([r, n]) => d[r] === n)),
+        `side ${i} of ${pending} is on the wire, split across a Delta`,
+      ).toEqual([]);
     }
+
     // And the prompt itself is the three-field shape and nothing else.
     expect(Object.keys(state.blind ?? {}).sort()).toEqual(['labels', 'order', 'question']);
     expect(beforePrompt).not.toBeNull();
