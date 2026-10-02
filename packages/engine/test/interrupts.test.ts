@@ -1,12 +1,10 @@
 /**
  * G13 — THE RESPONSE WINDOW: a BLOCK and a DEFLECT.
  *
- * Four properties, and each has a test rather than a comment:
+ * Five properties, and each has a test rather than a comment:
  *
  *  1. **IT IS A PHASE MACHINE, not an effect.** A played card's effects are HELD in
- *     `GameState.interrupt` for exactly as long as somebody could answer them. The
- *     shipped corpus holds no card carrying an `interrupt`, so the whole of this file
- *     is unreachable for it — which is asserted, not assumed.
+ *     `GameState.interrupt` for exactly as long as somebody could answer them.
  *  2. **NO TABLE DEADLOCKS.** Every window is closable in at most `n - 1` declines,
  *     including the two hostile cases the rules create: a BLOCK aimed at the player
  *     who is about to answer, and a BLOCK aimed at the player whose out-of-turn
@@ -17,7 +15,15 @@
  *  4. **IT LEAKS NOTHING.** The window carries no `responders` list — that is the
  *     field that would tell every client who is holding a BLOCK — and the payload
  *     walks the same structural check `playerView.test.ts` uses.
+ *  5. **THE SHIPPED CORPUS IS EXECUTABLE.** BLOCK and DEFLECT ship as `ct-et2040-014`
+ *     / `ct-et2040-015`, so the window is reachable for the real decks — and the last
+ *     describe block drives those two real cards through `reduce` to prove it. That
+ *     block also records WHY the ban it replaced existed; read the long comment above
+ *     it before touching anything in it.
  */
+
+import { readdirSync, readFileSync } from 'node:fs';
+import { sep } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -722,20 +728,415 @@ describe('G13 — it is a pure function of (state, action, ctx)', () => {
   });
 });
 
-describe('G13 — the shipped corpus is untouched by the staging branch', () => {
-  it('no shipped card carries an interrupt, so no game can ever open a window', async () => {
-    // The reason the blast radius is this small: `canBeAnswered` is only ever true
-    // for a Conspiracy Card with an executable `interrupt`, and the deck files
-    // contain none. `packages/cards/test/reducer-parity.test.ts` asserts the same
-    // fact over the corpus; this one asserts the consequence in the engine.
-    const { readdirSync, readFileSync } = await import('node:fs');
-    const dir = new URL('../../cards/decks/', import.meta.url);
-    const files = readdirSync(dir, { recursive: true }) as string[];
-    const decks = files.filter((f) => f.endsWith('.json'));
-    expect(decks.length).toBeGreaterThan(0);
-    for (const f of decks) {
-      const text = readFileSync(new URL(f, dir), 'utf8');
-      expect(text.includes('"interrupt"'), f).toBe(false);
+// ─────────────────────── 4. the shipped corpus, and what it now relies on ───────────────────────
+
+/**
+ * ## WHAT REPLACED THE BAN, AND WHY THIS IS STRONGER
+ *
+ * There WAS a test here that read every deck file and asserted the string
+ * `"interrupt"` appeared in none of them. It was not a style rule. It was the
+ * mechanical statement of a real hazard:
+ *
+ *  - `canBeAnswered` (reduce.ts) is true only when another player holds a
+ *    Conspiracy Card whose `interrupt` the engine acts on, and `resolveCard` then
+ *    STAGES the played card's effects in `GameState.interrupt` instead of applying
+ *    them. A window needs up to `n - 1` declines to close.
+ *  - At the time, nothing could act during one. `packages/server/test/driver.ts`
+ *    could not drive a window, and the client rendered no pass control, so a player
+ *    holding a BLOCK would watch a played card sit unresolved with no legal move
+ *    available. That is why BLOCK and DEFLECT were deliberately held out of the
+ *    shipped decks.
+ *
+ * Two things now discharge that obligation, and they are the reason the ban is
+ * replaced rather than lifted:
+ *
+ *  1. **the server driver acts during a window** — `packages/server/test/driver.ts`
+ *     answers a response window, so a held card is always closable over the wire;
+ *  2. **the client renders one with a pass control**, so a human always has the
+ *     `PASS_INTERRUPT` move on screen.
+ *
+ * So a reactive card is now shippable, and the hazard this file guarded against has
+ * moved DOWNSTREAM — to those two packages. What is left for the ENGINE to assert is
+ * therefore no longer "reactive cards are banned" but the stronger, more precise
+ * claim the corpus actually relies on:
+ *
+ *  - **exactly two** shipped cards carry an executed interrupt, by id. A third is a
+ *    change somebody makes on purpose; the count notices.
+ *  - **each one's op is a key of the registry `reduce.ts` declares**, re-derived here
+ *    from `reduce.ts`'s own source text, the way
+ *    `packages/cards/test/reducer-parity.test.ts` does it — so the guard cannot be
+ *    satisfied by editing the check.
+ *  - **each one is actually EXECUTABLE**: the real card, out of the real deck file,
+ *    is driven through `reduce` and must open a window and then answer it. This is
+ *    the part that is strictly stronger than a ban. A ban could only ever say "no";
+ *    this says "these two, and the engine does something with them". A card that
+ *    executes but whose downstream support does not exist is the same failure, one
+ *    boundary further out — so the boundary is asserted where the obligation now is.
+ *
+ * `packages/cards/test/reducer-parity.test.ts` pins the same two ids from the cards
+ * side (what a card MAY say) and this file pins them from the engine side (what
+ * `reduce` DOES). Both oracles, neither able to satisfy the other.
+ */
+
+/** One deck file's `cards` array, with the path for the failure message. */
+type DeckFile = { readonly file: string; readonly cards: readonly unknown[] };
+
+/** Every deck file the cards package ships, parsed. Read-only: nothing here writes. */
+function shippedDecks(): readonly DeckFile[] {
+  // Imported statically rather than with a dynamic `await import`, because a test
+  // that has to remember to be async before it can see the corpus is a test that can
+  // be skipped by an early return above it.
+  const dir = new URL('../../cards/decks/', import.meta.url);
+  const files = (readdirSync(dir, { recursive: true }) as string[])
+    // Normalised to `/` because `readdirSync(recursive)` hands back the platform
+    // separator, and a pinned path string is not a thing to assert on Windows.
+    .map((f) => f.split(sep).join('/'))
+    .filter((f) => f.endsWith('.json'));
+  // Non-zero, or "the corpus is empty" and every assertion below is vacuously true.
+  // The cards package is a sibling workspace, not a dependency of the engine, so
+  // this is a filesystem read and NOT an import of `packages/cards/src` — the engine
+  // has zero runtime dependencies and keeps them that way.
+  if (files.length === 0) throw new Error(`no deck files under ${dir.href}`);
+  return files.map((f) => {
+    const parsed = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as {
+      readonly cards?: readonly unknown[];
+    };
+    if (!Array.isArray(parsed.cards)) throw new Error(`${f} has no cards array`);
+    return { file: f, cards: parsed.cards };
+  });
+}
+
+/** A shipped card that carries an `interrupt`, read as narrowly as the engine type. */
+type Reactive = {
+  readonly id: string;
+  readonly file: string;
+  readonly card: ConspiracyCard;
+  readonly interrupt: Interrupt;
+};
+
+function isReactiveCard(value: unknown): value is ConspiracyCard & { readonly interrupt: Interrupt } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'interrupt' in value &&
+    (value as { interrupt?: unknown }).interrupt !== undefined
+  );
+}
+
+/** Every card carrying an `interrupt`, across `decks`, in a stable order. */
+function reactiveCardsIn(decks: readonly DeckFile[]): readonly Reactive[] {
+  const out: Reactive[] = [];
+  for (const deck of decks) {
+    for (const raw of deck.cards) {
+      if (!isReactiveCard(raw)) continue;
+      out.push({ id: raw.id, file: deck.file, card: raw, interrupt: raw.interrupt });
     }
+  }
+  return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** The two ids the corpus relies on, sorted — the one pinned list in this file. */
+const PINNED_REACTIVE_IDS: readonly string[] = ['ct-et2040-014', 'ct-et2040-015'];
+
+/**
+ * The corpus assertion, as a function so the teeth test can run the SAME one against
+ * a deliberately broken corpus rather than a paraphrase of it.
+ */
+function assertPinnedCorpus(found: readonly Reactive[]): void {
+  expect(found.map((r) => r.id)).toEqual(PINNED_REACTIVE_IDS);
+}
+
+/**
+ * The ops `RESPOND_INTERRUPT` acts on, re-derived from `reduce.ts`'s own source.
+ *
+ * The same derivation `packages/cards/test/reducer-parity.test.ts` performs, done
+ * again here because the engine is where the promise lives: the registry is a
+ * `const` inside `reduce.ts`, not something exported, and this package may not edit
+ * `packages/cards/` to reach it. A guard that imported the registry would be checking
+ * the cards package's copy of a promise about this file.
+ */
+function reactiveOpsInReducer(): readonly string[] {
+  const src = readFileSync(new URL('../src/reduce.ts', import.meta.url), 'utf8');
+  const start = src.indexOf('const REACTIVE_INTERRUPTS');
+  expect(start, 'reduce.ts still has REACTIVE_INTERRUPTS').toBeGreaterThan(-1);
+  const close = src.indexOf('};', start);
+  expect(close, 'reduce.ts still closes REACTIVE_INTERRUPTS').toBeGreaterThan(-1);
+  const body = src.slice(start, close);
+  return [...body.matchAll(/^ {2}(\w+):/gm)].map((m) => m[1]!).sort();
+}
+
+/**
+ * The `window` / `target` values `mayRespond` DISTINGUISHES.
+ *
+ * `'always'` and `'any-card'` have no literal to find — they are the absence of a
+ * refusal, the `else` — so this is a subset check in one direction, exactly as
+ * `reducer-parity` frames it. The direction with teeth is: everything the reducer
+ * distinguishes must be a value the engine's own `Interrupt` type declares, or the
+ * reducer is acting on a value no card can name.
+ */
+function mayRespondDistinguishes(field: 'window' | 'target'): readonly string[] {
+  const src = readFileSync(new URL('../src/reduce.ts', import.meta.url), 'utf8');
+  const start = src.indexOf('function mayRespond');
+  expect(start, 'reduce.ts still has mayRespond').toBeGreaterThan(-1);
+  const body = src.slice(start, src.indexOf('\n}', start));
+  const out = new Set<string>();
+  for (const m of body.matchAll(new RegExp(`interrupt\\.${field} === '([a-z-]+)'`, 'g'))) {
+    if (m[1] !== undefined) out.add(m[1]);
+  }
+  return [...out].sort();
+}
+
+/** The declared enums, spelled out from the engine's own union so they cannot drift. */
+const DECLARED_WINDOWS: readonly Interrupt['window'][] = ['always', 'pre-answer'];
+const DECLARED_TARGETS: readonly Interrupt['target'][] = ['any-card', 'card-affecting-you'];
+
+/** A Ctx carrying one real shipped reactive card on top of the fixture deck. */
+function ctxWith(reactive: Reactive): Ctx {
+  return {
+    ...CTX,
+    cards: {
+      ...CTX.cards,
+      conspiracy: { ...CTX.cards.conspiracy, [reactive.card.id]: reactive.card },
+    },
+  };
+}
+
+/**
+ * A turn-1 position dealt `hand`, in a Ctx of our own choosing.
+ *
+ * `position` is hard-wired to `CTX`; this is the same construction with the ctx as
+ * a parameter, so the executability test can drive the REAL card rather than a
+ * fixture that only resembles it.
+ */
+function positionIn(
+  ctx: Ctx,
+  hand: Readonly<Record<PlayerID, readonly string[]>>,
+  n = 3,
+): GameState {
+  const players = Array.from({ length: n }, (_, i) => `p${i + 1}`);
+  const base = setup({
+    players,
+    cards: ctx.cards,
+    seed: 77,
+    startResources: Array.from({ length: n }, () => ({ funds: 1, clout: 1, media: 1, trust: 1 })),
+    ideologyDeck: IDEOLOGY.map((c) => c.id),
+    voterDeck: VOTERS.map((c) => c.id),
+    conspiracyDeck: [PAYOUT.id, WIDE.id],
+    headlineDeck: HEADLINES.map((c) => c.id),
+  });
+  const given: GameState = {
+    ...base,
+    players: Object.fromEntries(
+      players.map((p) => [p, { ...base.players[p]!, conspiracies: hand[p] ?? [] }]),
+    ),
+  };
+  const answered = reduce(given, 'p1', { type: 'ANSWER', side: 0 }, ctx);
+  if (!answered.ok) throw new Error(answered.error);
+  return answered.state;
+}
+
+describe('G13d — the shipped corpus, and the support it now relies on', () => {
+  it('carries exactly two reactive cards, by id, and a third would fail here', () => {
+    // THE PIN. A reactive card is now shippable, so the load-bearing claim is the
+    // exact size of the set rather than its emptiness. `assertPinnedCorpus` is a
+    // function precisely so the next case can run this same assertion against a
+    // broken corpus — see "it has teeth" below.
+    const found = reactiveCardsIn(shippedDecks());
+    assertPinnedCorpus(found);
+    // Named, so the failure says WHICH card and WHICH deck file, not just two arrays
+    // that differ. A third card in a deck nobody opened is otherwise invisible.
+    expect(found.map((r) => `${r.id} in ${r.file}`).join('\n')).toBe(
+      'ct-et2040-014 in et2040/conspiracy.json\nct-et2040-015 in et2040/conspiracy.json',
+    );
+  });
+
+  it('has teeth: a third reactive card, or either card losing its interrupt, fails the pin', () => {
+    // NON-VACUITY, as a permanent test rather than a one-off manual mutation. The two
+    // edits a future agent is most likely to make are exactly these two, and both are
+    // checked against the SAME `assertPinnedCorpus` the corpus case above runs — so
+    // this cannot pass by testing a weaker thing than the thing that guards the decks.
+    const decks = shippedDecks();
+    const found = reactiveCardsIn(decks);
+
+    // (a) A third card gains an interrupt.
+    const third: DeckFile = {
+      file: 'synthetic/et2040-conspiracy.json',
+      cards: [
+        {
+          id: 'ct-et2040-016',
+          name: 'A Third Reaction',
+          text: 'A card that is not in the corpus.',
+          cost: 5,
+          effects: [],
+          interrupt: { op: 'block', window: 'always', target: 'any-card' },
+        },
+      ],
+    };
+    expect(reactiveCardsIn([...decks, third]).length).toBe(found.length + 1);
+    expect(() => assertPinnedCorpus(reactiveCardsIn([...decks, third]))).toThrow();
+
+    // (b) Either shipped card loses its `interrupt` block — the shape the ban used
+    // to enforce, and the one that silently makes the card a 5-cost "gain 1 Clout"
+    // that can never answer anything.
+    for (const victim of PINNED_REACTIVE_IDS) {
+      const withoutIt = decks.map((d) => ({
+        file: d.file,
+        cards: d.cards.map((c) => {
+          if (typeof c !== 'object' || c === null) return c;
+          const card = c as { id?: string };
+          if (card.id !== victim) return c;
+          const { interrupt: _dropped, ...rest } = c as Record<string, unknown>;
+          return rest;
+        }),
+      }));
+      const reduced = reactiveCardsIn(withoutIt);
+      expect(reduced.map((r) => r.id), `${victim} lost its interrupt`).not.toContain(victim);
+      expect(() => assertPinnedCorpus(reduced)).toThrow();
+    }
+  });
+
+  it('every shipped interrupt names an op RESPOND_INTERRUPT acts on, re-derived from reduce.ts', () => {
+    // Not a hardcoded `['block','deflect']`. The registry is read out of
+    // `REACTIVE_INTERRUPTS` in `reduce.ts` itself, so this file cannot drift from the
+    // reducer — the same seam `reducer-parity` cuts, cut again from the engine side
+    // because the engine is the package that owns the promise.
+    const ops = reactiveOpsInReducer();
+    // Not empty, or the check above is satisfied by asserting nothing.
+    expect(ops.length).toBeGreaterThan(0);
+    for (const r of reactiveCardsIn(shippedDecks())) {
+      expect(ops, `${r.id} carries interrupt op ${r.interrupt.op}`).toContain(r.interrupt.op);
+    }
+  });
+
+  it('and every window and target it names is one mayRespond reads', () => {
+    // `mayRespond` distinguishes the narrow value and falls through on the wide one,
+    // so the declared enum must be a superset of what it names. A card naming
+    // anything else is a declaration the engine ignores, which is the exact failure
+    // the old ban existed to keep out of the corpus.
+    expect(mayRespondDistinguishes('window')).toEqual(['pre-answer']);
+    expect(mayRespondDistinguishes('target')).toEqual(['card-affecting-you']);
+    for (const r of reactiveCardsIn(shippedDecks())) {
+      expect(DECLARED_WINDOWS, `${r.id} window`).toContain(r.interrupt.window);
+      expect(DECLARED_TARGETS, `${r.id} target`).toContain(r.interrupt.target);
+    }
+  });
+
+  it('EXECUTABILITY: the real card, out of the real deck file, opens a window and answers it', () => {
+    // THE STRONGER GUARD, and the reason this replaces a ban rather than being
+    // deleted. The ban could only say "no reactive card ships". This drives each
+    // shipped card through `reduce` — no fixture, no card object written by hand in
+    // this file — and requires that it (a) makes a window open at all, which is
+    // `canBeAnswered` consulting `isReactive(card.interrupt.op)` and nothing else, and
+    // (b) is then accepted by `RESPOND_INTERRUPT` and performs its op.
+    //
+    // A card that ships with an `interrupt` the engine ignores would pass every
+    // absence/presence check and fail HERE, which is the failure the old assertion
+    // was reaching for by a blunter route.
+    const found = reactiveCardsIn(shippedDecks());
+    expect(found.length).toBe(PINNED_REACTIVE_IDS.length);
+
+    for (const r of found) {
+      const ctx = ctxWith(r);
+      const s = positionIn(ctx, { p1: [PAYOUT.id], p2: [r.id] });
+
+      // (a) The card is what makes the window exist at all. Without it, `PAYOUT`
+      // resolves immediately and there is nothing to answer.
+      const held = reduce(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId: PAYOUT.id }, ctx);
+      expect(held.ok, `${r.id}: p1 could not play ${PAYOUT.id}`).toBe(true);
+      if (!held.ok) continue;
+      expect(held.state.interrupt, `${r.id} opens no window`).not.toBeNull();
+      expect(held.state.interrupt?.cardId).toBe(PAYOUT.id);
+      expect(funds(held.state, 'p1'), `${r.id}: the staged gain already happened`).toBe(
+        funds(s, 'p1'),
+      );
+
+      // (b) `RESPOND_INTERRUPT` accepts it and the op is performed. `mayRespond` is
+      // consulted for real here, so a `window`/`target` the reducer refuses fails
+      // rather than being assumed harmless.
+      const action: Action =
+        r.interrupt.op === 'deflect'
+          ? { type: 'RESPOND_INTERRUPT', cardId: r.id, at: 'p3' }
+          : { type: 'RESPOND_INTERRUPT', cardId: r.id };
+      const answered = reduce(held.state, 'p2', action, ctx);
+      expect(answered.ok, `${r.id} is not executable by RESPOND_INTERRUPT`).toBe(true);
+      if (!answered.ok) continue;
+      expect(answered.state.interrupt, `${r.id} left the window open`).toBeNull();
+
+      // And the consequence of the op, which is what distinguishes an executed
+      // interrupt from a merely accepted one.
+      if (r.interrupt.op === 'block') {
+        expect(funds(answered.state, 'p1'), `${r.id} did not negate the card`).toBe(
+          funds(held.state, 'p1'),
+        );
+      } else {
+        expect(funds(answered.state, 'p3'), `${r.id} did not redirect the resolution`).toBe(
+          funds(held.state, 'p3') + 3,
+        );
+        expect(funds(answered.state, 'p1'), `${r.id} resolved for the actor anyway`).toBe(
+          funds(held.state, 'p1'),
+        );
+      }
+      // Played face up, not a free erasure: it is out of the responder's hand, on the
+      // discard pile, and in the public log.
+      expect(answered.state.players.p2?.conspiracies, `${r.id} stayed in hand`).not.toContain(
+        r.id,
+      );
+      expect(answered.state._conspiracyDiscard).toContain(r.id);
+      expect(answered.state.log.some((e) => e.player === 'p2')).toBe(true);
+    }
+  });
+});
+
+describe('G13 — the engine refuses other actions while a window is open', () => {
+  it('including PLAY_CONSPIRACY, and the server must offer nothing while it does', () => {
+    // Recorded here, on the engine side, because `playableConspiraciesFor` in
+    // `packages/server/src/broadcast.ts` is the thing that has to agree with it.
+    //
+    // THE VERDICT: the refusal is CORRECT and belongs in the engine. Two reasons, and
+    // the first is not a matter of taste:
+    //
+    //  1. `PLAY_CONSPIRACY` routes through `resolveCard` (reduce.ts:2038), which
+    //     RETURNS A NEW `state.interrupt` (reduce.ts:1362-1381) when the card it is
+    //     playing is itself answerable. It does not merge, queue, or nest. So a
+    //     `PLAY_CONSPIRACY` admitted during an open window would REPLACE the window,
+    //     and the first card's staged `effects` — the ones still sitting in
+    //     `InterruptWindow.effects` — would never be applied by anything. The public
+    //     log has already said `Played "X".` and `PLAY_CONSPIRACY` has already
+    //     discarded the card to `_conspiracyDiscard`. The card's effects would vanish
+    //     with the card face up on the table and in the discard pile. That is a
+    //     permanent, silent loss of a resolved effect, which is the strongest
+    //     possible argument for the freeze.
+    //  2. The window's termination proof is `mustRespond` + `PASS_INTERRUPT`: at most
+    //     `n - 1` declines, ONE answer, then `closeInterrupt`. Admitting a second
+    //     card play mid-window lets the table inject new work into a countdown whose
+    //     whole invariant is that the staged effects are the only thing in it.
+    //
+    // p19's out-of-turn play is NOT the counter-argument: that is the `answer`-phase
+    // window, honoured separately by `outOfTurnOk` (reduce.ts:1596) and by
+    // `PLAY_CONSPIRACY`'s own phase check (reduce.ts:2025). It is a licence to act
+    // during the answer phase, not during a G13 window.
+    const s = position({ p1: [PAYOUT.id, WIDE.id], p2: [BLOCK.id] });
+    const held = reduce(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId: PAYOUT.id }, CTX);
+    expect(held.ok).toBe(true);
+    if (!held.ok) return;
+    expect(held.state.interrupt).not.toBeNull();
+
+    // The active player, mid-window, with a second card in hand: refused, and the
+    // window is untouched and still closable.
+    const refused = reduce(held.state, 'p1', { type: 'PLAY_CONSPIRACY', cardId: WIDE.id }, CTX);
+    expect(refused.ok).toBe(false);
+    expect(refused.ok === false && refused.error).toBe(
+      '"A Payout" is resolving — answer it or decline first',
+    );
+    expect(held.state.interrupt?.cardId).toBe(PAYOUT.id);
+    expect(held.state.players.p1?.conspiracies).toContain(WIDE.id);
+    expectALegalMove(held.state, 'a refused mid-window conspiracy play');
+
+    // And the two moves that ARE legal, so the freeze is a phase and not a deadlock:
+    // the holder answers, and a player with nothing to answer declines.
+    expect(
+      reduce(held.state, 'p2', { type: 'RESPOND_INTERRUPT', cardId: BLOCK.id }, CTX).ok,
+    ).toBe(true);
+    expect(reduce(held.state, 'p3', { type: 'PASS_INTERRUPT' }, CTX).ok).toBe(true);
   });
 });

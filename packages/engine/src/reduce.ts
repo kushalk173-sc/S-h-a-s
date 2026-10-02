@@ -1340,9 +1340,18 @@ function interruptCardName(w: InterruptWindow, ctx: Ctx): string {
  * Called from exactly the two places a card's effect list is resolved —
  * `PLAY_CONSPIRACY` and `ACK_HEADLINE` — and it is the whole of the phase machine:
  * a card with an effect list that somebody could answer is STAGED, and everything
- * else behaves exactly as it did before G13 landed. The shipped corpus holds no
- * card carrying an `interrupt`, so the staging branch is unreachable for it and no
- * existing test's behaviour moves.
+ * else behaves exactly as it did before G13 landed.
+ *
+ * Reachable from the shipped decks: BLOCK and DEFLECT ship as `ct-et2040-014` and
+ * `ct-et2040-015`, and holding either one is what makes `canBeAnswered` true.
+ * `packages/engine/test/interrupts.test.ts` drives both real cards through here and
+ * asserts the window opens and the op is performed.
+ *
+ * AND IT IS THE ONLY WRITER OF `state.interrupt` besides `RESPOND_INTERRUPT` /
+ * `PASS_INTERRUPT`, which is why `reduce` freezes every other action while a window
+ * is open: this function REPLACES the field rather than merging into it, so a second
+ * card play mid-window would orphan the first window's staged `effects` and they
+ * would never be applied by anything.
  */
 function resolveCard(
   state: GameState,
