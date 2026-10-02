@@ -98,6 +98,7 @@ import {
   type CardID,
   type CardIndex,
   type ChoicePick,
+  type ChoiceScope,
   type ClientState,
   type ConspiracyCard,
   type Ctx,
@@ -216,18 +217,37 @@ export function discardKeepingReserve(
   return out;
 }
 
-/** Non-Funds pegs a choice could legally take, most-contested first. */
+/**
+ * Non-Funds pegs a choice could legally take, most-contested first.
+ *
+ * `scope` is the CHOICE'S, not the driver's, and the distinction is load-bearing —
+ * this function used to ignore it and only ever offer pegs the chooser did NOT own.
+ * `reduce` computes `wanted = min(count, targetableCount(state, me, kind, scope))` and
+ * `targetableCount` filters by scope too, so for `scope: 'any'` — which is what
+ * `raiseVoterDecision` gives an `evict` the caster played at themselves — the ceiling
+ * counts the chooser's OWN pegs while the pick did not offer any. A chooser holding
+ * one peg against a 2-voter evict on a board with one opponent peg got
+ * `wanted = 2` and a 1-area pick, and the engine answered `choose exactly 2` forever.
+ * That is a hard lock reached through a driver bug, and it is the reason this
+ * function takes the scope and the kind at all.
+ */
 function foreignAreas(
   s: ClientState,
   me: PlayerID,
   want: number,
+  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  scope: ChoiceScope | undefined,
 ): readonly string[] {
   const out: string[] = [];
   for (const z of s.zones) {
     for (const a of z.areas) {
       // A Volatile Area cannot be evicted or converted — p18.
       if (a.peg === null || a.volatile) continue;
-      if (a.peg.owner === me) continue;
+      // Mirrors `targetableCount` in reduce.ts, clause for clause. Converting your own
+      // voter into your own voter is not a conversion, so it is not a target either.
+      if (scope === 'own' && a.peg.owner !== me) continue;
+      if (scope === 'others' && a.peg.owner === me) continue;
+      if (kind === 'convert-voter' && a.peg.owner === me) continue;
       out.push(a.id);
       if (out.length === want) return out;
     }
@@ -235,19 +255,83 @@ function foreignAreas(
   return out;
 }
 
-/** Areas a `steal-any` could legally take from `victim`. */
+/**
+ * Areas a choice could legally take, at the EXACT count the engine will demand.
+ *
+ * The clamp is `min(count, targetableCount(...))` and it is applied HERE rather than
+ * left to fail: `reduce` refuses a pick of the wrong length outright, so a pick built
+ * from the printed `count` is refused whenever the board offers fewer pegs. Offering
+ * the empty list is not a cop-out either — it is the only legal answer to a zero-voter
+ * ask, which is a real state (a card that evicted the last voter on the board).
+ */
+function areaPick(
+  s: ClientState,
+  me: PlayerID,
+  count: number,
+  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  scope: ChoiceScope | undefined,
+): { kind: 'areas'; areaIds: string[] } {
+  const usable = countableAreas(s, me, kind, scope);
+  const wanted = Math.min(count, usable);
+  return { kind: 'areas', areaIds: [...foreignAreas(s, me, wanted, kind, scope)] };
+}
+
+/** How many pegs satisfy the same filters `reduce`'s `targetableCount` applies. */
+function countableAreas(
+  s: ClientState,
+  me: PlayerID,
+  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  scope: ChoiceScope | undefined,
+): number {
+  let n = 0;
+  for (const z of s.zones) {
+    for (const a of z.areas) {
+      if (a.peg === null || a.volatile) continue;
+      if (scope === 'own' && a.peg.owner !== me) continue;
+      if (scope === 'others' && a.peg.owner === me) continue;
+      if (kind === 'convert-voter' && a.peg.owner === me) continue;
+      n += 1;
+    }
+  }
+  return n;
+}
+
+/**
+ * A legal `steal-any` pick: a victim and exactly the resources the engine will credit.
+ *
+ * `fixed` is `choice.from`, and honouring it is the whole point. A card with a
+ * `target` pins the victim at raise time — "take N from EVERY opponent" is only
+ * writable that way — and `resolveChoice` then refuses any pick naming anybody else
+ * with 'that is not the player you may take from'. This function used to walk
+ * `turnOrder` and take the first seat with resources, which is a redirect of the theft
+ * the engine will not accept.
+ *
+ * Two consequences worth stating, because both are silent-until-they-are-not:
+ *
+ *  - With a pinned victim, the victim is not a CHOICE. There is exactly one candidate
+ *    and the driver either satisfies it or has no pick at all.
+ *  - `want` may be ZERO, and that is a legal answer rather than a failure: the engine
+ *    clamps to `min(count, poolTotal(victim))`, so a victim holding nothing is asked
+ *    for nothing and an empty Delta resolves. Treating zero as "nothing to do" is what
+ *    made this return `null` and throw `no legal pick` on a table it could have played.
+ */
 function stealable(
   s: ClientState,
   me: PlayerID,
   n: number,
+  fixed: PlayerID | null,
 ): { from: PlayerID; res: Record<string, number> } | null {
-  for (const id of s.turnOrder) {
-    if (id === me) continue;
+  const candidates: readonly PlayerID[] =
+    fixed !== null
+      ? [fixed]
+      : s.turnOrder.filter((id) => id !== me);
+  for (const id of candidates) {
+    if (id === me) continue; // the engine refuses a theft naming the chooser, always
     const victim = s.players[id];
     if (victim === undefined) continue;
     const want = Math.min(n, sum(victim.resources));
-    if (want <= 0) continue;
-    const res = takeExactly(want, victim.resources);
+    // `want === 0` is legal: `deltaTotal({}) === 0 === want` and `canAfford` holds.
+    const res = want === 0 ? {} : takeExactly(want, victim.resources);
     // The other half of what `reduce` checks: the pick must be affordable FOR THE
     // VICTIM, so a player cannot be drained below zero by a steal.
     const legal = (POOLS.every((r) => (res[r] ?? 0) <= (victim.resources[r] ?? 0))) && sum(res) === want;
@@ -276,14 +360,14 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
     case 'lose-any':
       return { kind: 'resources', res: discardKeepingReserve(n, self.resources, s.market) };
     case 'steal-any': {
-      const hit = stealable(s, me, n);
+      const hit = stealable(s, me, n, choice.choice.from);
       return hit === null ? null : { kind: 'steal', from: hit.from, res: hit.res };
     }
     case 'evict-voter':
-      return { kind: 'areas', areaIds: [...foreignAreas(s, me, n)] };
+      return areaPick(s, me, n, 'evict-voter', choice.choice.scope);
     case 'discard-voter':
     case 'convert-voter':
-      return { kind: 'areas', areaIds: [...foreignAreas(s, me, n)] };
+      return areaPick(s, me, n, choice.choice.kind, choice.choice.scope);
     default:
       // Unreachable against a corpus the cards package has validated. Returning
       // `null` makes the caller throw with the kind in the message, which is the
