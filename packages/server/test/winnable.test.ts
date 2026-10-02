@@ -24,27 +24,42 @@
  *
  *   | seats | finished | nine majorities | turn min / med / max | actions      |
  *   |-------|---------:|----------------:|---------------------:|-------------:|
- *   |     2 |     20/20 |          20/20  |  35 / 43 / 50        | 211 .. 267   |
- *   |     3 |     19/20 |          19/20  |  42 / 49 / 106       | 238 .. 452   |
- *   |     4 |     20/20 |          20/20  |  46 / 54 / 64        | 251 .. 326   |
- *   |     5 |     20/20 |          20/20  |  53 / 63 / 73        | 280 .. 373   |
+ *   |     2 |     20/20 |          20/20  |  39 / 51 / 59        | 227 .. 292   |
+ *   |     3 |     20/20 |          20/20  |  44 / 56 / 99        | 239 .. 463   |
+ *   |     4 |     20/20 |          20/20  |  50 / 64 / 87        | 265 .. 415   |
+ *   |     5 |     20/20 |          20/20  |  57 / 70 / 99        | 294 .. 481   |
  *
- * 79 of 80 games reach a nine-majority finish. The one exception is named and
- * characterised in its own test below rather than averaged away, so that a second
- * stalling seed fails instead of quietly raising a tolerated count.
+ * 80 of 80 games reach a nine-majority finish. No seed stalls, no seat count is
+ * partial, and every seat count goes PAST turn 52 — which is the whole claim, because
+ * 52 Ideology Cards drawn one per turn cannot reach turn 60 at all.
  *
- * THE DRIVER IMPROVEMENT, BEFORE AND AFTER
+ * THE DRIVER DOES NOT PEEK, AND THAT IS WHY THE NUMBERS ARE WHAT THEY ARE
  *
- * The driver that used to live in `e2e.test.ts` had a `targetZone` that fell back
- * to "first zone with room" whenever no zone could be won. Against the shipped
- * corpus that fallback was actively harmful: measured over 12 seeds x 4 seat
- * counts, 19 of 48 games filled all 129 areas and still ended with only 6 to 8 of
- * 9 zones decided, because the voters went to zones that could never reach a
+ * An earlier version of this driver chose the answer side by its payout, which meant
+ * reading the pending card off the authoritative state. That is reading a server-only
+ * field, the server's secrets gate forbids it, and — the part that matters — it is
+ * not something a player can do. The two labels are all a client gets; the payout is
+ * what the blind is hiding.
+ *
+ * So the driver always answers the left label now, and the result is BETTER, not
+ * worse: 3 seats went from 19/20 to 20/20. The seed that used to strand — 3 seats,
+ * seed 11, turn 364 with 117 of 129 areas pegged and two zones mathematically out of
+ * reach — now finishes with nine majorities. Peeking had been giving one seat a
+ * richer income than the other, which skewed the economy; answering consistently is
+ * both the honest claim and the stronger one.
+ *
+ * TWO OTHER DRIVER FIXES, both invisible to the synthetic corpus
+ *
+ * The `targetZone` that used to fall back to "first zone with room" whenever no zone
+ * could be won. Against the shipped corpus that fallback was actively harmful: over 12
+ * seeds x 4 seat counts, 19 of 48 games filled all 129 areas and still ended with only
+ * 6 to 8 of 9 zones decided, because the voters went to zones that could never reach a
  * threshold. Removing the fallback took the nine-majority rate to 48/48.
  *
- * The second fix was not optional. See `discardKeepingReserve` in `./driver.ts`:
- * a Funds-only reserve drove a player to `{funds: 12, clout: 0, media: 0, trust: 0}`
- * against a Mat it could not buy, and ground to turn 398 with 12 pegs on the board.
+ * And the cap discard, which kept a Funds-only reserve. Eight of the shipped corpus's
+ * 18 Voter Cards are priced with no Funds at all, so that rule drove a player to
+ * `{funds: 12, clout: 0, media: 0, trust: 0}` against a Mat it could not buy, and ground
+ * to turn 398 with 12 pegs on the board. See `discardKeepingReserve` in ./driver.ts.
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -124,24 +139,24 @@ describe('the shipped corpus is winnable at every seat count', () => {
           `not-nine ${rows.filter((r) => r.maj !== 9).map((r) => `s${r.seed}(maj${r.maj} peg${r.pegs})`).join(' ') || 'none'}`,
       );
 
-      // Every seed reaches an ending, except the one that is NAMED here and
-      // characterised in full below. Named rather than tolerated as a bare count,
-      // because "we allow one" rots into "we allow four" and nobody notices.
+      // Every seed reaches an ending. There is no tolerated list, and that is the
+      // point: an earlier driver had one entry in it and a "we allow one" tolerance
+      // is how a suite ends up allowing four.
       expect(
         stalled.map((r) => `seed ${r.seed} stalled on turn ${r.turn} with ${r.pegs} pegs and ${r.maj} majorities: ${r.run.reason}`),
-        `${n} players: the set of stalling seeds changed`,
-      ).toEqual(n === 3 ? ['seed 11 stalled on turn 364 with 117 pegs and 7 majorities: budget: 1200 actions'] : []);
+        `${n} players: a seed stalled`,
+      ).toEqual([]);
     });
 
     it(`${n} players: the ending is nine majorities, not a full board`, () => {
       const rows = sweepRows(n);
       // A full board is a legal ending (p20) but it is not a WIN, and removing the
-      // placement fallback is precisely what stopped it happening. So the assertion
-      // is nine majorities, and the one tolerated shortfall is NAMED.
+      // placement fallback is precisely what stopped it happening. So the assertion is
+      // nine majorities, on every seed, with no tolerated list.
       expect(
         rows.filter((r) => r.maj !== 9).map((r) => `seed ${r.seed}: ${r.maj} majorities, ${r.pegs} pegs`),
-        `${n} players: not every seed reached nine majorities`,
-      ).toEqual(n === 3 ? ['seed 11: 7 majorities, 117 pegs'] : []);
+        `${n} players: a seed did not reach nine majorities`,
+      ).toEqual([]);
 
       // Where nine majorities formed, the board genuinely carries the 69 pegs they
       // need — otherwise the count is a majority-holder field that disagrees with
@@ -151,99 +166,68 @@ describe('the shipped corpus is winnable at every seat count', () => {
       }
     });
 
-    it(`${n} players: how far past the turn-52 deck cliff the game reaches`, () => {
+    it(`${n} players: the game goes past the turn-52 deck cliff`, () => {
       // The shipped bug, restated as a winnability requirement: the old build ended
       // EVERY game on turn 52 and the game could not be won at any seat count.
       //
-      // The honest shape of this differs by seat count, and flattening it would be
-      // asserting a falsehood:
-      //
-      //  - **2 players finishes INSIDE the first pass of the deck** (turns 35-50).
-      //    Nine majorities from 36 recycled voters needs about 69 pegs, which two
-      //    seats reach before the 52nd Ideology Card is ever needed. So the
-      //    two-seat win does not depend on the recycle at all, and demanding it go
-      //    past 52 would be demanding a slower game.
-      //  - **3, 4 and 5 players go PAST 52**, and cannot do otherwise: 52 cards
-      //    drawn one per turn cannot reach turn 60. So a game past 52 is direct
-      //    evidence the Ideology deck recycled.
-      //
-      // Both are asserted, per seat count, because both are real claims.
+      // This is the assertion the whole exercise turns on, and it is a hard one:
+      // 52 Ideology Cards drawn one per turn cannot reach turn 60 AT ALL, so a game
+      // past 60 is direct evidence the Ideology deck recycled. Not `min(turn) > 52` —
+      // a seat count can legitimately finish sooner, and demanding it not would be
+      // demanding a slower game — but the DEEPEST game at every seat count, which
+      // must be well past.
       const turns = sweepRows(n).filter((r) => r.run.state.finished).map((r) => r.turn);
       expect(turns.length, `${n} players produced no finished games`).toBeGreaterThan(0);
       const deepest = Math.max(...turns);
-
-      if (n === 2) {
-        expect(deepest, '2 players: a two-seat game should win inside the first deck pass').toBeLessThan(SHIPPED_IDEOLOGY);
-        // …and it is a real win, not a fast non-win, which the nine-majority test
-        // above already covers. The pairing is the claim: winnable AND quick.
-        expect(deepest, '2 players: no seed reached a decided board at all').toBeGreaterThan(30);
-      } else {
-        expect(
-          deepest,
-          `${n} players: no seed reached past turn ${SHIPPED_IDEOLOGY}, so the Ideology recycle is not being exercised`,
-        ).toBeGreaterThan(SHIPPED_IDEOLOGY);
-        // A real margin, not turn 53. Measured maxima are 106 / 64 / 73.
-        expect(deepest, `${n} players: the deepest game only reached turn ${deepest}`).toBeGreaterThan(60);
-      }
+      expect(
+        deepest,
+        `${n} players: no seed reached past turn ${SHIPPED_IDEOLOGY}, so the Ideology recycle is not being exercised`,
+      ).toBeGreaterThan(SHIPPED_IDEOLOGY);
+      // And past 52 by a REAL margin, which is the part a 52-card deck cannot do at
+      // all. Measured maxima are 59 / 99 / 87 / 99: two seats clears 55, the three
+      // larger tables clear 80. A single floor for all four would either be trivially
+      // true of two seats or false of them, which is why it is per seat count.
+      const wellPast: Record<number, number> = { 2: 55, 3: 80, 4: 80, 5: 80 };
+      expect(deepest, `${n} players: the deepest game only reached turn ${deepest}`).toBeGreaterThan(wellPast[n] ?? 60);
     });
   }
 
-  it('the one seed that stalls is characterised, not quietly tolerated', () => {
-    // 3 players, seed 11, on the shipped corpus. Named here rather than left as a
-    // tolerated count in the sweep, because "we allow one" rots into "we allow
-    // four" and nobody notices.
+  it('the seed that used to strand now finishes — the driver got BETTER by peeking less', () => {
+    // 3 players, seed 11, on the shipped corpus. This test is here because it USED to
+    // be a tolerated failure, and the fix is worth pinning so it cannot silently come
+    // back.
     //
-    // WHAT IT IS, measured: the table reaches turn 364 with 117 of 129 areas pegged
-    // and 7 of 9 zones decided. The two remaining zones are MATHEMATICALLY out of
-    // reach — for every zone, the voters still free plus the ones a seat already
-    // holds fall short of its majority threshold — so no sequence of purchases can
-    // decide them. The board is also not full, so p20's board-full ending cannot
-    // fire either. The two seats whose votes would matter hold
-    // `{funds: 0, clout: 0, media: 8, trust: 4}` and
-    // `{funds: 0, clout: 0, media: 7, trust: 5}`: neither can afford any card on
-    // the Mat, and the turn income each earns is taken straight back by the p12
-    // cap, so neither ever accumulates enough to change that.
+    // WHAT IT WAS. The driver that chose its answer side by reading the pending card
+    // out of the authoritative state stranded here: turn 364, 117 of 129 areas pegged,
+    // 7 of 9 zones decided. Both remaining zones were mathematically out of reach —
+    // for every zone, the free areas plus the ones a seat held fell short of its
+    // majority — so no sequence of purchases could decide them, and the board was not
+    // full either, so p20's board-full ending could not fire. Two seats held
+    // `{funds: 0, clout: 0, media: 8, trust: 4}` and `{funds: 0, clout: 0, media: 7,
+    // trust: 5}`: neither could afford anything on the Mat, and the p12 cap took the
+    // turn income straight back. Same SHAPE as the bug that shipped — a game that
+    // cannot end — reached by a different mechanism.
     //
-    // So this is a genuine late-game stranding on the shipped corpus at 3 seats,
-    // not a driver defect. It IS however reachable from a legal seed, and it is the
-    // same SHAPE as the bug that shipped — a game that cannot end — reached by a
-    // different mechanism. That is worth watching, and the honest answer is that the
-    // game is winnable at 3 seats in 19 of 20 seeds and strands in 1.
+    // WHY IT IS FIXED, and not by relaxing the placement rule: that was tried,
+    // measured, and REJECTED, because it took 4 seats from 20/20 nine-majority endings
+    // to 12/20 and 5 seats from 20/20 to 6/20, and it did not fix this seed either.
     //
-    // It was ALSO attempted as a driver fix and REJECTED on measurement. Relaxing
-    // `targetZone` to accept "any zone with room" in the endgame squeeze did not fix
-    // seed 11, and it took 4 seats from 20/20 nine-majority endings to 12/20 and
-    // 5 seats from 20/20 to 6/20. The narrow, winnable-only rule is the right one.
+    // It is fixed by the driver no longer reading the card at all. Answering the
+    // funds-rich side gave one seat a systematically richer income than the other,
+    // which is both something no player can do and a worse game to simulate: the
+    // table's economy was being skewed by the test's own cheating. Answering the left
+    // label every time is what a player with no private information does, and 3 seats
+    // went from 19/20 to 20/20.
     const run = playInProcess(freshShippedCorpus(11, 3, ctx), ctx, { maxActions: 1200 });
-    expect(
-      run.state.finished,
-      '3 players seed 11 now finishes. That is good news and it means two tests are out of date: ' +
-        'this one, and the tolerated-shortfall list in "the ending is nine majorities". ' +
-        'Re-measure the sweep, update both, and delete this characterisation.',
-    ).toBe(false);
-    expect(run.state.turn, 'seed 11 should strand in the hundreds of turns, not stall immediately').toBeGreaterThan(200);
-    expect(pegsOn(run.state), 'seed 11 should strand with a nearly-full board').toBeGreaterThan(100);
-    expect(pegsOn(run.state), 'seed 11 should strand BEFORE a full board, or p20 would have ended it').toBeLessThan(129);
-    expect(majoritiesOn(run.state), 'seed 11 should strand with zones undecided').toBeLessThan(9);
-    // The mechanism, asserted rather than asserted-in-prose: the seats that would
-    // have to vote are unable to buy anything the Mat is offering. That is the whole
-    // of it — they are not empty, they hold media and trust, just not the
-    // combination any current card asks for, and the p12 cap takes the turn income
-    // back before they can assemble one.
-    const mat = run.state.market;
-    const canBuy = (res: Readonly<Record<string, number>>): boolean =>
-      mat.every((slot) => (Object.entries(slot.cost) as [string, number][]).every(([r, n]) => (res[r] ?? 0) >= n));
-    const stranded = run.state.turnOrder
-      .map((id) => run.state.players[id]?.resources)
-      .filter((p): p is NonNullable<typeof p> => p !== undefined)
-      .filter((p) => !canBuy(p));
-    expect(
-      stranded.length,
-      'seed 11 should strand with at least two seats unable to afford anything on the Mat',
-    ).toBeGreaterThanOrEqual(2);
+    expect(run.stalled, `seed 11 stalled again: ${run.reason}`).toBe(false);
+    expect(run.state.finished).toBe(true);
+    expect(majoritiesOn(run.state), 'seed 11 finishes, but not with nine majorities').toBe(9);
+    expect(pegsOn(run.state)).toBeGreaterThanOrEqual(MAJORITY_PEGS);
+    // And the deck recycled rather than exhausting, which is the mechanism the old
+    // build got wrong.
     expect(
       run.state.log.some((l) => l.text.includes('Ideology deck is exhausted')),
-      'seed 11 must strand with a recycling deck, not an exhausted one',
+      'seed 11 finished by exhausting the Ideology deck',
     ).toBe(false);
   });
 });
@@ -312,11 +296,12 @@ describe('a real-corpus game runs to completion over a real socket, at every sea
       const seat = seats.find((x) => x.playerId === s.activePlayer);
       if (seat === undefined) throw new Error(`no seat for the active player ${s.activePlayer}`);
 
-      // `_pendingCard` is a ServerOnlyKey and is stripped from `ClientState`, so it
-      // is read off the room's authoritative state rather than the client's view.
-      // Operator-side information; see `answerSide` in ./driver.ts.
+      // The driver gets the seat's own projection and nothing else. The pending-card id
+      // is a server-only field, stripped from `ClientState`, and the secrets gate
+      // forbids a test from reading it — correctly, because it is not something a
+      // client can do either. See `answerSide` in ./driver.ts.
       const view: ClientState = room.viewFor(s.activePlayer).state;
-      const action = nextAction(view, s.activePlayer, { cards: harness.ctx.cards, pendingCardId: s._pendingCard });
+      const action = nextAction(view, s.activePlayer);
       if (action === null) {
         throw new Error(
           `no legal action for ${s.activePlayer} in phase ${s.phase} — ` +

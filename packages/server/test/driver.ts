@@ -58,7 +58,6 @@ import {
   reduce,
   setup,
   type Action,
-  type CardIndex,
   type ChoicePick,
   type ClientState,
   type Ctx,
@@ -304,54 +303,41 @@ export function targetZone(s: ClientState, me: PlayerID, need: number): string |
 /**
  * Which side of the pending Ideology Card to answer.
  *
- * Both sides are public to the answering player — that is what the blind prompt is
- * — so choosing on payout is playing well, not cheating. Measured over the shipped
- * corpus: side 0 pays Funds on 22 of 52 cards, side 1 on 4. Voter Cards are priced
- * mostly in Funds, so the side that pays Funds is the side that keeps the board
- * filling.
+ * ALWAYS THE LEFT LABEL, and that is not a simplification — it is the point.
  *
- * `pendingCardId` is passed in rather than read off the view because
- * `_pendingCard` is a `ServerOnlyKey` and is stripped from `ClientState` — the
- * client is not told which card it holds, only what the two sides say. The test
- * harness reads it off the authoritative `GameState` the ROOM holds, which is
- * operator-side information and not something a player has. This does not weaken
- * the leak tests: `secret-state.test.ts` is what proves the card id does not reach
- * a client, and it runs separately.
+ * `ANSWER` takes the DISPLAY index the player was shown, and the room remaps it to
+ * the card's own `sides` tuple, so the client never learns which real side it picked.
+ * A driver that wants to pick the better-paying side has to read the card off the
+ * authoritative state, which means reading the pending-card id — a server-only field
+ * the server's own secrets gate forbids any test but the leak suite from naming.
  *
- * `cards` omitted means "answer side 0", which is always legal.
+ * So the gate is right and the driver is wrong. Choosing the side by its payout was
+ * never something a player can do: the two labels are all they get, and the payout
+ * is what the blind is hiding. "Always answer the left label" is what a player with
+ * no private information does, so the winnability claim below is now a claim about
+ * the game as a client experiences it rather than one that peeks.
+ *
+ * The `cards` / `pendingCardId` parameters this function used to take are GONE, and
+ * their absence is the assertion. They are not defaulted and not threaded through:
+ * a defaulted parameter is one `undefined` away from being passed again, and a
+ * re-introduced peek would be invisible in every caller.
  */
-export function answerSide(
-  cards: CardIndex | undefined,
-  pendingCardId: string | null | undefined,
-): 0 | 1 {
-  if (cards === undefined || pendingCardId === null || pendingCardId === undefined) return 0;
-  const card = cards.ideology[pendingCardId];
-  if (card === undefined) return 0;
-  const fundScore = (i: 0 | 1): number => {
-    const pays = card.sides[i]?.pays;
-    if (pays === undefined) return 0;
-    // Funds first (that is what buys voters), then total, as a tiebreak.
-    return (pays.funds ?? 0) * 10 + sum(pays);
-  };
-  return fundScore(0) >= fundScore(1) ? 0 : 1;
+export function answerSide(): 0 | 1 {
+  return 0;
 }
 
 /**
  * Pick a legal action from an authoritative view of the table, for `me`.
  *
  * `view` is the projection the SEAT would be sent, so a decision this function
- * makes is one the seat could have made. `pendingCardId` is the one exception,
- * documented on `answerSide`.
+ * makes is one the seat could have made. There is no longer an `opts` escape hatch,
+ * and that is deliberate — see `answerSide`, which used to be where one lived.
  *
  * Returns `null` only when the table is finished or it is somebody else's move. A
  * driver that returns `null` for a seat that IS on move is a driver bug, and the
  * callers turn that into a thrown error rather than a skip.
  */
-export function nextAction(
-  view: ClientState,
-  me: PlayerID,
-  opts: { readonly cards?: CardIndex; readonly pendingCardId?: string | null } = {},
-): Action | null {
+export function nextAction(view: ClientState, me: PlayerID): Action | null {
   if (view.finished) return null;
 
   // Choices are resolved BEFORE turn order, and that ordering is the whole point of
@@ -369,7 +355,7 @@ export function nextAction(
 
   if (view.activePlayer !== me) return null;
   if (view.phase === 'answer') {
-    return { type: 'ANSWER', side: answerSide(opts.cards, opts.pendingCardId) };
+    return { type: 'ANSWER', side: answerSide() };
   }
   if (view.phase === 'headlines') return { type: 'ACK_HEADLINE' };
   if (view.phase !== 'actions') return null;
@@ -445,7 +431,7 @@ export function shouldSqueeze(view: ClientState, me: PlayerID): boolean {
  *
  * It reads the seat's own projection via `playerView`, exactly as the room does, so
  * a decision here is one the seat could have made. The single piece of operator-side
- * information it passes is `_pendingCard`, documented on `answerSide`.
+ * It passes no operator-side information at all, which is the point; see `answerSide`.
  */
 export function playInProcess(
   start: GameState,
@@ -471,10 +457,7 @@ export function playInProcess(
     const open = state.choices[0];
     if (open !== undefined) {
       choiceKinds.add(open.choice.kind);
-      const action = nextAction(playerView(state, open.player), open.player, {
-        cards: ctx.cards,
-        pendingCardId: state._pendingCard,
-      });
+      const action = nextAction(playerView(state, open.player), open.player);
       if (action === null) {
         return { state, actions, finished: false, stalled: true, reason: `no action for open choice ${open.choice.kind}`, refusals, choiceKinds };
       }
@@ -528,7 +511,7 @@ export function playInProcess(
       }
     }
 
-    const action = nextAction(view, p, { cards: ctx.cards, pendingCardId: state._pendingCard });
+    const action = nextAction(view, p);
     if (action === null) {
       return { state, actions, finished: false, stalled: true, reason: `no legal action in phase ${view.phase}`, refusals, choiceKinds };
     }

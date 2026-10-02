@@ -158,12 +158,22 @@ const ctx: Ctx = { rules: RULES, cards };
 const MATCH = 'm-live-effects';
 const P1: PlayerID = 'p1';
 
+/**
+ * The match seed, as a CONSTANT rather than read off the dealt state.
+ *
+ * The state's own seed is a server-only field and the secrets gate is right that a
+ * test has no business reading it. It does not need to: the seed is an INPUT to
+ * `setup`, so the test picks it, and `replay` is then required to reproduce the game
+ * from this number alone — which is the property under test.
+ */
+const SEED = 4242;
+
 function startState(): GameState {
   return setup({
     players: [P1, 'p2'],
     names: { [P1]: 'Ada', p2: 'Bo' },
     cards,
-    seed: 4242,
+    seed: SEED,
     ideologyDeck: Object.keys(cards.ideology),
     voterDeck: Object.keys(cards.voter),
     conspiracyDeck: Object.keys(cards.conspiracy),
@@ -230,7 +240,7 @@ async function recordGame(extraActions: number): Promise<{ store: InMemoryMatchS
   await store.create(
     {
       matchId: MATCH,
-      seed: state._seed,
+      seed: SEED,
       rules: RULES,
       cards,
       players: [
@@ -304,7 +314,7 @@ async function recordGame(extraActions: number): Promise<{ store: InMemoryMatchS
         action = slot < 0 ? { type: 'END_TURN' } : { type: 'INFLUENCE', slot };
       }
     } else {
-      action = nextAction(view, p, { cards, pendingCardId: state._pendingCard });
+      action = nextAction(view, p);
     }
 
     if (action === null) throw new Error(`no legal action for ${p} in phase ${state.phase}`);
@@ -372,22 +382,31 @@ describe('a persisted, in-flight live effect survives replay', () => {
     expect(derived.state.liveEffects, 'a full replay lost or altered a live effect').toEqual(
       replay({ stored, ctx }).state.liveEffects,
     );
-    // The ids come from `GameState._idSeq`, a counter in the state rather than at
-    // module scope, so a replay cannot re-mint them differently — and a trigger hook
-    // is keyed on them, so a divergence here would be a live effect firing against the
-    // wrong entry. Asserted as a property, not as a literal: the counter is shared
-    // with every other id the engine mints, so the exact numbers depend on how much
-    // else the game did, and pinning them would make the test fail for an unrelated
-    // reason the next time the engine mints one more thing.
+    // The ids are minted from a counter that lives in the STATE rather than at module
+    // scope, so a replay cannot re-mint them differently — and a trigger hook is keyed
+    // on them, so a divergence here would be a live effect firing against the wrong
+    // entry. Asserted as a property, not as a literal: the counter is shared with every
+    // other id the engine mints, so the exact numbers depend on how much else the game
+    // did, and pinning them would make this fail for an unrelated reason the next time
+    // the engine mints one more thing.
     const ids = derived.state.liveEffects.map((le) => le.id);
     expect(ids.length, 'no live effects to check ids for').toBeGreaterThan(0);
     for (const id of ids) expect(id, `live effect id ${id} is not from the state counter`).toMatch(/^L\d+$/);
     expect(new Set(ids).size, 'two live effects share an id').toBe(ids.length);
-    expect(derived.state._idSeq, 'the id counter itself must replay').toBe(replay({ stored, ctx }).state._idSeq);
+    // The counter itself is a server-only field, so it is NOT read here — but the
+    // property it exists to guarantee is checked without it: the ids are drawn from
+    // one shared sequence, so they strictly increase in install order and the replay
+    // produces the SAME numbers. A replay that re-minted `L10` as `L3` would pass a
+    // shape check and fail this.
+    const numbers = ids.map((id) => Number(id.slice(1)));
     expect(
-      Math.max(...ids.map((id) => Number(id.slice(1)))),
-      'a live effect id is beyond the replayed _idSeq, so the ids did not come from the same counter',
-    ).toBeLessThanOrEqual(derived.state._idSeq);
+      numbers.every((n, i) => i === 0 || n > (numbers[i - 1] ?? 0)),
+      `live effect ids are not increasing in install order: ${ids.join(', ')}`,
+    ).toBe(true);
+    // And the replay mints the same ones, which is the whole claim.
+    expect(derived.state.liveEffects.map((le) => le.id), 'a replay re-minted different live effect ids').toEqual(
+      replay({ stored, ctx }).state.liveEffects.map((le) => le.id),
+    );
   });
 
   it('the snapshot path agrees, and the snapshot survives a JSON round trip', async () => {
@@ -550,7 +569,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
       players: [P1, 'p2'],
       names: { [P1]: 'Ada', p2: 'Bo' },
       cards,
-      seed: 4242,
+      seed: SEED,
       ideologyDeck: Object.keys(cards.ideology),
       voterDeck: Object.keys(cards.voter),
       conspiracyDeck: Object.keys(cards.conspiracy),
@@ -562,7 +581,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
       players: [P1, 'p2'],
       names: { [P1]: 'Ada', p2: 'Bo' },
       cards,
-      seed: 4242,
+      seed: SEED,
       ideologyDeck: Object.keys(cards.ideology),
       voterDeck: Object.keys(cards.voter),
       conspiracyDeck: Object.keys(cards.conspiracy),
@@ -582,7 +601,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
       players: [P1, 'p2'],
       names: { [P1]: 'Ada', p2: 'Bo' },
       cards,
-      seed: 4242,
+      seed: SEED,
       ideologyDeck: Object.keys(cards.ideology),
       voterDeck: Object.keys(cards.voter),
       conspiracyDeck: Object.keys(cards.conspiracy),

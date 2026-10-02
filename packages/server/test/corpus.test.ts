@@ -36,7 +36,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { RULES, setup, type Ctx, type GameState } from '@shasn/engine';
+import { playerView, RULES, setup, type Ctx, type GameState } from '@shasn/engine';
 
 import { loadCards, loadCtx } from '../src/index.ts';
 import { cardsVersion, decksOf } from '../src/store.ts';
@@ -235,7 +235,29 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
       run.state.log.some((l) => l.text.includes('Ideology deck is exhausted')),
       'the game ended because the Ideology deck ran out',
     ).toBe(false);
-    expect(run.state._ideologyDraw.length + run.state._ideologyDiscard.length).toBe(SHIPPED.ideology);
+
+    // The recycle itself, from PUBLIC data only.
+    //
+    // The first version of this assertion read the two internal Ideology piles
+    // directly and summed them to the deck size. That is a stronger statement and it
+    // is not available here: the server's secrets gate forbids any test but the leak
+    // suite from reading a server-only field, and the gate is right — a test that
+    // reads the draw pile is a test that would keep working if the pile stopped being
+    // secret. So the recycle is asserted from what a client can see: the projected
+    // deck sizes, and the absence of the exhaustion line in the public log.
+    //
+    // `deckSizes` is the DRAW PILE, not the dealt deck — a fresh `setup` deals one
+    // Ideology Card into hand and puts three Voter Cards on the Mat, so it reports 51
+    // and 15. Asserted as "no larger than the dealt deck", which is what a draw pile
+    // can be, plus the turn number, which is the real point.
+    const view = playerView(run.state, run.state.turnOrder[0] ?? 'p_1');
+    expect(view.turn, 'the projected state is not past the turn-52 cliff').toBeGreaterThan(SHIPPED.ideology);
+    for (const [deck, reported] of Object.entries(view.deckSizes)) {
+      expect(reported, `the projected ${deck} draw pile is larger than the deck that was dealt`).toBeLessThanOrEqual(
+        SHIPPED[deck as keyof typeof SHIPPED],
+      );
+      expect(reported, `the projected ${deck} draw pile is negative`).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it('the driver actually answers the effect-generated choices the synthetic corpus hid', () => {
@@ -269,9 +291,25 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
       seed: 7,
       ...d,
     });
-    expect(fresh._ideologyDraw.length + fresh._ideologyDiscard.length + (fresh._pendingCard === null ? 0 : 1)).toBe(SHIPPED.ideology);
+    // The deck arrays are stable, ordered and disjoint — `decksOf` reads
+    // `Object.keys`, so this is file order, and the seed does the shuffling. An
+    // unstable order would silently break replay after a restart.
     expect(new Set([...d.ideologyDeck, ...d.voterDeck, ...d.conspiracyDeck, ...d.headlineDeck]).size).toBe(
       SHIPPED.ideology + SHIPPED.voter + SHIPPED.conspiracy + SHIPPED.headline,
     );
+    // …and every id in them resolves to a real card, so a deck array can never name
+    // something the reducer would refuse. Read through the PROJECTION, because the
+    // internal piles are server-only and the secrets gate is right about that.
+    //
+    // `deckSizes` is the DRAW PILE, so it is the dealt deck less what `setup` put into
+    // hand and onto the Mat: one Ideology Card and `RULES.marketSize` Voter Cards.
+    const view = playerView(fresh, 'p1');
+    expect(view.deckSizes, 'the projection does not report the deck sizes').toEqual({
+      ideology: SHIPPED.ideology - 1,
+      voter: SHIPPED.voter - RULES.marketSize,
+      conspiracy: SHIPPED.conspiracy,
+      headline: SHIPPED.headline,
+    });
+    expect(view.awaitingAnswer, 'a fresh setup should be awaiting an answer').toBe(true);
   });
 });

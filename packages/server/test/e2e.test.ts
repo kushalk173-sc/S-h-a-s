@@ -199,10 +199,11 @@ describe('a 2-player game runs to completion over a real socket', () => {
       // The transport is still fully exercised, because the action goes out over a
       // real socket and the assertions read what the CLIENTS were actually sent.
       const view: ClientState = room.viewFor(s.activePlayer).state;
-      // `_pendingCard` is a ServerOnlyKey stripped from `ClientState`, so the driver
-      // is handed the card id from the room's authoritative state. Operator-side
-      // information; see `answerSide` in ./driver.ts.
-      const action = nextAction(view, s.activePlayer, { cards: h.ctx.cards, pendingCardId: s._pendingCard });
+      // The driver is handed NOTHING beyond the seat's own projection, which is the
+      // discipline: the pending card id is a server-only field, and a winnability
+      // driver that reads it is not simulating what a client can do. See `answerSide`
+      // in ./driver.ts.
+      const action = nextAction(view, s.activePlayer);
       if (action === null || seat === undefined) {
         throw new Error(
           `no legal action for ${s.activePlayer} in phase ${s.phase} — ` +
