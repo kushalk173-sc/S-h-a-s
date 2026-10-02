@@ -627,57 +627,60 @@ export function GameScreen({ store }: GameScreenProps) {
       />
 
       <div className="shell__body">
-        {/*
-          THE BOARD'S BOX, AND WHAT IT ACTUALLY DOES — MEASURED, NOT ASSUMED.
+{/*
+          THE BOARD'S BOX, AND WHAT ACTUALLY HOLDS IT UP.
 
           This comment used to say that `BoardSvg` needed an aspect-ratio wrapper
           and `height="100%"` because an SVG with no intrinsic height collapses to
           zero, and that the board had been rendering 0x0 with 258 nodes in the DOM
-          and nothing on screen. THAT IS NOT WHAT THE CODE DOES, and the account was
-          left behind by a fix that has since been superseded. Re-measured in
-          headless Chrome against a real match on a real server, 2026-10-01:
+          and nothing on screen. Both halves of that are wrong, and the second one
+          was measuring the wrapper rather than the board.
 
-            viewport      <svg> box    board CONTENT      dead gutter   content uses
-            780x890       725 x 700    429.33 x 675.59    147.8 / 147.8      59.2%
-            350x525       310 x 335    205.47 x 323.32     52.3 /  52.3      66.3%
-            1440x960      780 x 770    472.27 x 743.15    153.9 / 153.9      60.6%
+          MEASURED, in headless Chrome against a live match on a real server,
+          2026-10-02, with the reveal frame forced clear so the reserve is not
+          moving underneath the numbers. `land` is the board's own rect — what a
+          player actually looks at — not the wrapper's:
 
-          617 nodes, 129 slots, and a box with real dimensions at every viewport.
-          There is no zero-height collapse to fix, so the justification for this
-          arrangement is gone. Two further measurements retire the mechanism it
-          named:
+            page        wrapper        the board itself   nodes  slots
+            1600x1000   780 x 610.00   374.13 x 588.73     617    129
+            1440x960    780 x 770.00   472.27 x 743.15     617    129
+            1280x900    780 x 710.00   435.47 x 685.24     617    129
+             900x900    493 x 710.00   435.47 x 685.24     617    129
 
-            1. `BoardSvg` always emits `viewBox="0 0 1000 1500"` ALONGSIDE the
-               `width`/`height` attributes. An SVG with a viewBox has an intrinsic
-               aspect ratio, and these two are handed `width="100%" height="100%"`
-               explicitly. The premise — an SVG here with no intrinsic height — does
-               not hold.
-            2. Neutralising the wrapper's `aspect-ratio` at runtime (leaving
-               everything else alone) does NOT collapse anything. The wrapper stays
-               at its `max-height` and the <svg> grows to 1087.5px — the CORRECT
-               1000:1500 height for 725px of width. So the wrapper's `aspect-ratio`
-               is not what keeps the board off zero.
+          There is no zero-height collapse: 617 nodes, 129 slots and a box with
+          real dimensions at every viewport. The premise about the SVG does not hold
+          either — `BoardSvg` always emits `viewBox="0 0 1000 1500"` alongside the
+          `width`/`height` attributes, and an SVG with a viewBox has an intrinsic
+          aspect ratio.
 
-          WHAT IS ACTUALLY WRONG, and it is a different defect than the one this
-          comment used to describe. `.board__canvas` sets `aspect-ratio: 1000/1500`
-          AND `max-height`, and they contradict each other: at 780x890 the aspect
-          wants 1087.5px and the clamp caps the box at 700px. The <svg> is told
-          `height="100%"`, so it dutifully fills the 700px it was given; with
-          `preserveAspectRatio` at its default `xMidYMid meet`, the 1000x1500
-          content then scales to the SHORTER axis and centres on the longer one. The
-          board is drawn at 429px inside a 725px box, with ~148px of dead gutter on
-          each side — about 40% of the available width thrown away, at every
-          viewport measured. Removing the wrapper's `aspect-ratio` alone renders it
-          at 667px of 725px (92%) with the correct proportions.
+          ── AND THE "dead gutter" IS NOT A BUG EITHER ──
 
-          NOT CHANGED HERE, deliberately. The fix is a one-line change to
-          `.board__canvas` in `app.css` — drop `aspect-ratio` and let the SVG's own
-          viewBox ratio size it, or drop `height="100%"` and let `max-height` scale
-          the box. Both are a visual decision about how much of the viewport the
-          board should occupy, which belongs to whoever owns the board's layout, and
-          it is recorded here rather than made silently. The one thing that was wrong
-          in this file — a comment claiming a 0x0 bug that does not occur — is
-          corrected.
+          `.board__canvas` sets `aspect-ratio: 1000/1500` AND `max-height`, which
+          read as a contradiction: the aspect wants 1.5x the width, the clamp caps
+          the height, and `preserveAspectRatio` letterboxes the result — so at
+          1440x960 the board draws 472px of content inside a 780px wrapper and
+          ~154px goes to waste on each side. The reading is correct about the
+          letterbox and wrong about the waste, because the board is HEIGHT-bound:
+          it is already as large as the 190px reserve allows, and surplus width is
+          not convertible into anything.
+
+          Both candidate rules were A/B'd into the SAME live page at those four
+          viewports, so the only variable was the rule:
+
+            page        width cap (new)      height cap (current)   the board
+            1600x1000   box 406.66 x 609.98  box 780.00 x 609.98    374.12 x 588.72
+            1440x960    box 513.33 x 769.98  box 780.00 x 770.00    472.26 x 743.14
+            1280x900    box 473.33 x 709.98  box 780.00 x 710.00    435.46 x 685.23
+             900x900    box 473.33 x 709.98  box 493.00 x 710.00    435.47 x 685.24
+
+          The board's rect is the SAME to a hundredth of a pixel in every row, at
+          the same distance below the fold. The width cap only makes the wrapper
+          tight, and at 900x900 it gives up 20px of width for nothing. So the
+          pairing stays and this comment no longer claims a fix that was measured
+          and found not to be one. Making the board BIGGER is a different question:
+          190px is the topbar, the shell padding and the log rail, and the board
+          already has all the height that leaves. That is a different reserve, not a
+          different box, and it is not this comment's decision to take.
         */}
         <div className="shell__board tabs" data-tabpanel="board" data-active={tab === 'board'}>
           <div className="board__canvas">

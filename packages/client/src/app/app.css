@@ -84,6 +84,36 @@
  * it is on screen. 1000x1500 is `BOARD_WIDTH`/`BOARD_HEIGHT` from
  * `board/geometry.ts`, which is where the viewBox comes from, and `max-height` keeps
  * a tall viewport from pushing the mat (§9.5) below the fold on a desktop.
+ *
+ * ── `aspect-ratio` AND `max-height` LOOK LIKE A CONTRADICTION. THEY ARE NOT. ──
+ *
+ * The obvious reading is that the aspect wants 1.5× the width, the clamp caps the
+ * box at a fixed height, and the SVG — handed `width="100%" height="100%"` — is
+ * then told to fill a box of the wrong shape and letterboxes its content on the
+ * longer axis. That is what happens. It is also, measured, free.
+ *
+ * The letterspacing argument says the *board* is small. It is not: the board is
+ * HEIGHT-bound, so it is already as large as this reserve allows, and the surplus
+ * width is not something a wider box could convert into anything. A/B'd against a
+ * live match at four viewports, with the reveal frame forced clear and both rules
+ * injected into the same page (2026-10-02):
+ *
+ *     page          NEW width cap            OLD height cap          the board (land)
+ *     1600x1000     box 406.66 x 609.98      box 780.00 x 609.98     374.12 x 588.72
+ *     1440x960      box 513.33 x 769.98      box 780.00 x 770.00     472.26 x 743.14
+ *     1280x900      box 473.33 x 709.98      box 780.00 x 710.00     435.46 x 685.23
+ *      900x900      box 473.33 x 709.98      box 493.00 x 710.00     435.47 x 685.24
+ *
+ * The board's own rect is the SAME to within a hundredth of a pixel in every row,
+ * at the same position and the same distance below the fold. The width cap only
+ * makes the wrapper tight, and at 900×900 it is very slightly worse: it gives up
+ * 20px of box width for the privilege of being narrower. So the pairing stays, and
+ * `GameScreen.tsx`'s note beside this box says so with the same numbers.
+ *
+ * Making the board BIGGER is a different question and it does not have an answer
+ * here: 190px is the topbar, the shell padding and the log rail, and the board
+ * already has all of the height that leaves. That would be a different reserve, not
+ * a different box.
  */
 .board__canvas {
   width: 100%;
@@ -110,6 +140,18 @@
    */
 .shell[data-reveal='true'] .board__canvas {
   max-height: calc(100vh - 390px);
+}
+
+/*
+   * G13: the response window's BANNER is in the same flow above the board, so the
+   * reserve has to know it is there — the same reason, the same route. Without
+   * this the band and the board fight over the viewport and the mat goes under the
+   * fold (§9.5). 380px is the band's own measured height plus the 190px this rule
+   * already reserved; the modal needs no rule of its own, because it is
+   * `position: fixed` and covers the board anyway.
+   */
+.shell[data-window='true'] .board__canvas {
+  max-height: calc(100vh - 380px);
 }
 
 .board__canvas > svg {
@@ -1057,13 +1099,9 @@
   font-weight: 800;
 }
 
-/* The banner is in the flow above the board, so the board's `max-height` reserve
-   has to know it is there — the same reason `.shell[data-reveal]` does. Without
-   this the band and the board fight over the viewport and the mat goes under the
-   fold (§9.5). The modal needs no rule: it is `position: fixed`. */
-.shell[data-window='true'] .board__canvas {
-  max-height: calc(100vh - 380px);
-}
+/* The banner's board-reserve rule lives with the board itself, beside
+   `.shell[data-reveal='true']`, because that is the only place the 190px reserve
+   and the arithmetic that spends it are written down. */
 
 /* ── Lobby ──────────────────────────────────────────────────────────────────
    §5.1: a sheet of paper on the table, centre column max-width 720px. */
