@@ -12,9 +12,10 @@ kept because they are still true. §3 is the handoff.
 
 ## 0bis. What the effect-execution substrate iteration landed
 
-Three engine changes, in this order, each a green commit. `npm run playable` — which
+Two engine changes, in this order, each a green commit. `npm run playable` — which
 **plays** each reduction through the real reducer rather than asking whether the
-schema accepts it — went from **14 of 54** to **18 of 54**.
+schema accepts it — went from **14 of 54** to **18 of 54**, and then from **21 of 54**
+to **23 of 54** in the phase-machine iteration recorded in §2 G13.
 
 | gap | what landed | cards moved |
 |---|---|---|
@@ -35,15 +36,20 @@ cannot buy). **No `_`-prefixed field was added.** `live-effects.test.ts` asserts
 property rather than trusting the argument — including that a live effect never
 names a Conspiracy Card a player is still holding.
 
-**The honesty gate grew a second seam.** `applyEffect` decides what ONE resolution
-does; `installLiveEffects` decides what LINGERS, one function above it. Slicing
-`applyEffect` cannot see a field read by the installer, so
+**The honesty gate grew a THIRD seam.** `applyEffect` decides what ONE resolution
+does; `installLiveEffects` decides what LINGERS, one function above it; and
+`RESPOND_INTERRUPT` decides what happens when a card's resolution is INTERRUPTED,
+hundreds of lines away in a `case` of `reduce` itself. Slicing `applyEffect` cannot
+see the third one at all, so declaring `interrupt` in `EXECUTED_OPS` would have made
+the re-derivation a lie and forced the test to be weakened to fit the registry.
 `reducer-parity.test.ts` now re-derives `SCOPE_FIELDS_READ_BY_INSTALL` from
-`installLiveEffects`'s own source text, and `EXECUTABLE_TRIGGERS` from every
-`trigger: '…'` raise site in `reduce.ts`. A `when` naming an event the reducer never
-raises installs a hook that never wakes — a card that reads as though something
-happens on every purchase, and nothing ever happens — so the registry is checked
-against the reducer in both directions, and against the JSON Schema's enum.
+`installLiveEffects`'s own source text, `EXECUTABLE_TRIGGERS` from every
+`trigger: '…'` raise site in `reduce.ts`, and `EXECUTED_INTERRUPT_OPS` /
+`_WINDOWS` / `_TARGETS` from `REACTIVE_INTERRUPTS` and `mayRespond`. A `when` naming
+an event the reducer never raises installs a hook that never wakes — a card that
+reads as though something happens on every purchase, and nothing ever happens — so
+the registry is checked against the reducer in both directions, and against the JSON
+Schema's enum.
 
 ### 0b.1 The rulings this iteration made, so the next person does not re-derive them
 
@@ -359,19 +365,144 @@ concept of an object moving between players mid-round.
 **Ask:** an owner on the card, a `GameState` queue of in-flight cards, and a
 "does this player have a card to pass?" gate in the turn state machine.
 
-### G13 — five PHASE-CHANGING ops that do not belong in `Effect[]`
+### G13 — five PHASE-CHANGING ops — **THE MACHINE LANDED, AND TWO OF THE FIVE WITH IT**
 
-**State: (b), and the design call is made: they are not effects.**
-`block` / `deflect` / `auction` / `vote` / `pass-card` are modelled as a **sibling
-card-level field**, `Interrupt`, deliberately outside `Effect[]` — REF §5.4 is
+**State: (a) for `block` and `deflect`. Still (c) for `auction`, `vote` and
+`pass-card`, ruled out below with a cost.**
+
+The design call made earlier still stands and was not re-litigated: these five are a
+**sibling card field**, `Interrupt`, deliberately outside `Effect[]` — REF §5.4 is
 emphatic that they change *which phase of play is running*, not how many resources
-anyone holds, so no parameterisation of the effect list will express them. They are
-schema-valid and refused by the validator with the reason.
+anyone holds.
 
-**Cards gained: 0, and BLOCK and DEFLECT remain the two most-replayed cards in the
-real product.** This is the largest remaining gap by reach.
+**What landed is one nullable `GameState.interrupt`, not a new `Phase`.** The
+reason is another package: `packages/server/src/broadcast.ts` decides whether to
+show a player their Conspiracy hand by testing `phase === 'actions' || 'answer'`, so
+a new `Phase` member would black out every hand for exactly as long as the window is
+open — including the hand of the player holding the BLOCK. That file is not this
+project's to change, so `phase` keeps saying which phase of *play* it is and the
+window is a suspension inside one. A card with a non-empty effect list that somebody
+could answer is **staged**; `RESPOND_INTERRUPT` plays a held BLOCK or DEFLECT into the
+window, and `PASS_INTERRUPT` declines it. The window closes on the first answer, or
+when every player it is waiting on has declined.
 
-**Ask:** the phase machine, not `applyEffect`. §3.
+**Cards gained: 2, and they are the two the product replays most.**
+`npm run playable`, measured by playing each reduction through the real reducer, went
+**from 21 of 54 to 23 of 54**. BLOCK and DEFLECT both report PLAYED. Two named
+deviations, both on the type and both in the probe's `note`: DEFLECT redirects the
+**whole** resolution rather than "only that partial effect" on the defender
+(`applyEffect` computes one `target` for an effect list, so per-effect granularity is
+G20), and it ships `target: 'any-card'` rather than `card-affecting-you`, because "a
+card that affects **you**" needs a decision over players and that is G1.
+
+**The visibility decision, and the field that must never be added.**
+`GameState.interrupt` is **public and unprefixed**, so `secret-inventory.ts` owes
+nothing. The full argument is on `InterruptWindow` in `state.ts`; the load-bearing
+part is that **there is no `responders` list and no list of who holds a reactive
+card.** A Conspiracy Card hand is a hidden hand, and such an array would tell every
+client who is holding a BLOCK. Eligibility is computed from the hidden hands at the
+moment a card is played and only the window reaches the state. `actor` / `cardId` /
+`effects` name a card the same action already logged by name and discarded, so the
+payload says nothing the log did not; `responder` and `deflectedTo` are null while
+the window is open; `passed` records people who **declined**, which reveals nothing
+about a hand. **The one residual, stated rather than hidden:** an open window tells
+every client that *somebody* holds a reactive card. It names no player. The
+alternative is a window that opens silently, which leaves a real client no way to
+know it is anybody's turn to act — a product deadlock traded for one bit about one
+unknown player. The engine takes the bit, and it is the same class of disclosure as
+`ClientState.awaitingAnswer`. **No `_` field was added.** It could not be: that file
+pins the `_` set to exactly eleven and this package may not edit it, which is a
+second and independent reason the field is unprefixed.
+
+**The termination argument is bounded three ways, all tested.** One answer per
+window, because BLOCK "cannot be reversed or deflected" — four reactive cards across
+two opponents still close the window on the first one played. Every player the window
+waits on always has `PASS_INTERRUPT`, so it is always closable in at most `n - 1`
+declines, asserted at 2, 3, 4 and 5 seats. And `RESOLVE_CHOICE` stays legal
+throughout, so a player frozen by p12's cap discard is neither required to decline
+nor a hostage. There is no counter and no clock, and the two closing conditions are
+monotone, so no cascade is reachable. The hostile cases have their own tests: a
+BLOCK on the player about to answer, and a BLOCK on the conspiracy whose own player
+is mid-window.
+
+**`window` and `target` were NARROWED from three values each to two**, and that was
+the price of the honesty gate. `Interrupt.window` lost `'out-of-turn'` because
+`RESPOND_INTERRUPT` already refuses the actor of a card, which was the whole of its
+meaning; `Interrupt.target` lost `'any-player'` because it is indistinguishable from
+`'any-card'` in every position the window can be in. A value the reducer cannot act
+on is a declaration it ignores, which is the exact failure `src/executable.ts` exists
+to prevent.
+
+### G13b — AUCTION: **RULED OUT OF SCOPE, with the cost written down**
+
+**Ruling: not built now.** The reasoning is the same in all three cases, and it is not
+"too big" — it is that **none of the three buys a card on its own**, so building one
+means building two mechanisms to get zero.
+
+**`auction` is a rules SYSTEM, not an op, and the audit that said so was right.**
+`docs/rules-reference.md` §6 (p25) has a bidder commit **up to their resource cap
+without holding the resources**, settle on an **IOU token** held by the seller, and
+**cannot make any purchases until the bid is fully paid**. That needs, at minimum:
+
+- `PlayerState.debts` — a field that **persists**, **expires**, appears in the client
+  payload, and is consulted by `INFLUENCE` and `BUY_CONSPIRACY`. This is the same
+  shape of problem as G5's `Restriction`, and G5's note says why it is not free.
+- A **cap ruling**: p12 says "if at any time you cross your resource cap … you cannot
+  take any other actions until you do so", checked *before any other action*. A
+  bidder at their cap bidding resources they do not hold is in direct tension with
+  that, and the answer is a rules decision, not an implementation.
+- Debt is **negative resources**, and every pool read in the engine (`canAfford`,
+  `enforceCap`, `poolTotal`) and in the balance checker currently assumes
+  non-negative. Retrofitting that touches the resource layer, not the card layer.
+- Four new actions (open, bid, pass-on-bid, settle) plus a second window protocol.
+
+**And it buys nothing.** The two real auction cards are A CALL FROM KARACHI (also G17
+deck search *and* G20 card moving) and QUANTUM WRISTBAND (also G14 deck-search
+override *and* G20). **Cost: roughly a second iteration of this one**, for zero
+playable cards at the end of it. That is the definition of half-building, and the
+brief's instruction not to half-build it is the reason this is written down instead.
+
+### G13c — VOTE and PASS-CARD: **RULED OUT, for the same reason and a cheaper one**
+
+- **`vote`** (NEXT BILLION DATA POINTS) needs a ballot, a no-self-vote rule, and a
+  **re-vote-on-tie loop that is a genuine termination hazard** — two opponents who
+  always tie is a table that never finishes, which is precisely the class of failure
+  §4 above refuses to accept. It also buys nothing: the payoff is *"the next
+  Conspiracy Card in the draw pile … up for grabs"*, handed to a chosen player, which
+  is **G20 card movement** and a G17 deal. The ballot without the payoff is half a
+  system.
+- **`pass-card`** has **no referent**. It needs something to pass the card *on to*:
+  G12's in-flight `GameState` queue with an owner, a position in the turn order and a
+  turn-boundary deadline, plus G20's `move-card` op and a `PlayerState.ideologyCards`
+  list — and reassigning Ideology Cards breaks the blind-answer invariant
+  `playerView.ts` tests for, which is a decision this package may not take unilaterally
+  either. Its three real cards are blocked on those anyway: HIGGS MORON on G10's token
+  counter as well, A COWARD OR A JOURNALIST? and CARD GAMES on the movement itself.
+
+**What a card author gets instead of a silent gap:** each of the three has its own
+refusal message naming the system it needs — `auction` names the IOU and the debt
+field, `vote` names the ballot, `pass-card` names the fact that it has no referent —
+rather than "add a case to `applyEffect`", which is not what any of them is short of.
+
+### G13d — WHAT IS STILL OWED, and it is not the engine
+
+**BLOCK and DEFLECT are not yet in `decks/`, and that is a coordination decision
+rather than an engine gap.** Both are proven playable through the real reducer by
+`scripts/playable.ts`, which is the project's designated scoreboard. Putting them in
+the shipped corpus needs two pieces of work in packages this project may not edit:
+
+1. **`packages/client`** — render the window and a pass control. Today a client that
+   ignores `state.interrupt` simply sees a brief pause with nothing actionable, and
+   `conspiracies` is blanked for its owner too (R1), so it cannot show the player their
+   own BLOCK either. That is the G20 hand-visibility gap, not a new one.
+2. **`packages/server/test/driver.ts`** — the test driver has to pick a legal action
+   when a window opens. A window needs up to `n - 1` declines before the turn
+   continues, and a driver that only knows the fourteen original actions would stall
+   the table it is driving. **This is why shipping them into the live corpus now would
+   be a production incident rather than a feature**, and why the probe is the honest
+   place for them in this iteration.
+
+Neither is engine work. Neither is small.
 
 ### G14 — no `when`: effects that trigger on other events
 
@@ -533,20 +664,19 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 | 5 | ~~`PlayerState.restrictions` + every action consults it~~ | — | **DONE for the purchase locks** (G5, 3 cards). `no-power` and `no-volatile-placement` still need their own consult points | — |
 | 5 | `PlayerState.restrictions` + every action consults it | `state.ts`, `reduce.ts` | **G5 (5 cards)** — §4. **The largest remaining lever: 3 of the 5 (PYTHONPOST, SNOOP B-O-DOUBLE-T, DON'T KISS THE BABIES) are surcharges, and a surcharge is a *cost* modifier, which no amount of `Effect` work can express.** | large |
 | **G5** | `PlayerState.restrictions` + a `restrict` op, consulted by `INFLUENCE` and `BUY_CONSPIRACY` | **DONE for the purchase locks.** 3 more cards | — |
-| 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **G13 (5 cards)**, incl. BLOCK and DEFLECT | largest |
+| 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **DONE — G13.** `GameState.interrupt`, `RESPOND_INTERRUPT` + `PASS_INTERRUPT`, no new `Phase`. **BLOCK and DEFLECT are playable: 21 → 23 of 54.** `auction` / `vote` / `pass-card` ruled out with a cost — §2 G13b/c, because each buys **no card** without G12/G17/G20 first | — |
 | 7 | `'chosen-player'` on `EffectTarget`, via a new `Choice` kind | `cards.ts`, `state.ts`, `reduce.ts`, **client** | G1 (2), G-new (1), and it is the last thing standing between 3 more trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM) | small, but a **wire-format change the client owns** |
 | 8 | `target` on `evict`, `discard-voter`, `convert-voter`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G-new (3 cards) | small |
 | 9 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **G20 (5 cards)** | medium |
 | 10 | `draw-card` with `from: 'draw' \| 'discard'` and a `'choose-card'` Choice | `state.ts`, `reduce.ts` | **G17 (4 cards)** | small |
 | 11 | a `price` field: a computed cost the *seller* reads, distinct from `discount` | `cards.ts`, `reduce.ts` | G15's JUMLA / HOLO SAPIENS, and the honest half of G3 | medium |
 
-**Where the leverage is now.** Items 1–4 are done and bought 4 cards. Of what is
-left, **item 5 is the only one where a single mechanism unlocks several cards at
-once**: `Restriction` is one type, and PYTHONPOST, SNOOP B-O-DOUBLE-T and DON'T KISS
-THE BABIES are all the same clause over it — *"all purchases cost 1 extra resource in
-your turn"*. Item 6 buys 5 cards for the largest single piece of work in the list.
-Item 7 is cheap in the engine but needs a new `Choice` kind, and **a `Choice` kind is
-a wire-format change the client owns**, so it is not one decision.
+**Where the leverage is now.** Items 1–6 are done and bought 6 cards. Of what is
+left, **item 7 is the cheapest**: `'chosen-player'` on `EffectTarget` is one union
+member and one `Choice` kind, and it is the last thing standing between three more
+trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM). It
+needs a new `Choice` kind, and **a `Choice` kind is a wire-format change the client
+owns**, so it is not one decision.
 
 **The shortest route to the next playable card** is not on this table: it is a
 `read`-vs-`target` split on a computed value, which is half of G4 and would make
