@@ -820,9 +820,29 @@ function applyEffect(
         return pushChoice(s, { kind: 'steal-any', count: resolveCount(s, source, effect.n, ctx), from: null, reason: 'Card effect' }, source);
       }
       for (const victim of named) {
-        if (victim === source) continue; // nobody snatches from themselves
         // A live effect that fires on somebody's purchase names them, not a field.
         const from = fire?.actor ?? victim;
+        // THE SELF-STEAL GUARD BELONGS ON `from`, NOT ON `victim`. — G21, and it is a
+        // hard lock when it is wrong, because a pending decision freezes its owner
+        // and `resolveChoice` refuses EVERY pick for a theft naming the chooser
+        // (`victim.id === playerId` -> 'steal from someone else'). Raise one with
+        // `from === source` and the thief is frozen for the rest of the match with no
+        // legal pick and no server-side recovery.
+        //
+        // The guard used to sit on `victim`, one line above the substitution, and the
+        // two facts make that a hole rather than a check: `fire.actor` is only ever
+        // `source` for `on-turn-start`, because `fireTriggers` requires
+        // `fire.actor === le.owner` there and then applies the effect with
+        // `source = next.owner`. So the only event that can substitute the thief in as
+        // the victim is the one event the guard never saw, and "steal 1 from each
+        // opponent" hooked to your own turn start raised a decision aimed at yourself.
+        // It was the same defect as the unclamped `lose-any` on a different axis: a
+        // choice raised in a state its own resolver cannot satisfy.
+        //
+        // Skipping is the honest reading, and it is what the guard already did for a
+        // named self-target: the card named its victims, and there is nobody to take
+        // from, so there is no theft to decide.
+        if (from === source) continue;
         s = pushChoice(s, { kind: 'steal-any', count: resolveCount(s, source, effect.n, ctx), from, reason: 'Card effect' }, source);
       }
       return s;

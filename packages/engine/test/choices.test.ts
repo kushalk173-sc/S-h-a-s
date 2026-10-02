@@ -310,6 +310,359 @@ describe('every kind is resolvable from the state it was raised in', () => {
   });
 });
 
+// ─────────────────────── G21: the invariant, PROVED rather than sampled ───────────────────────
+
+/**
+ * WHY THIS BLOCK IS CONSTRUCTIVE
+ *
+ * The sweep above is REACTIVE: it can only check the choices a small synthetic corpus
+ * happens to raise. That is exactly how two hard locks got through. It never plays a
+ * Conspiracy Card at all, so it never raises `steal-any`, `evict-voter`,
+ * `discard-voter` or `convert-voter` — its own `steal-any` arm was even written with
+ * `if (victim === undefined) continue;`, so the one case it could not probe was the
+ * one it skipped, and a test that skips the interesting state passes on it forever.
+ *
+ * So the sweep is kept for what it is good at (a whole shipped game, in motion, never
+ * stranding) and the invariant is proved BELOW by RAISING each kind on purpose
+ * through the real engine path, across the full cross-product of the conditions that
+ * could plausibly leave it unsatisfiable, and then SEARCHING a bounded pick space for
+ * one the engine accepts. Nothing here depends on a deck happening to cooperate.
+ */
+
+/** Every kind there is. The block below is worthless if this list is not exhaustive. */
+const ALL_KINDS = [
+  'gain-any',
+  'lose-any',
+  'steal-any',
+  'evict-voter',
+  'discard-voter',
+  'convert-voter',
+] as const;
+type Kind = (typeof ALL_KINDS)[number];
+
+/** The three scopes a voter decision can carry. All three must stay satisfiable. */
+const ALL_SCOPES = ['own', 'others', 'any'] as const;
+
+/** Pools chosen to sit on both sides of every ceiling: empty, one short, ample, at cap. */
+const POOLS_UNDER_TEST: readonly Pool[] = [POOL(0), POOL(1), POOL(2), POOL(12, 12, 12, 12), POOL(99, 99, 99, 99)];
+
+/** One probe card per op that can raise a decision, so each kind is raised for real. */
+const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
+  'gain-any': probeCard('probe-gain-any', [{ op: 'gain-any', n: 2, target: 'you' }]),
+  'lose-any': probeCard('probe-lose-any', [{ op: 'lose-any', n: 2, target: 'you' }]),
+  'steal-any': probeCard('probe-steal-any', [{ op: 'steal-any', n: 2, target: 'each-opponent' }]),
+  'evict-voter': probeCard('probe-evict-voter', [{ op: 'evict', n: 2, target: 'you' }]),
+  'discard-voter': probeCard('probe-discard-voter', [{ op: 'discard-voter', n: 2, target: 'you' }]),
+  'convert-voter': probeCard('probe-convert-voter', [{ op: 'convert-voter', n: 2, target: 'you' }]),
+};
+
+function probeCard(id: string, effects: ConspiracyCard['effects']): ConspiracyCard {
+  return { id, name: id, text: 'probe', cost: 0, effects };
+}
+
+const probeCards: CardIndex = indexCards({
+  ideology: Object.values(CARDS.ideology),
+  voter: Object.values(CARDS.voter),
+  conspiracy: [...Object.values(CARDS.conspiracy), ...Object.values(PROBE_EFFECTS)],
+  headline: Object.values(CARDS.headline),
+});
+const probeCtx: Ctx = { rules: RULES, cards: probeCards };
+
+/**
+ * Put pegs on the board. `own`/`foreign` count pegs for the chooser and for an
+ * opponent, and `volatile` count pegs that cannot be affected at all (p18).
+ *
+ * Pegs are the ONLY thing the three voter kinds read off the board, so a board with
+ * no pegs, a board of only foreign pegs, a board of only the chooser's own, and a
+ * board half of each are four genuinely different states for them — and the
+ * `evict-voter`-by-its-own-caster scope (`'any'`) is only distinct from `'others'` in
+ * the second and third.
+ */
+function pegged(s: GameState, who: PlayerID, own: number, foreign: number, volatile: number): GameState {
+  let free = [...s.zones.flatMap((z) => z.areas.map((a) => a.id))];
+  const take = (): string => {
+    const id = free.shift();
+    if (id === undefined) throw new Error('ran out of areas');
+    return id;
+  };
+  let areas = s.zones.flatMap((z) => z.areas);
+  for (let i = 0; i < own + foreign + volatile; i += 1) {
+    const id = take();
+    areas = areas.map((a) => (a.id === id ? { ...a, peg: { owner: i < own ? who : 'p2', majority: false }, ...(i >= own + foreign ? { volatile: true } : {}) } : a));
+  }
+  return { ...s, zones: s.zones.map((z) => ({ ...z, areas: areas.filter((a) => z.areas.some((x) => x.id === a.id)) })) };
+}
+
+/** Give each named player a pool. Anything omitted is left as setup dealt it. */
+function withPools(s: GameState, pools: Readonly<Record<string, Pool>>): GameState {
+  const players = { ...s.players };
+  for (const [who, pool] of Object.entries(pools)) {
+    const p = players[who];
+    if (!p) throw new Error(`no such player ${who}`);
+    players[who] = { ...p, resources: pool, powerUses: NO_POWER_USES };
+  }
+  return { ...s, players };
+}
+
+/** Hand `who` a Conspiracy Card, which is the only way a test reaches a card effect. */
+function withHand(s: GameState, who: PlayerID, ids: readonly string[]): GameState {
+  const p = s.players[who];
+  if (!p) throw new Error(`no such player ${who}`);
+  return { ...s, players: { ...s.players, [who]: { ...p, conspiracies: [...ids] } } };
+}
+
+/**
+ * EVERY candidate pick for `pending`, over a deliberately generous bounded space.
+ *
+ * Generous is the point: this is a SEARCH for one accepted pick, not a replay of what
+ * a client would offer. So it enumerates the empty Delta and single-resource takes up
+ * to 3, every victim including the chooser (the engine is supposed to refuse that one,
+ * and finding nothing else is how a self-steal shows up), and every subset of pegged
+ * areas up to size 3. If a legal pick exists anywhere in here, it is found.
+ */
+function candidatePicks(s: GameState, pending: PendingChoice): ReturnType<typeof reduce>[] {
+  const me = pending.player;
+  const c = pending.choice;
+  const out: ReturnType<typeof reduce>[] = [];
+  const reach = Math.max(3, c.count);
+  const deltas: Delta[] = [{}, { funds: c.count }];
+  for (const r of RESOURCES) {
+    for (let n = 1; n <= reach; n += 1) deltas.push({ [r]: n });
+  }
+  deltas.push({ funds: 1, trust: 1 }, { funds: 2, clout: 1 });
+  for (let a = 0; a <= reach; a += 1) {
+    for (let b = 0; b + a <= reach; b += 1) {
+      if (a + b === 0) continue;
+      deltas.push({ funds: a, trust: b });
+    }
+  }
+
+  if (c.kind === 'gain-any' || c.kind === 'lose-any') {
+    for (const res of deltas) out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'resources', res } }, probeCtx));
+    return out;
+  }
+  if (c.kind === 'steal-any') {
+    // The fixed victim FIRST, and the chooser among the candidates: a self-steal is
+    // the defect this search exists to find, so it has to be a candidate.
+    const victims = [c.from, ...s.turnOrder].filter((v, i, a): v is PlayerID => v !== null && a.indexOf(v) === i);
+    for (const from of victims) {
+      for (const res of deltas) out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'steal', from, res } }, probeCtx));
+    }
+    return out;
+  }
+  const areaIds = s.zones.flatMap((z) => z.areas.filter((a) => a.peg !== null).map((a) => a.id));
+  const subsets: string[][] = [[]];
+  const areaReach = Math.min(Math.max(2, c.count), areaIds.length);
+  for (let n = 1; n <= areaReach; n += 1) {
+    for (const combo of combos(areaIds, n)) subsets.push(combo);
+  }
+  for (const ids of subsets) out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'areas', areaIds: ids } }, probeCtx));
+  return out;
+}
+
+function combos<T>(xs: readonly T[], n: number): T[][] {
+  if (n === 0) return [[]];
+  if (xs.length < n) return [];
+  const out: T[][] = [];
+  for (let i = 0; i <= xs.length - n; i += 1) {
+    for (const rest of combos(xs.slice(i + 1), n - 1)) out.push([xs[i] as T, ...rest]);
+  }
+  return out;
+}
+
+describe('G21 — every kind accepts a legal pick in EVERY state it can be raised in', () => {
+  /**
+   * The exhaustive one. Raises all six kinds through `PLAY_CONSPIRACY` and, for each
+   * raised decision, searches for an accepted pick.
+   *
+   * The axes are the ones that can move a ceiling between the raise and the answer,
+   * and they are crossed rather than sampled:
+   *
+   *  - the chooser's pool, because `lose-any` clamps to it;
+   *  - every OTHER player's pool, because `steal-any` clamps to the victim's;
+   *  - the peg layout, because the three voter kinds clamp to the board;
+   *  - the count the card asks for, because a count above every clamp is the whole
+   *    shape of the defect;
+   *  - and for the voter kinds, every scope, because `ChoiceScope` deliberately makes
+   *    "your own" and "an opponent's" different questions.
+   */
+  it('no combination of chooser pool, other pools, pegs, scope or count strands a decision', () => {
+    const stranded: string[] = [];
+    const kindsRaised = new Set<string>();
+    let raised = 0;
+    let probed = 0;
+
+    for (const kind of ALL_KINDS) {
+      for (const mine of POOLS_UNDER_TEST) {
+        for (const theirs of POOLS_UNDER_TEST) {
+          for (const [own, foreign, vol] of [[0, 0, 0], [0, 2, 0], [2, 0, 0], [1, 1, 1]] as const) {
+            for (const count of [1, 2, 3, 5]) {
+              for (const scope of kind === 'evict-voter' || kind === 'discard-voter' || kind === 'convert-voter' ? ALL_SCOPES : [null]) {
+                const base = pegged(
+                  withPools(fresh(1, ['p1', 'p2', 'p3'], { startResources: [{}, {}, {}] }), { p1: mine, p2: theirs, p3: theirs }),
+                  'p1',
+                  own,
+                  foreign,
+                  vol,
+                );
+                const playable = withHand({ ...base, phase: 'actions', activePlayer: 'p1', _pendingCard: null, choices: [] } as GameState, 'p1', [PROBE_EFFECTS[kind].id]);
+
+                // The card's printed `n` is what sets `count`, so vary it through the
+                // card rather than through the choice — a state built by hand is not
+                // a state the engine can raise.
+                const card = probeCard(`probe-${kind}-${count}`, [{ op: opFor(kind), n: count, target: 'each-opponent' }]);
+                const indexed = indexCards({
+                  ideology: Object.values(CARDS.ideology),
+                  voter: Object.values(CARDS.voter),
+                  conspiracy: [card],
+                  headline: Object.values(CARDS.headline),
+                });
+                const ctxN: Ctx = { rules: RULES, cards: indexed };
+                const inHand = withHand(playable, 'p1', [card.id]);
+
+                // `each-opponent` raises the decision for the OPPONENTS, and their
+                // scope is what varies above. `you` raises it for the chooser. Both
+                // are real raise paths, so both are probed.
+                for (const castAt of ['you', 'each-opponent'] as const) {
+                  const out = playAndRead(inHand, card.id, castAt, ctxN);
+                  if (out === null) continue; // this raise path did not apply here
+                  for (const pending of out.choices) {
+                    raised += 1;
+                    kindsRaised.add(pending.choice.kind);
+                    probed += 1;
+                    if (!candidatePicks(out.state, pending).some((r) => r.ok)) {
+                      stranded.push(
+                        `${kind} count=${count} scope=${scope ?? '-'} castAt=${castAt} ` +
+                          `mine=${JSON.stringify(mine)} theirs=${JSON.stringify(theirs)} pegs=${own}/${foreign}/${vol} ` +
+                          `-> ${JSON.stringify(pending.choice)}`,
+                      );
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    expect(kindsRaised.size, `only raised ${[...kindsRaised].join(',')}`).toBe(ALL_KINDS.length);
+    expect(raised, 'no decision was raised, so nothing was proved').toBeGreaterThan(0);
+    expect(probed).toBe(raised);
+    expect(stranded, `${stranded.length} raised decisions had NO legal pick:\n${stranded.slice(0, 12).join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * The specific defect, pinned as a shape so the fix is a fix and not a coincidence.
+   *
+   * A live `steal-any` that names its victims, hooked to `on-turn-start`. On that one
+   * trigger `fireTriggers` requires `fire.actor === le.owner` and applies the effect
+   * with `source = le.owner`, so the waking event and the thief are the SAME player —
+   * and the old guard tested the resolved target instead of the substituted victim, so
+   * the decision was raised aimed at the thief. `resolveChoice` refuses every such
+   * pick ('steal from someone else'), which is a permanent freeze: `blockedBy` refuses
+   * every other action and nothing discharges the decision.
+   */
+  it('a live steal-any firing on its OWN owner\'s turn start does not raise a self-theft', () => {
+    const CARD = probeCard('probe-earworm-self', [
+      { op: 'steal-any', n: 1, target: 'each-opponent', when: 'on-turn-start', until: 'rest-of-game' },
+    ]);
+    const indexed = indexCards({
+      ideology: Object.values(CARDS.ideology),
+      voter: Object.values(CARDS.voter),
+      conspiracy: [CARD],
+      headline: Object.values(CARDS.headline),
+    });
+    const ctx1: Ctx = { rules: RULES, cards: indexed };
+    const s0 = withPools(fresh(1, ['p1', 'p2'], { startResources: [{}, {}] }), { p1: POOL(5), p2: POOL(5) });
+    const installed = withHand(
+      { ...s0, phase: 'actions', activePlayer: 'p1', _pendingCard: null, choices: [], turn: 1 },
+      'p1',
+      [CARD.id],
+    );
+    const played = reduce(installed, 'p1', { type: 'PLAY_CONSPIRACY', cardId: CARD.id }, ctx1);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    // Playing it installs the live effect. Now roll the owner's own turn round.
+    const live = played.state.liveEffects.find((le) => le.sourceCardId === CARD.id);
+    expect(live, 'the probe did not install a live effect').toBeDefined();
+
+    // The owner's next turn start is the event the effect is hooked to.
+    const nextTurn = { ...played.state, activePlayer: 'p1', phase: 'actions', choices: [], _pendingCard: null, turn: played.state.turn + 1 } as GameState;
+    const boundary = rollTurnStart(nextTurn, ctx1);
+    const selfThefts = boundary.choices.filter((c) => c.player === 'p1' && c.choice.kind === 'steal-any' && (c.choice as { from?: PlayerID | null }).from === 'p1');
+    expect(
+      selfThefts.map((c) => `${c.id} from=${(c.choice as { from?: PlayerID | null }).from}`),
+      'the live effect raised a theft aimed at its own owner, which no pick can resolve',
+    ).toEqual([]);
+    // And nothing it did raise is itself stranded.
+    for (const pending of boundary.choices) {
+      expect(
+        candidatePicks(boundary, pending).some((r) => r.ok),
+        `${pending.choice.kind} ${JSON.stringify(pending.choice)} had no legal pick at its owner's turn start`,
+      ).toBe(true);
+    }
+  });
+
+  /** Which reducer `op` raises `kind`. `evict` is the op; `evict-voter` is the choice. */
+  function opFor(kind: Kind): 'gain-any' | 'lose-any' | 'steal-any' | 'evict' | 'discard-voter' | 'convert-voter' {
+    return kind === 'evict-voter' ? 'evict' : kind;
+  }
+
+  /**
+   * Play a probe card retargeted at `castAt`, and return the state it produced plus
+   * the decisions it raised. `null` when the engine refused the play.
+   */
+  function playAndRead(
+    s: GameState,
+    cardId: string,
+    castAt: 'you' | 'each-opponent',
+    ctxN: Ctx,
+  ): { state: GameState; choices: PendingChoice[] } | null {
+    const card = ctxN.cards.conspiracy[cardId];
+    if (!card) return null;
+    const retargeted: ConspiracyCard = {
+      ...card,
+      effects: card.effects.map((e) => ('target' in e ? { ...e, target: castAt } : e)) as ConspiracyCard['effects'],
+    };
+    const idx = indexCards({
+      ideology: Object.values(CARDS.ideology),
+      voter: Object.values(CARDS.voter),
+      conspiracy: [retargeted],
+      headline: Object.values(CARDS.headline),
+    });
+    const played = reduce(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId }, { rules: RULES, cards: idx });
+    if (!played.ok) return null;
+    return { state: played.state, choices: [...played.state.choices] };
+  }
+
+  /** Push `state` through one turn boundary so `on-turn-start` effects fire. */
+  function rollTurnStart(s: GameState, ctxN: Ctx): GameState {
+    let cur = s;
+    for (let i = 0; i < 4 && !cur.finished; i += 1) {
+      const p = cur.activePlayer;
+      const end = reduce(cur, p, { type: 'END_TURN' }, ctxN);
+      if (end.ok) cur = end.state;
+      if (cur.phase === 'answer') {
+        const a = reduce(cur, p, { type: 'ANSWER', side: 0 }, ctxN);
+        if (a.ok) cur = a.state;
+      }
+      if (cur.phase === 'headlines') {
+        const h = reduce(cur, p, { type: 'ACK_HEADLINE' }, ctxN);
+        if (h.ok) cur = h.state;
+      }
+      if (cur.phase === 'answer') {
+        const a = reduce(cur, p, { type: 'ANSWER', side: 0 }, ctxN);
+        if (a.ok) cur = a.state;
+      }
+      if (cur.choices.length > 0) break;
+      // Drop anything the boundary raised so the next END_TURN is not refused.
+      cur = { ...cur, choices: [] };
+    }
+    return cur;
+  }
+});
+
 describe('gain-any imposes no affordability, by design', () => {
   it('a player holding nothing is credited the full ask', () => {
     // The engine half of the reported dead dialog. If this ever gains a

@@ -37,7 +37,7 @@ import { indexCards, type CardIndex, type ConspiracyCard, type HeadlineCard } fr
 import { reduce, type Ctx } from '../src/reduce';
 import { RULES } from '../src/rules';
 import { setup } from '../src/setup';
-import { findZone, type AreaID, type GameState, type PlayerID, type ZoneID } from '../src/state';
+import { findZone, poolTotal, RESOURCES, type AreaID, type Delta, type GameState, type PlayerID, type ZoneID } from '../src/state';
 import { emptyIn, IDEOLOGY_CARDS, PLAYERS_3, VOTER_CARDS } from './helpers';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -586,18 +586,73 @@ describe('every event EXECUTABLE_TRIGGERS claims is raised, with the context a c
     }
     const played = reduce(withCard, 'p1', { type: 'PLAY_CONSPIRACY', cardId: pinnedCard.id }, pinnedCtx);
     if (!played.ok) throw new Error(played.error);
-    const influenced = reduce(played.state, 'p1', { type: 'INFLUENCE', slot: 0 }, pinnedCtx);
+
+    // THE OWNER'S OWN PURCHASE — the hard lock, and what this test used to bless.
+    //
+    // This assertion previously read `expect(t.choice.from).toBe('p1')` with a comment
+    // saying "p1 cannot steal from p1, so `resolveChoice` will refuse. That is the
+    // correct outcome for this fixture". It was not correct. A pending decision freezes
+    // its owner and `resolveChoice` refuses EVERY pick for a theft naming the chooser,
+    // so raising one aimed at p1 strands p1 for the rest of the match with no legal
+    // pick and no server-side recovery. The test documented the defect instead of
+    // catching it, which is how it survived. See the guard in `applyEffect`'s
+    // `steal-any` arm, and `./choices.test.ts` for the invariant it now holds to.
+    const selfBought = reduce(played.state, 'p1', { type: 'INFLUENCE', slot: 0 }, pinnedCtx);
+    if (!selfBought.ok) throw new Error(selfBought.error);
+    expect(
+      selfBought.state.choices
+        .filter((c) => c.player === 'p1' && c.choice.kind === 'steal-any')
+        .map((c) => `${c.id} from=${(c.choice as { from?: PlayerID | null }).from}`),
+      'the hook fired on its own owner and raised a theft aimed at them',
+    ).toEqual([]);
+
+    // THE REAL BINDING, which is still worth pinning: when SOMEONE ELSE influences,
+    // `from` names the player who just bought — not the victim list, and not the owner.
+    const onP2 = endTurn(played.state);
+    const influencer = onP2.activePlayer;
+    expect(influencer, 'p1 still had the turn, so the binding is untested').not.toBe('p1');
+    // The incoming seat answers first; `endTurn` only closed the outgoing one.
+    const ready = reduce(onP2, influencer, { type: 'ANSWER', side: 0 }, pinnedCtx);
+    if (!ready.ok) throw new Error(`answer for ${influencer}: ${ready.error}`);
+    const me = ready.state.players[influencer];
+    const slot = ready.state.market.findIndex((m) =>
+      me !== undefined && RESOURCES.every((r) => (m.cost[r] ?? 0) <= me.resources[r]),
+    );
+    if (slot < 0) throw new Error(`${influencer} cannot afford anything on the market`);
+    const influenced = reduce(ready.state, influencer, { type: 'INFLUENCE', slot }, pinnedCtx);
     if (!influenced.ok) throw new Error(influenced.error);
     const thefts = influenced.state.choices.filter(
       (c) => c.player === 'p1' && c.choice.kind === 'steal-any',
     );
-    expect(thefts).toHaveLength(2);
+    expect(thefts.length, 'the hook did not fire for an opponent\'s purchase').toBeGreaterThan(0);
     for (const t of thefts) {
       if (t.choice.kind !== 'steal-any') throw new Error('not a theft');
-      // p1 bought it, so p1 is the actor — and p1 cannot steal from p1, so
-      // `resolveChoice` will refuse. That is the correct outcome for this fixture and
-      // is why the assertion is on `from` rather than on a resolution succeeding.
-      expect(t.choice.from).toBe('p1');
+      const from = t.choice.from;
+      if (from === null) throw new Error('a pinned theft left its victim for the thief to pick');
+      // The actor bought it, so the actor is the victim — and the actor is never the
+      // thief, so this pick is one `resolveChoice` can actually accept.
+      expect(from).toBe(influencer);
+      expect(from).not.toBe('p1');
+      const victim = influenced.state.players[from];
+      const want = Math.min(t.choice.count, victim ? poolTotal(victim.resources) : 0);
+      // Shed `want` off the victim's pool, largest denomination first, decrementing as
+      // it goes — the reducer demands EXACTLY `want`, so an over-pick is a refusal.
+      let left = want;
+      const res: Delta = {};
+      for (const r of RESOURCES) {
+        if (left <= 0) break;
+        const take = Math.min(victim?.resources[r] ?? 0, left);
+        if (take > 0) {
+          res[r] = take;
+          left -= take;
+        }
+      }
+      const resolved = reduce(influenced.state, 'p1', {
+        type: 'RESOLVE_CHOICE',
+        choiceId: t.id,
+        pick: { kind: 'steal', from, res },
+      }, pinnedCtx);
+      expect(resolved.ok, `the pinned theft from ${from} has no legal pick: ${resolved.ok ? '' : resolved.error} (count ${t.choice.count}, victim ${JSON.stringify(victim?.resources)}, pick ${JSON.stringify(res)})`).toBe(true);
     }
   });
 });
