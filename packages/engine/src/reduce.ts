@@ -37,6 +37,7 @@ import {
   findArea,
   findZone,
   gerrymanderRights,
+  ideologyHandOf,
   isInForce,
   ownerNextTurn,
   pegsOf,
@@ -373,6 +374,35 @@ const NO_FIRE: FireContext | undefined = undefined;
  * anything that would stall a request.
  */
 export const TRIGGER_MAX_WAVES = 16;
+
+/**
+ * G20 — the most Ideology Cards one player can be HOLDING at once.
+ *
+ * ## THIS IS A TERMINATION BOUND, NOT A RULES CLAIM
+ *
+ * The physical game has no such number, and asserting one would be a lie about the
+ * rulebook. It is here because `move-card` is the first op in the effect vocabulary
+ * that can ADD to a queue rather than resolve, and a queue an op can append to with
+ * no bound is a hang: a card with `when: { trigger: 'on-turn-start' }` and
+ * `to: 'hand'` would put one card in a hand every single turn, forever, from a deck
+ * that `draw-conspiracy`'s `from: 'discard'` recycles. `TRIGGER_MAX_WAVES` does not
+ * save it — that bound is per FIRING EVENT, and one event per turn is one wave per
+ * turn, which is a slow leak rather than a fast one.
+ *
+ * The same reasoning is why the cap is checked before the card leaves the pile rather
+ * than after: a refused move has to leave the world byte-identical, or a full hand
+ * would be a way to destroy cards by accident and the `to: 'destroy'` accounting
+ * above would stop meaning anything.
+ *
+ * ## WHY TWO
+ *
+ * 2 is the deepest the real corpus goes, and it comes from A COWARD OR A JOURNALIST?
+ * — *"you may pass along a card you just received"* — which implies a card in flight
+ * plus the one you are holding. 1 would be the minimum that makes the mechanic work
+ * and would refuse that card's own text; anything higher is headroom the corpus never
+ * asks for, and headroom in a bound is licence.
+ */
+export const IDEOLOGY_HAND_MAX = 2;
 
 const NO_CONSUMED: ReadonlySet<string> = new Set();
 
@@ -895,6 +925,61 @@ function applyEffect(
       }
       return s;
     }
+    case 'move-card': {
+      // G20. The whole of the contract is on `Effect`'s `move-card` arm in cards.ts
+      // and on `PlayerState.ideologyCards` in state.ts; what is left here is the
+      // three things that arm asks this function to guarantee, and each is a branch
+      // rather than a comment because a comment does not fail a test.
+      //
+      // SILENT, ON PURPOSE. There is no `log(...)` and no `GameEvent` on either path,
+      // and that is not an oversight the log line is merely forgotten in. A destroyed
+      // card must leak nothing about its SIDES, and a card moved into a hand must
+      // leak nothing about the hand — and `LogEntry` is a client-visible string
+      // (playerView copies `state.log` wholesale) and `GameEvent` is the wire. A line
+      // reading "a card was destroyed" is itself a leak: it tells every viewer that a
+      // card with two unrevealed answers just left the world, which is information
+      // about a hidden card that the game has no reason to publish. `card-transfer.
+      // test.ts` scans the whole payload for both ids and for both sides' payouts.
+      //
+      // The card being PLAYED is a different matter and is logged by the caller
+      // (`playCard`), which logs the source card the player chose to reveal. That is
+      // public by construction: you played it.
+      const n = resolveCount(s, source, effect.n, ctx);
+      if (n <= 0) return s;
+      // `from: 'discard'` is the only source the type allows, so this is not a
+      // runtime check so much as the narrowing that lets the loop below be honest.
+      const pile = s[DISCARD['ideology']];
+      if (pile.length === 0) return s;
+
+      if (effect.to === 'destroy') {
+        // Off the top, and NOT through `discardTo` - which would put it straight back
+        // on the pile this branch just read it from, and a "destroy" that recycles is
+        // not a destroy. This is the only write in the engine that SHRINKS the total
+        // number of Ideology Cards in the world, which is exactly what makes the
+        // conservation argument in the `move-card` doc comment true for every other
+        // path.
+        s = { ...s, [DISCARD['ideology']]: pile.slice(0, -Math.min(n, pile.length)) };
+        return s;
+      }
+
+      for (const p of resolveTargets(s, source, target)) {
+        const player = s.players[p];
+        if (!player) continue;
+        for (let i = 0; i < n; i += 1) {
+          const current = s[DISCARD['ideology']];
+          const id = current[current.length - 1];
+          if (id === undefined) break;
+          // The cap is checked BEFORE the card leaves the pile, so a refused move
+          // leaves the world exactly as it was. A partially-applied `n` is fine and
+          // correct: the pile is the shared resource and two `to: 'hand'` effects on
+          // one resolution compete for it.
+          if (ideologyHandOf(player).length >= IDEOLOGY_HAND_MAX) break;
+          s = { ...s, [DISCARD['ideology']]: current.slice(0, -1) };
+          s = withPlayer(s, p, { ideologyCards: [...ideologyHandOf(player), id] });
+        }
+      }
+      return s;
+    }
   }
 }
 
@@ -1365,8 +1450,34 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
   s = withPlayer(s, next, { powerUses: NO_POWER_USES });
 
   // p21: draw and read an Ideology Card for the next player.
-  const [drawn, cardId] = draw(s, 'ideology');
-  s = drawn;
+  //
+  // G20: A HELD CARD IS DRAINED HERE, ONE PER TURN, IN PLACE OF THE DRAW — and this
+  // is the only place in the engine a held card is ever read. The ruling on
+  // `PlayerState.ideologyCards` is what makes this the right seam and no other:
+  // `_pendingCard` is written exactly once per turn, right here, so a card arriving
+  // at any other moment cannot collide with the answer a player is in the middle of
+  // giving. A card moved to somebody MID-ANSWER is therefore dealt at their NEXT
+  // boundary, unchanged answer, no observable difference to anybody — which is the
+  // property `card-transfer.test.ts` drives directly.
+  //
+  // THE ORDER OF THE TWO EXHAUSTION CHECKS IS LOAD-BEARING, and getting it wrong is
+  // a soft-lock. The R10 branch below ends the game when the Ideology deck AND its
+  // discard are both empty. A player holding a card is dealt one WITHOUT touching
+  // either pile, so the hand has to be consulted first: check the deck first and a
+  // player carrying the only Ideology Card left in the world gets a game-over on the
+  // turn they were about to be handed something. `card-transfer.test.ts` builds
+  // exactly that position.
+  const held = ideologyHandOf(s.players[next]);
+  const [heldCard, ...heldRest] = held;
+  let cardId: CardID | null;
+  if (heldCard !== undefined) {
+    s = withPlayer(s, next, { ideologyCards: heldRest });
+    cardId = heldCard;
+  } else {
+    const [drawn, fromDeck] = draw(s, 'ideology');
+    s = drawn;
+    cardId = fromDeck;
+  }
 
   // R10, ruled. The Ideology deck AND its discard are both empty, so there is no
   // card to put to the next player. The headline path already handles exactly

@@ -363,6 +363,80 @@ export type Effect = (
    * effect vocabulary, and the reason it is a card field rather than a resource.
    */
   | { readonly op: 'discount'; readonly n: Count; readonly target?: EffectTarget }
+  /**
+   * G20 - move an Ideology Card. THE CARD-MOVING HALF OF THE GAME'S MOST FRAGILE
+   * MECHANIC, and the type is deliberately much smaller than the concept.
+   *
+   * **THE RULING IS ON `PlayerState.ideologyCards` in `state.ts`. Read it.** The
+   * short form: a moved card is HELD AND HIDDEN from everyone including whoever ends
+   * up holding it, and it is put to that player at their next turn boundary in
+   * place of that turn's draw.
+   *
+   * ## WHY THERE IS NO `from: 'hand'`, NO `from: 'pending'`, AND NO `to: 'pending'`
+   *
+   * Three things a card-transfer op would obviously want, and all three are refused
+   * at the type level so a future card cannot reach them by accident. Each refusal
+   * is a security or a termination ruling, not a missing feature:
+   *
+   * 1. **`from: 'pending'` - the card a player is MID-ANSWER.** This is the one the
+   *    whole mechanic turns on. A player who could hand on the card they have been
+   *    put has been told it exists and is being offered a way to look at it by
+   *    proxy; and emptying `_pendingCard` leaves that player with no legal move at
+   *    all, because `ANSWER` says "no card has been put to you" and `END_TURN` says
+   *    "answer your Ideology Card first". A COWARD OR A JOURNALIST? is exactly this
+   *    card, which is why it stays blocked on G12 as well as on G20.
+   * 2. **`from: 'hand'` - a donation out of a hidden hand.** A hand is a QUEUE the
+   *    engine drains, not a thing a player can reach into and read: the ruling is
+   *    that the holder does not know what they are holding, and an op that takes
+   *    "the top card of this player's hand" is an op that requires somebody to be
+   *    able to enumerate it.
+   * 3. **`to: 'pending'` and `to: 'manifesto'`.** See the ruling's "NO THIRD
+   *    CATEGORY" section: there are exactly two places an Ideology Card can be -
+   *    face down in a hand, or face up under a mat HAVING BEEN ANSWERED. Writing
+   *    either public field would be a p13 violation and would move the Ideologue
+   *    power ladder (p28-33) for a card nobody answered.
+   *
+   * ## `from: 'discard'` IS AN ADAPTATION, AND IT IS THE HONEST ONE
+   *
+   * A card has to come from SOMEWHERE, and the world holds a fixed number of
+   * Ideology Cards. The discard pile is the only source that conserves the count: a
+   * card taken from it is a real card with an unknown answer that re-enters play and
+   * is put to a real player, and the engine's own R10 ruling already recycles that
+   * pile as the deck's backstop. It is NOT in the physical game - reaching into a
+   * discard pile is not a Shasn move - and the one card that ships on it (JUMLA)
+   * says so in its own text.
+   *
+   * `from: 'draw'` is refused for the same reason `draw-conspiracy` takes `from` as
+   * a fixed union rather than a pile name: taking from the LIVE deck mid-turn is
+   * G17, and the answer-phase invariant (p21, one Ideology Card and one answer per
+   * turn) is worth more than the card.
+   *
+   * ## `to: 'destroy'` LEAKS NOTHING, AND THAT IS THE WHOLE OF ITS CONTRACT
+   *
+   * A destroyed card emits no `GameEvent` and no `LogEntry`, and no event text -
+   * the ids of both its sides must be unguessable from the payload. That is the same
+   * class of leak as an engine error string interpolating a card id, which
+   * `playerView.test.ts` already tests for.
+   *
+   * It leaves the game ENTIRELY rather than going to a pile, because a discard pile
+   * is reachable: `draw-conspiracy`'s `from: 'discard'` reads it. "Destroyed" and "on
+   * the discard pile" cannot be the same state without the distinction being a lie.
+   */
+  | {
+      readonly op: 'move-card';
+      /** The top of the Ideology discard pile - the most recently answered card. */
+      readonly from: 'discard';
+      readonly to: 'hand' | 'destroy';
+      readonly n: Count;
+      /**
+       * `to: 'hand'` only: who ends up holding it. Defaults to `'you'`, which is
+       * JUMLA's "this is an extra Ideology Card" read as YOURS to answer.
+       *
+       * `to: 'destroy'` ignores it, and the engine's own no-op is the assertion: a
+       * destroyed card has no holder, so naming one would be inventing a fact.
+       */
+      readonly target?: EffectTarget;
+    }
 ) &
   EffectScope;
 
