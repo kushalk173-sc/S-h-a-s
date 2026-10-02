@@ -1010,3 +1010,301 @@ describe('the driver reads its own hand and nothing else', () => {
     expect(s.turnOrder).toHaveLength(3);
   });
 });
+
+// ───────────────── 5. the projection never offers a card the window refuses ─────────────────
+
+/**
+ * THE BUG THIS SECTION IS FOR.
+ *
+ * `playableConspiraciesFor` is the projection that renders the PLAY button, and every
+ * guard in it is a transcription of a guard in `reduce`'s `PLAY_CONSPIRACY`. One was
+ * missing. The G13 response window check in `reduce` runs FIRST — above the per-player
+ * freeze, above the turn check, above the phase check — and exempts three ACTION TYPES
+ * (`RESPOND_INTERRUPT`, `PASS_INTERRUPT`, `RESOLVE_CHOICE`). `PLAY_CONSPIRACY` is not
+ * on that list, so while a window is open the reducer refuses the play for EVERY seat,
+ * the actor included, in EVERY phase.
+ *
+ * The projection did not know that. So during a window the client rendered a PLAY button
+ * for the actor's remaining Conspiracy Cards, the player pressed it, and the server
+ * answered `"A Grave Inheritance" is resolving — answer it or decline first`. A control
+ * that looks like it works and does not, which is §9.10's prohibited case — and the same
+ * class of defect as the ones already fixed in this repo: the server telling the client
+ * to do something the engine will refuse.
+ *
+ * WHY IT SURVIVED A SUITE THAT ALREADY CHECKS PROJECTION/REDUCER AGREEMENT
+ *
+ * `secret-state.test.ts` has the oracle test for this — it asks `reduce` rather than
+ * re-transcribing the rules — but it walks `CONSPIRACY_CORPUS`, and no state in that
+ * corpus ever has an open window. The blind spot was the corpus, not the assertion. So
+ * the oracle is applied here to window states, which is the same claim about states the
+ * other corpus cannot reach.
+ *
+ * AND THE NARROWER RULES THAT ARE ALSO WRONG, asserted rather than left as prose.
+ *
+ * A reader could reasonably narrow this to "only the actor" or "only outside the answer
+ * phase". Both are refuted below by the reducer's own refusal, which is what decides it:
+ * the exemption is by action type, so neither the seat nor the phase changes the answer.
+ * If a future engine change makes the window narrower, these tests fail and the guard is
+ * revisited — they are the tripwire for that, not a description of today's behaviour.
+ */
+describe('while a window is open the projection offers nothing `reduce` would refuse', () => {
+  /** The ids this viewer is offered. The projection, asked directly. */
+  function offered(s: GameState, viewer: PlayerID | null): readonly CardID[] {
+    return viewFor(s, ctx.cards, viewer).playableConspiracies.map((c) => c.id);
+  }
+
+  /** What the ENGINE accepts, asked of the engine. Never a second transcription. */
+  function engineAllows(s: GameState, viewer: PlayerID, cardId: CardID): boolean {
+    return reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, ctx).ok;
+  }
+
+  /**
+   * Two real conspiracy cards, chosen for having no `gain-any`/`* -any` effect in them.
+   *
+   * `resolveCard` STAGES a card's effects inside a window rather than applying them, so
+   * playing one raises no decision — but the counterfactual below removes the window,
+   * which would then apply the card for real. A `voters` or a flat `gain` cannot raise a
+   * choice whichever way it resolves, so the non-vacuity measurement is not confounded by
+   * a `PendingChoice` that guard 4 would have emptied the list on anyway.
+   */
+  const ACTOR_CARD_A: CardID = 'ct-et2040-003'; // {op:'voters',n:2}
+  const ACTOR_CARD_B: CardID = 'ct-et2040-005'; // flat gain + discount
+
+  /**
+   * A response window that is open DURING `actions` — the position the defect was
+   * reproduced in, and the one the headline sweep below cannot reach.
+   *
+   * WHY IT HAS TO BE BUILT RATHER THAN FOUND. On this corpus the driver never plays a
+   * Conspiracy Card, so `resolveCard` is only ever reached from `ACK_HEADLINE`, and every
+   * window the sweep opens is therefore open during `headlines` — where the PHASE guard
+   * already empties the list. That is the whole reason the bug survived: the states the
+   * suite could reach were already covered by a different guard, so the missing one was
+   * invisible. `resolveCard` stages a window from `PLAY_CONSPIRACY` as readily as from
+   * `ACK_HEADLINE`, so this walks to a free `actions` state, deals the actor two real
+   * conspiracies and a non-actor a BLOCK, and plays one.
+   *
+   * The actor is dealt two rather than one so that a card REMAINS in their hand — the
+   * defect is precisely that a held card was offered, so a hand emptied by the play would
+   * make the assertion vacuous. It throws rather than skipping if any of that fails to
+   * hold, because a silently-skipped fixture is the vacuity this whole section exists to
+   * rule out.
+   */
+  function actionsWindow(n: number, seed: number): GameState {
+    let s = reactiveGame(seed, n, ctx);
+    for (let step = 0; step < 1200; step += 1) {
+      if (s.finished) break;
+      if (s.phase === 'actions' && !s.choices.some((c) => c.player === s.activePlayer)) break;
+      const open = s.choices[0];
+      const seat = open?.player ?? s.activePlayer;
+      s = reduceOrThrow(s, seat, driverAction(s, seat), 'ordinary play');
+    }
+    if (s.finished || s.phase !== 'actions') throw new Error(`${n}p seed ${seed}: never reached a free actions phase`);
+
+    const actor = s.activePlayer;
+    const other = s.turnOrder.find((p) => p !== actor);
+    if (other === undefined) throw new Error(`${n}p seed ${seed}: no seat other than the actor`);
+
+    // `dealReactiveHands` round-robins ids across holders, so three ids over three holder
+    // slots puts the first two on the actor and the BLOCK on the non-actor. `canBeAnswered`
+    // skips the actor, so holding BLOCK there would be inert; it is dealt elsewhere.
+    const dealt = dealReactiveHands(s, [ACTOR_CARD_A, ACTOR_CARD_B, BLOCK_ID], [actor, actor, other]);
+    const played = reduceOrThrow(dealt, actor, { type: 'PLAY_CONSPIRACY', cardId: ACTOR_CARD_A }, 'stage a window');
+
+    const w = played.interrupt;
+    if (w === null) throw new Error(`${n}p seed ${seed}: the play did not stage a window`);
+    if (played.phase !== 'actions') throw new Error(`${n}p seed ${seed}: the window is not in actions (${played.phase})`);
+    if (played.choices.some((c) => c.player === actor)) {
+      throw new Error(`${n}p seed ${seed}: the actor owes a decision, so guard 4 would confound the measurement`);
+    }
+    if (!(played.players[actor]?.conspiracies ?? []).includes(ACTOR_CARD_B)) {
+      throw new Error(`${n}p seed ${seed}: the actor holds no card left to be offered`);
+    }
+    return played;
+  }
+
+  type Case = { readonly where: string; readonly state: GameState };
+
+  /**
+   * Every open-window state this section measures, from BOTH routes.
+   *
+   * The headline route is what the rest of this file has always used; the `actions` route
+   * is the one the defect lived in. Memoised because `actionsWindow` walks up to 1200 steps
+   * and three tests below ask for the same corpus, and a fixture recomputed per test is a
+   * fixture whose states can differ between them.
+   */
+  let cached: readonly Case[] | null = null;
+  function windowStates(): readonly Case[] {
+    if (cached !== null) return cached;
+    const out: Case[] = [];
+    for (const n of SEATS) {
+      for (const seed of SEEDS) {
+        out.push({ where: `${n}p seed ${seed} (headline window)`, state: playUntilWindow(seed, n) });
+      }
+      // Three seeds is enough for this route: it is a deterministic walk to a free
+      // `actions` state, so the shape is the same every time and the sweep's job here is
+      // seat count, not seed coverage.
+      for (const seed of [1, 2, 3] as const) {
+        out.push({ where: `${n}p seed ${seed} (actions window)`, state: actionsWindow(n, seed) });
+      }
+    }
+    cached = out;
+    return out;
+  }
+
+  it('offers EXACTLY what the engine accepts, for every seat — which is nothing', () => {
+    // The load-bearing pair, exactly as `secret-state.test.ts` frames it: sound (nothing
+    // offered that is refused) is what removes the dead button, and complete (nothing
+    // omitted that is accepted) is what proves the guard has not taken away a card the
+    // player legally holds. Both are read off `reduce`, so this cannot pass by agreeing
+    // with a bug in `broadcast.ts`.
+    let windowsSeen = 0;
+    let nonEmptyViews = 0;
+    for (const { where, state } of windowStates()) {
+      if (state.interrupt === null) throw new Error(`${where}: no window`);
+      windowsSeen += 1;
+
+      for (const viewer of [null, 'p_not_a_seat', '', ...state.turnOrder] as (PlayerID | null)[]) {
+        const hand = state.players[viewer ?? '']?.conspiracies ?? [];
+        const legal = hand.filter((id) => engineAllows(state, viewer ?? '', id));
+        expect(
+          [...offered(state, viewer)],
+          `${where}, phase ${state.phase}, viewer ${String(viewer)}: the projection offers a card the engine refuses`,
+        ).toEqual([...legal]);
+        if (offered(state, viewer).length > 0) nonEmptyViews += 1;
+      }
+    }
+    expect(windowsSeen, 'no window was reached, so nothing was exercised').toBeGreaterThan(0);
+    // The fix is the POINT of this file, so if a single view still came back non-empty
+    // the sweep above would have caught it; this states the conclusion rather than
+    // leaving it to be inferred from the equality holding.
+    expect(nonEmptyViews, 'a viewer was still offered a Conspiracy Card during a window').toBe(0);
+  });
+
+  it('the engine refuses the play for EVERY seat, the actor included — so a blanket ban is the rule', () => {
+    // This is the citation, executed rather than quoted. `reduce.ts` exempts action types
+    // and not seats, so the actor is refused exactly as hard as anybody else; a guard
+    // narrow enough to spare the actor would offer it a card the engine turns down.
+    let refusals = 0;
+    for (const { where, state } of windowStates()) {
+      const w = state.interrupt;
+      if (w === null) throw new Error(`${where}: no window`);
+      for (const viewer of state.turnOrder) {
+        for (const cardId of state.players[viewer]?.conspiracies ?? []) {
+          const r = reduce(state, viewer, { type: 'PLAY_CONSPIRACY', cardId }, ctx);
+          expect(r.ok, `${where}: ${viewer} may play ${cardId} during a window`).toBe(false);
+          // The refusal is the WINDOW's, not some incidental guard that would also have
+          // fired without a window — which is what makes it this defect and not another.
+          if (!r.ok) expect(r.error, `${where}: refused for the wrong reason`).toContain('is resolving');
+          refusals += 1;
+        }
+      }
+      // The actor is asserted by name. It is the seat that would have been spared by the
+      // obvious narrower fix, so it gets a line of its own rather than being left to the
+      // loop above to cover by accident.
+      const actorCard = state.players[w.actor]?.conspiracies[0];
+      if (actorCard !== undefined) {
+        const r = reduce(state, w.actor, { type: 'PLAY_CONSPIRACY', cardId: actorCard }, ctx);
+        expect(r.ok, `${where}: the actor was spared, so a seat-narrower guard would be wrong here`).toBe(false);
+        refusals += 1;
+      }
+    }
+    expect(refusals, 'no PLAY_CONSPIRACY was ever attempted during a window').toBeGreaterThan(0);
+  });
+
+  it('WITHOUT the window the same hands DO produce a non-empty list — the guard is what empties it', () => {
+    // NON-VACUITY, and the half that is easy to get wrong. A projection that returns []
+    // from a window state passes every assertion above whether or not the seats held
+    // anything, because an empty list is legal everywhere. So the counterfactual is
+    // measured: identical state, `interrupt` nulled, and the list is non-empty. Same
+    // hands, same phase, same active player, same index — the window is the only
+    // difference, so a non-empty result there proves the empty result here is the guard
+    // firing rather than a corpus with nothing in it.
+    let wouldOffer = 0;
+    let total = 0;
+    for (const { where, state } of windowStates()) {
+      if (state.interrupt === null) throw new Error(`${where}: no window`);
+      const without = { ...state, interrupt: null };
+      for (const viewer of state.turnOrder) {
+        total += 1;
+        if (offered(without, viewer).length > 0) {
+          wouldOffer += 1;
+        } else {
+          // Not a failure — a window open during `headlines` is already emptied by the
+          // PHASE guard, so it is expected to be empty either way. Reported so the count
+          // below cannot be read as covering states that had nothing to offer in the
+          // first place.
+          void where;
+        }
+      }
+    }
+    expect(total).toBeGreaterThan(0);
+    expect(
+      wouldOffer,
+      'no seat was offered anything even with the window removed, so the guard was never exercised',
+    ).toBeGreaterThan(0);
+    console.log(
+      `WINDOW PROJECTION: ${wouldOffer}/${total} seat-views offer a Conspiracy Card with ` +
+        `the window removed, and 0/${total} with it open`,
+    );
+  });
+
+  it('RESPONDING STILL WORKS — a BLOCK closes the window through RESPOND_INTERRUPT', () => {
+    // THE REGRESSION THIS FIX COULD HAVE CAUSED, asserted rather than assumed. Blocking
+    // the PLAY button would be worse than the bug if it also blocked answering, because
+    // the window is closed by spending a card — and spending it is `RESPOND_INTERRUPT`,
+    // a different action. So: a seat holding a BLOCK answers a real measurable window,
+    // the window closes, the card leaves the hand, and the answer is logged by name.
+    for (const n of SEATS) {
+      const found = measurableWindow(n, BLOCK_ID);
+      expect(
+        found,
+        `${n} players: no measurable window, so responding was not exercised`,
+      ).not.toBeNull();
+      if (found === null) return;
+      const { held, w, answerer } = found;
+
+      // The player about to answer is told nothing playable through the PLAY projection…
+      expect(
+        offered(held, answerer),
+        `${n}p: ${answerer} was offered a PLAY button during the window it is about to answer`,
+      ).toEqual([]);
+      // …and the answer still goes through, on the action type the reducer exempts.
+      const answer = reactiveAnswer(playerView(held, answerer), answerer, ownKnowledge(held, answerer, ctx.cards));
+      expect(answer, `${n}p: ${answerer} holds a BLOCK and produced no answer`).not.toBeNull();
+      if (answer === null) return;
+
+      const state = reduceOrThrow(held, answerer, answer, `${n}p, ${answerer} answers`);
+      expect(state.interrupt, `${n}p: the BLOCK did not close the window`).toBeNull();
+      expect(
+        state.players[answerer]?.conspiracies.includes(BLOCK_ID),
+        `${n}p: ${answerer} still holds the BLOCK it just played`,
+      ).toBe(false);
+      expect(
+        state.log.some((l) => l.text === `Played "${FIXTURE_BLOCK.name}".`),
+        `${n}p: the answer was not logged by name`,
+      ).toBe(true);
+      expect(state.log.some((l) => l.text.startsWith('Blocked ')), `${n}p: no BLOCK was logged`).toBe(true);
+      expect(w.actor, 'the window had no actor').toBeDefined();
+    }
+  });
+
+  it('and DECLINING still works — a window nobody answers still closes', () => {
+    // The other of the two moves the window exists for, and the one a production client
+    // actually takes, since it holds no hand. If the guard had leaked into the response
+    // path this is what would hang.
+    for (const n of SEATS) {
+      const held = playUntilWindow(11, n);
+      expect(held.interrupt, `${n}p: no window`).not.toBeNull();
+      let s = held;
+      let passes = 0;
+      while (s.interrupt !== null && passes <= n) {
+        const seat = windowResponder(playerView(s, s.activePlayer));
+        if (seat === null) break;
+        s = reduceOrThrow(s, seat, { type: 'PASS_INTERRUPT' }, `${n}p, decline`);
+        passes += 1;
+      }
+      expect(s.interrupt, `${n}p: the window never closed`).toBeNull();
+      expect(passes, `${n}p: the decline path took ${passes} passes`).toBeLessThanOrEqual(n - 1);
+    }
+  });
+});

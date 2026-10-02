@@ -175,16 +175,36 @@ const NO_CONSPIRACIES: readonly PlayableConspiracy[] = Object.freeze([]);
  *
  *   1. no viewer (a spectator) or no such seat
  *   2. `state.finished`                     — reduce: 'the game is over'
- *   3. a pending `PendingChoice`            — reduce: `blockedBy`, which freezes
+ *   3. an open `state.interrupt`            — reduce: '"X" is resolving — answer
+ *                                              it or decline first'
+ *   4. a pending `PendingChoice`            — reduce: `blockedBy`, which freezes
  *                                              a player until the choice resolves
- *   4. the turn window: not your turn is legal ONLY in the `answer` window
+ *   5. the turn window: not your turn is legal ONLY in the `answer` window
  *                                              (reduce's `outOfTurnOk`), because
  *                                              p19 lets a conspiracy be played
  *                                              immediately before an opponent
  *                                              answers
- *   5. the phase window: `actions` or `answer` only (reduce's own phase check),
+ *   6. the phase window: `actions` or `answer` only (reduce's own phase check),
  *      and specifically NOT `headlines`
- *   6. the card is in the viewer's hand and is readable from the index
+ *   7. the card is in the viewer's hand and is readable from the index
+ *
+ * GUARD 3 IS A BLANKET BAN, AND THAT IS THE RULE RATHER THAN THE EASY ANSWER.
+ * `reduce.ts` places the window check FIRST, above the per-player freeze and above
+ * the turn check, and exempts three ACTION TYPES — `RESPOND_INTERRUPT`,
+ * `PASS_INTERRUPT`, `RESOLVE_CHOICE` — rather than three seats or three phases.
+ * So an open window refuses `PLAY_CONSPIRACY` for the actor as well as for every
+ * other seat, and in `actions` as well as in `answer`. Two narrower rules would
+ * both be wrong: exempting the actor (they are refused too), and exempting a phase
+ * (the window is deliberately not a `Phase` member, and it can be open in either).
+ *
+ * AND IT CANNOT BREAK RESPONDING, which is the thing a reader of this file should
+ * check before changing it. Answering is not a conspiracy *played* — it is a card
+ * spent through the separate `RESPOND_INTERRUPT` action, which is on the reducer's
+ * exemption list and never reaches guard 7 at all. This list describes the PLAY
+ * button and only the PLAY button, so emptying it during a window takes away one
+ * dead control and leaves `RESPOND_INTERRUPT` and `PASS_INTERRUPT` untouched.
+ * `interrupt-window.test.ts` asserts both halves: nothing offered that `reduce`
+ * refuses, and a window still closed by a real BLOCK after the guard is in place.
  *
  * Note what is NOT a guard: nothing here looks at another player. `self` is the
  * only `PlayerState` read, so the list cannot contain a card the viewer does not
@@ -207,6 +227,13 @@ export function playableConspiraciesFor(
   const self = state.players[viewer];
   if (self === undefined) return NO_CONSPIRACIES;
   if (state.finished) return NO_CONSPIRACIES;
+  // G13: an open response window freezes the table. `reduce` checks this BEFORE the
+  // per-player freeze and before the turn check, and exempts three action types rather
+  // than any seat or phase — so `PLAY_CONSPIRACY` is refused here for the actor as
+  // well as for every other seat. Answering is not this action: it is
+  // `RESPOND_INTERRUPT`, which the reducer exempts outright, so emptying this list
+  // removes the dead PLAY button without touching the two moves the window exists for.
+  if (state.interrupt !== null) return NO_CONSPIRACIES;
   if (state.choices.some((c) => c.player === viewer)) return NO_CONSPIRACIES;
   if (viewer !== state.activePlayer && state.phase !== 'answer') return NO_CONSPIRACIES;
   if (state.phase !== 'actions' && state.phase !== 'answer') return NO_CONSPIRACIES;
