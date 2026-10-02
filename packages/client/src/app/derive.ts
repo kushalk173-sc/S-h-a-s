@@ -780,5 +780,24 @@ export const actions = {
     pick,
   }),
   ackHeadline: (): Action => ({ type: 'ACK_HEADLINE' }),
+  /**
+   * G13 — decline the open response window. The anti-stall move: it is the only
+   * thing in the vocabulary that guarantees a window is closable, and it is
+   * therefore offered to every seat the window is waiting on, whether or not that
+   * seat holds anything playable.
+   */
+  passInterrupt: (): Action => ({ type: 'PASS_INTERRUPT' }),
+  /**
+   * G13 — play a BLOCK or a DEFLECT into the open window. `at` is the player a
+   * DEFLECT redirects the resolution to, and MUST be omitted for a BLOCK: the
+   * engine refuses "a Block negates the effect; there is nothing to redirect it to"
+   * rather than ignoring the field, which is the right refusal and the reason the
+   * builder takes the target as an argument instead of defaulting it.
+   */
+  respondInterrupt: (cardId: string, at?: PlayerID): Action => ({
+    type: 'RESPOND_INTERRUPT',
+    cardId,
+    ...(at === undefined ? {} : { at }),
+  }),
   endTurn: (): Action => ({ type: 'END_TURN' }),
 };

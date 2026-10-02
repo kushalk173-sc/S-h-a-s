@@ -33,6 +33,7 @@ import type {
   Action,
   ClientState,
   Delta,
+  InterruptWindow,
   LogEntry,
   PlayerID,
   Resource,
@@ -45,6 +46,8 @@ import type { BlindPrompt, ClientStore } from '../net/index.ts';
 import { AnswerReveal, AnswerScreen } from './AnswerScreen.tsx';
 import { ChoiceResolver } from './ChoiceResolver.tsx';
 import { ConspiracyPicker, type PlayableConspiracy } from './ConspiracyPicker.tsx';
+import { ResponseWindow, type ResponsiveCard } from './ResponseWindow.tsx';
+import { windowLiveMessage } from './interrupt.ts';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
 import { ResourcePicker } from './ResourcePicker.tsx';
@@ -162,6 +165,48 @@ export function GameScreen({ store }: GameScreenProps) {
     () => (state === null ? undefined : playableConspiracies(state, you)),
     [state, you],
   );
+
+  /*
+    G13 — THE RESPONSE WINDOW, and the three things it changes about this screen.
+
+    `state.interrupt` is nullable and is NOT a `Phase`: `broadcast.ts` gates hand
+    visibility on `phase === 'actions' || 'answer'`, so a phase member would black
+    out every hand — including the BLOCK — for as long as the window is open. The
+    phase keeps saying which phase of PLAY it is, and this screen has to cope with a
+    suspension inside one:
+
+      1. A PANEL, which `ResponseWindow` renders as a modal for the one seat with a
+         decision to make and as a banner for everybody else.
+      2. THE CONTROLS BELOW ARE FROZEN, and that is not a nicety. `reduce.ts` refuses
+         every action except `RESPOND_INTERRUPT`, `PASS_INTERRUPT` and
+         `RESOLVE_CHOICE` while a window is open, with the message `"…" is resolving
+         — answer it or decline first`. Leaving the mat, the market and END TURN live
+         would hand the player eight controls that each earn a refusal toast, and
+         the table would look broken rather than suspended.
+      3. THE LIVE REGION SAYS SO, which is why `describeForScreenReader` reads
+         `state.interrupt`: a window can open on somebody else's turn and has no
+         focus target of its own, so without that sentence a screen-reader user
+         would hear nothing at all while the game stopped.
+  */
+  const openWindow = state === null ? null : state.interrupt;
+  const windowOpen = openWindow !== null;
+
+  const myResponsive = useMemo(
+    () => (state === null ? undefined : responsiveConspiracies(state, you)),
+    [state, you],
+  );
+
+  /*
+    A DEFLECT target is local intent, exactly like a placement pick or a drafted
+    payment: it is the redirect the player is choosing, and it is spent only when the
+    server accepts the response. It is CLEARED when the window changes, because a
+    target named for one window means nothing to another — and a stale target that
+    silently survived would redirect a card to a player the responder never picked.
+  */
+  const [deflectTarget, setDeflectTarget] = useState<PlayerID | null>(null);
+  useEffect(() => {
+    setDeflectTarget(null);
+  }, [openWindow?.id]);
 
   const interaction = useMemo<BoardInteraction>(() => {
     if (state === null) return IDLE_INTERACTION;
@@ -506,7 +551,13 @@ export function GameScreen({ store }: GameScreenProps) {
       : me.pending.find((g) => g.id === app.placingGroupId) ?? null;
   const owedChoice = state.choices.find((c) => c.player === you) ?? null;
 
-  const liveMessage = describeForScreenReader(state, isMyTurn, store.blind !== null, you);
+  const liveMessage = describeForScreenReader(
+    state,
+    isMyTurn,
+    store.blind !== null,
+    you,
+    openWindow,
+  );
 
   return (
     <div
@@ -515,12 +566,34 @@ export function GameScreen({ store }: GameScreenProps) {
       // The one-frame payout pushes the board down by ~192px, so the board's
       // `max-height` reserve has to know. See the `.shell[data-reveal]` rule.
       data-reveal={showReveal ? 'true' : 'false'}
+      // G13: same reason, different cause — the response window's banner is in the
+      // flow above the board, so the reserve has to know about that too.
+      data-window={windowOpen ? 'true' : 'false'}
     >
       <TopBar state={state} store={store} you={you} role={role} />
 
       {showReveal ? (
         <AnswerReveal state={state} you={you as PlayerID} answeredLabel={answeredLabel} />
       ) : null}
+
+      {/*
+        THE RESPONSE WINDOW, in the flow above the board so every seat sees it — the
+        actor, a player who has already declined, a player frozen by a decision of
+        their own, a spectator, and the one seat that gets the modal. Rendered from
+        the state, so a window that opens and closes needs nothing from this client
+        but a re-render: there is no local flag, no timer and no queue.
+      */}
+      <ResponseWindow
+        state={state}
+        window={openWindow}
+        you={you}
+        isSpectator={role === 'spectator'}
+        responsive={myResponsive}
+        onDecline={() => dispatch(actions.passInterrupt())}
+        onRespond={(cardId, at) => dispatch(actions.respondInterrupt(cardId, at))}
+        deflectTarget={deflectTarget}
+        onDeflectTarget={setDeflectTarget}
+      />
 
       <div className="shell__body">
         {/*
@@ -1011,6 +1084,38 @@ function playableConspiracies(
 }
 
 /**
+ * G13 — the cards the SERVER says this viewer may answer the open window with.
+ *
+ * The same shape and the same fail-closed cast as `playableConspiracies`, and the
+ * same reason: this client is never told what it holds, so a BLOCK or a DEFLECT can
+ * only be offered if the server names it. `op` is validated too, and it is the field
+ * that decides whether the control needs a target — a DEFLECT must name one and a
+ * BLOCK must not, and the engine refuses a BLOCK that carries one.
+ *
+ * `undefined` — the field was absent, which is what today's server sends — is NOT
+ * the same claim as `[]`, and `ResponseWindow` renders them differently rather than
+ * showing an empty card list that would read as "you hold nothing that can answer".
+ */
+function responsiveConspiracies(
+  state: ClientState,
+  you: PlayerID | null,
+): readonly ResponsiveCard[] | undefined {
+  if (you === null) return undefined;
+  const raw = (state as { responsiveConspiracies?: unknown }).responsiveConspiracies;
+  if (!Array.isArray(raw)) return undefined;
+  const out: ResponsiveCard[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const c = entry as Record<string, unknown>;
+    if (typeof c['id'] !== 'string') continue;
+    if (typeof c['name'] !== 'string' || typeof c['text'] !== 'string') continue;
+    if (c['op'] !== 'block' && c['op'] !== 'deflect') continue;
+    out.push({ id: c['id'], name: c['name'], text: c['text'], op: c['op'] });
+  }
+  return out;
+}
+
+/**
  * §5.7: both sides must exchange at least one resource, and the shortfall line
  * sits directly above the disabled SEND, because §9.2's rule is that the reason
  * is always adjacent to the control.
@@ -1380,13 +1485,24 @@ function lastAnswerText(log: readonly LogEntry[], you: PlayerID): string | null 
  * The polite live-region sentence. §8.5: state changes with no focus target
  * announce here, and a screen-reader user must hear the same information a
  * sighted one gets.
+ *
+ * THE RESPONSE WINDOW IS CHECKED FIRST, and the ordering is the point rather than a
+ * detail. A window can open inside ANY phase — `PLAY_CONSPIRACY` out of turn while
+ * somebody is answering, `ACK_HEADLINE` in the headline queue, or an active player's
+ * own card — and while it is open `reduce.ts` refuses every other action on the
+ * table. Every other sentence below describes a phase that is nominally still the
+ * one in progress and is, for the duration, not what is happening: a window can open
+ * on somebody else's turn, so without this the screen-reader user hears "Ria is
+ * thinking" while Ria's own controls are all refused.
  */
 function describeForScreenReader(
   state: ClientState,
   isMyTurn: boolean,
   hasPrompt: boolean,
   you: PlayerID | null,
+  openWindow: InterruptWindow | null,
 ): string {
+  if (openWindow !== null) return windowLiveMessage(state, openWindow);
   if (hasPrompt && isMyTurn) return 'An Ideology Card has been put to you. Answer it.';
   if (state.phase === 'headlines') return 'A Headline is resolving.';
   if (isMyTurn) {
