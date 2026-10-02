@@ -1001,27 +1001,64 @@ describe('LAYER 4 — the viewer-sent playable-conspiracy list', () => {
     expect(witnessed, 'no out-of-turn answer-window offer was ever witnessed').toBeGreaterThan(0);
   });
 
-  it('the list is COMPUTED, never cached: playing a card removes it from the next view', () => {
+it('the list is COMPUTED, never cached: playing a card removes it from the next view', () => {
     // The requirement that turns a projection into a live one. Take a state where
     // the viewer is offered something, actually play it through `reduce`, project
-    // again, and the card must be gone — with no invalidation step that could be
+    // again, and the card must be gone - with no invalidation step that could be
     // forgotten, because there is no cache to invalidate.
+    //
+    // WHAT THIS ASSERTS, AND WHY IT IS NOT A LENGTH DELTA — the arithmetic version
+    // used to be `after.length === before.length - 1`, and it was wrong in a way that
+    // had nothing to do with caching. `playableConspiraciesFor` is empty whenever the
+    // viewer owes a `PendingChoice`, and playing a card can MAKE them owe one:
+    // ct-in2020-007 is `evict 2` + `gain-any 1`, so the moment it resolves the player
+    // is frozen and the whole list is legitimately `[]` — two entries gone, not one.
+    // G20 did not break this by changing the corpus's leak surface; it moved the
+    // shuffle and so moved which state the walk reached first, which is how a fixture
+    // that had been asserting an arithmetic coincidence for months first noticed.
+    //
+    // A length delta also could not have caught the bug it was named for. The real
+    // failure mode of a cached list is a STALE entry — an id the viewer no longer
+    // holds, still on offer — and that is a set-membership question, so it is
+    // asserted as one. These three are the leak detector, and each is stronger than
+    // the delta it replaces:
+    //
+    //   1. the played card is gone.                    (the named claim)
+    //   2. nothing on offer is absent from the hand.   (no stale ids — the cache bug)
+    //   3. owing a decision empties the list.          (the rule that broke the delta)
     let exercised = 0;
+    let froze = 0;
     for (const s of CONSPIRACY_CORPUS) {
       const viewer = s.activePlayer;
       const before = offered(s, viewer);
       const cardId = before[0];
       if (cardId === undefined) continue;
       const played = reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS });
-      expect(played.ok).toBe(true);
+      expect(played.ok, `${viewer} was offered ${cardId} and could not play it`).toBe(true);
       if (!played.ok) continue;
       const after = offered(played.state, viewer);
+      const hand = handOf(played.state, viewer);
+
+      // 1. the named claim.
       expect(after, 'the played card is still on offer').not.toContain(cardId);
-      expect(after.length).toBe(Math.max(0, before.length - 1));
+      expect(hand, 'the card is still in the hand the projection is built from').not.toContain(cardId);
+      // 2. no stale entry. A projection built from an earlier state would fail here.
+      for (const id of after) {
+        expect(hand, `${id} is on offer to ${viewer} but is not in their hand — the list is stale`).toContain(id);
+      }
+      // 3. the freeze, asserted rather than stepped around.
+      const owes = played.state.choices.some((c) => c.player === viewer);
+      if (owes) {
+        expect(after, `${viewer} owes a decision but is still offered cards`).toEqual([]);
+        froze += 1;
+      }
       exercised += 1;
-      if (exercised >= 4) break;
+      if (exercised >= 6) break;
     }
     expect(exercised, 'no card was ever actually played').toBeGreaterThanOrEqual(2);
+    // At least one of the walks must have gone through the freeze branch, or the
+    // fixture is not exercising the case that broke the delta in the first place.
+    expect(froze, 'no played card ever left its player owing a decision').toBeGreaterThan(0);
   });
 
   it('handing a card to another seat takes it out of the giver\'s list immediately', () =>

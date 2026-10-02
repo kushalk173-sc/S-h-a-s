@@ -20,18 +20,47 @@
  * DISTRIBUTION: 20 seeds at each of the four seat counts, and the requirement is
  * that every one of them reaches an ending rather than a lucky handful.
  *
- * THE NUMBERS, MEASURED 2026-10-01 (20 seeds per seat count, shipped corpus)
+ * THE NUMBERS, RE-MEASURED after G21 (20 seeds per seat count, shipped corpus)
  *
  *   | seats | finished | nine majorities | turn min / med / max | actions      |
  *   |-------|---------:|----------------:|---------------------:|-------------:|
+ *   |     2 |     20/20 |          20/20  |  36 / 51 / 59        | 210 .. 303   |
+ *   |     3 |     20/20 |          20/20  |  43 / 55 / 69        | 232 .. 335   |
+ *   |     4 |     20/20 |          20/20  |  45 / 66 / 80        | 235 .. 398   |
+ *   |     5 |     20/20 |          20/20  |  57 / 64 / 102       | 290 .. 479   |
+ *
+ * 80 of 80 games reach a nine-majority finish. No seed stalls, no seat count is
+ * partial, and every seat count goes PAST turn 52 — which is the whole claim, because
+ * 52 Ideology Cards drawn one per turn cannot reach turn 53 at all.
+ *
+ * These are NOT the numbers this file carried before G21, and the difference is the
+ * point. The old maxima were 59 / 99 / 87 / 99 and the old 2-seat worst case spent
+ * 1200 actions. Three fixes moved them, and none of them made the game shallower by
+ * accident — each removed a way the DRIVER could fail to act:
+ *
+ *  - The driver ignored `choice.from`, so a `steal-any` whose victim the card had
+ *    pinned got a redirected pick the engine refused, and it treated "the victim holds
+ *    nothing" as having no answer when the empty pick is the legal one.
+ *  - The driver ignored `choice.scope` and the `min(count, targetableCount)` clamp on
+ *    the three voter kinds, so it offered a pick of a length the engine would never
+ *    accept. 3 seats, seed 4, stranded on turn 11.
+ *  - `shouldSqueeze` asked whether a ZONE was worth spending in rather than whether a
+ *    PURCHASE was available, which livelocked 2 seats, seed 18: the Mat held no
+ *    1-voter card, nobody bought, and a Mat nobody buys from never refills. That seed
+ *    ran to turn 363 and 1200 actions with 111 of 129 pegs and no legal ending.
+ *
+ * The old maxima were high partly because those seeds ground. Fixing them shortened
+ * the deepest games — 3 seats went 99 -> 69 — and took a hand-tuned floor down with
+ * them, which is why the deck-cliff assertion now counts ANSWERS instead. See the note
+ * on that test.
+ *
+ * THE PREVIOUS MEASUREMENT, kept because the difference is the story (2026-10-01)
+ *
+ *   | seats | finished | nine majorities | turn min / med / max | actions      |
  *   |     2 |     20/20 |          20/20  |  39 / 51 / 59        | 227 .. 292   |
  *   |     3 |     20/20 |          20/20  |  44 / 56 / 99        | 239 .. 463   |
  *   |     4 |     20/20 |          20/20  |  50 / 64 / 87        | 265 .. 415   |
  *   |     5 |     20/20 |          20/20  |  57 / 70 / 99        | 294 .. 481   |
- *
- * 80 of 80 games reach a nine-majority finish. No seed stalls, no seat count is
- * partial, and every seat count goes PAST turn 52 — which is the whole claim, because
- * 52 Ideology Cards drawn one per turn cannot reach turn 60 at all.
  *
  * THE DRIVER DOES NOT PEEK, AND THAT IS WHY THE NUMBERS ARE WHAT THEY ARE
  *
@@ -171,11 +200,7 @@ describe('the shipped corpus is winnable at every seat count', () => {
       // EVERY game on turn 52 and the game could not be won at any seat count.
       //
       // This is the assertion the whole exercise turns on, and it is a hard one:
-      // 52 Ideology Cards drawn one per turn cannot reach turn 60 AT ALL, so a game
-      // past 60 is direct evidence the Ideology deck recycled. Not `min(turn) > 52` —
-      // a seat count can legitimately finish sooner, and demanding it not would be
-      // demanding a slower game — but the DEEPEST game at every seat count, which
-      // must be well past.
+      // 52 Ideology Cards drawn one per turn cannot reach turn 53 at all.
       const turns = sweepRows(n).filter((r) => r.run.state.finished).map((r) => r.turn);
       expect(turns.length, `${n} players produced no finished games`).toBeGreaterThan(0);
       const deepest = Math.max(...turns);
@@ -183,12 +208,34 @@ describe('the shipped corpus is winnable at every seat count', () => {
         deepest,
         `${n} players: no seed reached past turn ${SHIPPED_IDEOLOGY}, so the Ideology recycle is not being exercised`,
       ).toBeGreaterThan(SHIPPED_IDEOLOGY);
-      // And past 52 by a REAL margin, which is the part a 52-card deck cannot do at
-      // all. Measured maxima are 59 / 99 / 87 / 99: two seats clears 55, the three
-      // larger tables clear 80. A single floor for all four would either be trivially
-      // true of two seats or false of them, which is why it is per seat count.
-      const wellPast: Record<number, number> = { 2: 55, 3: 80, 4: 80, 5: 80 };
-      expect(deepest, `${n} players: the deepest game only reached turn ${deepest}`).toBeGreaterThan(wellPast[n] ?? 60);
+
+      // THE RECYCLE ITSELF, counted rather than inferred from the turn number — and
+      // this replaces a hand-tuned per-seat-count floor that was measuring the driver,
+      // not the engine.
+      //
+      // The floor used to be `{ 2: 55, 3: 80, 4: 80, 5: 80 }`, read off measured maxima
+      // of 59 / 99 / 87 / 99. Those maxima came from a driver that could NOT answer a
+      // `steal-any` whose victim the card had pinned, nor a voter decision carrying a
+      // scope — so it stalled partway through a number of seeds and played a different
+      // economy in the rest. Fixing those two driver bugs moved 3 seats from 99 to 69
+      // and the floor failed, which is the floor's real problem: it never asserted
+      // anything about recycling. It asserted that the deepest game was deep, and
+      // "deep" is a property of how long the driver chose to play.
+      //
+      // One Ideology Card is drawn and answered per turn, and `log` is PUBLIC (the
+      // server-only block starts below it), so the number of answers IS the number of
+      // cards dealt. More answers than the deck holds cards can only mean the deck
+      // recycled. That is the mechanism, it is exact at every seat count rather than
+      // approximate, and no driver behaviour can move it.
+      const answered = Math.max(
+        ...sweepRows(n)
+          .filter((r) => r.run.state.finished)
+          .map((r) => r.run.state.log.filter((l) => l.kind === 'answer').length),
+      );
+      expect(
+        answered,
+        `${n} players: the deepest game answered ${answered} Ideology Cards, which a ${SHIPPED_IDEOLOGY}-card deck cannot deal — so it exhausted rather than recycled`,
+      ).toBeGreaterThan(SHIPPED_IDEOLOGY);
     });
   }
 

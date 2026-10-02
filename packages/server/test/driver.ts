@@ -722,8 +722,29 @@ function value(slot: { readonly cost: Readonly<Record<string, number>>; readonly
 export function shouldSqueeze(view: ClientState, me: PlayerID): boolean {
   const pool = view.players[me]?.resources;
   if (pool === undefined) return false;
-  if (targetZone(view, me, 1) !== null) return false; // there is somewhere worth it
-  return view.market.some((slot) => POOLS.every((r) => (pool[r] ?? 0) >= (slot.cost[r] ?? 0)));
+  const affordable = (cost: Readonly<Record<string, number>>): boolean =>
+    POOLS.every((r) => (pool[r] ?? 0) >= (cost[r] ?? 0));
+  const slots = view.market.filter((slot) => affordable(slot.cost));
+  if (slots.length === 0) return false;
+  // If ANY affordable card can be placed somewhere it can still win, buy it the
+  // ordinary way and do not squeeze.
+  //
+  // This replaces `targetZone(view, me, 1) !== null`, which was the wrong question and
+  // stranded a real seed. 2 players, seed 18: south and south_east each had exactly
+  // ONE free area, so `targetZone(1)` was non-null and the driver sat on its hands
+  // forever. But the Mat held no 1-voter card at all, so that one free area could
+  // never be filled — and because `refillMarket` only runs off a PURCHASE, a Mat that
+  // nobody buys from never changes. The table had no legal ending and no way to reach
+  // one: turn 363, 111 of 129 pegs, 7 majorities, 1200 actions spent. A livelock, not
+  // a hard lock, and the same "the game cannot end" shape the seed-11 note records.
+  //
+  // The old guard could not see it because it asked whether a ZONE was worth spending
+  // in rather than whether a PURCHASE was available, and it fired far too eagerly when
+  // it did fire — squeezing past a perfectly good 2-voter buy because no single-voter
+  // zone existed. Asking the question the driver actually faces is both narrower and
+  // sufficient.
+  if (slots.some((slot) => targetZone(view, me, slot.voters) !== null)) return false;
+  return true;
 }
 
 // ─────────────────────────── the in-process runner ───────────────────────────
