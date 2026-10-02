@@ -17,7 +17,7 @@ the auditable half. If the two ever disagree, the card is wrong.
 
 ---
 
-## 1. The headline finding: zero cards can be tagged `verbatim`
+## 1. The headline finding: zero cards can be tagged `verbatim` — and the two reactive cards are why
 
 **No card in this corpus is tagged `verbatim`, and that is not an oversight. It is
 structurally unreachable while `reduce()` holds at 13 ops.**
@@ -30,17 +30,40 @@ print a sentence describing something the engine does not do. That is precisely 
 `KNOWN-GAPS.md` §0 calls **state (b): "a card that lies,"** and precisely what
 `src/executable.ts` exists to prevent.
 
-So the honest per-card disposition of the whole recovered X-card corpus is:
+### The two cards that were supposed to be the counter-example, and were not
 
-- **11** ship as `adapted`, each with the dropped clause named in its `source`.
-- **~41** do not ship at all, each listed in §4 below with the gap that blocks it.
+BLOCK and DEFLECT were the obvious candidates to move this number: they were the two
+recovered cards whose *entire* effect is the reactive half, G13's phase machine now
+executes that half, and REF §4.2.1 recovers **both of them in full, verbatim, from the
+official Earth 2040 player aid**. Where every other recovered card has an inexpressible
+clause buried in the middle of its text, these two have nothing else in them. They were
+the first cards legitimately *eligible* for `verbatim`, and §1 of this file used to say so.
+
+They ship as `adapted`, and the count is still 0. Reading the recovered text clause by
+clause against what `reduce()` actually performs:
+
+| recovered clause (REF §4.2.1) | performed? |
+|---|---|
+| Block: *"Play this immediately out of turn … to negate its effect"* | **yes** — `RESPOND_INTERRUPT`, `blocked` cancels the staged list |
+| Block: *"Cannot be reversed or deflected"* | **yes** — a window takes exactly one answer |
+| Block: *"Actions not directed at you may also be blocked"* | **yes** — this is why it declares `target: 'any-card'` |
+| Block: *"For multi-turn cards the block must be done immediately, not midway"* | **yes, for free** — the window exists only while a card is resolving |
+| Block: *"[OR] Discard an open Conspiracy Card or Headline Card"* | **no** — no op discards another player's open card |
+| Block: *"May be used to block a card stealing this card"* | **no** — G20 `move-card` moves Ideology Cards only, so no Conspiracy can be stolen |
+| Block: *"A block may be used to cleanse an already-active card"* | **no** — no op removes an installed `LiveEffect` (G9/G22) |
+| Deflect: *"you may play this immediately to redirect its effect on any player other than them"* | **yes** |
+| Deflect: *"that affects you"* | **widened** — `card-affecting-you` resolves through `reachesPastActor`, an approximation (G1) |
+| Deflect: *"If the action card has a partial effect on you, only that partial effect is deflected"* | **no** — `applyEffect` computes one target per effect list, so the WHOLE resolution is redirected (G20) |
+
+Three clauses in one card and two in the other, and the two that make each card's identity
+— BLOCK's discard-an-open-card, DEFLECT's partial-effect granularity — are both missing
+mechanisms rather than missing wording. So the eligibility was real and the execution is
+still not complete, and the honest disposition of the whole recovered X-card corpus is
+unchanged:
+
+- **15** ship as `adapted`, each with the dropped clause named in its `source`.
+- **37** do not ship at all, each listed in §4 below with the gap that blocks it.
 - **0** ship as `verbatim`.
-
-The cheapest way to change that number is not to re-tag anything. It is KNOWN-GAPS §3
-**row 2** (a live-effects list on `GameState`, `state.ts` + `reduce.ts`), which is the
-substrate for 12 cards, followed by **row 6** (the phase machine: `block` / `deflect` /
-`auction` / `vote` / `pass-card`), which unblocks 5 including the two most-replayed cards
-in the real product.
 
 **What genuinely improved in this pass** is the Ideology deck, which is the deck players
 actually see: 20 → 52 Ideology Cards, and the number carrying recovered question text went
@@ -146,6 +169,8 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 11 | `ct-et2040-011` | Load Shedding, Properly Explained | `inferred` | original; REF §8.2 |
 | 12 | `ct-et2040-012` | Server Space | `inferred` | original; REF §8.2. Deliberately does **not** restate SELECTIVE ACCESS MEMORY (G17) |
 | 13 | `ct-et2040-013` | Holo Sapiens | `adapted` | REF §4.2.1 verbatim, on its first sentence alone. G20 `move-card`. Same archetype as `ct-in2020-011`; see KNOWN-GAPS.md G20 |
+| 14 | `ct-et2040-014` | Block | `adapted` | REF §4.2.1 verbatim, clause by clause against the reducer. **Ships the whole reactive half** — G13's phase machine executes it and §1 tabulates all eight clauses. Drops three: discard an open card, block a card stealing itself, cleanse an already-active card. The `Otherwise: gain 1 Clout` clause is **authored**; the schema requires an effect list |
+| 15 | `ct-et2040-015` | Deflect | `adapted` | REF §4.2.1 verbatim, clause by clause. Ships the reactive half with two named deviations: the **whole** effect list is redirected, not one partial effect (G20), and `target` is `any-card` rather than `card-affecting-you` (G1). The `Otherwise: gain 1 Trust` clause is **authored** |
 
 ### `et2040` / headline — 15 cards
 
@@ -236,7 +261,7 @@ Every one is `inferred`. **There is no verbatim Voter Card to import** — see �
 ## 4. Disposition of every recovered card — the audit trail
 
 Nothing recovered is dropped silently. **52 distinct recovered cards** are accounted for
-below. 13 ship `adapted`; 39 do not ship, each with the reason.
+below. 15 ship `adapted`; 37 do not ship, each with the reason.
 
 Counting note: REF §4 lists 56 card rows across its four tables. Four are duplicates by
 effect (REF §4.3: *"Deduplicate by effect, not by name"*) — SUBMERGED ≡ NEW FACE WHO DIS,
@@ -251,10 +276,10 @@ excluded.
 | card | disposition | blocking gap |
 |---|---|---|
 | A Grave Inheritance | **ships** `adapted` as `ct-et2040-001` | G2 |
-| Block | not representable | G13 — out-of-turn reactive cancellation; REF §5.4: a change of phase, not of resources |
+| Block | **ships** `adapted` as `ct-et2040-014` | the reactive half only. G13 landed. Still dropped: the *"[OR] Discard an open Conspiracy Card or Headline Card"* branch (no op discards an open card), *"block a card stealing this card"* (G20 moves Ideology Cards only) and *"cleanse an already-active card"* (no op removes a `LiveEffect`, G9/G22). §1 tabulates all eight recovered clauses |
 | Cut, Copy, and Paste | not representable | G16 zone-scoped, G22 spans two turns, G-new convert-own |
 | Deep Thoughts | not representable | no op borrows an opponent's Ideologue powers. **Not a G20 card** despite the row-9 table: move-card moves cards, not powers |
-| Deflect | not representable | G13 — retargeting, and it needs partial-effect granularity |
+| Deflect | **ships** `adapted` as `ct-et2040-015` | the reactive half only. G13 landed. Still dropped: *"only that partial effect is deflected"* — `applyEffect` computes one target per effect list, so the whole resolution is redirected (G20). And widened: `target: 'any-card'` rather than `card-affecting-you`, which resolves through an approximation (G1) |
 | Eradicating Germs | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
 | Holo Sapiens | **ships** `adapted` as `ct-et2040-013` | G20 landed — only *"This is an extra Ideology Card"*. G15 dynamic price, G17 the "of your choice", G23 re-filing, G12 expiry-on-purchase |
 | If You Like Piña Colada | not representable | mat-wide doubling with a cap check; no `gain`/`lose` op scales a whole pool |
@@ -283,7 +308,7 @@ excluded.
 |---|---|---|
 | Crushed Under Belly (headline) | not representable | name only. The "effect" is a six-word AI-blurb paraphrase (*"discard voters and receive resources"*), not official rules text. Authoring rules for it under a recovered name would be a fabrication |
 | Iftar Party (headline) | not representable | same |
-| Block | not representable | duplicate of §4.1; also G13 |
+| Block | duplicate of §4.1, where it **ships** as `ct-et2040-014` | the S1 blurb names it and nothing more; §4.1 recovers the full text, so there is nothing here to disposition separately |
 
 ### 4.4 Headline Cards, all campaigns — S2, REF §4.1
 
@@ -434,18 +459,24 @@ Recorded so nobody re-derives them from scratch. None of these changes a shipped
 
 ## 7. Provenance summary
 
-| | before | after |
+The `after` column is **measured, not remembered** — `npm run validate` prints the
+provenance split and the deck census, and `npm run playable` prints the playability count.
+A ledger that drifts from the decks is worse than no ledger, so where this table used to
+quote numbers from an earlier pass, it quotes today's.
+
+| | before | after (measured) |
 |---|---:|---:|
-| Total cards shipped | 64 | **118** |
+| Total cards shipped | 64 | **122** |
 | Ideology Cards | 20 | **52** |
 | Voter Cards | 12 | 18 |
-| Conspiracy Cards | 14 | 22 |
+| Conspiracy Cards | 14 | **26** |
 | Headline Cards | 18 | 26 |
-| `verbatim` | 0 | **0** — see §1 |
-| `adapted` (carries recovered material) | 19 | **21** |
+| `verbatim` | 0 | **0** — see §1, and BLOCK/DEFLECT are why |
+| `adapted` (carries recovered material) | 19 | **25** |
 | `inferred` | 45 | **97** |
-| Cards carrying recovered text | 19 | **21** |
-| Recovered cards not representable | 41 | **41** — each in §4 |
+| Cards carrying recovered text | 19 | **25** |
+| Recovered cards not representable | 41 | **37** — each in §4 |
+| Recovered cards playable, by playing | — | **25 of 54** (`npm run playable`) |
 
 **The one number that matters for playability:** REF §2.3 records 8–12 Ideology Cards in a
 player's hand after a 5-player game. The India deck went from 12 cards — so players saw the

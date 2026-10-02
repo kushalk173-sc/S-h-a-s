@@ -15,7 +15,10 @@ kept because they are still true. §3 is the handoff.
 Two engine changes, in this order, each a green commit. `npm run playable` — which
 **plays** each reduction through the real reducer rather than asking whether the
 schema accepts it — went from **14 of 54** to **18 of 54**, and then from **21 of 54**
-to **23 of 54** in the phase-machine iteration recorded in §2 G13.
+to **23 of 54** in the phase-machine iteration recorded in 2 G13. Shipping BLOCK and DEFLECT did not
+move that number - the probe writes its own reduction rather than reading the deck - but it turned
+**23 into a shipped fact**; the count is **25 of 54** today, and `packages/server/test/
+interrupt-window.test.ts` is what proves the window itself is safe to ship.
 
 | gap | what landed | cards moved |
 |---|---|---|
@@ -484,25 +487,80 @@ refusal message naming the system it needs — `auction` names the IOU and the d
 field, `vote` names the ballot, `pass-card` names the fact that it has no referent —
 rather than "add a case to `applyEffect`", which is not what any of them is short of.
 
-### G13d — WHAT IS STILL OWED, and it is not the engine
+### G13d — **CLOSED. WHAT IT COST, AND WHAT SHIPPED**
 
-**BLOCK and DEFLECT are not yet in `decks/`, and that is a coordination decision
-rather than an engine gap.** Both are proven playable through the real reducer by
-`scripts/playable.ts`, which is the project's designated scoreboard. Putting them in
-the shipped corpus needs two pieces of work in packages this project may not edit:
+**Both blockers are gone and BLOCK and DEFLECT are in `decks/et2040/conspiracy.json` as
+`ct-et2040-014` and `ct-et2040-015`.** Neither was engine work, which is what this gap said
+they would not be, and both cost less than the gap predicted — but only because two other
+pieces of work had already landed and were not visible from here.
 
-1. **`packages/client`** — render the window and a pass control. Today a client that
-   ignores `state.interrupt` simply sees a brief pause with nothing actionable, and
-   `conspiracies` is blanked for its owner too (R1), so it cannot show the player their
-   own BLOCK either. That is the G20 hand-visibility gap, not a new one.
-2. **`packages/server/test/driver.ts`** — the test driver has to pick a legal action
-   when a window opens. A window needs up to `n - 1` declines before the turn
-   continues, and a driver that only knows the fourteen original actions would stall
-   the table it is driving. **This is why shipping them into the live corpus now would
-   be a production incident rather than a feature**, and why the probe is the honest
-   place for them in this iteration.
+**The two named blockers, and what actually had to be true.**
 
-Neither is engine work. Neither is small.
+1. **`packages/client`** — landed before this iteration: `interrupt.ts` projects the window,
+   `GameScreen.tsx` renders it with an `interrupt-decline` control and
+   `responseWindow.test.tsx` pins that pressing it dispatches exactly one
+   `PASS_INTERRUPT`. A player can decline from every seat's view.
+2. **`packages/server/test/driver.ts`** — landed in this iteration, and it was bigger than
+   "pick a legal action". `driverPly(state)` now answers *which seat acts next* as well as
+   what, in the same order `playInProcess` already used: an open decision for whoever owns
+   it, then an open window for the one seat the table is waiting on, then the active
+   player's own move with the endgame squeeze considered first. The last two socket
+   drivers (`e2e.test.ts`, `winnable.test.ts`) drove `state.activePlayer` unconditionally
+   and had no squeeze at all, and shipping measured what that cost:
+   - **4 of 120 runs** (60 seeds × 2 and 3 seats) opened a window the driver could not act
+     in, and a seat reaches a reactive card **without buying** — `draw-conspiracy` puts
+     Server Space's draw straight into a hand — so this is roughly 3% of games, not a
+     corner case. A socket run mints a random seed, so the suite would have been failing
+     at random.
+   - **6 of 120 runs** ground to the action budget at 8 of 9 majorities with every seat on
+     `{funds 0, clout 0, media 12, trust 0}`. That one **predates this work** — the same
+     sweep on the deck *without* the two cards stalls 6 times in the same shape — and it
+     is the squeeze arm of `driverPly` closing it. Applied carelessly, the squeeze stalls
+     35 of 120 runs on `'resolve "Resource cap" first'`, because a seat that owes a
+     decision or a decline cannot buy; hence it is the TURN arm only.
+   - Measured after: **0 stalls over 150 seeds × 4 seat counts = 600 games.**
+
+**What shipped, and what it cost the cards.** Both are `adapted`, not `verbatim`, and
+`decks/SOURCES.md` §1 tabulates every recovered clause against what `reduce()` performs.
+The short form: the phase machine was never the blocker for the verbatim tag. BLOCK still
+cannot discard an open card, block a card that steals itself, or cleanse an
+already-active card; DEFLECT still redirects a whole effect list rather than one partial
+effect, and ships `target: 'any-card'` rather than `card-affecting-you`. **3 clauses and 2
+clauses**, each named on the card and each a named mechanism rather than missing wording.
+So the corpus count is unchanged at **0 verbatim**, and the two cards that were the
+obvious counter-example to that rule are the proof that the rule is about mechanisms.
+
+**The three things that had to be true about the corpus, and were not.**
+
+- `toEngineConspiracyCard` builds the engine card key by key and adds `duration` /
+  `timing` / `interrupt` through `withXScope`. Losing `interrupt` there would leave every
+  deck file valid, the parity test green (it checks the *corpus* card) and both shipped
+  cards inert in a real game. Now asserted in `packages/cards/test/reactive-cards.test.ts`.
+- A reactive card in hand changes what a played card does: its effect list is **staged**,
+  so it raises no decision until the window closes. `secret-state.test.ts`'s
+  "owing a decision empties the playable list" guard was reachable only by luck — it
+  stopped after six plays and depended on the seeded shuffle dealing a card that raises a
+  decision. It now walks every offered card and settles any window it opens.
+- `canBeAnswered` needs a player to **hold** a reactive card, so an ordinary driver that
+  never buys a Conspiracy Card still plays the ordinary game. That is the property that
+  keeps `winnable.test.ts`'s numbers comparable, and it is asserted directly.
+
+**One blocker remains, and it is a stale assertion rather than a gap.**
+`packages/engine/test/interrupts.test.ts:738` asserts that no deck file contains the string
+`"interrupt"` — *"the shipped corpus is untouched by the staging branch"*. That assertion
+**is** the recorded reason these two cards were held back, so shipping them makes it false
+by construction. It needs the engine owner to invert it to "the corpus carries exactly two
+executed interrupts, and no unexecuted one". `packages/engine/**` is not this package's to
+edit and nothing was weakened to make it pass.
+
+**Winnability with both cards in the deck**, 20 seeds per seat count, real corpus, driven
+through the real reducer: 2 — turn 40/53/69; 3 — 46/57/96; 4 — 55/66/114; 5 — 56/65/96.
+**80/80 finished, 80/80 with nine majorities, 0 windows left open, and both closure routes
+exercised** (20 answers and 80 all-declines at two seats; at 3, 4 and 5 the driver is
+greedy and answers every window it is asked first on, so the all-declines route is measured
+on the uninformed table instead — 101/137/206/204 windows, every one closed by declines).
+`npm run playable` is unchanged at **25 of 54**, because the probe writes its own reduction
+rather than reading the deck.
 
 ### G14 — no `when`: effects that trigger on other events
 
@@ -723,7 +781,7 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 | 5 | ~~`PlayerState.restrictions` + every action consults it~~ | — | **DONE for the purchase locks** (G5, 3 cards). `no-power` and `no-volatile-placement` still need their own consult points | — |
 | 5 | `PlayerState.restrictions` + every action consults it | `state.ts`, `reduce.ts` | **G5 (5 cards)** — §4. **The largest remaining lever: 3 of the 5 (PYTHONPOST, SNOOP B-O-DOUBLE-T, DON'T KISS THE BABIES) are surcharges, and a surcharge is a *cost* modifier, which no amount of `Effect` work can express.** | large |
 | **G5** | `PlayerState.restrictions` + a `restrict` op, consulted by `INFLUENCE` and `BUY_CONSPIRACY` | **DONE for the purchase locks.** 3 more cards | — |
-| 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **DONE — G13.** `GameState.interrupt`, `RESPOND_INTERRUPT` + `PASS_INTERRUPT`, no new `Phase`. **BLOCK and DEFLECT are playable: 21 → 23 of 54.** `auction` / `vote` / `pass-card` ruled out with a cost — §2 G13b/c, because each buys **no card** without G12/G17/G20 first | — |
+| 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **DONE — G13, and SHIPPED — G13d.** `GameState.interrupt`, `RESPOND_INTERRUPT` + `PASS_INTERRUPT`, no new `Phase`. **BLOCK and DEFLECT are playable (21 → 23 of 54) and are now in `decks/` as `ct-et2040-014` / `ct-et2040-015`.** `auction` / `vote` / `pass-card` ruled out with a cost — §2 G13b/c, because each buys **no card** without G12/G17/G20 first. One stale assertion left, in a package this one may not edit: `packages/engine/test/interrupts.test.ts:738` | — |
 | 7 | `'chosen-player'` on `EffectTarget`, via a new `Choice` kind | `cards.ts`, `state.ts`, `reduce.ts`, **client** | G1 (2), G-new (1), and it is the last thing standing between 3 more trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM) | small, but a **wire-format change the client owns** |
 | 8 | `target` on `evict`, `discard-voter`, `convert-voter`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G-new (3 cards) | small |
 | 9 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **DONE — G20. `move-card` executes, the ruling is made, and the hand drains at the turn boundary. JUMLA + HOLO SAPIENS ship adapted: 23 → 25 of 54.** `from: 'draw'` only — a discard-pile Ideology Card has been answered and p13 makes that public, so handing one over blind would publish the answer. A COWARD OR A JOURNALIST? stays blocked on G12 as well, and three other shapes are refused at the type level | — |
