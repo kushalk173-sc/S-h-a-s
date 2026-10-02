@@ -158,10 +158,122 @@ export type PlayerState = {
   readonly resources: Pool;
   /** One entry per answered Ideology Card, in answer order. p13. */
   readonly manifesto: readonly Ideologue[];
-  /** Card IDs of answered Ideology Cards, parallel to `manifesto`. Public — the card
-   *  is face up under the mat once answered. */
+  /**
+   * Card IDs of ANSWERED Ideology Cards, parallel to `manifesto`. **PUBLIC, and the
+   * visibility decision is reused by `ideologyCards` below — so read both.**
+   *
+   * Public because p13 (`rules-reference.md:238`) says *"Keep the Ideology Card
+   * under your mat, answer face up"*: an ANSWERED card is face up under the mat, and
+   * the Ideologue it carried is that player's public identity, which is what the
+   * Ideologue power ladder (p28-33) is read from. The rulebook draws the line at
+   * *answered* — see the long note on `ideologyCards`, which is the other half.
+   */
   readonly manifestoCards: readonly CardID[];
   readonly conspiracies: readonly CardID[];
+  /**
+   * G20 — Ideology Cards this player is HOLDING, face down, waiting to be put to
+   * them. A HIDDEN HAND, and this is the ruling, argued at length because it is the
+   * security decision G20 exists to make and every shortcut through it destroys the
+   * game's central mechanic.
+   *
+   * ## THE RULING, in one line
+   *
+   * **A transferred Ideology Card is HELD AND HIDDEN — from everyone, including the
+   * player it was given to. It is never face up, and it is never put straight to the
+   * receiver.**
+   *
+   * ## 1. Why HIDDEN and not face-up: the rulebook's own line, read closely
+   *
+   * p13 (`rules-reference.md:238-239`) is two sentences doing two separate jobs, and
+   * the whole ruling falls out of taking them apart:
+   *
+   * > *"Keep the Ideology Card under your mat, answer face up. **Keep the card
+   * > hidden until the active player confirms their answer.**"*
+   *
+   * The first sentence is what makes a card PUBLIC, and the thing that earns it is
+   * not "the card is on the table" — it is **"answer face up"**, i.e. that an answer
+   * has happened. That is exactly `manifestoCards`, and that is why
+   * `manifestoCards` is public. The second sentence is what makes a card HIDDEN, and
+   * what it conditions on is **"until the active player confirms their answer"** —
+   * that is, on the absence of an answer, not on which pile the card came from.
+   *
+   * A card donated by A COWARD OR A JOURNALIST? has not been answered. So the second
+   * sentence is the one that applies to it, and the first is not. **The rulebook
+   * draws the line at *answered*, and both existing fields sit on the correct side of
+   * it.** This is why the `manifestoCards` precedent could not simply be reused: that
+   * precedent is the face-up-answered pile, and a donation is not an answer. Putting
+   * a donated card there would have had it both faces up (a p13 violation) and
+   * counted as an answered card, which changes the Ideologue power ladder — p28-33
+   * count CARDS, so a card a player never answered would unlock their power.
+   *
+   * ## 2. Why hidden from the RECIPIENT too, and not just from the table
+   *
+   * Because the client state is a **machine-readable payload**, and
+   * `docs/ARCHITECTURE.md` §8.1.1 (D25, the labelled note) is entirely about that
+   * difference: *"The opponent can see it"* and *"the opponent's client process
+   * holds it, along with the whole ordered deck"* are different claims with different
+   * consequences, and only the first is what a physical table does. Physical Shasn
+   * hands a card face down and never turns it over — so the digital game giving the
+   * receiver MORE information than the physical one is the D25 failure in a new
+   * costume. Hence the precedent is `conspiracies` and not `manifestoCards`:
+   * `PRIVATE_PLAYER_KEYS` strips it for **every** viewer with no `pid === viewer`
+   * branch, and `ideologyCards` is in that list for the same reason. The answer to a
+   * card a player is holding is a coin flip they make; a player shown the card in
+   * their own hand has not made one.
+   *
+   * ## 3. Why it is never put STRAIGHT to the receiver: the anti-collision rule
+   *
+   * The blind answer is a single nullable field, `GameState._pendingCard`. A hand is
+   * a queue. **The queue is drained at the turn boundary, one card per turn, IN PLACE
+   * OF that turn's draw** — see `advanceTurn` in `reduce.ts`. The two therefore
+   * cannot collide: `_pendingCard` is written exactly once per turn, by the boundary,
+   * and a hand is read only there. A card that arrives while somebody is mid-answer
+   * sits in the queue and is dealt with at the next boundary, so:
+   *
+   *  - the receiver's answer is the card they already had, unchanged;
+   *  - `_pendingCard` is never rewritten by a card effect, so a resolution can never
+   *    change what a player is being asked and no client can observe a change;
+   *  - the receiver cannot see it, cannot answer it, and cannot learn that it exists.
+   *
+   * The "one per turn, in place of the draw" is also the p21 invariant (one Ideology
+   * Card and one answer per turn) preserved under an extra card in the world, which
+   * is what makes the queue incapable of starving the deck loop or of piling up
+   * unbounded. A player whose hand is empty is back on the deck exactly as before,
+   * and a player whose hand is not empty has a card — so there is no position this
+   * field can create in which a turn has no legal first move. That is the hard-lock
+   * argument, and it is tested rather than asserted (`card-transfer.test.ts`).
+   *
+   * ## 4. NO THIRD CATEGORY, deliberately
+   *
+   * There are exactly two places an Ideology Card can be, and this type is one of
+   * them. A "face up, unheld, sitting in front of the player" zone is NOT added,
+   * because nothing in the rulebook or the corpus creates one: a card is either
+   * face down in a hand, or face up under a mat having been answered. `move-card`
+   * can therefore only move a card between the hidden side and a pile — it can never
+   * write `manifestoCards`, and it can never write `_pendingCard`. Both prohibitions
+   * are assertions in `card-transfer.test.ts`, because both are the exact two ways
+   * this mechanic could destroy the blind answer.
+   *
+   * ## WHY IT IS OPTIONAL — the same wart, and the same reason as `restrictions`
+   *
+   * A REQUIRED field breaks every hand-built `PlayerState` literal in
+   * `packages/client` and `packages/server` — `choiceResolver.test.tsx` is one, and
+   * it does not even carry `restrictions`. `setup()` writes `[]` and only `setup()`
+   * and `reduce()` build a `PlayerState` in this package, so `undefined` means
+   * exactly one thing: a fixture that has not been updated. Every read goes through
+   * `ideologyHandOf`, which treats absent as empty.
+   *
+   * ## OWES THE SERVER AN ENTRY
+   *
+   * `packages/server/test/secret-inventory.ts` `LEAK_PATHS` lists the private but
+   * unprefixed fields it asserts the wire does not carry, and `conspiracyHand` is
+   * the only one. **`players[].ideologyCards` needs an entry there beside it** — the
+   * same class of leak, the same shape of assertion, and the engine's own strip does
+   * not make the server's list unnecessary: a list that rots silently is worse than
+   * one that is stale loudly. That file is not this package's to change and the
+   * omission is flagged in three places so it cannot read as an oversight.
+   */
+  readonly ideologyCards?: readonly CardID[];
   readonly pending: readonly PendingVoters[];
   readonly powerUses: PowerUses;
   /**
@@ -636,6 +748,20 @@ export type GameState = {
 // ─────────────────────────── derived helpers ───────────────────────────
 
 export const EMPTY_POOL: Pool = { funds: 0, clout: 0, media: 0, trust: 0 };
+
+/**
+ * The Ideology Cards a player is HOLDING, face down. Empty when the field is absent.
+ *
+ * One accessor rather than `?? []` at every call site, for the same reason
+ * `restrictions` has one: the field is OPTIONAL (see `PlayerState.ideologyCards` for
+ * why, and for the note it owes `packages/server/test/secret-inventory.ts`), and a
+ * private hand must never be read as `undefined` by accident. An empty hand and an
+ * un-updated fixture are the same thing to the reducer, and that is the only
+ * coincidence this design allows.
+ */
+export function ideologyHandOf(player: PlayerState | undefined): readonly CardID[] {
+  return player?.ideologyCards ?? [];
+}
 
 export function poolTotal(p: Pool): number {
   return p.funds + p.clout + p.media + p.trust;

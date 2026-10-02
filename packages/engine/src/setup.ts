@@ -143,6 +143,12 @@ export function setup(opts: SetupOptions): GameState {
       manifesto: [],
       manifestoCards: [],
       conspiracies: [],
+      // G20: nobody is holding an Ideology Card on turn 1 — a card only enters a hand
+      // when a card effect moves one there. HIDDEN, and stripped for every viewer
+      // including the holder: see the long ruling on `PlayerState.ideologyCards` in
+      // state.ts, which is the deliverable for this field, and the note there about
+      // the `LEAK_PATHS` entry this owes the server's secret inventory.
+      ideologyCards: [],
       pending: [],
       powerUses: NO_POWER_USES,
       // Nobody is restricted on turn 1. PUBLIC: see `Restriction` in state.ts, which

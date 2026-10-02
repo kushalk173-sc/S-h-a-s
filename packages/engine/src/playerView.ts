@@ -53,11 +53,26 @@ export type ClientState = Omit<GameState, ServerOnlyKeys> & {
  * Per-player fields that are private but are NOT `_`-prefixed. R1.
  *
  * A Conspiracy Card is "bought and held" (rules-reference.md:284-286) — the
- * client learns that a card is *playable* from a public flag, never by reading
- * the hand. There is deliberately no viewer-scoped exception: see the note in
+ * client learns that a card is *playable* from a public flag, never by reading the
+ * hand. There is deliberately no viewer-scoped exception: see the note in
  * `playerView`.
+ *
+ * G20 adds `ideologyCards`, an Ideology Card handed to a player by a card. It is the
+ * same class of field for a stronger reason: the counterpart of an unanswered card
+ * is that its holder does not know what it is, and the answer to a blind card is a
+ * coin flip the player makes. **The full ruling is on `PlayerState.ideologyCards` in
+ * `state.ts`**, and the short form is that the rulebook draws the line at *answered*
+ * — p13 keeps a card hidden "until the active player confirms their answer"
+ * (rules-reference.md:239), and a donated card has not been answered, so it is on
+ * the hidden side of the line along with `conspiracies` and not on the public side
+ * along with `manifestoCards`.
+ *
+ * **THE SAME ENTRY IS OWED `packages/server/test/secret-inventory.ts`**
+ * (`LEAK_PATHS`, beside `conspiracyHand`). That file is not this package's to change.
+ * It does not make the strip above optional: the strip is what stops the leak, and
+ * the server's entry is what keeps a future refactor from "simplifying" it away.
  */
-export const PRIVATE_PLAYER_KEYS = ['conspiracies'] as const;
+export const PRIVATE_PLAYER_KEYS = ['conspiracies', 'ideologyCards'] as const;
 
 export function playerView(state: GameState, _viewer: PlayerID): ClientState {
   const client: Record<string, unknown> = {};
@@ -65,9 +80,9 @@ export function playerView(state: GameState, _viewer: PlayerID): ClientState {
   for (const [key, value] of Object.entries(state)) {
     if (key.startsWith('_')) continue; // the eleven server-only fields, by convention
     if (key === 'players') {
-      // Conspiracy hands are hidden from EVERYONE, including their owner. There
-      // is no `(pid === viewer)` branch here on purpose: adding one is the R1
-      // bug in a plausible-looking form. Write `clone[k] = []` and rethink.
+      // Conspiracy hands and held Ideology Cards are hidden from EVERYONE, including
+      // their owner. There is no `(pid === viewer)` branch here on purpose: adding one
+      // is the R1 bug in a plausible-looking form. Write `clone[k] = []` and rethink.
       const safe: Record<string, unknown> = {};
       const players = value as Record<string, Record<string, unknown>>;
       for (const [pid, p] of Object.entries(players)) {
