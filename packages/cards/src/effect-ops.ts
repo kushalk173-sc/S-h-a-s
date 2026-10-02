@@ -8,7 +8,7 @@
  * but not in `Effect`, this file stops compiling.
  */
 
-import type { Effect } from './engine.js';
+import type { Effect, Interrupt } from './engine.js';
 
 export const EFFECT_OPS = [
   'gain',
@@ -34,10 +34,55 @@ export const EFFECT_OPS = [
 const NO_MISSING_OPS: Readonly<Record<Exclude<Effect['op'], (typeof EFFECT_OPS)[number]>, never>> =
   {};
 
+// ─────────────────────────── G13: the interrupt enums ───────────────────────────
+
+/**
+ * The same bridge for `Interrupt`, which has THREE independent lists that can drift:
+ * the union in `packages/engine/src/cards.ts`, the enum in
+ * `schema/card.schema.json`, and the values `EXECUTED_INTERRUPT_*` in
+ * `executable.ts` says `reduce()` honours.
+ *
+ * The last of those is the one that matters and it CANNOT be bridged at compile time,
+ * because whether the engine honours a value is a property of a function body.
+ * `test/reducer-parity.test.ts` re-derives it from `reduce.ts`'s own source text, in
+ * the same spirit as the op registry. What these two declarations below buy is that
+ * the TYPE and the shipped SCHEMA cannot drift from each other, and that a value the
+ * reducer honours is always declared — the assertion is in the test, and the
+ * declaration is here.
+ */
+export const INTERRUPT_OPS = [
+  'block',
+  'deflect',
+  'auction',
+  'vote',
+  'pass-card',
+] as const satisfies readonly Interrupt['op'][];
+
+export const INTERRUPT_WINDOWS = ['pre-answer', 'always'] as const satisfies readonly Interrupt['window'][];
+
+export const INTERRUPT_TARGETS = ['any-card', 'card-affecting-you'] as const satisfies readonly NonNullable<
+  Interrupt['target']
+>[];
+
+const NO_MISSING_INTERRUPT_OPS: Readonly<
+  Record<Exclude<Interrupt['op'], (typeof INTERRUPT_OPS)[number]>, never>
+> = {};
+
+const NO_MISSING_INTERRUPT_WINDOWS: Readonly<
+  Record<Exclude<Interrupt['window'], (typeof INTERRUPT_WINDOWS)[number]>, never>
+> = {};
+
+const NO_MISSING_INTERRUPT_TARGETS: Readonly<
+  Record<
+    Exclude<NonNullable<Interrupt['target']>, (typeof INTERRUPT_TARGETS)[number]>,
+    never
+  >
+> = {};
+
 export const EFFECT_OP_SET: ReadonlySet<string> = new Set<string>(EFFECT_OPS);
 
 export function isKnownEffectOp(op: string): boolean {
   return EFFECT_OP_SET.has(op);
 }
 
-export type { Effect };
+export type { Effect, Interrupt };

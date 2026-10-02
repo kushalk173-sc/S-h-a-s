@@ -75,6 +75,63 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
 
 export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(EXECUTED_OPS));
 
+// ─────────────────────────── G13: the phase-changing ops ───────────────────────────
+
+/**
+ * The `interrupt` ops `RESPOND_INTERRUPT` actually performs, re-derived from
+ * `REACTIVE_INTERRUPTS` in `reduce.ts` by `test/reducer-parity.test.ts`.
+ *
+ * ## WHY THIS IS A SEPARATE REGISTRY AND NOT A THIRD ENTRY IN `EXECUTED_OPS`
+ *
+ * `EXECUTED_OPS` is re-derived by slicing `applyEffect`'s own source text between
+ * its `case '…':` marks, and `interrupt` is read one function a very long way above
+ * it, in a different `case` of `reduce` itself. Putting it in that table would make
+ * the re-derivation a lie: the slice would not find it, and the test would have to
+ * be weakened to accommodate the registry rather than the registry matching the
+ * reducer. This is the third honesty seam, and it is cut the same way as the second
+ * (`SCOPE_FIELDS_READ_BY_INSTALL`, read by `installLiveEffects`).
+ *
+ * ## THE THREE THAT ARE NOT HERE, and why, in one line each
+ *
+ *  - `auction` — needs a `PlayerState` debt field, an IOU token, and a ruling on
+ *    p12's "check your resource cap before any other action" read against a bid you
+ *    do not have to be able to afford. A whole rules system, not an op.
+ *  - `vote` — needs a ballot, a no-self-vote rule, a re-vote loop that is a genuine
+ *    termination hazard, and a payoff (NEXT BILLION DATA POINTS hands a Conspiracy
+ *    Card to a player) that is G20 card movement, so the vote alone buys no card.
+ *  - `pass-card` — needs something to pass the card ON TO: G12's in-flight queue and
+ *    G20's `move-card`. With neither, `pass-card` is an op with no referent.
+ *
+ * KNOWN-GAPS G13 carries the full argument and the cost. An op listed here that the
+ * reducer cannot honour is a card that lies, so the registry names only what is real.
+ */
+export const EXECUTED_INTERRUPT_OPS: ReadonlySet<string> = new Set(['block', 'deflect']);
+
+/**
+ * `interrupt.window` values `RESPOND_INTERRUPT` honours, re-derived from
+ * `mayRespond` in `reduce.ts` by `test/reducer-parity.test.ts`.
+ *
+ * The enum in `cards.ts` was NARROWED from three values to two to make this list
+ * true rather than aspirational. `'out-of-turn'` was dropped because
+ * `RESPOND_INTERRUPT` already refuses the actor, which was the whole of its meaning,
+ * and a value the engine cannot distinguish from another is a value it is not reading.
+ */
+export const EXECUTED_INTERRUPT_WINDOWS: ReadonlySet<string> = new Set([
+  'always',
+  'pre-answer',
+]);
+
+/**
+ * `interrupt.target` values `RESPOND_INTERRUPT` honours, re-derived from
+ * `mayRespond` in `reduce.ts`. `'any-player'` was dropped for the same reason
+ * `'out-of-turn'` was: indistinguishable from `'any-card'` in every position the
+ * window can be in.
+ */
+export const EXECUTED_INTERRUPT_TARGETS: ReadonlySet<string> = new Set([
+  'any-card',
+  'card-affecting-you',
+]);
+
 /**
  * Fields the reducer ignores EXCEPT at the value that means "do nothing new".
  *
@@ -220,9 +277,13 @@ export const TIMING_FIX =
   'corpus needs one. See KNOWN-GAPS.md G22.';
 
 export const INTERRUPT_FIX =
-  'reduce() has no interrupt window: PLAY_CONSPIRACY is gated on phase/actions|answer for the ' +
-  'card owner alone, there is no auction, no vote, and no way to cancel an effect that has ' +
-  'already resolved. See KNOWN-GAPS.md G13.';
+  '`reduce()` now runs a response window: a played card whose effects somebody could ' +
+  'answer is held in GameState.interrupt until RESPOND_INTERRUPT or PASS_INTERRUPT ' +
+  'settles it, and RESPOND_INTERRUPT acts on a Conspiracy Card carrying an executed ' +
+  '`interrupt`. `block` and `deflect` are the two ops it acts on. `auction`, `vote` ' +
+  'and `pass-card` are still refused, each for a named reason in the message above, ' +
+  'because each needs a system the engine does not have rather than a new op. ' +
+  'See KNOWN-GAPS.md G13.';
 
 export const WHEN_FIX =
   'A `when` the reducer never raises would install a hook that never wakes — a card that reads ' +
@@ -390,6 +451,102 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
 }
 
 /**
+ * Everything about one `interrupt` that `RESPOND_INTERRUPT` would not act on.
+ *
+ * The mirror of `unexecutedEffectProblems` for the sibling card field, and the third
+ * honesty seam. `applyEffect`'s body cannot see `interrupt` at all — it is read in a
+ * `case` of `reduce` itself — so this registry is a promise about a different part of
+ * the engine, and `test/reducer-parity.test.ts` re-derives all three of its sets
+ * (`EXECUTED_INTERRUPT_OPS`, `…_WINDOWS`, `…_TARGETS`) from `reduce.ts`'s own source
+ * text rather than trusting this file.
+ */
+export function unexecutedInterruptProblems(
+  interrupt: unknown,
+  pointer: string,
+): readonly ExecutionProblem[] {
+  if (!isPlainObject(interrupt)) return [];
+  const out: ExecutionProblem[] = [];
+  const op = interrupt['op'];
+
+  if (typeof op !== 'string' || !EXECUTED_INTERRUPT_OPS.has(op)) {
+    out.push({
+      code: 'EFFECT_NOT_EXECUTED',
+      pointer,
+      message: UNEXECUTED_INTERRUPT_OP_FIX[op as string] ?? INTERRUPT_FIX,
+    });
+    return out;
+  }
+
+  const window = interrupt['window'];
+  if (typeof window !== 'string' || !EXECUTED_INTERRUPT_WINDOWS.has(window)) {
+    out.push({
+      code: 'EFFECT_NOT_EXECUTED',
+      pointer: `${pointer}/window`,
+      message:
+        `window ${JSON.stringify(window)} is not a window RESPOND_INTERRUPT honours. reduce() ` +
+        `reads 'always' (any phase in which a window is open) and 'pre-answer' (only while ` +
+        `phase === 'answer', the p19 window). The enum in cards.ts was narrowed to those two ` +
+        `because 'out-of-turn' is already enforced by the rule that the actor of a card cannot ` +
+        `answer it - a third value the engine cannot distinguish is a value it is not reading. ` +
+        `${INTERRUPT_FIX}`,
+    });
+  }
+
+  if ('target' in interrupt) {
+    const target = interrupt['target'];
+    if (typeof target !== 'string' || !EXECUTED_INTERRUPT_TARGETS.has(target)) {
+      out.push({
+        code: 'EFFECT_NOT_EXECUTED',
+        pointer: `${pointer}/target`,
+        message:
+          `target ${JSON.stringify(target)} is not a narrowing reduce() applies. It honours ` +
+          `'any-card' and 'card-affecting-you' (which is the engine's approximation of "a card ` +
+          `that affects you" - it reads whether any effect in the list aims past its own player, ` +
+          `because the narrower question is G1 and a new Choice kind this package cannot add). ` +
+          `'any-player' was dropped as indistinguishable from 'any-card'. ${INTERRUPT_FIX}`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * What each of the three unexecuted ops is actually waiting on, in one line each.
+ *
+ * Written out rather than left to the generic message because a card author reaching
+ * for `auction` deserves to know that the blocker is a missing `PlayerState` field and
+ * not a missing `case`, which are very different amounts of work.
+ */
+const UNEXECUTED_INTERRUPT_OP_FIX: Readonly<Record<string, string>> = {
+  auction:
+    '`auction` is not an op this engine is missing, it is a rules SYSTEM it is missing: ' +
+    'rules-reference.md §6 (p25) lets a bidder commit up to their cap WITHOUT holding the ' +
+    'resources, settles on an IOU token, and stops the winner buying anything until it is ' +
+    'paid in full. That needs a `PlayerState` debt field that persists, expires, appears in ' +
+    'the client payload and is consulted by INFLUENCE and BUY_CONSPIRACY, plus a ruling on ' +
+    'p12 ("check your resource cap before any other action") read against a bid the bidder ' +
+    'cannot afford - and debt is negative resources, which every pool read in the engine ' +
+    '(canAfford, enforceCap, poolTotal) and the balance checker currently assume is ' +
+    'non-negative. It would also buy no card on its own: both real auction cards (A CALL ' +
+    'FROM KARACHI, QUANTUM WRISTBAND) are also G17 deck search and G20 card movement. See ' +
+    'KNOWN-GAPS.md G13.',
+  vote:
+    '`vote` needs a ballot per player, a no-self-vote rule, and a re-vote-on-tie loop that is ' +
+    'a genuine termination hazard rather than a formality. It would also buy no card: the one ' +
+    'real vote card (NEXT BILLION DATA POINTS) hands "the next Conspiracy Card in the draw ' +
+    'pile" to a chosen player, which is G20 card movement, and the deal mechanism is G17. ' +
+    'Building the ballot and not the payoff is the half-built system KNOWN-GAPS G13 warns ' +
+    'against. See KNOWN-GAPS.md G13.',
+  'pass-card':
+    '`pass-card` has no referent: there is nothing to pass the card ON TO. It needs G12 (a ' +
+    'GameState queue of in-flight cards, an owner, a position in the turn order and a ' +
+    'turn-boundary deadline) and G20 (a `move-card` op and a `PlayerState.ideologyCards` list), ' +
+    'and the two real cards that need it are blocked on those anyway - HIGGS MORON on the G10 ' +
+    'token counter as well, A COWARD OR A JOURNALIST? and CARD GAMES on the card movement. ' +
+    'See KNOWN-GAPS.md G13.',
+};
+
+/**
  * Everything about an X-card that `reduce()` would not act on.
  *
  * The check is on the card object, not on the effect list, because `duration`,
@@ -421,14 +578,15 @@ export function unexecutedCardProblems(card: unknown, pointer: string): readonly
     }
   }
   if ('interrupt' in card) {
-    out.push({
-      code: 'EFFECT_NOT_EXECUTED',
-      pointer: `${pointer}/interrupt`,
-      message:
-        `"interrupt" is not read by reduce(): a BLOCK, DEFLECT, AUCTION, VOTE or PASS is a change of ` +
-        `phase, not of resources, and there is no window in which the engine would offer it. ` +
-        `${INTERRUPT_FIX}`,
-    });
+    // G13, and this is a VALUE check rather than a blanket refusal: `block` and
+    // `deflect` are executed, so a card carrying one is shippable, while the other
+    // three ops each get the specific reason they are not. The narrow `window` and
+    // `target` enums are checked against what `mayRespond` in `reduce.ts` honours,
+    // because a window the engine cannot act in is a window that is never open.
+    const out2 = unexecutedInterruptProblems(card['interrupt'], `${pointer}/interrupt`);
+    if (out2.length > 0) {
+      for (const p of out2) out.push(p);
+    }
   }
 
   const effects = card.effects;

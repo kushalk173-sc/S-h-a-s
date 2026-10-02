@@ -37,14 +37,25 @@ import {
   loadVoterDeck,
   type AnyCorpusCard,
 } from '../src/corpus.js';
-import { EFFECT_OPS, EFFECT_OP_SET } from '../src/effect-ops.js';
+import {
+  EFFECT_OPS,
+  EFFECT_OP_SET,
+  INTERRUPT_OPS,
+  INTERRUPT_TARGETS,
+  INTERRUPT_WINDOWS,
+} from '../src/effect-ops.js';
 import {
   EXECUTED_OPS,
   EXECUTABLE_COMPUTED_SOURCES,
+  EXECUTED_INTERRUPT_OPS,
+  EXECUTED_INTERRUPT_TARGETS,
+  EXECUTED_INTERRUPT_WINDOWS,
   EXECUTABLE_TRIGGERS,
+  INTERRUPT_FIX,
   SCOPE_FIELDS_READ_BY_INSTALL,
   unexecutedCardProblems,
   unexecutedEffectProblems,
+  unexecutedInterruptProblems,
 } from '../src/executable.js';
 import { validateEffect, validateDeckFile, corpusSchema, type SchemaProblem } from '../src/schema.js';
 import { validateCorpus, validateDecks, shippedDeckInputs, type DeckInput } from '../src/validate.js';
@@ -419,6 +430,11 @@ function codes(report: { errors: readonly { code: string }[] }): string[] {
   return report.errors.map((e) => e.code);
 }
 
+/** The same, for a bare list of `ExecutionProblem` rather than a validator report. */
+function codesOf(problems: readonly { readonly code: string }[]): string[] {
+  return problems.map((p) => p.code);
+}
+
 describe('G8 — target on gerrymander, closed on the reducer', () => {
   it('the case now honours every EffectTarget, so no value is special-cased', () => {
     for (const target of ['you', 'each-opponent', 'everyone', 'leader'] as const) {
@@ -564,13 +580,99 @@ describe('G9 / G22 — every duration is installed, and expires on a turn bounda
 });
 
 
-describe('G13 — the phase-changing ops are not effects', () => {
-  it('rejects an interrupt, and explains that it is not an Effect at all', () => {
-    for (const op of ['block', 'deflect', 'auction', 'vote', 'pass-card'] as const) {
-      const report = validateWithHeadline(baseHeadline({ interrupt: { op, window: 'out-of-turn' } }));
-      expect(codes(report), op).toEqual(['EFFECT_NOT_EXECUTED']);
-      expect(report.errors[0]?.message, op).toContain('change of phase');
+describe('G13 — the phase-changing ops: two are executed, three are ruled out', () => {
+  it('the op registry is exactly what RESPOND_INTERRUPT acts on', () => {
+    expect([...EXECUTED_INTERRUPT_OPS].sort()).toEqual(reactiveInterruptOps());
+    // And it is not empty, so the seam cannot be satisfied by asserting nothing.
+    expect(EXECUTED_INTERRUPT_OPS.size).toBeGreaterThan(0);
+    // Every executed op is one the TYPE and the SCHEMA both declare.
+    for (const op of EXECUTED_INTERRUPT_OPS) expect([...INTERRUPT_OPS], op).toContain(op);
+  });
+
+  it('every value mayRespond distinguishes is registered, and the registry is the enum', () => {
+    for (const [field, registry, declared] of [
+      ['window', EXECUTED_INTERRUPT_WINDOWS, INTERRUPT_WINDOWS],
+      ['target', EXECUTED_INTERRUPT_TARGETS, INTERRUPT_TARGETS],
+    ] as const) {
+      // The direction that catches a card that lies: the reducer distinguishes a
+      // value the validator would not accept.
+      for (const v of mayRespondDistinguishes(field)) {
+        expect([...registry], `${field}: reduce() names "${v}"`).toContain(v);
+      }
+      // And nothing is registered that the type does not declare.
+      expect([...registry].sort(), field).toEqual([...declared].sort());
     }
+    // And the scan is not vacuous: it has to find something, and what it finds is the
+    // narrowing each field exists for.
+    expect(mayRespondDistinguishes('window')).toEqual(['pre-answer']);
+    expect(mayRespondDistinguishes('target')).toEqual(['card-affecting-you']);
+  });
+
+  it('so neither enum can carry a value the engine ignores', () => {
+    // The narrowing that bought the assertions above: a value the reducer cannot
+    // distinguish from another is a value it is not reading, and a card author who
+    // writes one gets a card that reads as though something happens and does not.
+    for (const w of INTERRUPT_WINDOWS) expect(EXECUTED_INTERRUPT_WINDOWS, w).toContain(w);
+    for (const t of INTERRUPT_TARGETS) expect(EXECUTED_INTERRUPT_TARGETS, t).toContain(t);
+  });
+
+  it('the shipped schema carries the same enums, so a card cannot pass the type and fail the file', () => {
+    const schema = JSON.parse(
+      readFileSync(resolve(HERE, '..', 'schema', 'card.schema.json'), 'utf8'),
+    ) as { $defs: { interrupt: { properties: Record<string, { enum: readonly string[] }> } } };
+    const props = schema.$defs.interrupt.properties;
+    expect([...props['op']!.enum].sort()).toEqual([...INTERRUPT_OPS].sort());
+    expect([...props['window']!.enum].sort()).toEqual([...INTERRUPT_WINDOWS].sort());
+    expect([...props['target']!.enum].sort()).toEqual([...INTERRUPT_TARGETS].sort());
+  });
+
+  it('accepts a BLOCK and a DEFLECT, because reduce() performs them', () => {
+    for (const op of ['block', 'deflect'] as const) {
+      const report = validateWithHeadline(
+        baseHeadline({ interrupt: { op, window: 'always', target: 'any-card' }, effects: [] }),
+      );
+      expect(codes(report), op).toEqual([]);
+    }
+  });
+
+  it('and refuses each of the other three, with the reason IT is waiting on', () => {
+    for (const op of ['auction', 'vote', 'pass-card'] as const) {
+      const report = validateWithHeadline(baseHeadline({ interrupt: { op, window: 'always' }, effects: [] }));
+      expect(codes(report), op).toEqual(['EFFECT_NOT_EXECUTED']);
+      // `Finding` carries the object path as a prefix on the message, not as a
+      // field, so the pointer is asserted where it actually lives.
+      const message = report.errors[0]?.message ?? '';
+      expect(message, op).toContain('/interrupt ');
+      // Not the generic message: each op names the SYSTEM it needs, because "add a
+      // case to applyEffect" is not what any of the three is short of.
+      expect(message, op).not.toContain(INTERRUPT_FIX);
+      expect(message, op).toContain(op === 'auction' ? 'IOU' : op === 'vote' ? 'ballot' : 'referent');
+    }
+  });
+
+  it('refuses a window or a target the reducer does not honour', () => {
+    // Asserted on the pure registry function rather than through the validator,
+    // because the SCHEMA now refuses these values first (the enums were narrowed to
+    // match), so a card carrying one never reaches the engine check at all. The
+    // check is still the one an author hits if they hand-build a card object, and it
+    // is what keeps the enums honest if the schema is ever loosened again.
+    const badWindow = unexecutedInterruptProblems({ op: 'block', window: 'sometime' }, '/interrupt');
+    expect(codesOf(badWindow)).toEqual(['EFFECT_NOT_EXECUTED']);
+    expect(badWindow[0]?.pointer).toBe('/interrupt/window');
+
+    const badTarget = unexecutedInterruptProblems(
+      { op: 'deflect', window: 'always', target: 'any-player' },
+      '/interrupt',
+    );
+    expect(codesOf(badTarget)).toEqual(['EFFECT_NOT_EXECUTED']);
+    expect(badTarget[0]?.pointer).toBe('/interrupt/target');
+
+    // And through the card-level walk, which is the path a shipped card takes.
+    const viaCard = unexecutedCardProblems(
+      { ...baseHeadline({}), interrupt: { op: 'block', window: 'sometime' } },
+      '',
+    );
+    expect(viaCard.map((p) => p.pointer)).toContain('/interrupt/window');
   });
 
   it('the shape is schema-valid, so the error the author sees is the engine one', () => {
@@ -579,9 +681,15 @@ describe('G13 — the phase-changing ops are not effects', () => {
     expect(
       schemaProblems({
         ...baseHeadline({}),
-        interrupt: { op: 'block', window: 'out-of-turn', target: 'any-card' },
+        interrupt: { op: 'block', window: 'pre-answer', target: 'card-affecting-you' },
       }),
     ).toEqual([]);
+  });
+
+  it('and a narrowed value now fails at the SCHEMA, which is the right error for it', () => {
+    expect(
+      schemaProblems({ ...baseHeadline({}), interrupt: { op: 'block', window: 'out-of-turn' } }).length,
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -627,6 +735,77 @@ describe('the reserved shapes are still shapes', () => {
     expect(codes(report).slice().sort()).toEqual(['EFFECT_NOT_EXECUTED', 'EFFECT_NOT_EXECUTED']);
   });
 });
+
+
+/**
+ * The G13 registries, re-derived from `reduce.ts`'s own source text.
+ *
+ * The THIRD honesty seam, and the one the previous two could not reach.
+ * `EXECUTED_INTERRUPT_OPS`, `EXECUTED_INTERRUPT_WINDOWS` and
+ * `EXECUTED_INTERRUPT_TARGETS` in `src/executable.ts` are promises about
+ * `RESPOND_INTERRUPT` — a `case` of `reduce` itself, several hundred lines above
+ * `applyEffect`, and not inside it. Slicing `applyEffect` cannot see an `interrupt`
+ * at all, so putting these in `EXECUTED_OPS` would have made the re-derivation a
+ * lie and the test would have had to be weakened to fit the registry.
+ *
+ * So each is derived from the construct it names:
+ *  - the ops, from the keys of `REACTIVE_INTERRUPTS`;
+ *  - the windows and the targets, from the string literals `mayRespond` compares
+ *    against — and only the ones on the RIGHT of a comparison, so a literal in the
+ *    refusal MESSAGE cannot be mistaken for a value the engine acts on.
+ *
+ * A value the reducer cannot act on is a declaration it ignores, which is the exact
+ * failure this file exists to prevent: it is why `Interrupt.window` lost
+ * 'out-of-turn' and `Interrupt.target` lost 'any-player'.
+ */
+function reducerSource(): string {
+  return readFileSync(REDUCE_SRC, 'utf8');
+}
+
+/** The op keys of the `REACTIVE_INTERRUPTS` registry literal. */
+function reactiveInterruptOps(): string[] {
+  const src = reducerSource();
+  const start = src.indexOf('const REACTIVE_INTERRUPTS');
+  expect(start, 'reduce.ts still has REACTIVE_INTERRUPTS').toBeGreaterThan(-1);
+  const body = src.slice(start, src.indexOf('};', start));
+  return [...body.matchAll(/^ {2}(\w+):/gm)].map((m) => m[1]!).sort();
+}
+
+/**
+ * The `interrupt.window` / `.target` values `mayRespond` DISTINGUISHES, re-derived
+ * from `reduce.ts`.
+ *
+ * ## Why this is a SUBSET assertion in one direction and EQUALITY in the other
+ *
+ * A value the guard names appears as a literal; the value that falls through to the
+ * `else` — `'always'` for `window`, `'any-card'` for `target`, both the permissive
+ * readings — has no literal to find, because it is the absence of a refusal. So:
+ *
+ *  - everything `mayRespond` names must be REGISTERED, or the reducer distinguishes a
+ *    value the validator would not accept and the registry is stale. This is the
+ *    direction that catches a card that lies, so it is the one with a test.
+ *  - the registry must be exactly the declared enum, or a card could be shipped
+ *    against a value nothing reads. That is checked against `effect-ops.ts`, which
+ *    is compile-time-bridged to `Interrupt` in the engine, and against the shipped
+ *    JSON Schema below.
+ *
+ * Reading a literal out of a refusal MESSAGE is guarded against by requiring the
+ * comparison form `interrupt.<field> === '<value>'`, and the message text is on the
+ * far side of it.
+ */
+function mayRespondDistinguishes(field: string): string[] {
+  const src = reducerSource();
+  const start = src.indexOf('function mayRespond');
+  expect(start, 'reduce.ts still has mayRespond').toBeGreaterThan(-1);
+  const body = src.slice(start, src.indexOf('\n}', start));
+  const out = new Set<string>();
+  const re = new RegExp(`interrupt\\.${field} === '([a-z-]+)'`, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    if (m[1] !== undefined) out.add(m[1]);
+  }
+  return [...out].sort();
+}
 
 
 /** The schema alone, with no validator pass on top. */

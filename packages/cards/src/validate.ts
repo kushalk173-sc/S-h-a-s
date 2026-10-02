@@ -69,15 +69,15 @@ const KIND_PREFIX: Readonly<Record<CardKind, string>> = {
 };
 
 /**
- * The card-level shapes that are in `cards.ts` but inert in `reduce()`. See
- * `src/executable.ts` and KNOWN-GAPS.md G13. Listed here only so the card-level
- * schema fan-out does not bury the precise finding.
+ * The card-level shapes whose SCHEMA fan-out would bury the precise finding.
  *
- * `duration` and `timing` used to be on this list. They are not any more: both are
- * executed by `installLiveEffects`, so the engine is the authority on which VALUES
- * are legal and `executable.ts` says so. Only the phase-changing `interrupt`
- * remains, and a card carrying one is refused with the reason rather than with
- * "unknown property" four times over.
+ * `duration` and `timing` are executed by `installLiveEffects`, so the engine is the
+ * authority on which VALUES are legal and `executable.ts` says so — neither is here.
+ * `interrupt` is only half executed: `block` and `deflect` ship, and `auction`,
+ * `vote` and `pass-card` are refused per op, all through
+ * `unexecutedInterruptProblems` in `executable.ts`. `interrupt` stays on this list
+ * only so the card-level `oneOf` fan-out does not print that engine explanation once
+ * per card branch — the real finding is reported once, by pointer.
  */
 const RESERVED_CARD_FIELDS: readonly string[] = ['interrupt'];
 
