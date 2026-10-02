@@ -442,7 +442,77 @@ describe('the three cards whose text was corrected', () => {
   });
 });
 
-describe('G8 — gerrymander resolves its target, so "every player" is playable', () => {
+describe('AS CLEAR AS WATER — "every player without a Conspiracy Card receives 1"', () => {
+  const c = card('hl-et2040-013');
+
+  /** Resolve the headline with p2 and p3's hands in the state the test needs. */
+  function resolve(s: GameState): GameState {
+    return resolveHeadline(s, c.id, 2);
+  }
+
+  it('gives a card to an EMPTY hand and nothing to a full one', () => {
+    // The whole card. `onlyIfEmpty` reads the RECIPIENT's hand, and the printed
+    // condition is per player rather than for the table as a whole -- "if ANY player
+    // does not have one" is a per-player test, which is why this is a flag on the op
+    // and not a `when` on the effect list.
+    const before = game();
+    const p2 = before.players.p2!;
+    const withCards: GameState = {
+      ...before,
+      players: { ...before.players, p2: { ...p2, conspiracies: ['ct-et2040-001', 'ct-et2040-002'] } },
+    };
+    const after = resolve(withCards);
+    expect(after.players.p2?.conspiracies).toHaveLength(2);
+    expect(after.players.p3?.conspiracies).toHaveLength(1);
+  });
+
+  it('and the caster is skipped, because playing a card means they were holding one', () => {
+    // `target: 'everyone'` is the faithful reading of "every player": the caster is in
+    // the set, and the condition excludes them, because a Conspiracy Card has just left
+    // their hand. The card's own text says this, so a player is never surprised.
+    //
+    // The fixture resolves a HEADLINE, which is drawn from the queue rather than played
+    // from a hand, so the caster is given a card first to stand in for having just
+    // played one. Without that the caster's hand really is empty and the card really
+    // does hand them one -- which is the printed behaviour, not a bug.
+    const before = game();
+    const asPlayed: GameState = {
+      ...before,
+      players: { ...before.players, p1: { ...before.players.p1!, conspiracies: ['ct-et2040-001', 'ct-et2040-002'] } },
+    };
+    expect(resolve(asPlayed).players.p1?.conspiracies).toHaveLength(2);
+  });
+
+  it('and it DISCLOSES NOTHING about a hidden hand, to anybody', () => {
+    // The information half, and the reason this is a flag on the op rather than a
+    // `when`. A Conspiracy Card hand is hidden from every viewer INCLUDING its owner,
+    // so `onlyIfEmpty` reads a fact no client has. If it logged or emitted an event per
+    // player, "p2 was handed a card" would be a disclosure about a hidden hand, and a
+    // line announcing that a player is EMPTY is the same disclosure with the sign
+    // flipped. The assertion is therefore on the whole payload, not on one field.
+    const after = resolve(game());
+    const view = JSON.stringify(playerView(after, 'p2'));
+    expect(view).not.toContain('ct-et2040-001');
+    // No log line mentions a hand at all: the only lines are the headline and the play.
+    expect(after.log.filter((l) => /hand|conspiracy card (to|for) p/i.test(l.text))).toEqual([]);
+  });
+
+  it('and it is bounded: the draw pile falls and cannot be drained past its own length', () => {
+    // Termination. `onlyIfEmpty` can only move a card out of the draw pile into a hand
+    // that is empty, so the pile is the bound -- no queue grows on its own, and
+    // TRIGGER_MAX_WAVES is not what stops it here.
+    const before = game();
+    const after = resolve(before);
+    // Three empty hands in this fixture (the caster included), three cards in the pile.
+    expect(after._conspiracyDraw.length).toBe(before._conspiracyDraw.length - 3);
+    // And the pile is the bound: ask a second time and it is simply empty, not short.
+    const again = resolve(after);
+    expect(again._conspiracyDraw.length).toBe(0);
+    expect(again.players.p3?.conspiracies.length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('the G8 gerrymander resolves its target, so "every player" is playable', () => {
   const SUBMERGED = 'hl-fixture-submerged';
 
   it('writes the bonus into every resolved player, the caster included', () => {

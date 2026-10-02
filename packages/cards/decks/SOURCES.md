@@ -188,7 +188,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 10 | `hl-et2040-010` | Married With Bits | `adapted` | S4 / REF §4.3. Drops the 2-opponent target set and the opt-out (G1) |
 | 11 | `hl-et2040-011` | Good Gig Well Played | `adapted` | S4 / REF §4.3. Keep-one branch only; drops the two gifts and the discard fallback (G17, G20) |
 | 12 | `hl-et2040-012` | Tide Warnings | `inferred` | original; REF §8.2. Deliberately does **not** restate JUST BREATHE (G16) |
-| 13 | `hl-et2040-013` | Three Day Weekend | `inferred` | original; REF §8.2 |
+| 13 | `hl-et2040-013` | As Clear As Water | `adapted` | S4 / REF §4.3. Ships the top-up clause (`onlyIfEmpty`) and `target: everyone`. Drops both REVEAL clauses: a reveal has no state consequence in this engine. **Replaced** the `inferred` THREE DAY WEEKEND reskin |
 | 14 | `hl-et2040-014` | The Policy Review | `inferred` | original; REF §8.2 |
 | 15 | `hl-et2040-015` | Movement Anxiety Disorder | `adapted` | S4 / REF §4.3. Ships the trigger (`when: on-gerrymander` + `movedMyVoter` + `until: next-turn`) and needs G-new to reach your own pegs. Drops the counter (G10) and the multi-turn block (G13). **Replaced** the `inferred` SILICON RAIN, whose own `source` said it refused to restate any recovered card |
 
@@ -261,7 +261,7 @@ Every one is `inferred`. **There is no verbatim Voter Card to import** — see �
 ## 4. Disposition of every recovered card — the audit trail
 
 Nothing recovered is dropped silently. **52 distinct recovered cards** are accounted for
-below. 16 ship `adapted`; 36 do not ship, each with the reason. (Net: one `inferred` placeholder RETIRED and one recovered card SHIPPED, so every deck SIZE is unchanged and `packages/server/test/corpus.test.ts` `SHIPPED.headline` still reads 26.)
+below. 17 ship `adapted`; 35 do not ship, each with the reason. (Net: one `inferred` placeholder RETIRED and one recovered card SHIPPED, so every deck SIZE is unchanged and `packages/server/test/corpus.test.ts` `SHIPPED.headline` still reads 26.)
 
 Counting note: REF §4 lists 56 card rows across its four tables. Four are duplicates by
 effect (REF §4.3: *"Deduplicate by effect, not by name"*) — SUBMERGED ≡ NEW FACE WHO DIS,
@@ -336,7 +336,7 @@ excluded.
 |---|---|---|
 | 404 | not representable | G18 — swaps who answers which card |
 | Ain't No Cure For Love | **ships** `adapted` as `hl-et2040-003` | G1 only (G-new closed) |
-| As Clear As Water | not representable | G17 + G18 (a REVEAL of a Conspiracy Card, and who reveals first). **Not G20-blocked** now |
+| As Clear As Water | **ships** `adapted` as `hl-et2040-013` (replacing the `inferred` THREE DAY WEEKEND) | Both REVEAL clauses, and a reveal has **no state consequence in this engine** — a missing mechanism, not missing wording. The top-up is shipped in full |
 | Brave New Worlds | not representable | G18 — and it suppresses passive income |
 | Card Games | not representable | identical to A COWARD OR A JOURNALIST?, so identically blocked: G12 plus the `from: 'pending'` refusal. See that row |
 | Don't Kiss The Babies | not representable | G5 — a purchase surcharge, i.e. a cost modifier |

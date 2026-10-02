@@ -436,7 +436,7 @@
           }
         },
         {
-          "$comment": "draw-conspiracy's `from: 'discard'` is G17: the discard-pile reach that SELECTIVE ACCESS MEMORY needs. The top of a discard pile is the most recently discarded card, because that is the order discardTo pushes them in; choosing ANY card from the pile would need a decision over the pile's contents, which is a Choice kind this engine does not have. `target` says who receives the card.",
+          "$comment": "draw-conspiracy's `from: 'discard'` is G17: the discard-pile reach that SELECTIVE ACCESS MEMORY needs. The top of a discard pile is the most recently discarded card, because that is the order discardTo pushes them in; choosing ANY card from the pile would need a decision over the pile's contents, which is a Choice kind this engine does not have. `target` says who receives the card.\n\n`onlyIfEmpty` is G17's other half and is what makes AS CLEAR AS WATER (REF 4.3) expressible: a resolved player already holding a Conspiracy Card is skipped. It reads the RECIPIENT's hand, which is hidden from every viewer including its owner (playerView blanks it), so it is a fact no client can see and reduce() logs nothing on this path. It can only move a card out of the draw pile into an EMPTY hand, so it is bounded by the draw pile's own length.",
           "type": "object",
           "additionalProperties": false,
           "required": ["op", "n"],
@@ -445,6 +445,7 @@
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
             "from": { "enum": ["draw", "discard"] },
+            "onlyIfEmpty": { "type": "boolean" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }

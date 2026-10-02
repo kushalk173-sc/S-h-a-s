@@ -113,14 +113,11 @@
     },
     {
       "id": "hl-et2040-013",
-      "source": "original; register per REF 8.2. THE SECOND READING archetype (hl-et2040-005) reskinned.",
-      "provenance": "inferred",
-      "name": "Three Day Weekend",
-      "text": "Every opponent gains 1 resource of their choice from the Public Reserve. You then gain 2 Trust.",
-      "effects": [
-        { "op": "gain-any", "n": 1, "target": "each-opponent" },
-        { "op": "gain", "res": { "trust": 2 } }
-      ]
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of As Clear As Water in full. This slot was `inferred` (THREE DAY WEEKEND, a reskin of hl-et2040-005, which stays); SOURCES.md 4 replaces an inferred placeholder BY the recovered card once the engine can perform it. DROPPED, both for the same reason: a REVEAL has no state consequence here, so reduce() has nothing to perform. SHIPPED: 'if any player does not have a Conspiracy Card, they receive 1 from the draw pile' is `onlyIfEmpty`, read off the RECIPIENT's hand - a fact hidden from every owner too, so it logs nothing.",
+      "provenance": "adapted",
+      "name": "As Clear As Water",
+      "text": "Every player who is holding no Conspiracy Card receives 1 from the draw pile, in turn order. A player already holding one takes nothing \u2014 and that includes you, unless the card you just played was your last.",
+      "effects": [{ "op": "draw-conspiracy", "n": 1, "target": "everyone", "onlyIfEmpty": true }]
     },
     {
       "id": "hl-et2040-014",

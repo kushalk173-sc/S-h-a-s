@@ -327,6 +327,35 @@ export type Effect = (
       readonly n: Count;
       readonly target?: EffectTarget;
       readonly from?: 'draw' | 'discard';
+      /**
+       * G17 — GIVE ONLY TO A PLAYER WHO IS HOLDING NOTHING.
+       *
+       * AS CLEAR AS WATER (REF 4.3) is *"Every player reveals 1 of their Conspiracy
+       * Cards. If any player does not have a Conspiracy Card, they receive 1 from the
+       * draw pile (in order of turn) and then reveal it."* The clause with a state
+       * change in it is the second one, and the state it reads is the recipient's HAND
+       * — which `applyEffect` can already see, so the condition needs a flag rather
+       * than a decision.
+       *
+       * `true` means a resolved player who already holds at least one Conspiracy Card
+       * is SKIPPED and takes nothing. It is deliberately a flag and not a count: no
+       * recovered card asks for a card to a player holding exactly some number, and a
+       * bound the corpus never uses is licence.
+       *
+       * **The information question, and why it is safe.** A Conspiracy Card hand is
+       * hidden from every viewer INCLUDING its owner (`playerView` blanks it), so this
+       * field reads a fact the caster cannot see and the reducer never discloses: the
+       * per-player outcome is a bare `continue`, and `applyEffect` logs nothing here.
+       * A player who was skipped and a player who was not are indistinguishable from
+       * outside except by the size of their own hand, which they already know. It adds
+       * no `_` field and owes `packages/server/test/secret-inventory.ts` nothing.
+       *
+       * **Termination.** It can only ever move a card out of the draw pile into a hand
+       * that is empty, so it is bounded by the draw pile's own length, and the pile
+       * refills from the discard exactly as an ordinary turn draw does. It cannot
+       * append to a queue that grows on its own.
+       */
+      readonly onlyIfEmpty?: boolean;
     }
   /** Discard all face-up Voter Cards and deal fresh ones. */
   | { readonly op: 'refresh-market' }

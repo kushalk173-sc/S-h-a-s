@@ -644,6 +644,46 @@ resources and the opponents get none of it. **+1 real card, adapted.**
 
 **Ask:** `{ op: 'draw-card'; kind; n; from; pick }` plus a `'choose-card'` Choice.
 
+**THIS ITERATION CLOSED THE OTHER HALF, and it bought a card: `onlyIfEmpty`.**
+
+`draw-conspiracy` gains `onlyIfEmpty?: boolean`, and a resolved player who already
+holds a Conspiracy Card is skipped. That is AS CLEAR AS WATER's whole
+state-changing clause — *"If any player does not have a Conspiracy Card, they receive
+1 from the draw pile (in order of turn)"* (REF 4.3) — and it is a FLAG rather than a
+decision because the state it reads is the **recipient's hand**, which `applyEffect`
+can already see. `target: 'everyone'` is the faithful reading of "every player": the
+caster is in the set and the condition excludes them, because a Conspiracy Card has
+just left their hand.
+
+**Card gained: AS CLEAR AS WATER** (`hl-et2040-013`, `adapted`), replacing the
+`inferred` THREE DAY WEEKEND placeholder. **27 of 54, measured by playing.** Both
+REVEAL clauses are dropped and the reason is the same for both: **a reveal has no
+state consequence in this engine**, so there is nothing for `reduce()` to perform.
+That is a missing MECHANISM, not missing wording, and it is named as such.
+
+**No `GameState`/`PlayerState` field, so no visibility decision.** The information
+question is the interesting one and it is worth the space: a Conspiracy Card hand is
+hidden from every viewer **including its owner** (`playerView` blanks it), so
+`onlyIfEmpty` reads a fact the caster cannot see and the table cannot see. The
+per-player outcome is a bare `continue`: **no `LogEntry`, no `GameEvent`.** A line
+reading "p2 was handed a card" would be a disclosure about a hidden hand, and so would
+"p2 is holding nothing" — the same bit with the sign flipped. `card-playback.test.ts`
+asserts this on the whole `playerView` payload rather than on one field.
+
+**Termination: the draw pile is the bound.** `onlyIfEmpty` can only move a card out of
+the draw pile into a hand that is *empty*, so no queue grows on its own and
+`TRIGGER_MAX_WAVES` is not what stops it. Asserted by resolving the card twice against
+a three-card pile.
+
+**What is STILL (c), and it is the reason this is not a full G17:** a decision over a
+pile's CONTENTS. SELECTIVE ACCESS MEMORY's *"pick ANY Conspiracy Card from the discard
+pile, in any order"* needs a `'choose-card'` `Choice` kind, and a new `Choice` kind
+breaks `packages/client/src/app/derive.ts` at two `switch`es — verified, `tsc` reports
+`TS2366` at `derive.ts:372` and `derive.ts:435`. `packages/client` is not this
+package's to edit, so `pick` remains unbuilt and the top of the pile is still the
+honest subset. A CALL FROM KARACHI, FUELLING THE NEWS and BLESSINGS OF PARENTS PAST
+each need the choice on top of G20 card movement, and none of them moves.
+
 ### G18 — no control over the draw-and-answer phase
 
 **State: (c).** Cards: 404, BRAVE NEW WORLDS, CARD GAMES. These change who gets which

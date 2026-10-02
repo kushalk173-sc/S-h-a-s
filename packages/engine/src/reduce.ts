@@ -935,6 +935,18 @@ function applyEffect(
       // change the client owns. The top of the pile is the honest subset.
       const fromDiscard = effect.from === 'discard';
       for (const p of resolveTargets(s, source, target)) {
+        // G17's `onlyIfEmpty`, which is what makes AS CLEAR AS WATER expressible: a
+        // resolved player who is already holding a Conspiracy Card is skipped and
+        // takes nothing. The check is on the RECIPIENT, because a Conspiracy Card is
+        // bought and held and its hand is hidden from every viewer including its owner,
+        // so this reads a fact nobody at the table can see and nothing here discloses
+        // which players were skipped. There is no log line and no event on this path,
+        // and that is deliberate rather than forgotten: "p2 was given a card" would be a
+        // disclosure about a hidden hand.
+        const holder = s.players[p];
+        if (effect.onlyIfEmpty === true && holder !== undefined && holder.conspiracies.length > 0) {
+          continue;
+        }
         for (let i = 0; i < resolveCount(s, p, effect.n, ctx); i++) {
           const pile = fromDiscard ? s._conspiracyDiscard : s._conspiracyDraw;
           const id = fromDiscard ? pile[pile.length - 1] : pile[0];
