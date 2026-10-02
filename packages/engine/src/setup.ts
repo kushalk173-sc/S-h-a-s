@@ -192,6 +192,9 @@ export function setup(opts: SetupOptions): GameState {
     // state.ts for the visibility argument, which is why this line is above the
     // server-only block rather than inside it.
     liveEffects: [],
+    // G13: no card is being answered. PUBLIC for the same reason, and for the same
+    // per-field argument, as `liveEffects` above — see `InterruptWindow` in state.ts.
+    interrupt: null,
     finalRoundFrom: null,
     log: [],
 

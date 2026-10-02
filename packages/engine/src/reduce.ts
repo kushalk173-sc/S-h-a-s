@@ -22,6 +22,7 @@ import type {
   EffectTarget,
   EffectTiming,
   EffectTrigger,
+  Interrupt,
 } from './cards';
 import { hasPower, passiveBonus, usesLeft } from './powers';
 import { applyDiscounts, canAfford, deltaError, overCap, subtract } from './resources';
@@ -48,6 +49,7 @@ import {
   type ChoiceScope,
   type Delta,
   type GameState,
+  type InterruptWindow,
   type LiveEffect,
   type LogEntry,
   type PendingChoice,
@@ -1120,6 +1122,194 @@ function gerrymanderAllowance(state: GameState, player: PlayerID, rules: Rules, 
   return base + bonus - used;
 }
 
+// ─────────────────────────── the response window (G13) ───────────────────────────
+
+/**
+ * THE REGISTRY, and `packages/cards/test/reducer-parity.test.ts` re-derives these
+ * keys out of this object's own source text.
+ *
+ * `block` and `deflect` are the two of the five phase-changing ops this engine
+ * actually performs, and they are performed by `RESPOND_INTERRUPT` — not by
+ * `applyEffect`, which is why they are a sibling card field and not an `Effect`.
+ * `auction`, `vote` and `pass-card` are absent, and their absence is the argument
+ * recorded in KNOWN-GAPS G13: an auction needs a `PlayerState` debt field and an
+ * IOU, a vote needs a ballot with a re-vote rule and a payoff that is itself G20,
+ * and a pass needs an in-flight queue (G12) plus something to pass the card to
+ * (G20). An op listed here that the reducer cannot honour is a card that lies, so
+ * the registry names only what is real.
+ */
+const REACTIVE_INTERRUPTS: Readonly<Record<string, 'block' | 'deflect'>> = {
+  block: 'block',
+  deflect: 'deflect',
+};
+
+/** Is this op one `RESPOND_INTERRUPT` will act on? */
+function isReactive(op: string): op is 'block' | 'deflect' {
+  return Object.prototype.hasOwnProperty.call(REACTIVE_INTERRUPTS, op);
+}
+
+/** The open window, or null. One accessor so a missing field is never a third state. */
+function openInterrupt(state: GameState): InterruptWindow | null {
+  return state.interrupt;
+}
+
+/**
+ * May a card holding this `Interrupt` answer the open window?
+ *
+ * The two fields are read, not declared-and-ignored, which is the whole reason the
+ * enum in `cards.ts` was narrowed from three values to two (see the note there).
+ */
+function mayRespond(state: GameState, interrupt: Interrupt): string | null {
+  if (interrupt.window === 'pre-answer' && state.phase !== 'answer') {
+    return 'that card may only be played immediately before an opponent answers';
+  }
+  if (interrupt.target === 'card-affecting-you' && !reachesPastActor(state)) {
+    return 'that card only answers a card that affects a player other than the one who played it';
+  }
+  return null;
+}
+
+/**
+ * The engine's approximation of "this card affects somebody other than its player".
+ *
+ * AN APPROXIMATION, and labelled: `applyEffect` computes `target` once for a whole
+ * effect list, so this answers "does any effect in the list aim past its owner", not
+ * "does it aim at THIS player". The printed DEFLECT reads "a card that affects
+ * YOU", and the narrower question is G1 — a decision over players, which is a new
+ * `Choice` kind and a client wire-format change this package may not make. The
+ * shipped DEFLECT therefore declares `'any-card'`, which is the reading the
+ * defender's judgement supplies at a physical table anyway.
+ */
+function reachesPastActor(state: GameState): boolean {
+  const w = openInterrupt(state);
+  if (w === null) return false;
+  return w.effects.some((e) => 'target' in e && e.target !== undefined && e.target !== 'you');
+}
+
+/**
+ * Everybody except the actor, minus anybody frozen by a pending decision.
+ *
+ * THE DEADLOCK ARGUMENT, in one function. Every player in this set always has
+ * `PASS_INTERRUPT` available, so the window is always closable; and a player who
+ * cannot act at all is not required to decline, so p12's freeze is honoured rather
+ * than overridden. It is derived from the state on every call and never stored, so
+ * it cannot drift from who is actually frozen.
+ */
+function mustRespond(state: GameState, actor: PlayerID): readonly PlayerID[] {
+  return state.turnOrder.filter(
+    (p) => p !== actor && !state.choices.some((c) => c.player === p),
+  );
+}
+
+/** Does any OTHER player hold a Conspiracy Card whose `interrupt` this engine acts on? */
+function canBeAnswered(state: GameState, ctx: Ctx, actor: PlayerID): boolean {
+  for (const p of state.turnOrder) {
+    if (p === actor) continue;
+    const hand = state.players[p];
+    if (!hand) continue;
+    for (const cardId of hand.conspiracies) {
+      const card = ctx.cards.conspiracy[cardId];
+      if (card?.interrupt && isReactive(card.interrupt.op)) return true;
+    }
+  }
+  return false;
+}
+
+/** The name of the card under response, for the log. It is already a public play. */
+function interruptCardName(w: InterruptWindow, ctx: Ctx): string {
+  if (w.kind === 'conspiracy') return ctx.cards.conspiracy[w.cardId]?.name ?? w.cardId;
+  return ctx.cards.headline[w.cardId]?.name ?? w.cardId;
+}
+
+/**
+ * Resolve a played card's effects NOW, or hold them for a beat.
+ *
+ * Called from exactly the two places a card's effect list is resolved —
+ * `PLAY_CONSPIRACY` and `ACK_HEADLINE` — and it is the whole of the phase machine:
+ * a card with an effect list that somebody could answer is STAGED, and everything
+ * else behaves exactly as it did before G13 landed. The shipped corpus holds no
+ * card carrying an `interrupt`, so the staging branch is unreachable for it and no
+ * existing test's behaviour moves.
+ */
+function resolveCard(
+  state: GameState,
+  actor: PlayerID,
+  card: {
+    readonly id: CardID;
+    readonly effects: readonly Effect[];
+    readonly duration?: EffectDuration;
+    readonly timing?: EffectTiming;
+  },
+  kind: 'conspiracy' | 'headline',
+  ctx: Ctx,
+): GameState {
+  const duration = card.duration ?? 'this-turn';
+  const timing = card.timing ?? 'now';
+
+  if (card.effects.length > 0 && canBeAnswered(state, ctx, actor)) {
+    const seq = state._idSeq + 1;
+    return {
+      ...state,
+      _idSeq: seq,
+      interrupt: {
+        id: `I${seq}`,
+        actor,
+        cardId: card.id,
+        kind,
+        effects: card.effects,
+        duration,
+        timing,
+        blocked: false,
+        deflectedTo: null,
+        responder: null,
+        passed: [],
+      },
+    };
+  }
+
+  return applyEffects(state, actor, card.effects, ctx, undefined, {
+    sourceCardId: card.id,
+    duration,
+    timing,
+  });
+}
+
+/**
+ * CLOSE THE WINDOW and settle the card.
+ *
+ * The two exits, and the order is the rules: a BLOCK wins outright, because BLOCK
+ * says "cannot be reversed or deflected" and a resolution that retargeted a blocked
+ * card would be a block that did not block. Otherwise a DEFLECT's target replaces
+ * the actor as the player the whole effect list resolves FOR.
+ *
+ * The deviation is recorded rather than hidden: the printed DEFLECT moves "only
+ * that partial effect" that touched the defender, and `applyEffect` computes one
+ * `target` for the whole list, so the engine redirects the whole resolution. That is
+ * G20's granularity, not a bug, and the card's `source` field says so.
+ */
+function closeInterrupt(state: GameState, w: InterruptWindow, ctx: Ctx): Result {
+  const base: GameState = { ...state, interrupt: null };
+
+  const settled: GameState = w.blocked
+    ? log(base, {
+        player: w.responder,
+        text: `Blocked "${interruptCardName(w, ctx)}".`,
+        kind: 'system',
+      })
+    : applyEffects(base, w.deflectedTo ?? w.actor, w.effects, ctx, undefined, {
+        sourceCardId: w.cardId,
+        duration: w.duration,
+        timing: w.timing,
+      });
+
+  // A Headline that was held was still one of a queue, and `ACK_HEADLINE` stopped
+  // before draining it. Resuming here rather than there is what keeps the turn
+  // boundary exactly where the interrupted action left it — and it is the reason a
+  // BLOCK on a Headline delays the game rather than cancelling the whole turn.
+  if (w.kind === 'headline') return nextHeadlineOrAdvance({ ...settled, activeHeadline: null }, ctx);
+  return { ok: true, state: settled, events: [] };
+}
+
 // ─────────────────────────── turn advance ───────────────────────────
 
 function endOfGame(state: GameState, events: GameEvent[] = []): Result {
@@ -1240,6 +1430,20 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
   const self = state.players[playerId];
   if (!self) return fail(`unknown player ${playerId}`);
 
+  // G13: an open response window freezes the whole table except the two moves the
+  // window exists for, plus `RESOLVE_CHOICE` so a player frozen by p12 can always
+  // thaw. Placed FIRST, above the per-player freeze, because the window is the more
+  // fundamental one: it is not about this player, it is about the card.
+  const window = openInterrupt(state);
+  if (
+    window !== null &&
+    action.type !== 'RESPOND_INTERRUPT' &&
+    action.type !== 'PASS_INTERRUPT' &&
+    action.type !== 'RESOLVE_CHOICE'
+  ) {
+    return fail(`"${interruptCardName(window, ctx)}" is resolving — answer it or decline first`);
+  }
+
   // A pending decision freezes that player. p12 says so for the resource cap, and it
   // is the only sane reading for a card effect that is mid-resolution.
   const blocker = blockedBy(state, playerId);
@@ -1251,7 +1455,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
   // right before an opponent answers. Everything else is active-player only.
   // The phase windows themselves are checked in the PLAY_CONSPIRACY case.
   const outOfTurnOk = action.type === 'PLAY_CONSPIRACY' && state.phase === 'answer';
-  if (playerId !== state.activePlayer && !outOfTurnOk && action.type !== 'RESOLVE_CHOICE') {
+  // G13: the two response-window moves are out-of-turn for EVERYBODY, which is the
+  // point — a BLOCK is played by a player who is not the active one, and a DEFLECT
+  // is played by a player the card they are answering has not even reached yet.
+  const responding = action.type === 'RESPOND_INTERRUPT' || action.type === 'PASS_INTERRUPT';
+  if (playerId !== state.activePlayer && !outOfTurnOk && !responding && action.type !== 'RESOLVE_CHOICE') {
     return fail('not your turn');
   }
 
@@ -1685,11 +1893,14 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       let s = withPlayer(state, playerId, {
         conspiracies: self.conspiracies.filter((c) => c !== action.cardId),
       });
-      s = applyEffects(s, playerId, card.effects, ctx, undefined, {
-        sourceCardId: card.id,
-        duration: card.duration ?? 'this-turn',
-        timing: card.timing ?? 'now',
-      });
+      // G13: somebody who can answer this card holds a BLOCK or a DEFLECT, so the
+      // effects are held in `state.interrupt` instead of applied. Otherwise they
+      // resolve here, exactly as they always have, in the same order.
+      s = resolveCard(s, playerId, card, 'conspiracy', ctx);
+      // The card is face up by the time any client can see the state that carries
+      // the window: this play logs it by name and puts it on the discard pile, and
+      // `InterruptWindow.effects` is public on exactly that strength. A client that
+      // reads the window has learned nothing this log line did not already say.
       s = discardTo(s, 'conspiracy', action.cardId);
       s = log(s, { player: playerId, text: `Played "${card.name}".`, kind: 'card' });
       return { ok: true, state: s, events: [{ type: 'conspiracy', player: playerId, cardId: action.cardId }] };
@@ -1857,6 +2068,78 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
     case 'RESOLVE_CHOICE':
       return resolveChoice(state, playerId, action.choiceId, action.pick, ctx);
 
+    // ───────────── G13: the response window ─────────────
+
+    case 'RESPOND_INTERRUPT': {
+      const w = window;
+      if (w === null) return fail('there is nothing to answer');
+      // The printed rule: a BLOCK "cannot be reversed or deflected", and a player
+      // does not block their own card. Both are also the termination argument — a
+      // window takes at most one answer.
+      if (playerId === w.actor) return fail('you played that card');
+      if (w.responder !== null) return fail('that card has already been answered');
+
+      const card = cards.conspiracy[action.cardId];
+      if (!card) return fail('unknown conspiracy card');
+      if (!self.conspiracies.includes(action.cardId)) return fail('you do not hold that card');
+      const interrupt = card.interrupt;
+      if (!interrupt) return fail('that card cannot answer another card');
+      if (!isReactive(interrupt.op)) return fail('that card is not a reactive interrupt');
+      const notNow = mayRespond(state, interrupt);
+      if (notNow !== null) return fail(notNow);
+
+      if (interrupt.op === 'deflect') {
+        // "redirect its effect on any player OTHER THAN THEM" — the actor is the
+        // one exclusion the card states, and a DEFLECT aimed back at its own player
+        // would be a no-op dressed as a card.
+        if (action.at === undefined) return fail('name the player the effect is redirected to');
+        if (action.at === w.actor) return fail('you cannot redirect it back at the player who played it');
+        if (action.at === playerId) return fail('you cannot redirect it at yourself');
+        if (!state.players[action.at]) return fail(`unknown player ${action.at}`);
+      } else if (action.at !== undefined) {
+        return fail('a Block negates the effect; there is nothing to redirect it to');
+      }
+
+      // Played face up, from the responder's own hand, into the public log — the
+      // same two steps `PLAY_CONSPIRACY` takes, and for the same reason: a card
+      // nobody has seen resolved is a card nobody can answer.
+      let s = withPlayer(state, playerId, {
+        conspiracies: self.conspiracies.filter((c) => c !== action.cardId),
+      });
+      s = discardTo(s, 'conspiracy', action.cardId);
+      s = log(s, { player: playerId, text: `Played "${card.name}".`, kind: 'card' });
+      s = {
+        ...s,
+        interrupt: {
+          ...w,
+          blocked: interrupt.op === 'block',
+          deflectedTo: interrupt.op === 'deflect' ? (action.at ?? null) : null,
+          responder: playerId,
+        },
+      };
+
+      // One answer, then it closes. `advanceTurn` and `nextHeadlineOrAdvance` are
+      // NOT re-entered before the window resolves — the card being answered was
+      // already accounted for by the action that staged it, so closing resumes
+      // exactly where that action left off rather than replaying its bookkeeping.
+      return closeInterrupt(s, s.interrupt as InterruptWindow, ctx);
+    }
+
+    case 'PASS_INTERRUPT': {
+      const w = window;
+      if (w === null) return fail('there is nothing to answer');
+      if (playerId === w.actor) return fail('you played that card');
+      if (w.passed.includes(playerId)) return fail('you have already declined');
+
+      const passed = [...w.passed, playerId];
+      const s: GameState = { ...state, interrupt: { ...w, passed } };
+      // Every player the window is waiting on has now declined, so it closes and the
+      // staged card resolves as it would have with no BLOCK in anybody's hand.
+      const outstanding = mustRespond(state, w.actor).some((p) => !passed.includes(p));
+      if (outstanding) return { ok: true, state: s, events: [] };
+      return closeInterrupt(s, s.interrupt as InterruptWindow, ctx);
+    }
+
     case 'ACK_HEADLINE': {
       if (state.phase !== 'headlines') return fail('there is no Headline to resolve');
       const cardId = state.activeHeadline;
@@ -1868,14 +2151,17 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       const source = entry?.by ?? playerId;
 
       let s: GameState = { ...state, headlineQueue: state.headlineQueue.slice(1) };
-      s = applyEffects(s, source, card.effects, ctx, undefined, {
-        sourceCardId: card.id,
-        duration: card.duration ?? 'this-turn',
-        timing: card.timing ?? 'now',
-      });
+      s = resolveCard(s, source, card, 'headline', ctx);
       s = discardTo(s, 'headline', cardId);
       s = log(s, { player: source, text: `HEADLINE — ${card.name}`, kind: 'card' });
 
+      if (openInterrupt(s) !== null) {
+        // The window outlives this action, so the queue must NOT drain yet: calling
+        // `nextHeadlineOrAdvance` now would advance the turn out from under a card
+        // that has not resolved, and the turn boundary would be taken twice.
+        // `closeInterrupt` resumes the queue instead.
+        return { ok: true, state: s, events: [] };
+      }
       return nextHeadlineOrAdvance({ ...s, activeHeadline: null }, ctx);
     }
 

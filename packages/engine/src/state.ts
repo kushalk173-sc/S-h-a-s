@@ -10,7 +10,7 @@
  * underscore is load-bearing and enforced by test.
  */
 
-import type { Effect, EffectCondition, EffectTrigger } from './cards';
+import type { Effect, EffectCondition, EffectDuration, EffectTiming, EffectTrigger } from './cards';
 
 export type PlayerID = string;
 export type CardID = string;
@@ -463,6 +463,104 @@ export type Restriction = {
   readonly sourcePlayer: PlayerID;
 };
 
+/**
+ * G13 — A CARD'S EFFECTS, HELD FOR ONE BEAT SO THAT A BLOCK OR A DEFLECT CAN LAND.
+ *
+ * This is the whole phase machine, and it is one nullable field rather than a
+ * `Phase` variant, for a reason that is about OTHER PACKAGES rather than elegance:
+ *
+ *  - `packages/server/src/broadcast.ts` decides whether to show a player their
+ *    Conspiracy hand by testing `state.phase === 'actions' || 'answer'`. A new
+ *    `Phase` member would make the window a phase the server does not recognise, and
+ *    every hand would go dark for exactly as long as the window is open — so the
+ *    player who is supposed to be holding the BLOCK could not be shown it. Neither
+ *    that file nor the client's `Phase` handling is this package's to change.
+ *  - `phase` therefore keeps saying which phase of PLAY it is, and the window is a
+ *    suspension inside one, which is what a BLOCK actually is: the game has not
+ *    stopped, one card's resolution is being argued about.
+ *
+ * ## THE PROTOCOL, and why it cannot deadlock
+ *
+ * The window opens when a card with a non-empty effect list is played AND some
+ * OTHER player holds a Conspiracy Card whose `interrupt.op` is `block` or `deflect`.
+ * It closes on the first of two conditions:
+ *
+ *  1. somebody answered it (`RESPOND_INTERRUPT`) — one answer only, so a Block can
+ *     never itself be blocked or deflected, which is the printed rule ("cannot be
+ *     reversed or deflected") and also the termination argument;
+ *  2. every player who is required to decline has declined (`PASS_INTERRUPT`).
+ *
+ * The required set is `turnOrder` minus the actor minus anybody with a pending
+ * `Choice` — derived from the state, never stored as its own list, so a player
+ * frozen by p12's cap discard is not required to decline (they cannot act at all)
+ * and is not a hostage either. **Every player in the required set always has
+ * `PASS_INTERRUPT` available**, so the window is always closable, and condition 2
+ * is reached in at most `n - 1` passes. `RESOLVE_CHOICE` stays legal throughout, so
+ * a frozen player can always thaw. There is no counter to overflow, no clock, and
+ * no way for one response to raise another window: the window is a single linear
+ * protocol and both closing conditions are monotone. `interrupts.test.ts` asserts
+ * that rather than trusting it.
+ *
+ * ## VISIBILITY: PUBLIC, and every field in it argued, because one of them is
+ * exactly the kind of thing that ends the game if it leaks
+ *
+ * A Conspiracy Card hand is a hidden hand (`PRIVATE_PLAYER_KEYS`), so the obvious
+ * worry is that this window says WHO is holding a BLOCK. **It does not, and the
+ * design is arranged so it cannot:**
+ *
+ *  - there is NO list of who may respond, and no list of who holds a reactive card.
+ *    `reduce()` computes eligibility from the hidden hands at the moment a card is
+ *    played and the only thing that reaches the state is the window itself. Adding a
+ *    `responders: PlayerID[]` would hand every client the answer to "who is holding
+ *    a Block", and it is the one field that must never be added.
+ *  - `actor`, `cardId` and `effects` name a card that has ALREADY been played. The
+ *    play is logged and the card is on the discard pile in the same action, so a
+ *    client reading this has learned nothing the log did not already say. It cannot
+ *    name a card in a hidden hand, for the same reason `LiveEffect.sourceCardId`
+ *    cannot (see the note on that type).
+ *  - `responder` and `deflectedTo` are null while the window is open, and by the
+ *    time they are set the responder has already played a card face up, so their
+ *    identity and their target are both on the public record.
+ *  - `passed` says a player DECLINED. A player who declines has revealed nothing
+ *    about their hand: they may hold a Block and choose not to play it, which is
+ *    the ordinary case.
+ *  - **The one residual, stated rather than hidden: the mere existence of an open
+ *    window tells every client that *somebody* holds a reactive card.** It names no
+ *    player and says nothing about which one. The alternative — a window that opens
+ *    silently — leaves a real client with no way to know it is anybody's turn to
+ *    act, which is a product deadlock traded for an information leak of one bit about
+ *    one unknown player. The engine takes the one bit, and it is the same class of
+ *    disclosure as `ClientState.awaitingAnswer`, which already tells every client
+ *    that a card is in flight without saying which.
+ *
+ * This is the same reasoning that made `liveEffects` and `restrictions` public, and
+ * the same constraint: no `_`-prefixed field is added, so
+ * `packages/server/test/secret-inventory.ts` owes nothing. It also could not owe
+ * anything — that file pins the `_` set to exactly eleven and this package may not
+ * edit it, which is a second, independent reason the field is unprefixed.
+ */
+export type InterruptWindow = {
+  /** `I<n>` from `GameState._idSeq`. R2: no module-scope counter. */
+  readonly id: string;
+  /** Who played the card under response. They may not answer it themselves. */
+  readonly actor: PlayerID;
+  /** The card being answered. Already face up: played, logged and discarded. */
+  readonly cardId: CardID;
+  readonly kind: 'conspiracy' | 'headline';
+  /** The staged effects. Held, NOT applied, for exactly as long as the window is open. */
+  readonly effects: readonly Effect[];
+  readonly duration: EffectDuration;
+  readonly timing: EffectTiming;
+  /** A BLOCK landed, so the resolution is cancelled outright. */
+  readonly blocked: boolean;
+  /** A DEFLECT landed. The resolution resolves FOR this player instead of the actor. */
+  readonly deflectedTo: PlayerID | null;
+  /** The player who answered the window, or null. At most one, by the printed rule. */
+  readonly responder: PlayerID | null;
+  /** Everybody who has declined. See the protocol note for who is required to. */
+  readonly passed: readonly PlayerID[];
+};
+
 export type GameState = {
   readonly zones: readonly Zone[];
   readonly players: Readonly<Record<PlayerID, PlayerState>>;
@@ -493,6 +591,14 @@ export type GameState = {
    * every client deliberately.
    */
   readonly liveEffects: readonly LiveEffect[];
+
+  /**
+   * G13 — a played card whose effects are being held for a BLOCK or a DEFLECT, or
+   * `null` when no card is in that state. See `InterruptWindow` for the protocol,
+   * the deadlock argument and the per-field visibility ruling. Unprefixed and
+   * public on purpose; there is deliberately no `responders` list on it.
+   */
+  readonly interrupt: InterruptWindow | null;
 
   /**
    * Set when the board fills before every majority forms (p20). Everyone gets one

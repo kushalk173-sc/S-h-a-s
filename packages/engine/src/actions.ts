@@ -61,7 +61,23 @@ export type Action =
   | { readonly type: 'RESOLVE_CHOICE'; readonly choiceId: string; readonly pick: ChoicePick }
   /** p18/p21: acknowledge the face-up Headline, applying its effects. */
   | { readonly type: 'ACK_HEADLINE' }
-  | { readonly type: 'END_TURN' };
+  | { readonly type: 'END_TURN' }
+
+  // ── G13: the response window. See `state.ts` `InterruptWindow`. ──
+  //
+  // Both are legal for ANY player, including the active one, and both are refused
+  // outright while no window is open. `RESPOND_INTERRUPT` plays a held BLOCK or
+  // DEFLECT into the open window; `PASS_INTERRUPT` declines it. The second one
+  // exists for the deadlock argument rather than for the game: it is the move that
+  // guarantees a window is always closable, so no table can ever be waiting on a
+  // player who has nothing to play.
+  //
+  // `RESPOND_INTERRUPT` is the whole reason the client needs no new `Choice` kind
+  // for DEFLECT: the redirect target rides on the action rather than in a
+  // `PendingChoice`, so nothing in the public `choices` array ever says "this player
+  // holds a Deflect" before they have played it.
+  | { readonly type: 'RESPOND_INTERRUPT'; readonly cardId: CardID; readonly at?: PlayerID }
+  | { readonly type: 'PASS_INTERRUPT' };
 
 export type ChoicePick =
   | { readonly kind: 'resources'; readonly res: Delta }

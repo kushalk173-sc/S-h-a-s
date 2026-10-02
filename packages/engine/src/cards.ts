@@ -164,14 +164,60 @@ export type EffectCondition = {
  * card text bears it out: a BLOCK, a DEFLECT, an AUCTION and a VOTE change *which
  * phase of play is running*, not how many resources anyone holds, so no amount of
  * parameterising the effect list will express them. They are a sibling field on
- * the X-card types for exactly that reason, and `reduce()` ignores this whole
- * object — a card carrying an `interrupt` is rejected by the corpus validator.
+ * the X-card types for exactly that reason, and `reduce()` reads this object in
+ * `RESPOND_INTERRUPT` — one function a long way from `applyEffect`.
+ *
+ * ## WHAT IS EXECUTED, and the narrowing that bought it
+ *
+ * `block` and `deflect` are EXECUTED. `auction`, `vote` and `pass-card` are
+ * declared and refused, and KNOWN-GAPS G13 records why for each: an auction needs
+ * a `PlayerState` debt field and an IOU, a vote needs a ballot with a re-vote rule
+ * and a payoff that is itself G20 card movement, and a pass needs something to pass
+ * the card ON TO, which is G12's in-flight queue plus G20's `move-card`. Declaring
+ * an op and then not honouring it is the card that lies, so the two that are
+ * honest are the two that ship and the other three carry a per-op refusal.
+ *
+ * **`window` and `target` were narrowed from three values each to two and two.**
+ * That is not tidying — it is the honesty gate. `reduce()` reads both fields, and a
+ * third value it could not distinguish would be a declaration the engine ignores,
+ * which is exactly the failure `packages/cards/src/executable.ts` exists to stop.
+ * The two dropped values are named in that file and in KNOWN-GAPS G13.
  */
 export type Interrupt = {
   readonly op: 'block' | 'deflect' | 'auction' | 'vote' | 'pass-card';
-  /** When the window is open. */
-  readonly window: 'out-of-turn' | 'pre-answer' | 'always';
-  readonly target?: 'any-card' | 'card-affecting-you' | 'any-player';
+  /**
+   * WHEN the holder may answer another card.
+   *
+   *  - `'always'` — in any phase in which a response window is open. This is the
+   *    printed reading of both real cards: BLOCK says "play this IMMEDIATELY out of
+   *    turn when an opponent plays a Conspiracy Card", and DEFLECT says "you may
+   *    play this IMMEDIATELY". Neither is tied to the answer phase.
+   *  - `'pre-answer'` — only while `phase === 'answer'`, the p19 window
+   *    ("immediately before an opponent answers"). Kept because it is the narrower
+   *    and more defensible reading, and it is what a card wants if its author wants
+   *    to forbid an answer-phase block.
+   *
+   * The dropped third value was `'out-of-turn'`, because `RESPOND_INTERRUPT`
+   * already refuses the actor ("you played that card"), which is the whole of what
+   * it meant. A value the engine cannot distinguish from another is a value the
+   * engine is not reading.
+   */
+  readonly window: 'pre-answer' | 'always';
+  /**
+   * WHICH cards the holder may answer.
+   *
+   *  - `'any-card'` (the default reading) — anything currently in the window.
+   *  - `'card-affecting-you'` — only a card whose effect list reaches a player other
+   *    than the card's own actor, which is the engine's approximation of DEFLECT's
+   *    "a Conspiracy or Headline card that AFFECTS YOU". It is an approximation
+   *    and is labelled as one: the engine computes one `target` for the whole
+   *    effect list rather than per effect, so this answers "does this card reach
+   *    past its player", not "does it reach THIS player".
+   *
+   * The dropped third value was `'any-player'`, for the same reason: it is
+   * indistinguishable from `'any-card'` in every position the window can be in.
+   */
+  readonly target?: 'any-card' | 'card-affecting-you';
 };
 
 /**
@@ -355,10 +401,9 @@ export type XCardScope = {
   readonly duration?: EffectDuration;
   /** G22 — `'now'` (default) or `'next-turn'` (dormant until the owner's next turn). */
   readonly timing?: EffectTiming;
-  /** RESERVED, not executed by `reduce()`. G13. */
+  /** G13. EXECUTED for `block` and `deflect`; refused for the other three ops. */
   readonly interrupt?: Interrupt;
 };
-
 
 export type ConspiracyCard = {
   readonly id: CardID;
