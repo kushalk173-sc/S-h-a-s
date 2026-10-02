@@ -330,6 +330,39 @@ export function decodeAction(value: unknown): Action | null {
       return { type, choiceId, pick };
     }
 
+    // G13 — the response window's two moves, and they are the ONLY two actions a
+    // client may send while a window is open (`reduce` refuses everything else with
+    // '"<card>" is resolving - answer it or decline first'`).
+    //
+    // These cases were MISSING while the engine's window was already built, which is
+    // the same class of bug as the driver not being able to act in one: the rules
+    // existed, the reducer honoured them, and the wire refused to carry them, so a
+    // live table holding a BLOCK could not be closed by ANY seat and the match hung.
+    // `decodeAction`'s `switch` is exhaustive by design, so the omission was a
+    // compile-clean `default: return null` — and the client sees it as
+    // `malformed action`, not as "unknown action", which is why it would have been
+    // hard to diagnose from a log.
+    case 'RESPOND_INTERRUPT': {
+      if (!check('type', 'cardId', 'at')) return null;
+      const cardId = str(value['cardId'], MAX_ID);
+      if (cardId === null) return null;
+      // `at` is the DEFLECT target and is REQUIRED by the reducer for a deflect and
+      // FORBIDDEN for a block ("a Block negates the effect; there is nothing to
+      // redirect it to"). The decoder cannot tell the two apart — that needs the
+      // card body, which the client is not sent — so it passes the field through
+      // when present and lets `reduce` be the authority on whether it is legal.
+      // `exactOptionalPropertyTypes` is on, so an absent key and `undefined` are
+      // different types and the field is added by key, never assigned.
+      const at = value['at'];
+      if (at === undefined) return { type, cardId };
+      if (typeof at !== 'string' || at.length === 0 || at.length > MAX_ID) return null;
+      return { type, cardId, at };
+    }
+
+    case 'PASS_INTERRUPT':
+      if (!check('type')) return null;
+      return { type };
+
     case 'ACK_HEADLINE':
     case 'END_TURN':
       if (!check('type')) return null;
