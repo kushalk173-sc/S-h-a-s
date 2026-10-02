@@ -119,6 +119,26 @@
       "text": "This is an extra Ideology Card. You will be put it at the start of your next turn, face down, and you will not be told which one.",
       "cost": 5,
       "effects": [{ "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "you" }]
+    },
+    {
+      "id": "ct-et2040-014",
+      "source": "REF 4.2.1 recovers BLOCK. SHIPS THE REACTIVE HALF, which G13 executes: out of turn it negates the staged resolution; one answer per window, so it cannot be reversed or deflected. 'Actions not aimed at you may also be blocked' is why target:any-card. DROPPED: 'Discard an open Conspiracy Card or Headline Card' (no op discards an open card); 'block a card stealing this card' (G20 moves Ideology Cards only); 'cleanse an already-active card' (no op removes a LiveEffect, G9/G22). WIDENED: a window also opens on a Headline resolving. 'Otherwise: gain 1 Clout' AUTHORED. G13d.",
+      "provenance": "adapted",
+      "name": "Block",
+      "text": "Play this IMMEDIATELY out of turn when an opponent plays a Conspiracy Card, or a Headline resolves, to negate that card's effect entirely. It cannot be reversed or deflected, and a card not aimed at you may also be blocked. Otherwise: gain 1 Clout.",
+      "cost": 5,
+      "effects": [{ "op": "gain", "res": { "clout": 1 } }],
+      "interrupt": { "op": "block", "window": "always", "target": "any-card" }
+    },
+    {
+      "id": "ct-et2040-015",
+      "source": "REF 4.2.1 recovers DEFLECT. SHIPS THE REACTIVE HALF (G13): out of turn it retargets the staged resolution onto any player who is neither actor nor responder. DEVIATIONS: 'only that partial effect is deflected' DROPPED - one target per effect list, so the WHOLE resolution is redirected (G20); the text says 'whole effect'. 'Affects you' WIDENED to target:any-card, because card-affecting-you resolves via reachesPastActor, which asks whether an effect aims past its OWNER (G1). 'It cannot be blocked' is not recovered but true. 'Otherwise: gain 1 Trust' AUTHORED. G13d.",
+      "provenance": "adapted",
+      "name": "Deflect",
+      "text": "Play this IMMEDIATELY out of turn when an opponent plays a card, to redirect that card's whole effect onto a third player of your choosing - whoever it was aimed at. It cannot be blocked. Otherwise: gain 1 Trust.",
+      "cost": 5,
+      "effects": [{ "op": "gain", "res": { "trust": 1 } }],
+      "interrupt": { "op": "deflect", "window": "always", "target": "any-card" }
     }
   ]
 }

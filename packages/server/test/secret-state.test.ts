@@ -404,6 +404,38 @@ function conspiracyCorpus(steps: number): readonly GameState[] {
   return corpus;
 }
 
+/**
+ * Close a response window by DECLINING it, which is what a client with no hand does.
+ *
+ * Needed since G13d. `PLAY_CONSPIRACY` no longer resolves its own effect list the moment
+ * it is played: if any OTHER seat holds a reactive card — BLOCK or DEFLECT, and
+ * `draw-conspiracy` puts one in a hand without anybody buying — the effect list is STAGED
+ * in `state.interrupt` and raises no decision until the window closes. So the walk below
+ * has to finish the protocol before it can ask "did playing this freeze its player", and
+ * without this the freeze branch below was unreachable: measured, `froze` was 0 across all
+ * twenty states of the fixture once the corpus carried a reactive card at all.
+ *
+ * The required set is transcribed from `mustRespond` in `reduce.ts`: everybody except the
+ * actor, minus anybody frozen by a decision (they cannot act, and `PASS_INTERRUPT` from a
+ * frozen player is refused by the per-player freeze above the switch). Declining is
+ * always legal for a seat in that set, so this always terminates.
+ */
+function closeWindow(s: GameState): GameState {
+  let cur = s;
+  for (let guard = 0; cur.interrupt !== null && guard < 8; guard += 1) {
+    const w = cur.interrupt;
+    if (w === null) break;
+    const seat = cur.turnOrder.find(
+      (p) => p !== w.actor && !w.passed.includes(p) && !cur.choices.some((c) => c.player === p),
+    );
+    if (seat === undefined) break;
+    const r = reduce(cur, seat, { type: 'PASS_INTERRUPT' }, { rules: ctx.rules, cards: CARDS });
+    if (!r.ok) break;
+    cur = r.state;
+  }
+  return cur;
+}
+
 function nextConspiracyAction(s: GameState, me: PlayerID) {
   if (s.finished) return null;
   if (s.phase === 'answer') return s.activePlayer === me ? ({ type: 'ANSWER', side: 0 } as const) : null;
@@ -1028,32 +1060,42 @@ it('the list is COMPUTED, never cached: playing a card removes it from the next 
     //   3. owing a decision empties the list.          (the rule that broke the delta)
     let exercised = 0;
     let froze = 0;
-    for (const s of CONSPIRACY_CORPUS) {
+    // EVERY OFFERED CARD, not just the first. `reduce` is pure, so probing every card a
+    // viewer is offered costs nothing and makes assertion 3 independent of which cards
+    // the seeded shuffle happened to deal: measured, the old walk played exactly three
+    // distinct cards across twenty states and none of them raised a decision, so the
+    // freeze branch was reachable only by luck. A leak-suite guard that depends on luck is
+    // a guard that will report a corpus change as a coverage hole.
+    outer: for (const s of CONSPIRACY_CORPUS) {
       const viewer = s.activePlayer;
-      const before = offered(s, viewer);
-      const cardId = before[0];
-      if (cardId === undefined) continue;
-      const played = reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS });
-      expect(played.ok, `${viewer} was offered ${cardId} and could not play it`).toBe(true);
-      if (!played.ok) continue;
-      const after = offered(played.state, viewer);
-      const hand = handOf(played.state, viewer);
+      for (const cardId of offered(s, viewer)) {
+        const played = reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS });
+        expect(played.ok, `${viewer} was offered ${cardId} and could not play it`).toBe(true);
+        if (!played.ok) continue;
+        // The card under response has to be SETTLED before "did playing this freeze its
+        // player" is a question with an answer: a staged effect list raises no decision
+        // until the window closes. See `closeWindow`.
+        const settled = closeWindow(played.state);
+        const after = offered(played.state, viewer);
+        const afterSettled = offered(settled, viewer);
+        const hand = handOf(played.state, viewer);
 
-      // 1. the named claim.
-      expect(after, 'the played card is still on offer').not.toContain(cardId);
-      expect(hand, 'the card is still in the hand the projection is built from').not.toContain(cardId);
-      // 2. no stale entry. A projection built from an earlier state would fail here.
-      for (const id of after) {
-        expect(hand, `${id} is on offer to ${viewer} but is not in their hand — the list is stale`).toContain(id);
+        // 1. the named claim.
+        expect(after, 'the played card is still on offer').not.toContain(cardId);
+        expect(hand, 'the card is still in the hand the projection is built from').not.toContain(cardId);
+        // 2. no stale entry. A projection built from an earlier state would fail here.
+        for (const id of after) {
+          expect(hand, `${id} is on offer to ${viewer} but is not in their hand — the list is stale`).toContain(id);
+        }
+        // 3. the freeze, asserted rather than stepped around.
+        const owes = settled.choices.some((c) => c.player === viewer);
+        if (owes) {
+          expect(afterSettled, `${viewer} owes a decision but is still offered cards`).toEqual([]);
+          froze += 1;
+          if (froze >= 2) break outer;
+        }
+        exercised += 1;
       }
-      // 3. the freeze, asserted rather than stepped around.
-      const owes = played.state.choices.some((c) => c.player === viewer);
-      if (owes) {
-        expect(after, `${viewer} owes a decision but is still offered cards`).toEqual([]);
-        froze += 1;
-      }
-      exercised += 1;
-      if (exercised >= 6) break;
     }
     expect(exercised, 'no card was ever actually played').toBeGreaterThanOrEqual(2);
     // At least one of the walks must have gone through the freeze branch, or the

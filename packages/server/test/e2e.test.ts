@@ -46,7 +46,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { TestClient, advance, digest, startHarness, type Harness } from './fixtures.ts';
-import { discardKeepingReserve, nextAction, targetZone } from './driver.ts';
+import { discardKeepingReserve, driverPly, targetZone } from './driver.ts';
 import type { ClientState } from '@shasn/engine';
 
 let h: Harness;
@@ -187,28 +187,34 @@ describe('a 2-player game runs to completion over a real socket', () => {
     const room = h.server.hub.rooms.get(matchId);
     if (room === undefined) throw new Error('no room');
 
-    let actions = 0;
+let actions = 0;
     for (let step = 0; step < 4000; step += 1) {
       const s = room.state;
       if (s.finished) break;
-      const seat = seats.find((x) => x.playerId === s.activePlayer) ?? seats[0];
+      // WHICH SEAT ACTS, AND WHAT — see `driverPly`. This loop used to ask only
+      // `s.activePlayer`, which cannot survive a response window: the seat the table is
+      // waiting on is not the active player, and shipping BLOCK and DEFLECT put windows
+      // into real games (measured: 4 of 120 two- and three-seat runs opened one, because
+      // `draw-conspiracy` puts Server Space's draw into a hand without anybody buying).
+      // `driverPly` also considers the endgame squeeze, which this loop lacked — 6 of 120
+      // runs ground to the action budget at 8 of 9 majorities before it.
+      const ply = driverPly(s);
+      const seat = seats.find((x) => x.playerId === ply.seat);
       // The view the SEAT would be sent, not a client's cached copy: two sockets are
       // never updated at the same instant, so a driver that reads each client's last
-      // message occasionally acts on a state one ply stale and is refused with "not
-      // your turn" — a race in the harness that has nothing to do with the server.
+      // message occasionally acts on a state one ply stale and is refused with "not your
+      // turn" — a race in the harness that has nothing to do with the server.
       // The transport is still fully exercised, because the action goes out over a
       // real socket and the assertions read what the CLIENTS were actually sent.
-      const view: ClientState = room.viewFor(s.activePlayer).state;
       // The driver is handed NOTHING beyond the seat's own projection, which is the
       // discipline: the pending card id is a server-only field, and a winnability
       // driver that reads it is not simulating what a client can do. See `answerSide`
       // in ./driver.ts.
-      const action = nextAction(view, s.activePlayer);
-      if (action === null || seat === undefined) {
+      const action = ply.action;
+      if (seat === undefined) {
         throw new Error(
-          `no legal action for ${s.activePlayer} in phase ${s.phase} — ` +
-            `choices=${JSON.stringify(s.choices.map((c) => `${c.player}:${c.choice.kind}`))} ` +
-            `pool=${JSON.stringify(s.players[s.activePlayer]?.resources)}`,
+          `no seat for ${ply.seat} — choices=${JSON.stringify(s.choices.map((c) => `${c.player}:${c.choice.kind}`))} ` +
+            `window=${s.interrupt?.id ?? 'none'} pool=${JSON.stringify(s.players[ply.seat]?.resources)}`,
         );
       }
 
@@ -221,10 +227,10 @@ describe('a 2-player game runs to completion over a real socket', () => {
       const refused = seat.client.all('error').slice(errorsBefore)[0];
       if (refused !== undefined) {
         throw new Error(
-          `server refused a scripted legal action (${action.type} for ${s.activePlayer} in ${s.phase}): ${refused.message}\n` +
+          `server refused a scripted legal action (${action.type} for ${ply.seat} in ${s.phase}): ${refused.message}\n` +
             `  room.state.choices = ${JSON.stringify(s.choices.map((c) => `${c.id}:${c.player}:${c.choice.kind}`))}\n` +
-            `  view.choices       = ${JSON.stringify(view.choices.map((c) => `${c.id}:${c.player}:${c.choice.kind}`))}\n` +
-            `  pool               = ${JSON.stringify(s.players[s.activePlayer]?.resources)}`,
+            `  view.choices       = ${JSON.stringify(ply.view.choices.map((c) => `${c.id}:${c.player}:${c.choice.kind}`))}\n` +
+            `  pool               = ${JSON.stringify(s.players[ply.seat]?.resources)}`,
         );
       }
     }

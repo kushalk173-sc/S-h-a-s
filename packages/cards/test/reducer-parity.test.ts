@@ -370,15 +370,36 @@ describe('no shipped card uses an effect the reducer cannot execute', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('and no card of any kind carries a reserved duration / timing / interrupt', () => {
+  it('and no card of any kind carries a reserved duration / timing / UNEXECUTED interrupt', () => {
     // Previously scoped to the X-cards only. Ideology and Voter Cards have no such
     // field in the schema today, so this cannot fail yet -- which is exactly why it
     // belongs here: it is the assertion that stops it starting.
+    //
+    // `interrupt` is the ONE field on this list that is now legal, and only for the two
+    // ops `reduce()` performs: `block` and `deflect` went from inert to executed with
+    // G13's phase machine, and BLOCK and DEFLECT ship as `ct-et2040-014` /
+    // `ct-et2040-015`. So the ban is narrowed rather than lifted, and the two card ids are
+    // PINNED: a third card carrying an interrupt, or one of these two carrying a different
+    // op, is a change somebody has to make on purpose and say so here. `duration`,
+    // `timing` and `auction` / `vote` / `pass-card` remain refused, and
+    // `unexecutedCardProblems` above is what says so over every card rather than over
+    // this list.
+    const executed: string[] = [];
     for (const card of allCards) {
       expect((card as { duration?: string }).duration ?? 'this-turn', `${card.id} duration`).toBe('this-turn');
       expect('timing' in card, `${card.id} timing`).toBe(false);
-      expect('interrupt' in card, `${card.id} interrupt`).toBe(false);
+      if (!('interrupt' in card)) continue;
+      const op = (card as { readonly interrupt?: { readonly op?: string } }).interrupt?.op;
+      if (op === 'block' || op === 'deflect') {
+        executed.push(card.id);
+        continue;
+      }
+      expect(`interrupt op ${String(op)} on ${card.id}`, 'only block and deflect are executed').toBe(false);
     }
+    expect(
+      executed.sort(),
+      'the set of shipped cards carrying an executed interrupt is not the two that ship',
+    ).toEqual(['ct-et2040-014', 'ct-et2040-015']);
   });
 
   it('the CI gate agrees with the test, over the same 118 cards', () => {

@@ -747,6 +747,106 @@ export function shouldSqueeze(view: ClientState, me: PlayerID): boolean {
   return true;
 }
 
+/**
+ * THE PLY: which seat acts next, and what it does — for a driver that sends ONE action
+ * at a time over a socket.
+ *
+ * `playInProcess` below cannot use this, because it also tallies windows and choice
+ * kinds. The two socket drivers (`e2e.test.ts`, `winnable.test.ts`) are the ones that
+ * need it, and they were the two that could not survive a window: each drove
+ * `state.activePlayer` unconditionally, so a window whose seat on the hook was somebody
+ * else left `nextAction` returning `null` and the run died on "no legal action". That is
+ * what shipping BLOCK and DEFLECT exposed, measured over 60 seeds at 2 and 3 seats: 4 of
+ * 120 runs opened a window and could not act in it. A seat reaches a reactive card
+ * without buying one — `draw-conspiracy` puts Server Space's draw straight into a hand —
+ * so this is roughly a 3% event per game, not a corner case.
+ *
+ * So the dispatch is here, in ONE place, in the same order `playInProcess` uses:
+ *
+ *  1. **an open decision, whoever owns it.** A frozen player cannot play and `reduce`
+ *     refuses everything else for them, so this outranks turn order — and it outranks the
+ *     window because `RESOLVE_CHOICE` is legal throughout a window, which is exactly what
+ *     lets a p12-frozen player thaw instead of becoming a hostage.
+ *  2. **an open response window**, for the ONE seat the table is waiting on.
+ *  3. **the active player's own move**, with the endgame squeeze considered first.
+ *
+ * Read through `playerView` for every seat it picks, so a decision made here is one that
+ * seat could have made — and so the answer to a window is derived from the projection,
+ * which is the only place a client could get it from. No hand, and therefore no peek:
+ * step 2 passes no `SeatKnowledge`, so the driver declines, which is what a real client
+ * does.
+ *
+ * Throws rather than returning null. A driver that returns "I have nothing" for a seat
+ * that IS on move is a driver bug, and every caller turns null into a skip; the
+ * diagnostic names the phase, the window and the open decisions so the failure says which
+ * of the three arms went wrong.
+ */
+export type DriverPly = { readonly seat: PlayerID; readonly view: ClientState; readonly action: Action };
+
+export function driverPly(state: GameState): DriverPly {
+  const choice = state.choices[0];
+  const window = state.interrupt;
+
+  let seat: PlayerID | null;
+  if (choice !== undefined) seat = choice.player;
+  else if (window === null) seat = state.activePlayer;
+  else seat = windowResponder(playerView(state, state.activePlayer));
+
+  if (seat === null || seat === undefined) {
+    throw new Error(
+      `window ${window?.id ?? 'none'} is open but no seat owes a response — ` +
+        `turnOrder ${JSON.stringify(state.turnOrder)} passed ${JSON.stringify(window?.passed ?? [])}`,
+    );
+  }
+
+  const view = playerView(state, seat);
+  const arm: 'choice' | 'window' | 'turn' = choice !== undefined ? 'choice' : window !== null ? 'window' : 'turn';
+  // The squeeze is the TURN arm only. In the other two the seat is not free to buy
+  // anything — it owes a decision or a decline — and buying there is refused with
+  // 'resolve "Resource cap" first' or '"<card>" is resolving'. Measured: a squeeze that
+  // ignored that stalled 35 of 120 runs, every one of them on the cap refusal.
+  const action =
+    arm === 'turn' ? squeezeBuy(view, seat) ?? nextAction(view, seat) : nextAction(view, seat);
+  if (action === null) {
+    throw new Error(
+      `no legal action for ${seat} on the ${arm} arm in phase ${state.phase} — ` +
+        `choices=${JSON.stringify(state.choices.map((c) => `${c.player}:${c.choice.kind}`))} ` +
+        `window=${window?.id ?? 'none'} pool=${JSON.stringify(view.players[seat]?.resources)}`,
+    );
+  }
+  return { seat, view, action };
+}
+
+/**
+ * The endgame squeeze, for a driver that drives ONE seat at a time.
+ *
+ * `playInProcess` has this as step 3 of its own loop; the socket drivers reach the same
+ * decision through `driverPly`. They had no squeeze at all, and the cost was measured
+ * rather than argued: over 60 seeds at 2 and 3 seats on the deck WITHOUT the reactive
+ * cards, 6 of 120 runs ground to the 4000-action budget at 8 of 9 majorities with every
+ * seat on `{funds 0, clout 0, media 12, trust 0}` — a Mat nobody can place on, which
+ * p20's board-full ending can never resolve because the last free areas cannot be filled.
+ * That is the same livelock `shouldSqueeze`'s own note records for 2 players seed 18, and
+ * it predates this work.
+ *
+ * `null` means "do not squeeze": either the ordinary driver has a purchase worth making,
+ * or there is nothing affordable on the Mat at all. The caller sends the buy and lets its
+ * NEXT ply place the voters, because `nextAction` places a pending group before it buys
+ * anything — so no second action is needed in the same ply, and the socket drivers do not
+ * have to reimplement placement.
+ */
+function squeezeBuy(view: ClientState, me: PlayerID): { readonly type: 'INFLUENCE'; readonly slot: number } | null {
+  if (view.phase !== 'actions') return null;
+  if (!shouldSqueeze(view, me)) return null;
+  const pool = view.players[me]?.resources;
+  if (pool === undefined) return null;
+  const affordable = view.market
+    .map((slot, i) => ({ slot, i }))
+    .filter(({ slot }) => POOLS.every((r) => (pool[r] ?? 0) >= (slot.cost[r] ?? 0)))
+    .sort((a, b) => value(a.slot) - value(b.slot))[0];
+  return affordable === undefined ? null : { type: 'INFLUENCE', slot: affordable.i };
+}
+
 // ─────────────────────────── the in-process runner ───────────────────────────
 
 /**

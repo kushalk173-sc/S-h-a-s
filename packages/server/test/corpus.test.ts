@@ -55,7 +55,7 @@ import { freshShippedCorpus, majoritiesOn, pegsOn, playInProcess } from './drive
 const SHIPPED = {
   ideology: 52, // 20 (et2040) + 32 (in2020). ONE PER TURN. This is the cliff.
   voter: 18,
-  conspiracy: 24, // 22 + JUMLA + HOLO SAPIENS (G20).
+  conspiracy: 26, // 22 + JUMLA + HOLO SAPIENS (G20) + BLOCK + DEFLECT (G13d).
   headline: 26,
 } as const;
 
