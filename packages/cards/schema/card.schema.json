@@ -488,6 +488,22 @@
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
           }
+        },
+        {
+          "$comment": "G20. `move-card` is the only op that changes WHICH Ideology Card exists rather than what a player may do with one, so both its enums are rulings and not formatting.\n\n`from` has exactly one value, 'draw', and the reason it is not 'discard' is the whole security content of the op. The top of the Ideology DISCARD pile is the most recently ANSWERED card — ANSWER is the only thing that puts one there — and p13 makes an answered card face up under its owner's mat. Moving a discard-pile card into a player's hand would not restore the blind answer, it would publish it: the whole table would already know the question and the answer the holder is about to commit to. A card in the DRAW pile has never been answered, so nothing about it is public.\n\nThat choice also closes a leak for free. A hand is drained at the turn boundary INSTEAD OF a draw, so a card entering a hand must have left the draw pile already, for the deck to fall by exactly one per turn. Off the discard it would fall by one on the turn a card moved in and by none on the turn it was dealt — a discontinuity an observer could time, disclosing that a transfer had happened. Off the draw the count is monotonic and there is nothing to read.\n\n`to` has two values and no third. A moved Ideology Card is HELD AND HIDDEN from every viewer INCLUDING its holder (see PRIVATE_PLAYER_KEYS and the ruling on PlayerState.ideologyCards in packages/engine/src/state.ts), or it leaves the game. A 'manifesto' or 'pending' destination would put a public card in the hidden zone, and neither is expressible. 'destroy' emits no LogEntry and no GameEvent, because a line announcing that a card with two unrevealed answers left the world is itself a disclosure.\n\nThe same source is HONEST for Conspiracy Cards and a LEAK for Ideology Cards: a Conspiracy Card is bought and held, never answered face up, so `draw-conspiracy`'s `from: 'discard'` discloses nothing. The difference is entirely p13.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n", "from", "to"],
+          "properties": {
+            "op": { "const": "move-card" },
+            "from": { "const": "draw" },
+            "to": { "enum": ["hand", "destroy"] },
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
+          }
         }
       ]
     },

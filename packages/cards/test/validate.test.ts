@@ -249,6 +249,7 @@ describe('schema: the effect union', () => {
       'refresh-market': { op: 'refresh-market' },
       restrict: { op: 'restrict', kind: 'surcharge', value: 1, target: 'each-opponent', until: 'rest-of-game' },
       discount: { op: 'discount', n: 1 },
+      'move-card': { op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'you' },
     };
     for (const op of EFFECT_OP_SET) {
       expect(validateEffect(FILE, samples[op], EFFECT_OP_SET), op).toEqual([]);

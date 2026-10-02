@@ -70,6 +70,13 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   'refresh-market': [],
   restrict: ['kind', 'value', 'owed', 'target'],
   discount: ['n', 'target'],
+  /**
+   * G20. Every field is listed, including the ones that are a single allowed value,
+   * and that is the point: `from` is a fixed union rather than a pile name precisely
+   * so the list can be exhaustive. A `from: 'discard'` here would be a card moving a
+   * card whose answer p13 has already made public under somebody's mat.
+   */
+  'move-card': ['from', 'to', 'n', 'target'],
 };
 
 

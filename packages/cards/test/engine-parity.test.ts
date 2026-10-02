@@ -82,6 +82,14 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
         case 'restrict':
           expect(effect.kind).toBeDefined();
           break;
+        case 'move-card':
+          // G20. The two fields whose VALUES are the ruling, so they are checked as
+          // values and not merely as present: `from` must never be 'discard' (a
+          // discarded Ideology Card has been answered, and p13 makes that public), and
+          // `to` must be one of the two things the ruling allows a card to become.
+          expect(effect.from).toBe('draw');
+          expect(['hand', 'destroy']).toContain(effect.to);
+          break;
         default: {
           const never: never = effect;
           throw new Error(`unhandled Effect variant: ${JSON.stringify(never)}`);
