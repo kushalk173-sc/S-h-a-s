@@ -396,36 +396,49 @@ export type Effect = (
    *    either public field would be a p13 violation and would move the Ideologue
    *    power ladder (p28-33) for a card nobody answered.
    *
-   * ## `from: 'discard'` IS AN ADAPTATION, AND IT IS THE HONEST ONE
+   * ## `from: 'draw'` — AND WHY IT IS NOT `from: 'discard'`, which is the whole point
    *
-   * A card has to come from SOMEWHERE, and the world holds a fixed number of
-   * Ideology Cards. The discard pile is the only source that conserves the count: a
-   * card taken from it is a real card with an unknown answer that re-enters play and
-   * is put to a real player, and the engine's own R10 ruling already recycles that
-   * pile as the deck's backstop. It is NOT in the physical game - reaching into a
-   * discard pile is not a Shasn move - and the one card that ships on it (JUMLA)
-   * says so in its own text.
+   * **A card taken off the Ideology DISCARD pile is a card whose answer is already
+   * public.** p13 makes an answered card face up under its owner's mat, and the top of
+   * the Ideology discard is by construction the most recently ANSWERED card: `ANSWER`
+   * is the only thing that puts one there. Handing that card to a player blind does not
+   * restore the blind answer, it announces it - the whole table already knows the
+   * question and the answer the holder is about to commit to. This is the same
+   * argument as the `to: 'manifesto'` refusal, running in the other direction: the
+   * rulebook draws its line at ANSWERED, and a discard-pile card is on the public side
+   * of it. `card-transfer.test.ts` pins this by asserting that no card ever in a hand
+   * is in anybody's `manifestoCards`, and by running a whole played game and failing
+   * if any `xfer-` id reaches a log line.
    *
-   * `from: 'draw'` is refused for the same reason `draw-conspiracy` takes `from` as
-   * a fixed union rather than a pile name: taking from the LIVE deck mid-turn is
-   * G17, and the answer-phase invariant (p21, one Ideology Card and one answer per
-   * turn) is worth more than the card.
+   * The first draft of this op took `from: 'discard'`, and the game-loop test caught it
+   * on its first run - the card it had just moved was the one the caster had answered
+   * that same turn. The engine was right and the op was wrong, which is the only
+   * acceptable way for that to go round.
    *
-   * ## `to: 'destroy'` LEAKS NOTHING, AND THAT IS THE WHOLE OF ITS CONTRACT
+   * `from: 'draw'` is honest because a card in the draw pile has never been answered,
+   * so there is nothing public about it. It is also an ADAPTATION and not in the
+   * physical game - reaching into the draw pile is not a Shasn move - and the one card
+   * that ships on it (JUMLA) says so in its own text.
    *
-   * A destroyed card emits no `GameEvent` and no `LogEntry`, and no event text -
-   * the ids of both its sides must be unguessable from the payload. That is the same
-   * class of leak as an engine error string interpolating a card id, which
-   * `playerView.test.ts` already tests for.
+   * **AND IT CLOSES THE DECK-COUNT SIGNAL, which the discard version could not.** A
+   * hand is drained at the turn boundary INSTEAD OF a draw, so a card that entered a
+   * hand must have left the draw pile already for the deck to fall by exactly one per
+   * turn. Off the discard, the deck would fall by one on the turn a card moved in and
+   * by NONE on the turn it was dealt - a discontinuity an observer could time, which
+   * would tell every viewer that a transfer had happened and roughly when. Off the
+   * draw, the count is monotonic and drops by exactly one per turn forever, so there is
+   * no signal to read. The design choice and the security property are the same
+   * decision, and that is rare enough to be worth saying out loud.
    *
-   * It leaves the game ENTIRELY rather than going to a pile, because a discard pile
-   * is reachable: `draw-conspiracy`'s `from: 'discard'` reads it. "Destroyed" and "on
-   * the discard pile" cannot be the same state without the distinction being a lie.
+   * The asymmetry with `draw-conspiracy`'s `from: 'discard'` is real and deliberate:
+   * a Conspiracy Card is bought and held, never answered face up, so recycling one out
+   * of ITS discard pile discloses nothing. The same source is honest for one deck and a
+   * leak for the other, and the difference is entirely p13.
    */
   | {
       readonly op: 'move-card';
-      /** The top of the Ideology discard pile - the most recently answered card. */
-      readonly from: 'discard';
+      /** The top of the Ideology draw pile - a card that has never been answered. */
+      readonly from: 'draw';
       readonly to: 'hand' | 'destroy';
       readonly n: Count;
       /**

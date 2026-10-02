@@ -928,53 +928,61 @@ function applyEffect(
     case 'move-card': {
       // G20. The whole of the contract is on `Effect`'s `move-card` arm in cards.ts
       // and on `PlayerState.ideologyCards` in state.ts; what is left here is the
-      // three things that arm asks this function to guarantee, and each is a branch
-      // rather than a comment because a comment does not fail a test.
+      // things that arm asks this function to guarantee, and each is a branch rather
+      // than a comment because a comment does not fail a test.
       //
       // SILENT, ON PURPOSE. There is no `log(...)` and no `GameEvent` on either path,
       // and that is not an oversight the log line is merely forgotten in. A destroyed
-      // card must leak nothing about its SIDES, and a card moved into a hand must
-      // leak nothing about the hand — and `LogEntry` is a client-visible string
-      // (playerView copies `state.log` wholesale) and `GameEvent` is the wire. A line
-      // reading "a card was destroyed" is itself a leak: it tells every viewer that a
-      // card with two unrevealed answers just left the world, which is information
-      // about a hidden card that the game has no reason to publish. `card-transfer.
-      // test.ts` scans the whole payload for both ids and for both sides' payouts.
+      // card must leak nothing about its SIDES, and a card moved into a hand must leak
+      // nothing about the hand — and `LogEntry` is a client-visible string (playerView
+      // copies `state.log` wholesale) and `GameEvent` is the wire. A line reading "a
+      // card was destroyed" is itself a leak: it tells every viewer that a card with two
+      // unrevealed answers just left the world, which is information about a hidden card
+      // that the game has no reason to publish. `card-transfer.test.ts` scans the whole
+      // payload for both ids and for both sides' payouts.
       //
-      // The card being PLAYED is a different matter and is logged by the caller
-      // (`playCard`), which logs the source card the player chose to reveal. That is
-      // public by construction: you played it.
+      // The card being PLAYED is a different matter and is logged by the caller, which
+      // logs the source card the player chose to reveal. That is public by construction:
+      // you played it.
       const n = resolveCount(s, source, effect.n, ctx);
       if (n <= 0) return s;
-      // `from: 'discard'` is the only source the type allows, so this is not a
-      // runtime check so much as the narrowing that lets the loop below be honest.
-      const pile = s[DISCARD['ideology']];
-      if (pile.length === 0) return s;
+      // `from: 'draw'` is the only source the type allows, and it is the only honest
+      // one: a card in the Ideology DISCARD pile has been ANSWERED, which p13 makes
+      // face up under its owner's mat, so handing one to a player blind would publish
+      // the answer they are about to give. See the `move-card` arm in cards.ts, which
+      // is the long version of why, and which also explains why the drain in
+      // `advanceTurn` taking a card INSTEAD OF a draw is what makes the deck count fall
+      // by exactly one per turn.
+      if (effect.from === 'draw' && s._ideologyDraw.length === 0) return s;
 
+      // "The top of the draw pile" is the end `draw()` takes from — `pile[0]` — and not
+      // the end `discardTo` pushes onto. Using the other end would be a second,
+      // invisible definition of "top" in the same file, and a card the engine calls top
+      // in one function and not in the other is a card a replay cannot reproduce.
       if (effect.to === 'destroy') {
-        // Off the top, and NOT through `discardTo` - which would put it straight back
-        // on the pile this branch just read it from, and a "destroy" that recycles is
-        // not a destroy. This is the only write in the engine that SHRINKS the total
-        // number of Ideology Cards in the world, which is exactly what makes the
-        // conservation argument in the `move-card` doc comment true for every other
-        // path.
-        s = { ...s, [DISCARD['ideology']]: pile.slice(0, -Math.min(n, pile.length)) };
-        return s;
+        // Straight off the top, and NOT through `discardTo` — which would put it
+        // straight back on a pile, and a "destroy" that recycles is not a destroy. This
+        // is the only write in the engine that SHRINKS the total number of Ideology
+        // Cards in the world, which is what makes the conservation argument above
+        // true for every other path.
+        const take = Math.min(n, s._ideologyDraw.length);
+        if (take <= 0) return s;
+        return { ...s, _ideologyDraw: s._ideologyDraw.slice(take) };
       }
 
       for (const p of resolveTargets(s, source, target)) {
         const player = s.players[p];
         if (!player) continue;
         for (let i = 0; i < n; i += 1) {
-          const current = s[DISCARD['ideology']];
-          const id = current[current.length - 1];
+          const pile = s._ideologyDraw;
+          const id = pile[0];
           if (id === undefined) break;
           // The cap is checked BEFORE the card leaves the pile, so a refused move
-          // leaves the world exactly as it was. A partially-applied `n` is fine and
-          // correct: the pile is the shared resource and two `to: 'hand'` effects on
-          // one resolution compete for it.
+          // leaves the world exactly as it was. A partially-applied `n` is correct and
+          // not a bug: the draw pile is a shared resource and two `to: 'hand'` effects
+          // in one resolution compete for it.
           if (ideologyHandOf(player).length >= IDEOLOGY_HAND_MAX) break;
-          s = { ...s, [DISCARD['ideology']]: current.slice(0, -1) };
+          s = { ...s, _ideologyDraw: pile.slice(1) };
           s = withPlayer(s, p, { ideologyCards: [...ideologyHandOf(player), id] });
         }
       }
