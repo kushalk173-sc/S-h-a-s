@@ -61,8 +61,8 @@ mechanisms rather than missing wording. So the eligibility was real and the exec
 still not complete, and the honest disposition of the whole recovered X-card corpus is
 unchanged:
 
-- **15** ship as `adapted`, each with the dropped clause named in its `source`.
-- **37** do not ship at all, each listed in §4 below with the gap that blocks it.
+- **16** ship as `adapted`, each with the dropped clause named in its `source`.
+- **36** do not ship at all, each listed in §4 below with the gap that blocks it.
 - **0** ship as `verbatim`.
 
 **What genuinely improved in this pass** is the Ideology deck, which is the deck players
@@ -178,7 +178,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 |---|---|---|---|---|
 | 1 | `hl-et2040-001` | New Face Who Dis | `adapted` | S4 / REF §4.3. Drops the Volatile-Area prohibition (G5) and the every-player targeting (G8) |
 | 2 | `hl-et2040-002` | Red Blooded | `adapted` | S4 / REF §4.3. Drops the per-voter scaling (G4) and the self-discard (G-new) |
-| 3 | `hl-et2040-003` | Ain't No Cure For Love | `adapted` | S4 / REF §4.3. Drops the OR-branch donate (G1) and the self-discard (G-new) |
+| 3 | `hl-et2040-003` | Ain't No Cure For Love | `adapted` | S4 / REF §4.3. The self-discard branch is now the PRINTED clause (`target: 'you'`; G-new is closed). Drops only the OR-branch donate (G1) |
 | 4 | `hl-et2040-004` | Quietly, The Ceiling Moved | `inferred` | original; REF §8.2 |
 | 5 | `hl-et2040-005` | The Second Reading | `inferred` | original; REF §8.2 |
 | 6 | `hl-et2040-006` | Long Winter, Short Ledger | `inferred` | original; REF §8.2 |
@@ -190,7 +190,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 12 | `hl-et2040-012` | Tide Warnings | `inferred` | original; REF §8.2. Deliberately does **not** restate JUST BREATHE (G16) |
 | 13 | `hl-et2040-013` | Three Day Weekend | `inferred` | original; REF §8.2 |
 | 14 | `hl-et2040-014` | The Policy Review | `inferred` | original; REF §8.2 |
-| 15 | `hl-et2040-015` | Silicon Rain | `inferred` | original; REF §8.2. Deliberately does **not** restate WHY THE LONG FACE (G14) |
+| 15 | `hl-et2040-015` | Movement Anxiety Disorder | `adapted` | S4 / REF §4.3. Ships the trigger (`when: on-gerrymander` + `movedMyVoter` + `until: next-turn`) and needs G-new to reach your own pegs. Drops the counter (G10) and the multi-turn block (G13). **Replaced** the `inferred` SILICON RAIN, whose own `source` said it refused to restate any recovered card |
 
 ### `in2020` / conspiracy — 10 cards
 
@@ -261,7 +261,7 @@ Every one is `inferred`. **There is no verbatim Voter Card to import** — see �
 ## 4. Disposition of every recovered card — the audit trail
 
 Nothing recovered is dropped silently. **52 distinct recovered cards** are accounted for
-below. 15 ship `adapted`; 37 do not ship, each with the reason.
+below. 16 ship `adapted`; 36 do not ship, each with the reason. (Net: one `inferred` placeholder RETIRED and one recovered card SHIPPED, so every deck SIZE is unchanged and `packages/server/test/corpus.test.ts` `SHIPPED.headline` still reads 26.)
 
 Counting note: REF §4 lists 56 card rows across its four tables. Four are duplicates by
 effect (REF §4.3: *"Deduplicate by effect, not by name"*) — SUBMERGED ≡ NEW FACE WHO DIS,
@@ -277,7 +277,7 @@ excluded.
 |---|---|---|
 | A Grave Inheritance | **ships** `adapted` as `ct-et2040-001` | G2 |
 | Block | **ships** `adapted` as `ct-et2040-014` | the reactive half only. G13 landed. Still dropped: the *"[OR] Discard an open Conspiracy Card or Headline Card"* branch (no op discards an open card), *"block a card stealing this card"* (G20 moves Ideology Cards only) and *"cleanse an already-active card"* (no op removes a `LiveEffect`, G9/G22). §1 tabulates all eight recovered clauses |
-| Cut, Copy, and Paste | not representable | G16 zone-scoped, G22 spans two turns, G-new convert-own |
+| Cut, Copy, and Paste | not representable | G16 zone-scoped, G22 spans two turns. (The convert-own clause is no longer blocked on G-new.) |
 | Deep Thoughts | not representable | no op borrows an opponent's Ideologue powers. **Not a G20 card** despite the row-9 table: move-card moves cards, not powers |
 | Deflect | **ships** `adapted` as `ct-et2040-015` | the reactive half only. G13 landed. Still dropped: *"only that partial effect is deflected"* — `applyEffect` computes one target per effect list, so the whole resolution is redirected (G20). And widened: `target: 'any-card'` rather than `card-affecting-you`, which resolves through an approximation (G1) |
 | Eradicating Germs | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
@@ -300,7 +300,7 @@ excluded.
 |---|---|---|
 | Chai-Paani | not representable | **the base effect was never recovered.** Only a re-application clause exists (*"a second card can be applied on the same player; the first gets deactivated"*), from a search snippet of S2. Shipping it would mean authoring the whole card under a recovered name |
 | Jumla | **ships** `adapted` as `ct-in2020-011` | G20 landed, so the card is a movable object and the first sentence executes. Still dropped: G15 (*"as many resources as the Ideologue level this card is on"* — a computed price the seller reads), G17 (*"of your choice"* — a choice over the pile's contents, which is a new `Choice` kind the client owns), G23 (re-filing under another Ideologue). See KNOWN-GAPS.md G20 |
-| Cult-ivating Obedience | not representable | protection of a specific majority; G-new convert-own. Recovered from S5, not from a player-aid. **Still not G20-only** now that G20 has landed: a protection is a PlayerState field, not an effect |
+| Cult-ivating Obedience | not representable | protection of a specific majority (a `PlayerState` field, not an effect). Recovered from S5, not from a player-aid. **Still not G20-only** now that G20 has landed: a protection is a PlayerState field, not an effect |
 
 ### 4.3 Names recovered without an effect — REF §4.2.2, from the S1 blurb
 
@@ -335,7 +335,7 @@ excluded.
 | card | disposition | blocking gap |
 |---|---|---|
 | 404 | not representable | G18 — swaps who answers which card |
-| Ain't No Cure For Love | **ships** `adapted` as `hl-et2040-003` | G1, G-new |
+| Ain't No Cure For Love | **ships** `adapted` as `hl-et2040-003` | G1 only (G-new closed) |
 | As Clear As Water | not representable | G17 + G18 (a REVEAL of a Conspiracy Card, and who reveals first). **Not G20-blocked** now |
 | Brave New Worlds | not representable | G18 — and it suppresses passive income |
 | Card Games | not representable | identical to A COWARD OR A JOURNALIST?, so identically blocked: G12 plus the `from: 'pending'` refusal. See that row |
@@ -347,7 +347,7 @@ excluded.
 | Higgs Moron | not representable | G10 (tokens on a card) + G12 (timed pass) |
 | Just Breathe | not representable | G16 — the zone is computed from board state |
 | Married With Bits | **ships** `adapted` as `hl-et2040-010` | G1 |
-| Movement Anxiety Disorder | not representable | G9 + G22 |
+| Movement Anxiety Disorder | **ships** `adapted` as `hl-et2040-015` (replacing the `inferred` SILICON RAIN) | G10 (the counter), G13 (multi-turn block). Both of its recorded gaps, G9 and G22, were already CLOSED when the playability probe wrote the row down |
 | New Face Who Dis | **ships** `adapted` as `hl-et2040-001` | G5, G8 |
 | Red Blooded | **ships** `adapted` as `hl-et2040-002` | G4, G-new |
 | Snoop B-O-Double-T | not representable | G9. Same card as PYTHONPOST |
@@ -414,9 +414,15 @@ against a control card that must come back NO-OP or the script exits 1.
    uses it — `hl-et2040-003` was written as a `discard-voter` — which is why this has
    never surfaced. It is in `reduce.ts`, not here.
 2. **REF §4.3 reads AIN'T NO CURE FOR LOVE as *"Discard 2 of your own voters"*, which
-   does not play** (G-new). What ships as `hl-et2040-003` is the **opponents'**
-   reading, which `discard-voter` with no target does perform. The card and its
-   printed text are two different cards, and the shipped text says so.
+   did not play** (G-new). What shipped as `hl-et2040-003` for three iterations was the
+   **opponents'** reading, with the `text` weakened to match — the card and its printed
+   text were two different cards. **G-new is now closed**: `voterScope` in `reduce.ts`
+   passes the RAW `target` field through instead of the value `applyEffect` defaulted it
+   to, so `discard-voter` with `target: 'you'` reaches the chooser's own pegs while a
+   card that says nothing still gets `'others'`. The card now ships the printed clause,
+   and the only dropped clause is the OR-branch donate (G1) — with that branch gone,
+   the printed *"if you are unable to do either, ignore this card"* fallback has nothing
+   to name and is not stated.
 
 ---
 

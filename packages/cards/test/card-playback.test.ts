@@ -25,7 +25,7 @@ import { RULES, type CardID, type CardIndex, type HeadlineCard, type IdeologyCar
 import { playerView } from '../../engine/src/playerView';
 import { reduce } from '../../engine/src/reduce';
 import { setup } from '../../engine/src/setup';
-import type { GameState } from '../../engine/src/state';
+import type { AreaID, GameState } from '../../engine/src/state';
 
 const corpus = loadCorpus();
 
@@ -396,10 +396,39 @@ describe('the three cards whose text was corrected', () => {
     }
   });
 
-  it("AIN'T NO CURE FOR LOVE says opponents, and the reducer agrees", () => {
+  it("AIN'T NO CURE FOR LOVE says OWN voters again, and the reducer agrees", () => {
+    // INVERTED by G-new. This card shipped for three iterations with its `text`
+    // weakened to the opponents' reading, because `resolveChoice` could not reach the
+    // chooser's own pegs. G-new closed that by passing the RAW `target` field to
+    // `voterScope`, so the printed clause is expressible and the card says it again.
+    // The assertion is behavioural, not textual: a `text` that claims own-voters and a
+    // reducer that refuses them is exactly the state-(b) lie this file exists to catch.
     const c = card('hl-et2040-003');
-    expect(c.text).toContain("opponents' voters");
-    expect(c.text).not.toContain('of your own voters');
+    expect(c.text).toContain('your OWN voters');
+    expect(c.effects).toEqual([{ op: 'discard-voter', n: 2, target: 'you' }]);
+
+    const seeded = game();
+    const mine = seeded.zones.flatMap((z) => z.areas).find((a) => !a.peg && !a.volatile);
+    if (mine === undefined) throw new Error('the board has no empty area');
+    const withOwnPeg: GameState = {
+      ...seeded,
+      zones: seeded.zones.map((z) => ({
+        ...z,
+        areas: z.areas.map((a) => (a.id === mine.id ? { ...a, peg: { owner: 'p1' as PlayerID, majority: false } } : a)),
+      })),
+    };
+    const played = play(withOwnPeg, c.id);
+    const choice = played.choices.find((x) => x.player === 'p1' && x.choice.kind === 'discard-voter');
+    expect(choice?.choice).toMatchObject({ scope: 'own' });
+    const struck = reduce(played, 'p1', {
+      type: 'RESOLVE_CHOICE',
+      choiceId: choice!.id,
+      pick: { kind: 'areas', areaIds: [mine.id] },
+    }, CTX);
+    expect(struck.ok).toBe(true);
+    if (struck.ok) {
+      expect(struck.state.zones.flatMap((z) => z.areas).find((a) => a.id === mine.id)?.peg).toBeNull();
+    }
   });
 
   it('ERADICATING GERMS now does the thing its name and REF describe', () => {
@@ -447,6 +476,99 @@ describe('G8 — gerrymander resolves its target, so "every player" is playable'
     expect(after.activePlayer).toBe('p2');
     expect(after.players.p1?.powerUses.gerrymandered['__bonus'] ?? 0).toBe(1);
     expect(after.players.p2?.powerUses.gerrymandered['__bonus'] ?? 0).toBe(0);
+  });
+});
+
+describe('MOVEMENT ANXIETY DISORDER — "the next voter you Gerrymander is discarded" (REF 4.3)', () => {
+  /**
+   * Answer whichever Ideology Card the incoming player was put.
+   *
+   * `resolveHeadline` with a one-deep queue drains into `advanceTurn`, so the state
+   * it returns is the NEXT player's `answer` phase and the gerrymander below would be
+   * refused with "answer your Ideology Card first". The side is arbitrary: no card
+   * under test reads an Ideology Card.
+   */
+  function answeredBy(s: GameState, who: PlayerID): GameState {
+    return must(reduce(s, who, { type: 'ANSWER', side: 0 }, CTX));
+  }
+
+  /**
+   * A position where p2 holds Gerrymanding Rights in a zone that also holds one of
+   * p1's voters, with somewhere empty to move it into.
+   *
+   * The rights holder needs TWO pegs (p17 refuses to move your only voter out of a
+   * zone whose rights you are using) and the moved peg is a THIRD slot, so the
+   * holder is strictly ahead — a tie gives nobody rights at all.
+   */
+  function p2RightsOverP1(s: GameState): { readonly state: GameState; readonly from: AreaID; readonly to: AreaID } {
+    const zone = s.zones.find((z) => z.areas.filter((a) => a.peg === null && !a.volatile).length >= 3);
+    if (!zone) throw new Error('no zone with three empty areas');
+    const free = zone.areas.filter((a) => a.peg === null && !a.volatile).map((a) => a.id);
+    const [a, b, c] = free as [AreaID, AreaID, AreaID];
+    const peg = (state: GameState, areaId: AreaID, owner: PlayerID): GameState => ({
+      ...state,
+      zones: state.zones.map((z) => ({
+        ...z,
+        areas: z.areas.map((x) => (x.id === areaId ? { ...x, peg: { owner, majority: false } } : x)),
+      })),
+    });
+    return { state: peg(peg(peg(s, a, 'p2'), b, 'p2'), c, 'p1'), from: c, to: free[3]! };
+  }
+
+  it('installs the hook the card says, with the owner\'s own voters as the only legal pick', () => {
+    // MOVEMENT ANXIETY DISORDER was recorded in KNOWN-GAPS as blocked on G9 and G22.
+    // Both had already been CLOSED by the live-effects substrate, which is why the
+    // playability probe's row for it was a measurement of the probe rather than of
+    // the engine. The card ships on the trigger; only the COUNTER ("the next 3") is
+    // dropped, and a counter is G10.
+    const after = resolveHeadline(game(), 'hl-et2040-015');
+    expect(after.liveEffects.map((le) => le.trigger)).toContain('on-gerrymander');
+    expect(after.liveEffects[0]?.condition).toEqual({ movedMyVoter: true });
+  });
+
+  it('and an opponent Gerrymanding the owner\'s voter raises exactly one discard for the owner', () => {
+    const installed = resolveHeadline(game(), 'hl-et2040-015');
+    const built = p2RightsOverP1(answeredBy(installed, 'p2'));
+    const moved = must(
+      reduce(built.state, 'p2', {
+        type: 'GERRYMANDER',
+        zoneId: installed.zones.find((z) => z.areas.some((x) => x.id === built.from))!.id,
+        fromAreaId: built.from,
+        toAreaId: built.to,
+      }, CTX),
+    );
+    // The hook fires for the OWNER, not for the player who moved the peg — that is
+    // the whole of `movedMyVoter`, and it is why the card reads as a tax on you
+    // rather than on whoever happens to be gerrymandering.
+    const owed = moved.choices.filter((x) => x.player === 'p1' && x.choice.kind === 'discard-voter');
+    expect(owed).toHaveLength(1);
+    expect(owed[0]?.choice).toMatchObject({ kind: 'discard-voter', count: 1, scope: 'own' });
+  });
+
+  it('and a legal pick always exists, so the hook can never be the thing that deadlocks a table', () => {
+    const installed = resolveHeadline(game(), 'hl-et2040-015');
+    const built = p2RightsOverP1(answeredBy(installed, 'p2'));
+    const moved = must(
+      reduce(built.state, 'p2', {
+        type: 'GERRYMANDER',
+        zoneId: installed.zones.find((z) => z.areas.some((x) => x.id === built.from))!.id,
+        fromAreaId: built.from,
+        toAreaId: built.to,
+      }, CTX),
+    );
+    const pending = moved.choices.find((x) => x.player === 'p1' && x.choice.kind === 'discard-voter');
+    if (!pending) throw new Error('the hook did not raise its discard');
+    const own = moved.zones.flatMap((z) => z.areas).filter((x) => x.peg?.owner === 'p1' && !x.volatile);
+    expect(own.length).toBeGreaterThan(0);
+    const resolved = must(
+      reduce(moved, 'p1', {
+        type: 'RESOLVE_CHOICE',
+        choiceId: pending.id,
+        pick: { kind: 'areas', areaIds: [own[0]!.id] },
+      }, CTX),
+    );
+    expect(resolved.choices).toHaveLength(0);
+    expect(resolved.zones.flatMap((z) => z.areas).filter((x) => x.peg?.owner === 'p1')).toHaveLength(0);
   });
 });
 

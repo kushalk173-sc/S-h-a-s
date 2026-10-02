@@ -20,11 +20,11 @@
     },
     {
       "id": "hl-et2040-003",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The first branch is represented; two things in it are dropped. (1) The real discard is '2 of YOUR OWN voters', and reduce.ts resolveChoice rejects any area the chooser owns, so `discard-voter` reaches opponents' voters only — `text` says so. (2) The OR-branch ('Donate 1 of your voters to the player on your left. If you are unable to do either, ignore this card') needs a DONATE op aimed at a seat-relative neighbour and a conditional over the whole effect — KNOWN-GAPS G1.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The FIRST BRANCH IS NOW THE PRINTED CLAUSE. It used to be weakened to '2 of your OPPONENTS' voters' because resolveChoice rejected any area the chooser owns; KNOWN-GAPS G-new recorded that as the fix, and G-new is now CLOSED (voterScope in reduce.ts passes the RAW target through). ONE CLAUSE REMAINS DROPPED: the OR-branch donate to the player on your left, which needs a DONATE op aimed at a seat-relative neighbour plus a conditional - G1.",
       "provenance": "adapted",
       "name": "Ain't No Cure For Love",
-      "text": "You strike 2 of your opponents' voters from the board, permanently. Voters in Volatile Areas cannot be struck, and your own voters cannot be.",
-      "effects": [{ "op": "discard-voter", "n": 2 }]
+      "text": "You strike 2 of your OWN voters from the board, permanently. Voters in Volatile Areas cannot be struck.",
+      "effects": [{ "op": "discard-voter", "n": 2, "target": "you" }]
     },
     {
       "id": "hl-et2040-004",
@@ -132,11 +132,20 @@
     },
     {
       "id": "hl-et2040-015",
-      "source": "original; register per REF 8.2. Refuses to restate any recovered card: WHY THE LONG FACE (REF 4.3) scales off the caster's own purchases, which is G14 and G22, and this deck does not ship a card that reads as a trigger it does not have.",
-      "provenance": "inferred",
-      "name": "Silicon Rain",
-      "text": "Take 3 resources of your choice from the Public Reserve. Then gain 1 voter.",
-      "effects": [{ "op": "gain-any", "n": 3 }, { "op": "voters", "n": 1 }]
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Movement Anxiety Disorder in full. This slot was `inferred` (SILICON RAIN), a placeholder that said it refused to restate any recovered card; SOURCES.md 4 replaces such a placeholder BY the recovered card once the engine can perform it. TWO CLAUSES ARE DROPPED: 'the next 3' ships as the next ONE, because ending 'when 3 have been discarded' is a COUNTER ON THE CARD (G10), not G9; and 'can be blocked at any turn' is a G13 multi-turn window. THE TRIGGER IS PERFORMED (G14 + G22). Reaching your OWN voter needs G-new, closed.",
+      "provenance": "adapted",
+      "name": "Movement Anxiety Disorder",
+      "text": "Before the end of your next turn, the next time one of your own voters is Gerrymandered, you must discard 1 voter of your own from the board. Voters in Volatile Areas cannot be discarded.",
+      "effects": [
+        {
+          "op": "discard-voter",
+          "n": 1,
+          "target": "you",
+          "when": "on-gerrymander",
+          "until": "next-turn",
+          "condition": { "movedMyVoter": true }
+        }
+      ]
     }
   ]
 }

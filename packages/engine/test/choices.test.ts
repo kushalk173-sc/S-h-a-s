@@ -690,6 +690,139 @@ describe('gain-any imposes no affordability, by design', () => {
   });
 });
 
+describe('G-new — a self-targeted discard reaches the chooser\'s OWN pegs', () => {
+  // Known-Gaps G-new, found by the honesty test rather than predicted by the gap
+  // analysis: `targetableCount` skipped the chooser's own pegs and `resolveChoice`
+  // rejected them, so *"Discard 2 of your own voters"* — which REF 4.3 records as
+  // AIN'T NO CURE FOR LOVE's first branch — was not expressible, and three shipped
+  // cards were telling the player one thing while doing another.
+  //
+  // THE FIX IS THE RAW `target` FIELD, and it is deliberately narrow. `applyEffect`
+  // defaults an absent `target` to `'you'`, so by the time the three voter cases ran
+  // their `raiseVoterDecision` an absent field and an explicit `target: 'you'` were
+  // the same value — and they are not the same card. RED BLOODED says *"You must
+  // discard any 2 voters"* and AIN'T NO CURE FOR LOVE says *"Discard 2 of your own
+  // voters"*; both land on `discard-voter`. Passing the raw field lets `voterScope`
+  // tell them apart without changing what any existing card does.
+  const DISCARD_OPPONENTS: ConspiracyCard = {
+    id: 'test-discard-opponents',
+    name: 'Test Discard (no target)',
+    text: "Discard 1 of your opponents' voters.",
+    cost: 1,
+    effects: [{ op: 'discard-voter', n: 1 }],
+  };
+  const DISCARD_OWN: ConspiracyCard = {
+    id: 'test-discard-own',
+    name: 'Test Discard (own)',
+    text: 'Discard 1 of your own voters.',
+    cost: 1,
+    effects: [{ op: 'discard-voter', n: 1, target: 'you' }],
+  };
+  const NEW_CARDS = [...Object.values(CARDS.conspiracy), DRAIN, DISCARD_OPPONENTS, DISCARD_OWN];
+  const newCtx: Ctx = {
+    rules: RULES,
+    cards: {
+      ...CARDS,
+      conspiracy: Object.fromEntries(NEW_CARDS.map((c) => [c.id, c])),
+    },
+  };
+
+  /** Two seats, one peg each, the active player's card in hand. */
+  function board(): { readonly s: GameState; readonly mine: string; readonly theirs: string } {
+    const base = fresh(1, ['p1', 'p2'], { startResources: [{}, {}] });
+    const answeredState = (() => {
+      const a = reduce(base, 'p1', { type: 'ANSWER', side: 0 }, newCtx);
+      if (!a.ok) throw new Error(`fixture could not answer: ${a.error}`);
+      return a.state;
+    })();
+    const zone = answeredState.zones[0]!;
+    const [mine, theirs] = zone.areas.slice(0, 2).map((a) => a.id);
+    const seeded: GameState = {
+      ...answeredState,
+      zones: answeredState.zones.map((z) =>
+        z.id === zone.id
+          ? {
+              ...z,
+              areas: z.areas.map((a) =>
+                a.id === mine
+                  ? { ...a, peg: { owner: 'p1' as PlayerID, majority: false } }
+                  : a.id === theirs
+                    ? { ...a, peg: { owner: 'p2' as PlayerID, majority: false } }
+                    : a,
+              ),
+            }
+          : z,
+      ),
+    };
+    return { s: seeded, mine: mine!, theirs: theirs! };
+  }
+
+  const held = (id: string, s: GameState): boolean =>
+    s.zones.flatMap((z) => z.areas).some((a) => a.id === id && a.peg?.owner === 'p2');
+
+  function playCard(s: GameState, cardId: string): GameState {
+    const withCard: GameState = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, conspiracies: [cardId] } },
+    };
+    const r = reduce(withCard, 'p1', { type: 'PLAY_CONSPIRACY', cardId }, newCtx);
+    if (!r.ok) throw new Error(`PLAY_CONSPIRACY refused: ${r.error}`);
+    return r.state;
+  }
+
+  it('with `target: \'you\'` the chooser may strike their own voter', () => {
+    const { s, mine } = board();
+    const after = playCard(s, DISCARD_OWN.id);
+    const pending = after.choices.find((c) => c.player === 'p1');
+    expect(pending?.choice).toMatchObject({ kind: 'discard-voter', count: 1, scope: 'own' });
+    const r = reduce(after, 'p1', { type: 'RESOLVE_CHOICE', choiceId: pending!.id, pick: { kind: 'areas', areaIds: [mine] } }, newCtx);
+    expect(r.ok).toBe(true);
+    expect(after.zones.flatMap((z) => z.areas).find((a) => a.id === mine)?.peg).not.toBeNull();
+  });
+
+  it('and with NO target the default is UNCHANGED: opponents only', () => {
+    // The regression half. Three shipped cards state the opponents' reading in their
+    // own `text`, and `others` is what they have always performed — so this is the
+    // assertion that keeps the fix from being a behaviour change in disguise.
+    const { s, mine } = board();
+    const after = playCard(s, DISCARD_OPPONENTS.id);
+    const pending = after.choices.find((c) => c.player === 'p1');
+    expect(pending?.choice).toMatchObject({ kind: 'discard-voter', count: 1, scope: 'others' });
+    expect(reduce(after, 'p1', { type: 'RESOLVE_CHOICE', choiceId: pending!.id, pick: { kind: 'areas', areaIds: [mine] } }, newCtx).ok).toBe(false);
+  });
+
+  it('and it is a DEADLOCK-FREE widening: a legal pick exists at every seat count', () => {
+    // The invariant that matters. A self-targeted `discard-voter` must never be the
+    // reason a player has no legal move, and the way that is guaranteed here is the
+    // same way it is for every other kind: the ask is clamped at RESOLUTION by
+    // `targetableCount`, so a player who has since lost their last own peg is asked
+    // for zero, not for one.
+    for (const seats of [['p1', 'p2'], ['p1', 'p2', 'p3'], ['p1', 'p2', 'p3', 'p4'], ['p1', 'p2', 'p3', 'p4', 'p5']] as const) {
+      const base = fresh(1, [...seats], { startResources: seats.map(() => ({})) });
+      const a = reduce(base, 'p1', { type: 'ANSWER', side: 0 }, newCtx);
+      expect(a.ok, `${seats.length} seats`).toBe(true);
+      if (!a.ok) continue;
+      const after = playCard(a.state, DISCARD_OWN.id);
+      const pending = after.choices.find((c) => c.player === 'p1');
+      expect(pending, `${seats.length} seats raised a decision`).toBeDefined();
+      const wanted = Math.min(1, after.zones.flatMap((z) => z.areas).filter((x) => x.peg?.owner === 'p1' && !x.volatile).length);
+      const mineAreas = after.zones.flatMap((z) => z.areas).filter((x) => x.peg?.owner === 'p1' && !x.volatile).slice(0, wanted).map((x) => x.id);
+      const r = reduce(after, 'p1', { type: 'RESOLVE_CHOICE', choiceId: pending!.id, pick: { kind: 'areas', areaIds: mineAreas } }, newCtx);
+      expect(r.ok, `${seats.length} seats could answer`).toBe(true);
+      if (r.ok) expect(r.state.choices).toHaveLength(0);
+    }
+  });
+
+  it('and the held helper sees p2 keep the voter when the pick was p2\'s', () => {
+    const { s, theirs } = board();
+    const after = playCard(s, DISCARD_OPPONENTS.id);
+    const pending = after.choices.find((c) => c.player === 'p1');
+    const r = reduce(after, 'p1', { type: 'RESOLVE_CHOICE', choiceId: pending!.id, pick: { kind: 'areas', areaIds: [theirs] } }, newCtx);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(held(theirs, r.state)).toBe(false);
+  });
+});
+
 describe('the small deck still deals a legal opening', () => {
   it('setup deals a card, and the opening position has a legal first move', () => {
     // A regression guard on the thing `winnable.test.ts` relies on: with a

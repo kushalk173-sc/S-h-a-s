@@ -138,7 +138,7 @@ const PROBES: readonly Probe[] = [
   // (G18). What the corpus ships as `hl-et2040-003` is the opponents' reading, which
   // `discard-voter` with no target already performs -- so that is probed here, and
   // the reading that does NOT work is recorded as the gap.
-  { name: "Ain't No Cure For Love", ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 2 }], gap: 'G-new/G1', note: 'the shipped opponents reading; the printed own-voters branch is G-new' },
+  { name: "Ain't No Cure For Love", ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 2, target: 'you' }], gap: 'G1', note: 'G-new is CLOSED, so the FIRST branch now ships the PRINTED clause: `target: "you"` reaches the chooser\'s own pegs (voterScope in reduce.ts passes the RAW target through, so an absent field still means opponents). DROPPED: the OR-branch, which needs a DONATE to a seat-relative neighbour plus a conditional over the whole effect \u2014 G1' },
   { name: 'As Clear As Water', ref: '4.3', kind: 'headline', reduction: null, gap: 'G17/G18/G20', note: 'reveal a hand, top up from the draw pile' },
   { name: 'Brave New Worlds', ref: '4.3', kind: 'headline', reduction: null, gap: 'G18', note: 'every player answers, suppressing income' },
   { name: 'Card Games', ref: '4.3', kind: 'headline', reduction: null, gap: 'G12/G20', note: 'same card as A COWARD OR A JOURNALIST?' },
@@ -150,7 +150,7 @@ const PROBES: readonly Probe[] = [
   { name: 'Higgs Moron', ref: '4.3', kind: 'headline', reduction: null, gap: 'G10/G12', note: 'tokens on a card, timed pass' },
   { name: 'Just Breathe', ref: '4.3', kind: 'headline', reduction: null, gap: 'G16', note: 'the zone is computed from board state' },
   { name: 'Married With Bits', ref: '4.3', kind: 'headline', reduction: [{ op: 'voters', n: 1, target: 'each-opponent' }], gap: 'G1', note: '2 opponents and the opt-out are dropped' },
-  { name: 'Movement Anxiety Disorder', ref: '4.3', kind: 'headline', reduction: null, gap: 'G9/G22', note: 'next 3 gerrymanders discard' },
+  { name: 'Movement Anxiety Disorder', ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 1, target: 'you', when: 'on-gerrymander', until: 'next-turn', condition: { movedMyVoter: true } }], gap: 'G9/G22', note: 'G9 AND G22 ARE BOTH CLOSED, and this probe row understated that: the hook needs nothing either of them did not already do. Dropped, and named: "the next 3" ships as the next ONE, and "the effect only ends when 3 voters have been discarded" is dropped for the owner\'s-next-turn lifetime, because a counter on a card is G10' },
   { name: 'New Face Who Dis', ref: '4.3', kind: 'headline', reduction: [{ op: 'gerrymander', n: 1, target: 'everyone' }], gap: 'G5/G9', note: 'the Volatile-Area ban is dropped; same card as SUBMERGED' },
   { name: 'Red Blooded', ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 1, target: 'each-opponent' }], gap: 'G4/G-new' },
   { name: 'Snoop B-O-Double-T', ref: '4.3', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'the same card as PYTHONPOST, per REF 4.3; not double-counted as two mechanisms' },

@@ -493,12 +493,25 @@ function raiseVoterDecision(
   source: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   n: Count,
-  target: EffectTarget,
+  /**
+   * The card's RAW `target` field — `undefined` when it wrote none.
+   *
+   * G-new, and the distinction is the whole of it. `applyEffect` computes one
+   * `target` for the whole effect list and defaults it to `'you'`, so by the time a
+   * case gets here an absent field and an explicit `target: 'you'` are the same
+   * value. They are NOT the same card: *"Discard 2 voters"* and *"Discard 2 of your
+   * OWN voters"* are both real recovered text (REF 4.3: AIN'T NO CURE FOR LOVE says
+   * the second, RED BLOODED says the first), both land on `discard-voter`, and before
+   * this change both reached opponents' voters only. Passing the raw field is what
+   * lets `voterScope` tell them apart.
+   */
+  named: EffectTarget | undefined,
   ctx: Ctx,
 ): GameState {
   let s = state;
+  const target = named ?? 'you';
   for (const p of resolveTargets(s, source, target)) {
-    const scope: ChoiceScope = p === source ? (kind === 'evict-voter' ? 'any' : 'others') : 'own';
+    const scope = voterScope(p, source, kind, named);
     s = pushChoice(
       s,
       { kind, count: resolveCount(s, p, n, ctx), scope, reason: 'Card effect' },
@@ -506,6 +519,34 @@ function raiseVoterDecision(
     );
   }
   return s;
+}
+
+/**
+ * Which pegs a voter decision may name. G-new, and each row is a shipped card.
+ *
+ *  - somebody the card NAMED answers about their own pegs — *"All your opponents
+ *    evict 1 voter"* (KHAKI TERROR's shape), and the victim of a theft picks the
+ *    denomination, so `own` is right for all three kinds.
+ *  - the caster evicting may reach anything: eviction said "any voter" before scopes
+ *    existed.
+ *  - the caster CONVERTING may not reach their own, because `resolveChoice` refuses
+ *    it — converting your own voter into your own voter is not a conversion, and
+ *    naming `target: 'you'` does not make it one.
+ *  - the caster DISCARDING reaches their OWN pegs when the card SAID `target: 'you'`
+ *    (G-new) and opponents' when it said nothing. The default is unchanged, and it
+ *    has to be: three shipped cards state the opponents' reading in their own text
+ *    and `others` is what they have always performed.
+ */
+function voterScope(
+  chooser: PlayerID,
+  source: PlayerID,
+  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  named: EffectTarget | undefined,
+): ChoiceScope {
+  if (chooser !== source) return 'own';
+  if (kind === 'evict-voter') return 'any';
+  if (kind === 'convert-voter') return 'others';
+  return named === 'you' ? 'own' : 'others';
 }
 
 /**
@@ -854,11 +895,13 @@ function applyEffect(
       return s;
     }
     case 'evict':
-      return raiseVoterDecision(s, source, 'evict-voter', effect.n, target, ctx);
+      return raiseVoterDecision(s, source, 'evict-voter', effect.n, effect.target, ctx);
     case 'discard-voter':
-      return raiseVoterDecision(s, source, 'discard-voter', effect.n, target, ctx);
+      // G-new: the RAW field, not the defaulted one, so `discard-voter` with an
+      // explicit `target: 'you'` can reach the caster's OWN pegs. See `voterScope`.
+      return raiseVoterDecision(s, source, 'discard-voter', effect.n, effect.target, ctx);
     case 'convert-voter':
-      return raiseVoterDecision(s, source, 'convert-voter', effect.n, target, ctx);
+      return raiseVoterDecision(s, source, 'convert-voter', effect.n, effect.target, ctx);
     case 'gerrymander': {
       // G8, closed on the REDUCER (KNOWN-GAPS.md G8). The bonus used to be credited
       // to `source` alone, which is why "starting with you, EVERY player can

@@ -756,15 +756,58 @@ would close it.
 
 ### G-new — `discard-voter` / `convert-voter` cannot reach your own voters
 
-**State: (c), found while writing the honesty test, not predicted by the gap
-analysis.** `targetableCount` skips the chooser's own pegs for both ops and
-`resolveChoice` rejects them, so *"discard 2 of your own voters"* — which RED BLOODED
-and AIN'T NO CURE FOR LOVE both say — is not expressible, and neither is any
-self-targeted discard or conversion. Three shipped cards were affected and their text
-is corrected.
+**State: (a). CLOSED — and the whole fix is passing the RAW `target` field down.**
 
-**Ask:** let the choice take the chooser's own pegs when the card targets `you`, which
-is a `target` on the two ops plus one condition in `resolveChoice`.
+`targetableCount` skipped the chooser's own pegs for both ops and `resolveChoice`
+rejected them, so *"Discard 2 of your own voters"* — which REF 4.3 records as AIN'T NO
+CURE FOR LOVE's first branch — was not expressible, and neither was any self-targeted
+discard. Three shipped cards were telling the player one thing and doing another and
+their `text` had been weakened to match.
+
+**The fix, and why it is one line.** `applyEffect` computes ONE `target` for the whole
+effect list and defaults it to `'you'`, so by the time the three voter cases called
+`raiseVoterDecision` an absent `target` field and an explicit `target: 'you'` were the
+same value. They are **not** the same card: RED BLOODED says *"You must discard any 2
+voters"* and AIN'T NO CURE FOR LOVE says *"Discard 2 of your own voters"*, both land on
+`discard-voter`. The three cases now pass `effect.target` — undefined when the card
+wrote none — and `voterScope` in `reduce.ts` is the table:
+
+| chooser | op | scope |
+|---|---|---|
+| a player the card NAMED | any of the three | `'own'` |
+| the caster | `evict` | `'any'` |
+| the caster | `convert-voter` | `'others'` — even with `target: 'you'`, because `resolveChoice` refuses a pick on the chooser's own peg, and converting your own voter into your own voter is not a conversion |
+| the caster | `discard-voter`, `target: 'you'` | **`'own'` — the new row** |
+| the caster | `discard-voter`, no `target` | `'others'` — **unchanged**, and it has to be |
+
+**No `GameState` or `PlayerState` field was added, so there is no visibility decision to
+make.** `ChoiceScope` already existed and already had a `'own'` member, so
+`packages/server/test/secret-inventory.ts` owes nothing and the client's own copy of the
+rule (`packages/client/src/app/derive.ts`) already handles `'own'` — this is why the
+answer was a scope VALUE and not a new field. `targetableCount` was already parameterised
+by `scope`, so the client's `targetableCount` and the engine's agree without either being
+edited.
+
+**Deadlock: the ask is clamped at resolution by `targetableCount`, so a player who has
+since lost their last own peg is asked for zero rather than for one.** Asserted at 2, 3,
+4 and 5 seats in `choices.test.ts`.
+
+**Card gained: MOVEMENT ANXIETY DISORDER** (`hl-et2040-016`, `adapted`) — the next
+voter you Gerrymander is discarded, hooked on `on-gerrymander` with `movedMyVoter`.
+**`npm run playable` 25 → 26 of 54, measured by playing.** Both of that card's recorded
+gaps (G9, G22) had already been CLOSED by the live-effects substrate, so the probe row
+was a measurement of the probe rather than of the engine; only the COUNTER (*"the next
+3"*) is dropped, and a counter that outlives its resolution is **G10**, not G9.
+
+**One card's text got MORE faithful, which is the part worth reading.** `hl-et2040-003`
+(AIN'T NO CURE FOR LOVE) now ships `target: 'you'` and its `text` says *"2 of your OWN
+voters"* — the printed clause — instead of the weakened opponents' reading. It is still
+`adapted`: the OR-branch (*"Donate 1 of your voters to the player on your left"*) is
+still G1, and with that branch gone the printed *"if you are unable to do either, ignore
+this card"* fallback has nothing to name.
+
+**Still blocked on this gap's larger sibling: CULT-IVATING OBEDIENCE** needs a *player's*
+card to become a ransomable object (G11/G20), not just a peg.
 
 ---
 

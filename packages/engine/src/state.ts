@@ -317,14 +317,18 @@ export type PlayerState = {
  * | who resolves it | scope | why |
  * |---|---|---|
  * | the caster, no `target` | `'others'` | the card did not say "your own"; the three shipped cards say "your opponents'" |
+ * | the caster, `target: 'you'`, `discard-voter` | `'own'` | *"Discard 2 of your OWN voters"* — AIN'T NO CURE FOR LOVE, REF 4.3. **G-new, and it is the raw field that makes it say so**: `applyEffect` defaults an absent `target` to `'you'`, so an absent field and an explicit one used to arrive here indistinguishable, and the card text had to be weakened to match |
  * | a player the card named | `'own'` | *"All your opponents evict 1 voter"* — they choose which of theirs, exactly as a victim of a theft picks the denomination |
  * | the caster, evicting | `'any'` | eviction already allowed any peg before this field existed, and `evict` is the one op whose real text says "any voter" |
  *
  * `'others'` is the default and it is deliberately unchanged from what `resolveChoice`
  * did before this type existed, so no shipped card's behaviour moves and the client's
  * own copy of this rule (`packages/client/src/app/derive.ts`) keeps agreeing with it.
- * `'own'` is reachable only by naming the victim with `target`, which is what makes
- * "discard 2 of your own voters" expressible at all.
+ * `'own'` is reachable by naming the victim with `target`, which is what makes
+ * "discard 2 of your own voters" expressible at all. `'own'` is NOT reachable for
+ * `convert-voter`, because `resolveChoice` refuses a pick on the chooser's own peg —
+ * converting your own voter into your own voter is not a conversion — and a `target`
+ * that says `'you'` does not make it one. See `voterScope` in `reduce.ts`.
  */
 export type ChoiceScope = 'any' | 'others' | 'own';
 
