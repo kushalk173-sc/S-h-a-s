@@ -50,6 +50,43 @@
  * gerrymanders. Those are separate rule surfaces with their own tests, and a driver
  * that reached for them would make a failure ambiguous: "the driver could not find
  * a legal move" and "the rules have no legal move" would look the same.
+ *
+ * G13 — THE RESPONSE WINDOW, and the one thing this driver CANNOT decide from its
+ * projection
+ *
+ * `reduce` freezes the whole table while `GameState.interrupt` is open, and the two
+ * actions it still accepts are `RESPOND_INTERRUPT` and `PASS_INTERRUPT`. So before
+ * G13 this driver did not merely play badly during a window, it had no legal move
+ * at all: `nextAction` returned `END_TURN` or `INFLUENCE`, the reducer answered
+ * `"<card>" is resolving - answer it or decline first`, and the run reported a
+ * stall. That is why BLOCK and DEFLECT were kept out of the shipped decks.
+ *
+ * What it CAN decide from a projection is who owes a response. `turnOrder` is
+ * public, `choices` is public, and `InterruptWindow.actor` / `passed` are public, so
+ * `requiredDecliners` and `responseOrder` below are transcriptions of the engine's
+ * own `mustRespond` with no private input at all.
+ *
+ * What it CANNOT decide is whether to ANSWER, and this is the interesting
+ * constraint rather than an inconvenience. `PRIVATE_PLAYER_KEYS` in
+ * `packages/engine/src/playerView.ts` is `['conspiracies']`, and `playerView`
+ * strips it for EVERY viewer including the owner — with a docstring saying that a
+ * `(pid === viewer)` branch there "is the R1 bug in a plausible-looking form". So a
+ * `ClientState` contains no Conspiracy Card id anywhere, for anybody, and a driver
+ * reading only the projection is structurally incapable of naming a BLOCK.
+ *
+ * So responding takes an EXPLICIT, OPTIONAL, SEAT-SCOPED input: `SeatKnowledge`,
+ * built by `ownKnowledge(state, me, cards)` and carrying nothing but the named
+ * seat's own hand plus the printed card bodies. A player at a physical table knows
+ * the cards in their own hand, so this is not information a person lacks; it is
+ * information a `ClientState` cannot carry. The distinction that matters and is
+ * asserted in `./interrupt-window.test.ts` is:
+ *
+ *  - `ownKnowledge` reads `state.players[me].conspiracies` and nothing else. There
+ *    is no parameter through which another seat's hand could be supplied, and no
+ *    default, so the re-introduction of the old peek has to be written on purpose.
+ *  - without `SeatKnowledge` the driver DECLINES, every time, and a table driven
+ *    that way still terminates (also asserted). That is the honest fallback: if the
+ *    driver cannot know, it declines, and it says so rather than guessing.
  */
 
 import {
@@ -58,10 +95,14 @@ import {
   reduce,
   setup,
   type Action,
+  type CardID,
+  type CardIndex,
   type ChoicePick,
   type ClientState,
+  type ConspiracyCard,
   type Ctx,
   type GameState,
+  type InterruptWindow,
   type PendingChoice,
   type PlayerID,
   type Resource,
@@ -301,6 +342,161 @@ export function targetZone(s: ClientState, me: PlayerID, need: number): string |
 }
 
 /**
+ * The seats the engine is waiting on: `turnOrder` minus the actor minus anybody
+ * frozen by a pending decision.
+ *
+ * A transcription of `mustRespond` in `reduce.ts`, and derived the same way — from
+ * the state, never from a stored list. Three things make it safe to transcribe
+ * rather than read off the window:
+ *
+ *  - `turnOrder` is public, so the ORDER is knowable. `InterruptWindow` has no
+ *    `responders` field (deliberately — see the type's docstring), so the driver
+ *    recomputes the same set the reducer computes.
+ *  - `choices` is public, so "somebody is frozen" is knowable, which is what stops
+ *    the driver demanding a decline from a player who cannot act at all.
+ *  - `actor` and `passed` are public for the reasons argued on `InterruptWindow`:
+ *    the actor played a card that is already face up, and a player who declines has
+ *    revealed nothing.
+ *
+ * So this function reads nothing private. If it ever needed to, the right response
+ * is a new argument, not a peek into the projection.
+ */
+export function requiredDecliners(view: ClientState, w: InterruptWindow): readonly PlayerID[] {
+  return view.turnOrder.filter((p) => p !== w.actor && !view.choices.some((c) => c.player === p));
+}
+
+/**
+ * The required seats in the order the table asks them: `turnOrder` cycled forward
+ * from the seat AFTER the actor.
+ *
+ * The engine does not store an order — `mustRespond` returns a set and
+ * `PASS_INTERRUPT` is accepted from anyone outstanding — so the driver has to pick
+ * one, and this is the pick a table would make: the player whose turn is next. It
+ * is a convention, stated here so it is visible rather than emergent, and it is why
+ * the sweep sees both outcomes: a seat holding a reactive card that is asked first
+ * answers, and one asked after a decline answers later or not at all.
+ */
+export function responseOrder(view: ClientState, w: InterruptWindow): readonly PlayerID[] {
+  const required = new Set(requiredDecliners(view, w));
+  const order = view.turnOrder;
+  const start = order.indexOf(w.actor);
+  const out: PlayerID[] = [];
+  for (let i = 1; i <= order.length; i += 1) {
+    const p = order[(start + i) % order.length];
+    if (p !== undefined && required.has(p)) out.push(p);
+  }
+  return out;
+}
+
+/** The ONE seat the table is waiting on, or `null` when no window is open. */
+export function windowResponder(view: ClientState): PlayerID | null {
+  const w = view.interrupt;
+  if (w === null) return null;
+  if (w.responder !== null) return null; // answered; the window is already closing
+  for (const p of responseOrder(view, w)) {
+    if (!w.passed.includes(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * What a seat knows that its projection cannot tell it. See the G13 note in the
+ * header for why this is an explicit input rather than a read.
+ *
+ * `ownConspiracies` is the seat's OWN hand and nothing else. There is deliberately
+ * no field for "any other player's hand", so the driver has no way to be handed
+ * one — the absence is the assertion.
+ */
+export type SeatKnowledge = {
+  readonly ownConspiracies: readonly CardID[];
+  /** Printed card bodies. Rulebook text, identical for every seat at the table. */
+  readonly conspiracyCards: Readonly<Record<CardID, ConspiracyCard>>;
+};
+
+/**
+ * Build a seat's `SeatKnowledge` from authoritative state.
+ *
+ * READS EXACTLY ONE PLAYER'S HAND, and the shape is the guarantee: the only state
+ * read is `state.players[me]`, chosen by the caller's own `me`. There is no second
+ * parameter through which another seat could be named, so "the driver read a hidden
+ * hand" cannot be reintroduced by accident — it has to be written.
+ *
+ * Throws on an unknown seat rather than returning an empty hand, because an empty
+ * hand here means "decline", and a typo would produce a sweep with no answers in it
+ * that still passes.
+ */
+export function ownKnowledge(state: GameState, me: PlayerID, cards: CardIndex): SeatKnowledge {
+  const self = state.players[me];
+  if (self === undefined) throw new Error(`ownKnowledge: ${me} is not a seat`);
+  return { ownConspiracies: self.conspiracies, conspiracyCards: cards.conspiracy };
+}
+
+/** Is a card's `interrupt` one this engine actually acts on? Mirrors `isReactive`. */
+function isReactiveOp(op: string): op is 'block' | 'deflect' {
+  return op === 'block' || op === 'deflect';
+}
+
+/**
+ * `mayRespond` again, from the engine — the card's own two fields plus the phase.
+ *
+ * Both inputs are public: `phase` is on the projection, and `'card-affecting-you'`
+ * resolves through `reachesPastActor` over `w.effects`, which are the effects of a
+ * card that is already face up.
+ */
+function mayAnswer(view: ClientState, card: ConspiracyCard): boolean {
+  const interrupt = card.interrupt;
+  if (interrupt === undefined) return false;
+  if (!isReactiveOp(interrupt.op)) return false;
+  if (interrupt.window === 'pre-answer' && view.phase !== 'answer') return false;
+  if (interrupt.target === 'card-affecting-you') {
+    const reachesPastActor = (view.interrupt?.effects ?? []).some(
+      (e) => 'target' in e && e.target !== undefined && e.target !== 'you',
+    );
+    if (!reachesPastActor) return false;
+  }
+  return true;
+}
+
+/**
+ * The seat's own choice of card to answer the window with, or `null` to decline.
+ *
+ * PREFERENCE IS BLOCK, THEN DEFLECT, and the ordering is not tidiness: a BLOCK
+ * needs no target and cannot be refused for a missing one, so a hand holding both
+ * answers with the BLOCK, and a hand holding only a DEFLECT uses `at`. Determinism
+ * also means the same game replays the same way, which the room's action log
+ * depends on.
+ *
+ * DEFLECT's TARGET is the first seat in `turnOrder` that is neither the responder
+ * nor the actor, which is exactly what `RESPOND_INTERRUPT` allows (`at === w.actor`
+ * and `at === playerId` are both refused). **At two seats that set is empty**, so a
+ * two-player table cannot answer with a DEFLECT at all — not a driver limitation
+ * but the printed rule meeting the smallest possible table. It is measured in
+ * `./interrupt-window.test.ts` rather than papered over.
+ */
+export function reactiveAnswer(
+  view: ClientState,
+  me: PlayerID,
+  knowledge: SeatKnowledge | undefined,
+): Extract<Action, { type: 'RESPOND_INTERRUPT' }> | null {
+  const w = view.interrupt;
+  if (w === null || knowledge === undefined) return null;
+  if (w.actor === me || w.responder !== null) return null;
+
+  const inHand = knowledge.ownConspiracies
+    .map((id) => knowledge.conspiracyCards[id])
+    .filter((c): c is ConspiracyCard => c !== undefined && mayAnswer(view, c));
+
+  const block = inHand.find((c) => c.interrupt?.op === 'block');
+  if (block !== undefined) return { type: 'RESPOND_INTERRUPT', cardId: block.id };
+
+  const deflect = inHand.find((c) => c.interrupt?.op === 'deflect');
+  if (deflect === undefined) return null;
+  const target = view.turnOrder.find((p) => p !== me && p !== w.actor);
+  if (target === undefined) return null; // no third player: a DEFLECT has nowhere to go
+  return { type: 'RESPOND_INTERRUPT', cardId: deflect.id, at: target };
+}
+
+/**
  * Which side of the pending Ideology Card to answer.
  *
  * ALWAYS THE LEFT LABEL, and that is not a simplification — it is the point.
@@ -333,17 +529,28 @@ export function answerSide(): 0 | 1 {
  * makes is one the seat could have made. There is no longer an `opts` escape hatch,
  * and that is deliberate — see `answerSide`, which used to be where one lived.
  *
- * Returns `null` only when the table is finished or it is somebody else's move. A
- * driver that returns `null` for a seat that IS on move is a driver bug, and the
- * callers turn that into a thrown error rather than a skip.
+ * `knowledge` is the ONE thing the projection cannot supply: whether this seat holds
+ * a reactive card. Omit it and the driver still handles a window correctly — it
+ * declines — because declining is always legal and always closes. Pass
+ * `ownKnowledge(state, me, cards)` and it will answer when it legally can.
+ *
+ * Returns `null` only when the table is finished, it is somebody else's move, or a
+ * window is open and it is not this seat's moment in it. A driver that returns
+ * `null` for a seat that IS on move is a driver bug, and the callers turn that into
+ * a thrown error rather than a skip.
  */
-export function nextAction(view: ClientState, me: PlayerID): Action | null {
+export function nextAction(view: ClientState, me: PlayerID, knowledge?: SeatKnowledge): Action | null {
   if (view.finished) return null;
 
   // Choices are resolved BEFORE turn order, and that ordering is the whole point of
   // `PendingChoice` being the engine's out-of-turn decision channel. A player with
   // an unresolved decision must act even when it is not their turn, and the engine
   // refuses everything else for them until they do.
+  //
+  // Which is also why this arm comes FIRST of the two "someone else must act" rules:
+  // `reduce` leaves `RESOLVE_CHOICE` legal during a window precisely so a player
+  // frozen by p12 can thaw, and a frozen seat is excluded from `requiredDecliners`
+  // anyway, so the two rules cannot disagree about this seat.
   const mine = view.choices.find((c) => c.player === me);
   if (mine !== undefined) {
     const pick = pickForChoice(view, mine);
@@ -351,6 +558,22 @@ export function nextAction(view: ClientState, me: PlayerID): Action | null {
       throw new Error(`no legal pick for choice ${mine.id} (${mine.choice.kind})`);
     }
     return { type: 'RESOLVE_CHOICE', choiceId: mine.id, pick };
+  }
+
+  // G13 — an open window freezes the whole table, so this is the next thing after
+  // choices and BEFORE anything turn-shaped.
+  //
+  // `view.interrupt !== null` means EVERY action except `RESPOND_INTERRUPT`,
+  // `PASS_INTERRUPT` and `RESOLVE_CHOICE` is refused, so returning an ordinary
+  // play here is returning a guaranteed refusal — which is precisely how this
+  // driver used to stall on any game whose deck held a BLOCK.
+  //
+  // When it is not this seat's moment, the answer is `null` rather than a doomed
+  // action, so the caller advances to the seat `windowResponder` names instead of
+  // firing at the table and being refused.
+  if (view.interrupt !== null) {
+    if (windowResponder(view) !== me) return null;
+    return reactiveAnswer(view, me, knowledge) ?? { type: 'PASS_INTERRUPT' };
   }
 
   if (view.activePlayer !== me) return null;
@@ -424,22 +647,29 @@ export function shouldSqueeze(view: ClientState, me: PlayerID): boolean {
 /**
  * Play a whole game in process, driving the SAME `nextAction` the socket tests use.
  *
- * Two reasons this is not a second driver. It keeps one set of decisions under
+ * Three reasons this is not a second driver. It keeps one set of decisions under
  * test — a competence fix and a winnability fix measured on the socket are the same
  * competence fix measured in process — and it makes a seed sweep affordable, which
  * is what turns "this seed wins" into "wins across a range".
  *
- * It reads the seat's own projection via `playerView`, exactly as the room does, so
+ * It reads each seat's own projection via `playerView`, exactly as the room does, so
  * a decision here is one the seat could have made. The single piece of operator-side
- * It passes no operator-side information at all, which is the point; see `answerSide`.
+ * information it passes at all is `ownKnowledge(state, seat, cards)` for the seat it
+ * is currently acting for — that seat's OWN hand. See the G13 note in the header for
+ * why that is a separate input and not a read of the projection.
+ *
+ * `knowOwnHand: false` reproduces the pure-client driver, which is what the
+ * decline-only termination claim is measured on: a table whose seats know nothing
+ * still has to close every window, and declining is the only move it has.
  */
 export function playInProcess(
   start: GameState,
   ctx: Ctx,
-  opts: { readonly maxActions?: number; readonly maxSqueezes?: number } = {},
+  opts: { readonly maxActions?: number; readonly maxSqueezes?: number; readonly knowOwnHand?: boolean } = {},
 ): RunResult {
   const maxActions = opts.maxActions ?? 1200;
   const maxSqueezes = opts.maxSqueezes ?? 80;
+  const knowOwnHand = opts.knowOwnHand ?? true;
 
   let state = start;
   let actions = 0;
@@ -447,10 +677,28 @@ export function playInProcess(
   let stuckTurn = 0;
   const refusals: string[] = [];
   const choiceKinds = new Set<string>();
+  const windows = emptyTally();
+
+  /** The knowledge for a seat, or `undefined` for a client that cannot know. */
+  const knowledgeFor = (seat: PlayerID): SeatKnowledge | undefined =>
+    knowOwnHand ? ownKnowledge(state, seat, ctx.cards) : undefined;
+
+  const done = (): RunResult => ({
+    state,
+    actions,
+    finished: state.finished,
+    stalled: !state.finished,
+    reason: state.finished ? null : 'unfinished',
+    refusals,
+    choiceKinds,
+    // Computed HERE rather than tracked, so it cannot drift from the final state:
+    // a window that never closed shows up as a count, not as a missing assertion.
+    windows: { ...windows, unclosedAtEnd: state.interrupt === null ? 0 : 1 },
+  });
 
   while (!state.finished) {
     if (actions >= maxActions) {
-      return { state, actions, finished: false, stalled: true, reason: `budget: ${maxActions} actions`, refusals, choiceKinds };
+      return { ...done(), reason: `budget: ${maxActions} actions` };
     }
 
     // 1. Any open decision, whoever owns it, first.
@@ -459,11 +707,50 @@ export function playInProcess(
       choiceKinds.add(open.choice.kind);
       const action = nextAction(playerView(state, open.player), open.player);
       if (action === null) {
-        return { state, actions, finished: false, stalled: true, reason: `no action for open choice ${open.choice.kind}`, refusals, choiceKinds };
+        return { ...done(), reason: `no action for open choice ${open.choice.kind}` };
       }
       const r = reduce(state, open.player, action, ctx);
       if (!r.ok) {
-        return { state, actions, finished: false, stalled: true, reason: `choice refused: ${r.error}`, refusals, choiceKinds };
+        return { ...done(), reason: `choice refused: ${r.error}` };
+      }
+      state = r.state;
+      actions += 1;
+      continue;
+    }
+
+    // 2. An open response window, for the ONE seat the table is waiting on.
+    //
+    //    Placed above every turn-shaped rule and below the choices for two reasons.
+    //    Above: `reduce` refuses everything else while a window is open, so asking
+    //    the active player for a move here produces a refusal and nothing else.
+    //    Below the choices: `RESOLVE_CHOICE` stays legal during a window precisely so
+    //    a frozen player can thaw, and a frozen seat is excluded from the required
+    //    set anyway — but the choice really does need answering before the table can
+    //    move, and p12's cap is a per-player freeze, not a table one.
+    const openWindow = state.interrupt;
+    if (openWindow !== null) {
+      windows.opened.add(openWindow.id);
+      const seat = windowResponder(playerView(state, state.activePlayer));
+      if (seat === null) {
+        // Every required seat has declined and the reducer has not closed it, or the
+        // window was already answered. Either way the table is stuck with a window
+        // open, which is the exact hang this suite exists to rule out.
+        return { ...done(), reason: `window ${openWindow.id} is open but no seat owes a response` };
+      }
+      const action = nextAction(playerView(state, seat), seat, knowledgeFor(seat));
+      if (action === null) {
+        return { ...done(), reason: `no action for window ${openWindow.id} with ${seat} on the hook` };
+      }
+      const r = reduce(state, seat, action, ctx);
+      if (!r.ok) {
+        return { ...done(), reason: `window ${openWindow.id} refused ${action.type} for ${seat}: ${r.error}` };
+      }
+      if (action.type === 'RESPOND_INTERRUPT') windows.answered += 1;
+      if (action.type === 'PASS_INTERRUPT') windows.declined += 1;
+      if (r.state.interrupt === null) {
+        windows.closed += 1;
+        if (action.type === 'RESPOND_INTERRUPT') windows.closedByAnswer += 1;
+        if (action.type === 'PASS_INTERRUPT') windows.closedByAllDeclines += 1;
       }
       state = r.state;
       actions += 1;
@@ -473,7 +760,7 @@ export function playInProcess(
     const p = state.activePlayer;
     const view = playerView(state, p);
 
-    // 2. The endgame squeeze, before the ordinary buy. It only fires when
+    // 3. The endgame squeeze, before the ordinary buy. It only fires when
     //    `nextAction` would otherwise have nothing worth buying, so it cannot
     //    pre-empt a real purchase.
     if (view.phase === 'actions' && squeezes < maxSqueezes && shouldSqueeze(view, p)) {
@@ -513,7 +800,7 @@ export function playInProcess(
 
     const action = nextAction(view, p);
     if (action === null) {
-      return { state, actions, finished: false, stalled: true, reason: `no legal action in phase ${view.phase}`, refusals, choiceKinds };
+      return { ...done(), reason: `no legal action in phase ${view.phase}` };
     }
 
     const r = reduce(state, p, action, ctx);
@@ -524,15 +811,67 @@ export function playInProcess(
       // worth failing on rather than looping past.
       stuckTurn = state.turn === stuckTurn ? stuckTurn + 1 : 0;
       if (stuckTurn >= 2) {
-        return { state, actions, finished: false, stalled: true, reason: `refused twice at turn ${state.turn}: ${r.error}`, refusals, choiceKinds };
+        return { ...done(), reason: `refused twice at turn ${state.turn}: ${r.error}` };
       }
-      return { state, actions, finished: false, stalled: true, reason: `refused: ${r.error}`, refusals, choiceKinds };
+      return { ...done(), reason: `refused: ${r.error}` };
     }
     state = r.state;
     actions += 1;
   }
 
-  return { state, actions, finished: true, stalled: false, reason: null, refusals, choiceKinds };
+  return done();
+}
+
+/**
+ * What a run observed about the response windows it played through.
+ *
+ * The claim the G13 tests need is not "a window opened" but "a window CLOSED, and
+ * the table kept going". `closed` is therefore counted separately from `opened`, and
+ * `unclosedAtEnd` is the number that must be zero for a run that reports `finished`
+ * — a window still open when the game ends is the stall this whole mechanism
+ * exists to prevent.
+ *
+ * `answered` versus `declined` matters because a driver that only ever declines
+ * proves termination but proves nothing about responding. A run with
+ * `answered > 0` exercised the real path.
+ */
+/** The mutable accumulator a run fills in. The exported `WindowStats` is a snapshot. */
+type WindowTally = {
+  opened: Set<string>;
+  closed: number;
+  closedByAnswer: number;
+  closedByAllDeclines: number;
+  answered: number;
+  declined: number;
+};
+
+function emptyTally(): WindowTally {
+  return {
+    opened: new Set<string>(),
+    closed: 0,
+    closedByAnswer: 0,
+    closedByAllDeclines: 0,
+    answered: 0,
+    declined: 0,
+  };
+}
+
+export type WindowStats = {
+  /** Every window id this run saw open, for the "each closed exactly once" claim. */
+  readonly opened: ReadonlySet<string>;
+  readonly closed: number;
+  /** Closed by someone spending a reactive card, not by everyone declining. */
+  readonly closedByAnswer: number;
+  /** Closed by every required seat declining — the termination path. */
+  readonly closedByAllDeclines: number;
+  readonly answered: number;
+  readonly declined: number;
+  /** Windows still open when the run ended. Must be 0 for a run that finished. */
+  readonly unclosedAtEnd: number;
+};
+
+export function emptyWindowStats(): WindowStats {
+  return { ...emptyTally(), unclosedAtEnd: 0 };
 }
 
 export type RunResult = {
@@ -543,6 +882,7 @@ export type RunResult = {
   readonly reason: string | null;
   readonly refusals: readonly string[];
   readonly choiceKinds: ReadonlySet<string>;
+  readonly windows: WindowStats;
 };
 
 /** Deal a real-corpus game with `n` seats, exactly the way `lobby.ts` deals one. */
