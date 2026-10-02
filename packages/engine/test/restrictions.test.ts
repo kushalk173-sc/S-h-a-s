@@ -29,6 +29,7 @@ import { indexCards, type CardIndex, type ConspiracyCard } from '../src/cards';
 import { allKeys, playerView } from '../src/playerView';
 import { reduce, type Ctx } from '../src/reduce';
 import { RULES } from '../src/rules';
+import { usesLeft } from '../src/powers';
 import { setup } from '../src/setup';
 import { poolTotal, type Delta, type GameState, type PlayerID, type Resource } from '../src/state';
 import { IDEOLOGY_CARDS, PLAYERS_3, VOTER_CARDS } from './helpers';
@@ -100,10 +101,19 @@ const SHORT_TAX: ConspiracyCard = {
   ],
 };
 
+/** GENDER TROUBLE: no Ideologue Power for the owner's next turn. */
+const NO_POWER: ConspiracyCard = {
+  id: 'rsv-no-power',
+  name: 'A Blank',
+  text: 'You cannot use any of your Ideologue Powers before the end of your next turn.',
+  cost: 1,
+  effects: [{ op: 'restrict', kind: 'no-power', value: 0, target: 'you', until: 'next-turn' }],
+};
+
 const CARDS: CardIndex = indexCards({
   ideology: IDEOLOGY_CARDS,
   voter: [...VOTER_CARDS, ...VOTERS],
-  conspiracy: [KHAKI, DONATE_ONLY, LOCK_ONLY, PYTHONPOST, DOUBLE_TAX, SHORT_TAX],
+  conspiracy: [KHAKI, DONATE_ONLY, LOCK_ONLY, PYTHONPOST, DOUBLE_TAX, SHORT_TAX, NO_POWER],
   headline: [],
 });
 
@@ -464,5 +474,112 @@ describe('a game with no restricted player is unaffected', () => {
     const a = run();
     playAs(answered(freshGame(PLENTY, 999)), 'rsv-surcharge', 'p3');
     expect(run()).toBe(a);
+  });
+});
+
+describe('G5 — `no-power` is consulted by usesLeft, so it is total over the vocabulary', () => {
+  /**
+   * Give the active player three CAPITALIST answers on the manifesto, which is exactly
+   * `rules.level3` and therefore exactly what unlocks Prospecting. p22 makes powers
+   * DERIVED from the manifesto rather than stored, so writing the manifesto IS writing
+   * the power: there is no cached unlock for the restriction to disagree with.
+   */
+  function capitalist(s: GameState): GameState {
+    const cards = IDEOLOGY_CARDS.filter((c) => c.sides[0]?.ideologue === 'capitalist').slice(0, 3);
+    const owner = s.activePlayer;
+    return {
+      ...s,
+      players: {
+        ...s.players,
+        [owner]: {
+          ...s.players[owner]!,
+          manifesto: [...s.players[owner]!.manifesto, 'capitalist', 'capitalist', 'capitalist'],
+          manifestoCards: [...s.players[owner]!.manifestoCards, ...cards.map((c) => c.id)],
+        },
+      },
+    };
+  }
+
+  const prospecting = (s: GameState) =>
+    reduce(s, s.activePlayer, { type: 'POWER_PROSPECT', give: 'trust', take: ['funds'] }, ctx);
+
+  it('the power works before the card and is refused after it', () => {
+    const before = answered(capitalist(freshGame()));
+    expect(usesLeft(before.players[before.activePlayer]!, RULES, 'prospecting')).toBeGreaterThan(0);
+    expect(prospecting(before).ok).toBe(true);
+
+    const after = play(before, NO_POWER.id);
+    expect(usesLeft(after.players[after.activePlayer]!, RULES, 'prospecting')).toBe(0);
+    expect(prospecting(after).ok).toBe(false);
+  });
+
+  it('and the refusal is a `fail`, not a crash, so the action is legal to ATTEMPT', () => {
+    // R12's rule, the one POWER_LAND_GRAB's comment records: a power the player does
+    // not hold must be a refusal with a message, never a TypeError. A crash inside
+    // `reduce` would take the request down rather than the turn.
+    const after = play(answered(capitalist(freshGame())), NO_POWER.id);
+    const r = prospecting(after);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.length).toBeGreaterThan(0);
+  });
+
+  it('and it is DEADLOCK-FREE: a restricted player is less able, never frozen', () => {
+    // The invariant that matters most for a `restrict` op. A restriction REFUSES
+    // actions; it never raises a decision, so it cannot leave a player with no legal
+    // move — the class of bug this project has shipped three times. Asserted at every
+    // seat count, and on END_TURN specifically, because a FROZEN player cannot end
+    // their turn and this one can.
+    for (const seats of [
+      ['p1', 'p2'],
+      ['p1', 'p2', 'p3'],
+      ['p1', 'p2', 'p3', 'p4'],
+      ['p1', 'p2', 'p3', 'p4', 'p5'],
+    ] as const) {
+      const base = setup({
+        players: [...seats],
+        cards: CARDS,
+        seed: 7,
+        startResources: seats.map(() => ({ funds: 2, clout: 2, media: 2, trust: 2 })),
+        ideologyDeck: IDEOLOGY_CARDS.map((c) => c.id),
+        voterDeck: VOTERS.map((c) => c.id),
+        conspiracyDeck: [NO_POWER.id],
+        headlineDeck: [],
+      });
+      const a = reduce(base, base.activePlayer, { type: 'ANSWER', side: 0 }, ctx);
+      expect(a.ok, `${seats.length} seats could answer`).toBe(true);
+      if (!a.ok) continue;
+      const played = play(a.state, NO_POWER.id);
+      expect(
+        (played.players[played.activePlayer]?.restrictions ?? []).some((r) => r.kind === 'no-power'),
+        `${seats.length} seats carry the restriction`,
+      ).toBe(true);
+      expect(reduce(played, played.activePlayer, { type: 'END_TURN' }, ctx).ok, `${seats.length} seats`).toBe(true);
+    }
+  });
+
+  it('and it expires on the owner\'s NEXT turn, which is the printed lifetime', () => {
+    // `until: 'next-turn'` is `ownerNextTurn + 1` in `durationExpiry`, and
+    // `expireRestrictions` in `advanceTurn` removes what has run out on the same clock
+    // that resets `powerUses`. `usesLeft` deliberately does NOT re-check the deadline
+    // (it has no GameState), so this test is the only thing pinning the two together:
+    // if either moved, the restriction would be in force for a different number of
+    // turns than its text says.
+    const after = play(answered(capitalist(freshGame())), NO_POWER.id);
+    expect(prospecting(after).ok).toBe(false);
+    const held = (s: GameState): boolean =>
+      (s.players[s.activePlayer]?.restrictions ?? []).some((r) => r.kind === 'no-power');
+
+    let s = after;
+    for (let i = 0; i < PLAYERS_3.length * 2 && held(s); i += 1) {
+      const next =
+        s.phase === 'answer'
+          ? reduce(s, s.activePlayer, { type: 'ANSWER', side: 0 }, ctx)
+          : s.phase === 'actions'
+            ? reduce(s, s.activePlayer, { type: 'END_TURN' }, ctx)
+            : reduce(s, s.activePlayer, { type: 'ACK_HEADLINE' }, ctx);
+      if (!next.ok) break;
+      s = next.state;
+    }
+    expect(held(s), 'the restriction outlived the owner\'s next turn').toBe(false);
   });
 });

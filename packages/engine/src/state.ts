@@ -521,7 +521,42 @@ export type RestrictionKind =
   /** *"You cannot make any purchases until you do so."* KHAKI TERROR. */
   | 'no-purchases'
   /** *"All Voter Cards cost any 1 extra resource in your turn."* PYTHONPOST. */
-  | 'surcharge';
+  | 'surcharge'
+  /**
+   * G5 — *"You cannot use one of your unlocked Level 3 Ideologue Powers in your next
+   * turn."* GENDER TROUBLE.
+   *
+   * **THIS IS NOT "THE POWER IS SPENT" AND IT IS NOT A LEVEL RULE.** The engine
+   * implements it in exactly one place, `usesLeft` in `powers.ts`, which returns 0 for
+   * every power the restricted player holds — so the restriction is total, and a card
+   * that wants to name ONE power has nothing to name it with. That is a dropped
+   * clause, not a different reading: the printed card says *one of your unlocked Level
+   * 3 powers*, and choosing which is a decision over powers, which is G1 and a
+   * `Choice` kind this package cannot add. KNOWN-GAPS §4 records GENDER TROUBLE as
+   * *"one of your unlocked Level 3 powers"*; what ships is *"none of your powers"*.
+   *
+   * **WHY `usesLeft` IS THE RIGHT HOOK, and it is worth saying.** A power's
+   * availability is `usesLeft(...) <= 0` in EVERY `POWER_*` case, so this is one edit
+   * rather than seven, and it cannot drift: a power added to the vocabulary later
+   * consults the restriction the moment its action checks `usesLeft`, which every one
+   * of them must do already or the power would be free.
+   *
+   * **EXPIRY IS NOT CHECKED HERE, and that is deliberate rather than forgotten.**
+   * `expiresTurn` is an absolute turn number and `expireRestrictions` in
+   * `advanceTurn` removes what has run out, on the same clock that resets
+   * `powerUses`. `usesLeft` takes a `PlayerState`, not a `GameState`, so it cannot see
+   * the turn — and re-deriving expiry from the player alone would be a SECOND
+   * definition of the same deadline, which is how a card ends up living one turn too
+   * long in one place and not another. `restrictions.test.ts` pins that a `no-power`
+   * imposed with `until: 'next-turn'` is in force for exactly the owner's next turn.
+   *
+   * **Visibility: PUBLIC, unchanged, and for the same reason as its two siblings.** A
+   * restriction is a rule every other player must be able to predict, and every real
+   * card imposing one announces it; GENDER TROUBLE's whole effect is the victim
+   * knowing they cannot use their powers next turn. No new field, so
+   * `packages/server/test/secret-inventory.ts` owes nothing.
+   */
+  | 'no-power';
 
 /**
  * ONE RESTRICTION. The two rulings this type forces are argued on the fields that

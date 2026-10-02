@@ -155,6 +155,21 @@ export function archetype(player: PlayerState): Ideologue | null {
 
 /** Remaining uses of a power this turn, or 0 if it is not unlocked. */
 export function usesLeft(player: PlayerState, rules: Rules, id: PowerID): number {
+  // G5's `no-power`, and THE consult point for it. Every `POWER_*` case in `reduce()`
+  // already asks this function whether the power is available, so returning 0 here is
+  // what makes the restriction total across the whole vocabulary — one edit rather
+  // than seven, and it cannot drift: a power added later consults the restriction the
+  // moment its action asks, which every one of them must do already.
+  //
+  // It is `0` rather than a reduced allowance because the printed card says "you
+  // CANNOT USE" and not "you have fewer uses". Expiry is NOT tested here and that is
+  // deliberate: `expiresTurn` is absolute and `expireRestrictions` in `advanceTurn`
+  // removes what has run out, on the same clock that resets `powerUses`. This function
+  // takes a `PlayerState`, not a `GameState`, so it cannot see the turn, and
+  // re-deriving the deadline from the player alone would be a SECOND definition of the
+  // same expiry — which is how a restriction lives one turn too long in one place and
+  // not another. See `RestrictionKind` in state.ts.
+  if ((player.restrictions ?? []).some((r) => r.kind === 'no-power')) return 0;
   if (!hasPower(player, rules, id)) return 0;
   const u = player.powerUses;
   switch (id) {

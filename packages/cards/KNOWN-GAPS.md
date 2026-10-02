@@ -924,14 +924,67 @@ says "an EXTRA resource", not "one resource less than usual".
 
 ### What G5 still owes
 
-`no-power` (GENDER TROUBLE) and `no-volatile-placement` (NEW FACE WHO DIS) are
-declared in the type's history but not in the current `RestrictionKind`, and their
-consult points — `POWER_*` against `usesLeft`, and `PLACE_VOTERS` /
-`GERRYMANDER` against a volatile destination — do not exist. Those are the last two
-cards, and both are small now that the mechanism is there. THE BIG FREEZE's *"reduce
-your resource cap to 10"* is not a restriction at all: it is a `PlayerState` cap
-field, and a card that changes a number every other rule reads from is a different
-mechanism again.
+**`no-power` LANDED, and it is the last of the two consult points G5 named.** A third
+`RestrictionKind`, `'no-power'`, read in exactly one place: `usesLeft` in
+`packages/engine/src/powers.ts`, which returns 0 for every power the restricted player
+holds. That is a deliberately good hook rather than a lucky one -- **every `POWER_*`
+case in `reduce()` already asks `usesLeft` whether the power is available**, so this is
+one edit rather than seven, and it cannot drift: a power added to the vocabulary later
+consults the restriction the moment its action checks, which every one of them must do
+already or the power would be free.
+
+**`expiresTurn` is NOT re-checked in `usesLeft`, and that is deliberate.** It takes a
+`PlayerState`, not a `GameState`, so it cannot see the turn; re-deriving the deadline
+from the player alone would be a SECOND definition of the same expiry, which is how a
+restriction lives one turn too long in one place and not another.
+`expireRestrictions` in `advanceTurn` removes it, on the same clock that resets
+`powerUses`. `restrictions.test.ts` walks the table round to pin that a
+`until: 'next-turn'` restriction is in force for exactly the owner's next turn and no
+longer -- that test is the only thing holding the two clocks together.
+
+**Card gained: NONE, and the reason is a corpus gate rather than an engine one.**
+GENDER TROUBLE (`REF 4.3`: *"You cannot use one of your unlocked Level 3 Ideologue
+Powers in your next turn"*) is now **expressible and executable** — `restrict` with kind
+`no-power` — and the playability probe reports it PLAYED, which is the honest reading.
+It is **not shipped**, for two measured reasons:
+
+1. **`packages/server/test/corpus.test.ts:197` pins the number of DISTINCT effect ops
+   across all shipped Headline Cards at 12**, because that number is how many driver
+   branches a corpus swap invalidates. `restrict` appears in no shipped Headline today,
+   so the first one makes it 13. The only way back to 12 is for a *unique* op to leave
+   with it, and the three unique headline ops are `gerrymander` (NEW FACE WHO DIS, a
+   recovered card), `restrict` (this one) and `refresh-market` (PANI KI KAMMI, an
+   `inferred` placeholder). Retiring the placeholder was tried and it **regresses the
+   server suite**: `interrupt-window.test.ts`'s decline-only sweep, 5 seats, seed 14,
+   finishes **19/20** with "reasons budget: 1200 actions" where it finished 20/20 before
+   (verified by stashing the deck change and re-running). That is an uninformed socket
+   driver running out of budget, not a soft-lock — the greedy sweep is 20/20 at all four
+   seat counts either way — but it is a real regression in a suite this package may not
+   edit, and shipping a card whose cost is "one server assertion went red" is not a
+   trade worth making unilaterally.
+2. Even once it ships, it is **weaker than printed, and the direction matters**: the
+   printed card takes ONE chosen Level 3 power away and this takes ALL of them, because
+   naming one is a decision over powers and that is G1. That is strictly *less* for the
+   caster — a Headline that only hurts the player who resolved it. The *"if you do not
+   have a Level 3 power, discard 2 resources instead"* fallback is also dropped; it needs
+   a conditional over the whole effect list. Whoever ships it should say that in the
+   card's `text` rather than reproducing the printed wording.
+
+**The one-line unblock for the server owner:** bump `corpus.test.ts:197` from 12 to 13
+**and** re-run the decline-only sweep; if the sweep is still red, the card is blocked on
+the corpus's interaction with that driver and the mechanism above is still worth having
+— it is the last of G5's two named consult points and it cost one line in `powers.ts`.
+
+**`no-volatile-placement` is still (c).** NEW FACE WHO DIS's *"these voters cannot be
+placed into Volatile Areas"* needs a consult point in `PLACE_VOTERS` and `GERRYMANDER`,
+and `placeableAreas` in `reduce.ts` is where the client already asks the same question.
+Small now that the mechanism is there, and it buys **zero new cards** -- NEW FACE WHO
+DIS already ships.
+
+**THE BIG FREEZE's *"reduce your resource cap to 10"* is not a restriction at all:**
+it is a `PlayerState` cap field, and a card that changes a number every other rule
+reads from is a different mechanism again. `canAfford`, `enforceCap`, `overCap`,
+`poolTotal` and the balance checker all read `rules.resourceCap` directly today.
 
 ---
 

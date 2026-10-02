@@ -379,7 +379,14 @@ export type Effect = (
    */
   | {
       readonly op: 'restrict';
-      readonly kind: 'no-purchases' | 'surcharge';
+      /**
+       * `'no-power'` is GENDER TROUBLE and is consulted by `usesLeft` in
+       * `powers.ts`, not by `INFLUENCE` or `BUY_CONSPIRACY` — see `RestrictionKind`
+       * in `state.ts` for why that hook is total across the whole power vocabulary,
+       * and for the clause it costs (the printed card names ONE Level 3 power, and
+       * choosing which is G1).
+       */
+      readonly kind: 'no-purchases' | 'surcharge' | 'no-power';
       /** Extra resources per purchase, for `'surcharge'`. Zero for `'no-purchases'`. */
       readonly value: number;
       /** For `'no-purchases'`: what the player must give before buying again. */
