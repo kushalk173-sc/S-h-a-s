@@ -593,16 +593,75 @@ card and suppress passive income; `Effect` is a list applied inside one turn.
 
 **Ask:** a card-level `answerPhase` the `answer` branch of `reduce()` reads.
 
-### G20 — no card-destroying or card-moving effects between players
+### G20 — card-destroying and card-moving effects between players
 
-**State: (c).** Cards: A CALL FROM KARACHI, DEFLECT, CARD GAMES, A COWARD OR A
-JOURNALIST?, BLESSINGS OF PARENTS PAST, ON THE "HIGH" SEAS.
-`PlayerState.conspiracies` exists, but no op moves a card between players or back into
-a pile, and reassigning Ideology Cards breaks the blind-answer invariant
-`playerView.ts` tests for.
+**State: (c) → the MECHANISM LANDED, and two real cards with it.** `move-card` executes,
+`PlayerState.ideologyCards` exists, and the ruling on blind answers is made, argued and
+tested. **23 → 25 of 54.**
 
-**Ask:** a `move-card` op and a `PlayerState.ideologyCards` list — and a decision about
-the blind-answer invariant before it.
+**The ruling, in one line: a moved Ideology Card is HELD AND HIDDEN — from everyone,
+including the player it was given to — and is put to that player at their next turn
+boundary, in place of that turn's draw.** The long form is on `PlayerState.ideologyCards`
+in `packages/engine/src/state.ts`; the mechanism's own contract is on the `move-card` arm
+in `packages/engine/src/cards.ts`. Three findings from building it that the next reader
+must not re-derive:
+
+1. **The source is the DRAW pile, not the discard pile, and that is the security
+   decision rather than a convenience.** The top of the Ideology discard is the most
+   recently *answered* card (`ANSWER` is the only thing that puts one there), and p13
+   makes an answered card face up under its owner's mat. Moving a discard-pile card into
+   a hand would not restore the blind answer, it would **announce** it — the whole table
+   already knows the question and the answer the holder is about to commit to. The first
+   draft took `from: 'discard'` and the engine's own game-loop test caught it on its
+   first run: the card it had just moved was the one the caster had answered that same
+   turn. Same argument as the `to: 'manifesto'` refusal, running the other way.
+   A card in the draw pile has never been answered, so nothing about it is public.
+2. **That choice closes a leak for free.** A hand drains at the boundary *instead of* a
+   draw, so a card entering a hand must have left the draw pile already for the deck to
+   fall by exactly one per turn. Off the discard it fell by one on the play turn and by
+   **none** on the deal turn — a discontinuity an observer could time, which would tell
+   every viewer that a transfer had happened. Off the draw, the count is monotonic and
+   there is nothing to read. The design choice and the security property are one
+   decision.
+3. **The op is deliberately tiny, and three of its obvious shapes are refused AT THE
+   TYPE LEVEL**: `from: 'pending'` (it would tell a mid-answer player the card exists,
+   offer a look at it by proxy, and empty `_pendingCard` into a soft-lock where `ANSWER`
+   and `END_TURN` are both illegal), `from: 'hand'` (a hand is a queue the *engine*
+   drains; its holder cannot enumerate it, so neither can an op), and `to: 'pending'` /
+   `to: 'manifesto'` (there is no third category — see ruling §4).
+
+`IDEOLOGY_HAND_MAX = 2` is a **termination** bound and not a rules claim, because
+`move-card` is the first op that can append to a queue: `TRIGGER_MAX_WAVES` does not
+cover a `when: 'on-turn-start'` move into a hand, because that bound is per *firing
+event* and one event per turn is a slow leak rather than a hang.
+
+**What this bought, and what it did not.** JUMLA (`ct-in2020-011`) and HOLO SAPIENS
+(`ct-et2040-013`) ship `adapted`, both on *"This is an extra Ideology Card"* alone — which
+is the card's whole identity. **+2 real cards.** The same source is *honest* for a
+Conspiracy Card and a *leak* for an Ideology Card: `draw-conspiracy`'s `from: 'discard'`
+discloses nothing, because a Conspiracy Card is bought and held and never answered face
+up. The difference is entirely p13.
+
+**Still blocked, and the three reasons are rulings rather than missing features.**
+A COWARD OR A JOURNALIST? / CARD GAMES needs `from: 'pending'` *and* G12's in-flight
+queue (an owner, a seat, a deadline) — so the type refusal and the missing queue are the
+same blocker seen twice. BLESSINGS OF PARENTS PAST is G17 (choose 2) plus a Voter Card
+donation plus a defined two-player order. A CALL FROM KARACHI, AS CLEAR AS WATER and
+FUELLING THE NEWS are all G17 deck search or G18 on top of a card move. CULT-IVATING
+OBEDIENCE, POLO RETREAT and DEEP THOUGHTS name G20 in the table but are G-new, G11 and
+borrow-a-power respectively, and no `move-card` reaches any of them. **Re-entrancy is
+bounded**, and the `to: 'destroy'` branch ships with no card yet: it is the operation the
+destruction-leak tests pin, and inventing a card for it would be a card the corpus does
+not contain.
+
+**Tested, adversarially**, in `packages/engine/test/card-transfer.test.ts` (17 tests) and
+`packages/cards/test/card-playback.test.ts` (4 more, on the shipped cards): mid-answer
+transfer leaks nothing and the payload is **byte-identical** before and after; a destroyed
+card emits no `LogEntry`, no `GameEvent`, no id and neither side's payout, and shrinks the
+world; the deck count falls by exactly one per turn forever; a 60-position played game
+asserts at every step that some action succeeds *and* changes something; and the
+empty-deck-with-a-held-card case that the hand-before-deck ordering in `advanceTurn`
+exists for.
 
 ### G22 — no "during your next turn" scope
 
@@ -667,7 +726,7 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 | 6 | phase machine: `block` / `deflect` / `auction` / `vote` / `pass-card` | `reduce.ts`, `actions.ts` | **DONE — G13.** `GameState.interrupt`, `RESPOND_INTERRUPT` + `PASS_INTERRUPT`, no new `Phase`. **BLOCK and DEFLECT are playable: 21 → 23 of 54.** `auction` / `vote` / `pass-card` ruled out with a cost — §2 G13b/c, because each buys **no card** without G12/G17/G20 first | — |
 | 7 | `'chosen-player'` on `EffectTarget`, via a new `Choice` kind | `cards.ts`, `state.ts`, `reduce.ts`, **client** | G1 (2), G-new (1), and it is the last thing standing between 3 more trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM) | small, but a **wire-format change the client owns** |
 | 8 | `target` on `evict`, `discard-voter`, `convert-voter`, `discount`; let a choice reach the chooser's own pegs | `cards.ts`, `reduce.ts` | G-new (3 cards) | small |
-| 9 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **G20 (5 cards)** | medium |
+| 9 | `move-card` op + `PlayerState.ideologyCards`, and a ruling on blind answers | `state.ts`, `reduce.ts` | **DONE — G20. `move-card` executes, the ruling is made, and the hand drains at the turn boundary. JUMLA + HOLO SAPIENS ship adapted: 23 → 25 of 54.** `from: 'draw'` only — a discard-pile Ideology Card has been answered and p13 makes that public, so handing one over blind would publish the answer. A COWARD OR A JOURNALIST? stays blocked on G12 as well, and three other shapes are refused at the type level | — |
 | 10 | `draw-card` with `from: 'draw' \| 'discard'` and a `'choose-card'` Choice | `state.ts`, `reduce.ts` | **G17 (4 cards)** | small |
 | 11 | a `price` field: a computed cost the *seller* reads, distinct from `discount` | `cards.ts`, `reduce.ts` | G15's JUMLA / HOLO SAPIENS, and the honest half of G3 | medium |
 

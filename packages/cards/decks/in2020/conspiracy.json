@@ -94,6 +94,15 @@
       "text": "Gain 2 Funds from the Public Reserve. Then gain 2 voters, which you may place in different zones.",
       "cost": 5,
       "effects": [{ "op": "gain", "res": { "funds": 2 } }, { "op": "voters", "n": 2 }]
+    },
+    {
+      "id": "ct-in2020-011",
+      "source": "REF 4.2.2 (scribd 814006944) recovers Jumla verbatim. SHIPS ON ITS FIRST SENTENCE ALONE - 'This is an extra Ideology Card' - put to you at your next turn. DROPPED for NAMED gaps: 'of your choice' is G17; the price an opponent pays is G15's price field; re-filing under another Ideologue is G23. Same archetype as HOLO SAPIENS per REF 4.2.2: one template, two skins, one reduction. Argument in KNOWN-GAPS.md G20.",
+      "provenance": "adapted",
+      "name": "Jumla",
+      "text": "This is an extra Ideology Card. You will be put it at the start of your next turn, face down, and you will not be told which one.",
+      "cost": 5,
+      "effects": [{ "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "you" }]
     }
   ]
 }

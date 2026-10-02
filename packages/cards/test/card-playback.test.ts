@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { loadCorpus, toEngineConspiracyCard, toEngineHeadlineCard, toEngineIdeologyCard, toEngineVoterCard } from '../src/corpus.js';
 import { RULES, type CardID, type CardIndex, type HeadlineCard, type IdeologyCard, type PlayerID } from '../src/engine.js';
 
+import { playerView } from '../../engine/src/playerView';
 import { reduce } from '../../engine/src/reduce';
 import { setup } from '../../engine/src/setup';
 import type { GameState } from '../../engine/src/state';
@@ -284,6 +285,85 @@ describe('GOOD GIG WELL PLAYED — "Draw the top Conspiracy Card and keep it"', 
     const after = play(before, c.id);
     const drawn = after.players.p1!.conspiracies.at(-1);
     expect(drawn).toBe(before._conspiracyDraw[0]);
+  });
+});
+
+/**
+ * G20 — "This is an extra Ideology Card", shipped as JUMLA and HOLO SAPIENS.
+ *
+ * The engine's own tests live in `packages/engine/test/card-transfer.test.ts` and
+ * they are where the security argument is made: mid-answer inertness, destruction
+ * silence, the legal-move-always property. What is HERE is the half that only this
+ * package can see — that the reduction on a REAL recovered card, in the shipped deck,
+ * produces the mechanic those tests describe. A G20 that only works in a hand-built
+ * engine fixture is a G20 the corpus cannot reach, which is the exact failure
+ * `scripts/playable.ts` exists to catch.
+ */
+describe('JUMLA and HOLO SAPIENS — "This is an extra Ideology Card"', () => {
+  const ids = ['ct-in2020-011', 'ct-et2040-013'] as const;
+
+  it('both ship, both adapted, both on the same one-op reduction', () => {
+    for (const id of ids) {
+      const c = card(id);
+      expect(c.provenance, id).toBe('adapted');
+      expect(c.effects.length, id).toBe(1);
+      expect(c.effects[0], id).toEqual({ op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'you' });
+    }
+  });
+
+  it('puts an Ideology Card in its player\'s hand, off the top of the draw pile', () => {
+    for (const id of ids) {
+      const before = game();
+      const after = playConspiracy(before, id);
+      const hand = after.players.p1!.ideologyCards ?? [];
+      expect(hand.length, id).toBe((before.players.p1!.ideologyCards ?? []).length + 1);
+      // "An extra Ideology Card" off the TOP of the deck, which is the end `draw()`
+      // takes from. Anything else and the text would be describing something else.
+      expect(hand.at(-1), id).toBe(before._ideologyDraw[0]);
+      expect(after._ideologyDraw.length, id).toBe(before._ideologyDraw.length - 1);
+    }
+  });
+
+  it('the held card is in NOBODY\'s payload, including its owner\'s', () => {
+    // The ruling on `PlayerState.ideologyCards`: a transferred Ideology Card is hidden
+    // from every viewer including whoever ends up holding it, because the answer to a
+    // blind card is a coin flip the player makes and a player shown the card in their
+    // own hand has not made one. Asserted here against the real shipped card, so the
+    // property is tied to a card a player can actually buy rather than to a fixture.
+    for (const id of ids) {
+      const after = playConspiracy(game(), id);
+      const held = after.players.p1!.ideologyCards ?? [];
+      expect(held.length, id).toBe(1);
+      const card = INDEX.ideology[held[0] as CardID];
+      for (const viewer of after.turnOrder) {
+        const json = JSON.stringify(playerView(after, viewer));
+        expect(json, `${id} / ${viewer} / ${held[0]}`).not.toContain(held[0] as string);
+        for (const side of card?.sides ?? []) {
+          expect(json, `${id} / ${viewer} leaked a payout`).not.toContain(JSON.stringify(side.pays));
+        }
+      }
+    }
+  });
+
+  it('the card is put to that player at their NEXT turn boundary, in place of the draw', () => {
+    // The mechanic the whole ruling is built on, checked on a real card: p1 holds the
+    // card after playing it, and on p1's next boundary they are dealt THAT card, not a
+    // fresh one off the deck.
+    const before = game();
+    const after = playConspiracy(before, 'ct-in2020-011');
+    const held = (after.players.p1!.ideologyCards ?? [])[0] as CardID;
+    const restOfTheTurn = must(reduce(after, 'p1', { type: 'END_TURN' }, CTX));
+    // p2 goes next and holds nothing, so p2 is dealt from the deck.
+    expect(restOfTheTurn.activePlayer).toBe('p2');
+    expect(restOfTheTurn._pendingCard).not.toBe(held);
+    const p2 = must(reduce(restOfTheTurn, 'p2', { type: 'ANSWER', side: 0 }, CTX));
+    const p3Turn = must(reduce(p2, 'p2', { type: 'END_TURN' }, CTX));
+    expect(p3Turn.activePlayer).toBe('p3');
+    const p3 = must(reduce(p3Turn, 'p3', { type: 'ANSWER', side: 0 }, CTX));
+    const p1Turn = must(reduce(p3, 'p3', { type: 'END_TURN' }, CTX));
+    expect(p1Turn.activePlayer).toBe('p1');
+    expect(p1Turn._pendingCard, 'the held card is the one p1 is put').toBe(held);
+    expect(p1Turn.players.p1!.ideologyCards ?? []).toEqual([]);
   });
 });
 

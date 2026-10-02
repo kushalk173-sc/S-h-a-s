@@ -145,6 +145,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 10 | `ct-et2040-010` | The Long Commute | `inferred` | original; REF §8.2 |
 | 11 | `ct-et2040-011` | Load Shedding, Properly Explained | `inferred` | original; REF §8.2 |
 | 12 | `ct-et2040-012` | Server Space | `inferred` | original; REF §8.2. Deliberately does **not** restate SELECTIVE ACCESS MEMORY (G17) |
+| 13 | `ct-et2040-013` | Holo Sapiens | `adapted` | REF §4.2.1 verbatim, on its first sentence alone. G20 `move-card`. Same archetype as `ct-in2020-011`; see KNOWN-GAPS.md G20 |
 
 ### `et2040` / headline — 15 cards
 
@@ -180,6 +181,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 8 | `ct-in2020-008` | Kharcha Uthao | `inferred` | original; REF §8.2 rule 5. Does **not** restate COUGH IT UP (G2) |
 | 9 | `ct-in2020-009` | Chhoti Si Chori | `inferred` | original; REF §8.2 rule 5 |
 | 10 | `ct-in2020-010` | Pet Ka Register | `inferred` | original; REF §8.2 rule 5 |
+| 11 | `ct-in2020-011` | Jumla | `adapted` | REF §4.2.2 verbatim, on its first sentence alone. G20 `move-card`. The India skin of the Holo Sapiens archetype; see KNOWN-GAPS.md G20 |
 
 > Naming note: `ct-in2020-001` ("Jumlai Dafaar") and `ct-in2020-010` ("Pet Ka Register") are
 > **not** the recovered cards JUMLA and CHAI-PAANI. Those names are Memesys' and are
@@ -234,7 +236,7 @@ Every one is `inferred`. **There is no verbatim Voter Card to import** — see �
 ## 4. Disposition of every recovered card — the audit trail
 
 Nothing recovered is dropped silently. **52 distinct recovered cards** are accounted for
-below. 11 ship `adapted`; 41 do not ship, each with the reason.
+below. 13 ship `adapted`; 39 do not ship, each with the reason.
 
 Counting note: REF §4 lists 56 card rows across its four tables. Four are duplicates by
 effect (REF §4.3: *"Deduplicate by effect, not by name"*) — SUBMERGED ≡ NEW FACE WHO DIS,
@@ -251,10 +253,10 @@ excluded.
 | A Grave Inheritance | **ships** `adapted` as `ct-et2040-001` | G2 |
 | Block | not representable | G13 — out-of-turn reactive cancellation; REF §5.4: a change of phase, not of resources |
 | Cut, Copy, and Paste | not representable | G16 zone-scoped, G22 spans two turns, G-new convert-own |
-| Deep Thoughts | not representable | no op borrows an opponent's Ideologue powers |
+| Deep Thoughts | not representable | no op borrows an opponent's Ideologue powers. **Not a G20 card** despite the row-9 table: move-card moves cards, not powers |
 | Deflect | not representable | G13 — retargeting, and it needs partial-effect granularity |
 | Eradicating Germs | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
-| Holo Sapiens | not representable | G15 dynamic price, G20 card moving, re-filing, expiry on purchase |
+| Holo Sapiens | **ships** `adapted` as `ct-et2040-013` | G20 landed — only *"This is an extra Ideology Card"*. G15 dynamic price, G17 the "of your choice", G23 re-filing, G12 expiry-on-purchase |
 | If You Like Piña Colada | not representable | mat-wide doubling with a cap check; no `gain`/`lose` op scales a whole pool |
 | Lab-Grown Earworm | not representable | G14 trigger on *another* player's purchase; plus self-limiting copies |
 | Power Trip | not representable | G14 trigger |
@@ -272,8 +274,8 @@ excluded.
 | card | disposition | blocking gap |
 |---|---|---|
 | Chai-Paani | not representable | **the base effect was never recovered.** Only a re-application clause exists (*"a second card can be applied on the same player; the first gets deactivated"*), from a search snippet of S2. Shipping it would mean authoring the whole card under a recovered name |
-| Jumla | not representable | G15 (*"as many resources as the Ideologue level this card is on"*) + G20 (the card is a movable object) |
-| Cult-ivating Obedience | not representable | protection of a specific majority; G-new convert-own; G20 card transfer. Recovered from S5, not from a player-aid |
+| Jumla | **ships** `adapted` as `ct-in2020-011` | G20 landed, so the card is a movable object and the first sentence executes. Still dropped: G15 (*"as many resources as the Ideologue level this card is on"* — a computed price the seller reads), G17 (*"of your choice"* — a choice over the pile's contents, which is a new `Choice` kind the client owns), G23 (re-filing under another Ideologue). See KNOWN-GAPS.md G20 |
+| Cult-ivating Obedience | not representable | protection of a specific majority; G-new convert-own. Recovered from S5, not from a player-aid. **Still not G20-only** now that G20 has landed: a protection is a PlayerState field, not an effect |
 
 ### 4.3 Names recovered without an effect — REF §4.2.2, from the S1 blurb
 
@@ -291,17 +293,17 @@ excluded.
 | DOSTI BANI RAHE | not representable | G15 + G22 — *your* Gerrymandering Rights, read on *their* turn |
 | KHAKI TERROR | **ships** `adapted` as `hl-in2020-007` | G5, G10 |
 | GROWING DISSENT | not representable | G9 + G14 |
-| A CALL FROM KARACHI | not representable | G13 auction + G17 deck search + G20; also explicitly *"you don't need to reveal this card"* |
+| A CALL FROM KARACHI | not representable | G13 auction (ruled out with a cost) + G17 deck search + G18; also explicitly *"you don't need to reveal this card"* |
 | STAY IN YOUR LIMITS | not representable | G2 — per-player iteration plus a conditional bonus |
-| POLO RETREAT | not representable | no op borrows another player's Level 3 powers |
+| POLO RETREAT | not representable | no op borrows another player's Level 3 powers. **Not G20**: nothing here moves a card |
 | NEXT BILLION DATA POINTS | not representable | G13 vote (no self-votes, re-vote on tie) |
 | PYTHONPOST | not representable | G9 rest-of-game purchase surcharge + G5 |
 | SUBMERGED | ships as `hl-et2040-001` | same card as NEW FACE WHO DIS (REF §4.3); **not double-counted** |
 | COUGH IT UP | **now partially playable** — see §4.7 | `evict` carries `target` since commit `9d1326c`, so *"All your opponents evict 1 voter"* plays. The conditional bonus — *"if a player breaks a majority using this action, all other players gain 1 resource of their choice"* — is still G2: no op reads board state to decide a payout |
 | NERO'S GUESTS | not representable | G16 — zone-scoped, all-or-nothing, *"this zone"* context |
 | ON THE "HIGH" SEAS | not representable | G11 hostage — a persistent board-resident object holding 4 pegs |
-| A COWARD OR A JOURNALIST? | not representable | G12 + G20 — donate an Ideology Card down the seat order |
-| BLESSINGS OF PARENTS PAST | not representable | G17 + G20 + a defined two-player resolution order |
+| A COWARD OR A JOURNALIST? | not representable | **G20 has landed and this is STILL blocked**, which is the interesting entry here. It needs `from: 'pending'` — donating the card you have been PUT — and that is refused AT THE TYPE LEVEL, because it would tell a mid-answer player the card exists, offer a look at it by proxy, and empty `_pendingCard` into a soft-lock where `ANSWER` and `END_TURN` are both illegal. It needs G12's in-flight queue (an owner, a seat, a deadline) besides. See KNOWN-GAPS.md G20 |
+| BLESSINGS OF PARENTS PAST | not representable | G17 (choose 2 of 2 Voter Cards) + a Voter Card donation, which is not an Ideology Card hand at all + a defined two-player resolution order. **Not G20-blocked** now |
 
 ### 4.5 Headline Cards, Earth 2040 — S4, REF §4.3
 
@@ -309,12 +311,12 @@ excluded.
 |---|---|---|
 | 404 | not representable | G18 — swaps who answers which card |
 | Ain't No Cure For Love | **ships** `adapted` as `hl-et2040-003` | G1, G-new |
-| As Clear As Water | not representable | G17 + G18 + G20 |
+| As Clear As Water | not representable | G17 + G18 (a REVEAL of a Conspiracy Card, and who reveals first). **Not G20-blocked** now |
 | Brave New Worlds | not representable | G18 — and it suppresses passive income |
-| Card Games | not representable | G12 + G20. Same card as A COWARD OR A JOURNALIST? |
+| Card Games | not representable | identical to A COWARD OR A JOURNALIST?, so identically blocked: G12 plus the `from: 'pending'` refusal. See that row |
 | Don't Kiss The Babies | not representable | G5 — a purchase surcharge, i.e. a cost modifier |
 | Fatality | not representable | G1 — donate voters to any opponent, placed immediately |
-| Fuelling The News | not representable | G17 + G20 |
+| Fuelling The News | not representable | G17 (draw 3 Headlines) + G18 (choose the resolution order). The *giving* half moves Headline Cards, and move-card is Ideology-only. **Not G20-blocked** now |
 | Gender Trouble | not representable | G5 + G22 |
 | Good Gig Well Played | **ships** `adapted` as `hl-et2040-011` (keep-one branch) | G17, G20 |
 | Higgs Moron | not representable | G10 (tokens on a card) + G12 (timed pass) |

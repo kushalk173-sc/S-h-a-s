@@ -95,7 +95,7 @@ const PROBES: readonly Probe[] = [
   { name: 'Deep Thoughts', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G20', note: "borrow an opponent's powers" },
   { name: 'Deflect', ref: '4.2.1', kind: 'conspiracy', reduction: [], gap: 'G13', interrupt: { op: 'deflect', window: 'always', target: 'any-card' }, responder: 'p2', at: 'p3', note: 'the REACTIVE half: DEFLECT redirects the card under response onto a third player. Two named deviations, both on the type: it redirects the WHOLE resolution rather than "only that partial effect" on the defender (applyEffect computes one target for the effect list, so per-effect granularity is G20), and it ships target: any-card rather than card-affecting-you because "a card that affects YOU" needs a decision over players, which is G1' },
   { name: 'Eradicating Germs', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'refresh-market', until: 'rest-of-game' }], gap: 'G3', note: 'the RECURRING obligation — "discard an open Voter Card every turn (mandatory)" — is now installed as a standing live effect and re-applied at the top of every one of your turns; the per-card reward is dropped' },
-  { name: 'Holo Sapiens', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'dynamic price, card moves, expiry on purchase' },
+  { name: 'Holo Sapiens', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'you' }], gap: 'G15/G17', note: 'SHIPS on "this is an extra Ideology Card" alone — the card\'s whole identity. DROPPED for three NAMED gaps: "of your choice" is G17 (a choice over the draw pile\'s contents, a new Choice kind the client owns); the price an opponent pays is G15\'s `price` field, a computed cost the SELLER reads; re-filing under a different Ideologue is G23, and the expiry-on-purchase clause is G12. THE SAME ARCHETYPE AS JUMLA — REF 4.2.2 says so outright — so this is the Earth 2040 skin of ct-et2040-013 / ct-in2020-011 and the three omissions are identical. NOTE WHAT THE OP IS NOT ALLOWED TO REACH: not from the Ideology DISCARD pile, because a discard-pile Ideology Card has been answered and p13 makes that face up under its owner\'s mat, so handing one over blind would publish the answer instead of concealing it' },
   { name: 'If You Like Pina Colada', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'gain', res: { funds: 1, clout: 1, media: 1, trust: 1 }, per: { of: 'held-of-each-resource' } }], gap: 'G4', note: 'FAITHFUL: a res of 1 in each resource multiplied by what you hold of each IS a doubling of the mat, and the cap still applies on top — the card own second sentence' },
   { name: 'Lab-Grown Earworm', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'steal-any', n: 1, when: 'on-voter-influenced', until: 'rest-of-game' }], gap: 'G1', note: 'NOT FAITHFUL, and named: the chosen-opponent binding is G1, so the hook fires on ANY influence including your own and the thief picks the victim. STRICTLY STRONGER than the printed card — this would need a ruling before it ships' },
   { name: 'Power Trip', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'discard-voter', n: 1, target: 'each-opponent', when: 'on-voter-influenced', until: 'rest-of-game', condition: { byOwner: true, influencedVotersAtLeast: 3 } }], gap: 'G14', note: 'dropped: "non-majority" — the engine reach here is any peg a victim owns. Otherwise faithful, and slightly WEAKER, because each opponent chooses which of their own' },
@@ -109,7 +109,7 @@ const PROBES: readonly Probe[] = [
 
   // ── India Conspiracy Cards, REF §4.2.2 ───────────────────────────────────
   { name: 'Chai-Paani', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'unknown', note: 'base effect never recovered' },
-  { name: 'Jumla', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'value read off a card; card is a movable object' },
+  { name: 'Jumla', ref: '4.2.2', kind: 'conspiracy', reduction: [{ op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'you' }], gap: 'G15/G17', note: 'SHIPS as ct-in2020-011 on "this is an extra Ideology Card" alone. DROPPED for NAMED gaps: "of your choice" is G17; the price an opponent pays is G15\'s `price` field; re-filing under a different Ideologue is G23. Same archetype as HOLO SAPIENS per REF 4.2.2 — one template, two campaign skins — so this and Holo Sapiens share a reduction and neither is counted as a new archetype' },
   { name: 'Cult-ivating Obedience', ref: '4.2.2', kind: 'conspiracy', reduction: null, gap: 'G-new/G20', note: 'convert own voters, transfer a card' },
 
   // ── Headline Cards, all campaigns, REF §4.1 ───────────────────────────────
@@ -186,7 +186,22 @@ const underResponseId = (p: Probe) => `under-${probeId(p)}`;
  * (`evict`, `discard-voter`, `convert-voter`) have something to reach, which is the
  * whole question for five of these cards.
  */
-/** A tiny Ideology deck, declared here so the position cannot drift with the corpus. */
+/**
+ * A tiny Ideology deck, declared here so the position cannot drift with the corpus.
+ *
+ * **TWO cards, and the second one exists for G20.** `setup` deals one card to the
+ * opening player, so a ONE-card deck leaves `_ideologyDraw` EMPTY for the whole probe —
+ * and `move-card`'s only source is the Ideology draw pile, so JUMLA and HOLO SAPIENS
+ * were both measured as "played, NO-OP" in a position the real game never produces. That
+ * is the failure mode this file exists to prevent: a capability reported as absent
+ * because the harness could not reach it. A real table is drawing from a real deck.
+ *
+ * `draw.i` is already in `fingerprint()`, so the extra card is measurable without
+ * putting the private HAND in the fingerprint — which would be wrong, because
+ * `ideologyCards` is hidden from every viewer including its holder (see
+ * `PRIVATE_PLAYER_KEYS`). The probe may observe how many cards left the deck; it must
+ * not observe which, because no client may.
+ */
 const FIXTURE_IDEOLOGY = [
   {
     id: 'probe-ig-a',
@@ -195,6 +210,15 @@ const FIXTURE_IDEOLOGY = [
     sides: [
       { answer: 'Yes.', ideologue: 'capitalist' as const, pays: { funds: 1 } },
       { answer: 'No.', ideologue: 'idealist' as const, pays: { trust: 1 } },
+    ],
+  },
+  {
+    id: 'probe-ig-b',
+    campaign: 'probe',
+    question: 'Is there still a card in the draw pile?',
+    sides: [
+      { answer: 'Yes.', ideologue: 'supremo' as const, pays: { clout: 1 } },
+      { answer: 'No.', ideologue: 'showstopper' as const, pays: { media: 1 } },
     ],
   },
 ] as const;

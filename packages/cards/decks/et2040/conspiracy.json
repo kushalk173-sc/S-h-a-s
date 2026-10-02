@@ -110,6 +110,15 @@
       "text": "Draw the top Conspiracy Card and keep it. You also get 2 discounts on purchases this turn.",
       "cost": 4,
       "effects": [{ "op": "draw-conspiracy", "n": 1 }, { "op": "discount", "n": 2 }]
+    },
+    {
+      "id": "ct-et2040-013",
+      "source": "REF 4.2.1 (scribd 915391788) recovers Holo Sapiens. SHIPS ON ITS FIRST SENTENCE ALONE - 'This is an extra Ideology Card' - put to you at your next turn. Same template as Jumla per REF 4.2.2, so the identical reduction to ct-in2020-011 and the identical omissions: G17, G15's price field, G23, and G12 for expiry-on-purchase. Not counted twice as an archetype. Argument in KNOWN-GAPS.md G20.",
+      "provenance": "adapted",
+      "name": "Holo Sapiens",
+      "text": "This is an extra Ideology Card. You will be put it at the start of your next turn, face down, and you will not be told which one.",
+      "cost": 5,
+      "effects": [{ "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "you" }]
     }
   ]
 }
