@@ -102,6 +102,23 @@ row says so — that is the point of this log.
 | 36 | §6.4's **D3 definition** corrected to match the code | Doc said "an *ideologue* `i` … `ΣX[i] ≥ level3`" — an Ideologue index compared against a Resource index. Code counts **threshold crossings** (`balance.ts:191-200`), because the per-direction test reports a cliff twice on `{trust:3}` vs `{funds:3}`, a perfectly symmetric card |
 | 37 | This log, §7 statuses, M2b, §9 re-rank | — |
 
+### 2026-10-02 — the projection offered a card the engine refuses · ✅ VERIFIED
+
+| # | What landed | Evidence |
+|---|---|---|
+| 38 | **Fixed a real defect: the PLAY projection offered a Conspiracy Card the reducer refuses during a G13 response window** | `playableConspiraciesFor` transcribed 6 of the 7 guards `reduce` applies to `PLAY_CONSPIRACY` and missed the window check, so the client rendered a PLAY button that could only ever fail. This is the same class as the earlier "server tells the client to do something the engine refuses" fixes |
+| 39 | **The rule is a blanket ban, and that is the rule rather than the easy answer** | `reduce.ts:1576-1584` places the window check FIRST — above the per-player freeze, above the turn check, above the phase check — and exempts three **action types** (`RESPOND_INTERRUPT`, `PASS_INTERRUPT`, `RESOLVE_CHOICE`), not seats and not phases. So the **actor is refused too**, and in both `actions` and `answer`. Narrowing to "the actor" or to a phase would re-introduce the bug; a test asserts the actor's own refusal by name |
+| 40 | **It cannot break responding, and that is asserted rather than assumed** | Answering is `RESPOND_INTERRUPT` — a different action type the reducer exempts outright, so it never reaches the hand guard. Tests still close a window with a real BLOCK (`cards leave hand, answer logged by name, "Blocked …" logged`) and still close it by all-declines |
+| 41 | The old oracle test **could not have caught this**, and the reason is recorded | `secret-state.test.ts` asks `reduce` rather than re-transcribing the rules — but walks `CONSPIRACY_CORPUS`, in which **no state ever has an open window**. Every window the driver reaches opens during `headlines`, which the *phase* guard already covered. The blind spot was the corpus, not the assertion |
+| 42 | New tests build a window **during `actions`**, which is where the defect reproduced | The driver never plays a Conspiracy Card, so `resolveCard` is only reached from `ACK_HEADLINE`. The new fixture walks to a free `actions` state, deals the actor two real conspiracies and a non-actor a BLOCK, and plays one — `resolveCard` stages from `PLAY_CONSPIRACY` as readily as from `ACK_HEADLINE` |
+| 43 | **Non-vacuity proven twice** | In-suite counterfactual: with `interrupt` nulled the same hands yield **12/322** non-empty seat-views; with the window open, **0/322**. Out-of-suite: with the guard commented out the suite **fails** — `2p seed 1 (actions window), phase actions, viewer p1: the projection offers a card the engine refuses: expected [ 'ct-et2040-005' ] to deeply equal []` |
+| 44 | 212 server tests pass (207 before) | `npm test --workspace @shasn/server` → **212 passing**; `npm run typecheck` from root → **exit 0**, secret gate **clean** |
+| 45 | **G13 reconciled: 2 of the 5 phase-changing ops shipped** | `block` / `deflect` ship as `ct-et2040-014` / `ct-et2040-015`, resolve through `RESPOND_INTERRUPT`, and `npm run playable` in `packages/cards` (which drives every recovered card through the real reducer) reports **25 of 54 played, 0 refused, 29 inexpressible**. `ARCHITECTURE.md` gaps row **5 → 3**; this checklist item marked done for `block`/`deflect` |
+| 46 | Both reactive cards ship as **`adapted`**, dropped clauses named | BLOCK drops the discard-an-open-card branch, blocking a card *stealing this card*, cleansing an active card, and the multi-turn clause (G9). DEFLECT drops *"affects **you**"* (`target` is `any-card`, because `reachesPastActor` is an approximation) and redirects the **whole** resolution, not the partial effect — G20. **0 verbatim, unchanged.** `auction`, `vote`, `pass-card` remain outstanding |
+
+**No new unverified claims from this pass.** The three remaining phase-changing ops are
+still inexpressible, so M2b's priority is unchanged.
+
 **Claims in this repository that are still NOT verified by anything.** Listed so they are
 not mistaken for shipped:
 - The client's server-wiring (row 32) — **no live session**
@@ -597,8 +614,13 @@ M1 checklist:
       `PlayerState`, so it is an engine change and touches `playerView`'s private-key
       reasoning. Sequence it deliberately.
 - [ ] Give the five phase-changing ops (`block`, `deflect`, `auction`, `vote`,
-      `pass-card`) a home **outside `Effect[]`** — **G13, 5 cards.** They change the
-      *phase*; no amount of `Effect` vocabulary expresses them.
+      `pass-card`) a home **outside `Effect[]`** — **G13, 3 cards outstanding.** They
+      change the *phase*; no amount of `Effect` vocabulary expresses them. **`block` and
+      `deflect` are DONE** — shipped as `ct-et2040-014` / `ct-et2040-015` and resolved by
+      `RESPOND_INTERRUPT`, which is a sibling card field rather than an `Effect`; both
+      report PLAYED under `npm run playable`, which puts the corpus at **25 of 54**.
+      Still outstanding: `auction` (needs a `PlayerState` debt field and an IOU), `vote`
+      (a ballot with a re-vote rule), `pass-card` (an in-flight queue plus a target).
 - [ ] Support dynamic values read off own state — **G15, 5 cards**
 - [ ] **First move, deliberately small: a one-line `gerrymander` target field.** Not
       because it is the biggest gap but because it is the only one with a one-line fix,

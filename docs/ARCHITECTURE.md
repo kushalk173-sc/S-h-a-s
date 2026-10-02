@@ -2367,7 +2367,7 @@ The gaps that cost the most cards (`KNOWN-GAPS.md` §0):
 | G9 `duration` + G22 "next turn" scope | **11** | no way to say "this turn" / "rest of game". **G9 is called the single highest-value fix in the file.** |
 | G14 `when` / triggers | **6** | effects that fire *on* another event, not on resolution |
 | G5 `PlayerState` restriction | **5** | **a state change, not a card change** — e.g. "you may not buy Conspiracies next turn" |
-| G13 phase-changing ops | **5** | `block`, `deflect`, `auction`, `vote`, `pass-card` **do not belong in an `Effect[]` at all** — they change the *phase* |
+| G13 phase-changing ops | **3** | `auction`, `vote`, `pass-card` **do not belong in an `Effect[]` at all** — they change the *phase*. **`block` and `deflect` are no longer lost**: they ship as `ct-et2040-014` / `ct-et2040-015`, resolve through `RESPOND_INTERRUPT` rather than `applyEffect`, and both report **PLAYED** under `npm run playable` (G13 row: 2 played, 3 inexpressible) |
 | G15 dynamic value off own state | **5** | "gain as many funds as you have media" |
 | G17 deck search | **4** | look into a deck |
 | G16 zone-scoped operation | **3** | |
@@ -2479,6 +2479,30 @@ enumerated gaps (G13) are *phase-changing ops that do not belong in an `Effect[]
 all*, and eleven more are `duration`/scope — which is precisely the vocabulary M6's
 Headline and Conspiracy screens need. Building M6 against the current schema means
 building a UI for effects the engine cannot evaluate.
+
+> **Status 2026-10-02 — G13 is two-fifths closed, and the note above now overstates it.**
+> Of the five phase-changing ops, `block` and `deflect` **ship and execute**: they are
+> `ct-et2040-014` and `ct-et2040-015` in the live corpus, they resolve through
+> `RESPOND_INTERRUPT` (a sibling card field, not an `Effect`), and `npm run playable` in
+> `packages/cards` — which drives every recovered card through the real reducer rather
+> than asking whether the schema parses it — reports **both as PLAYED**, taking the corpus
+> to **25 of 54** played. `auction`, `vote` and `pass-card` remain inexpressible, which is
+> why the row above is now 3 and not 5: an auction needs a `PlayerState` debt field and an
+> IOU, a vote needs a ballot with a re-vote rule, and a pass needs an in-flight queue plus
+> something to pass the card to.
+>
+> Both reactive cards ship as **`adapted`, not `verbatim`**, and their dropped clauses are
+> named in their own `source` fields rather than here. BLOCK drops the *discard an open
+> Conspiracy or Headline Card* branch, blocking a card *stealing this card*, cleansing an
+> already-active card, and the multi-turn "immediately, not midway" clause (G9).
+> DEFLECT drops *"a card that affects **you**"* — its `target` is `any-card`, because the
+> engine's `reachesPastActor` is an approximation over the whole effect list — and it
+> redirects the **whole** resolution rather than only the partial effect that touched the
+> defender, which is G20's granularity. **0 cards ship as `verbatim`**, and that count did
+> not move.
+>
+> Nothing about the defect fixed alongside this changes M2b's priority: the remaining three
+> ops are still phase-changing, and the eleven `duration`/scope cards are untouched.
 
 ### 7.3 M0r — Engine repair · ✅ COMPLETE
 
