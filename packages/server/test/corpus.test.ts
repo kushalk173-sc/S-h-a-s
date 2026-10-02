@@ -55,18 +55,48 @@ import { freshShippedCorpus, majoritiesOn, pegsOn, playInProcess } from './drive
 const SHIPPED = {
   ideology: 52, // 20 (et2040) + 32 (in2020). ONE PER TURN. This is the cliff.
   voter: 18,
-  conspiracy: 22,
+  conspiracy: 24, // 22 + JUMLA + HOLO SAPIENS (G20).
   headline: 26,
 } as const;
+
+const cards = loadCards();
+const ctx: Ctx = { rules: RULES, cards };
+
+/**
+ * THE SAME FOUR NUMBERS, MEASURED RATHER THAN QUOTED.
+ *
+ * `SHIPPED` above is a deliberate literal and must stay one: it is the tripwire that
+ * makes a rebalance a visible edit to this file rather than a silent one. But quoting
+ * a literal is only right where the QUESTION is "has the shipped corpus changed?".
+ *
+ * Every assertion in the second `describe` below asks a different question — "is the
+ * deck the tests are playing the same deck the server boots with?" — and answering it
+ * against a literal is a category error twice over. G20 added two Conspiracy Cards and
+ * turned four such assertions red without anything being wrong: a hardcoded size in a
+ * test whose entire purpose is to prove the suite is not playing a synthetic corpus is
+ * the same structural blindness this file was written to catch, one layer down. It
+ * cannot distinguish "the corpus changed" from "the test was wrong", and its failure
+ * mode is worse than useless, because fixing it means editing a number to match
+ * whatever the code now does — which is a tautology, not a test.
+ *
+ * So the split is: literals answer "did the corpus change", these answer "are these
+ * two things the same list". A new card now moves `SHIPPED` (deliberately) and leaves
+ * every derived assertion green (correctly).
+ */
+const d0 = decksOf(cards);
+const dealt = {
+  ideology: d0.ideologyDeck.length,
+  voter: d0.voterDeck.length,
+  conspiracy: d0.conspiracyDeck.length,
+  headline: d0.headlineDeck.length,
+} as const;
+const dealtTotal = dealt.ideology + dealt.voter + dealt.conspiracy + dealt.headline;
 
 /** 6+11+6+9+5+9+6+11+6: the pegs needed to hold a majority in all nine zones. */
 const MAJORITY_PEGS = 69;
 
 /** 129 areas on the board. p20's board-full ending threshold. */
 const FULL_BOARD = 129;
-
-const cards = loadCards();
-const ctx: Ctx = { rules: RULES, cards };
 
 function sum(d: Readonly<Record<string, number>>): number {
   let total = 0;
@@ -167,7 +197,7 @@ describe('the shipped corpus is the corpus', () => {
     expect(ops.size, `the shipped headlines now carry ${ops.size} distinct effect ops`).toBe(12);
   });
 
-  it('has 22 Conspiracy Cards whose effects are not all "gain funds"', () => {
+  it('has a Conspiracy deck of the pinned size whose effects are not all "gain funds"', () => {
     // Not load-bearing for the driver, which never plays a Conspiracy, but a
     // corpus where every conspiracy is `gain funds 2` would make the Conspiracy
     // deck inert and the 4-5 cost prices meaningless.
@@ -199,10 +229,10 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // visibly, instead of quietly reintroducing a 4.6x deck.
     const h = await startHarness({ dispatchRate: 4000 });
     try {
-      expect(Object.keys(h.ctx.cards.ideology)).toHaveLength(SHIPPED.ideology);
-      expect(Object.keys(h.ctx.cards.voter)).toHaveLength(SHIPPED.voter);
-      expect(Object.keys(h.ctx.cards.conspiracy)).toHaveLength(SHIPPED.conspiracy);
-      expect(Object.keys(h.ctx.cards.headline)).toHaveLength(SHIPPED.headline);
+      expect(Object.keys(h.ctx.cards.ideology)).toHaveLength(dealt.ideology);
+      expect(Object.keys(h.ctx.cards.voter)).toHaveLength(dealt.voter);
+      expect(Object.keys(h.ctx.cards.conspiracy)).toHaveLength(dealt.conspiracy);
+      expect(Object.keys(h.ctx.cards.headline)).toHaveLength(dealt.headline);
       // And it is the SAME corpus, by content hash, not merely the same size. A
       // harness handed a copy of the real cards would satisfy the counts.
       expect(cardsVersion(h.ctx.cards)).toBe(cardsVersion(loadCtx().cards));
@@ -250,11 +280,17 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // Ideology Card into hand and puts three Voter Cards on the Mat, so it reports 51
     // and 15. Asserted as "no larger than the dealt deck", which is what a draw pile
     // can be, plus the turn number, which is the real point.
+    //
+    // The ceiling is `dealt`, measured off `decksOf`, and NOT `SHIPPED`. What is being
+    // asserted is that the draw pile never exceeds the deck that was dealt — a relation
+    // between two things the engine produced — so a literal here would be asserting
+    // that the engine agrees with a number typed by hand, which is what turned four
+    // assertions red when G20 shipped two cards and proved nothing about the game.
     const view = playerView(run.state, run.state.turnOrder[0] ?? 'p_1');
     expect(view.turn, 'the projected state is not past the turn-52 cliff').toBeGreaterThan(SHIPPED.ideology);
     for (const [deck, reported] of Object.entries(view.deckSizes)) {
       expect(reported, `the projected ${deck} draw pile is larger than the deck that was dealt`).toBeLessThanOrEqual(
-        SHIPPED[deck as keyof typeof SHIPPED],
+        dealt[deck as keyof typeof dealt],
       );
       expect(reported, `the projected ${deck} draw pile is negative`).toBeGreaterThanOrEqual(0);
     }
@@ -265,16 +301,37 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // decisions the synthetic corpus could never produce. Without this, a driver
     // that quietly degraded to "answer side 0 and hope" would still pass the
     // winnability tests at a seat count where the headlines happened to be benign.
-    const kinds = new Set<string>();
+    //
+    // WHY A SEED RANGE AND NOT ONE SEED — G20
+    //
+    // This used to play seed 3 at all four seat counts and assert the union covered
+    // all five kinds. It passed, and then G20 added two Conspiracy Cards and it
+    // failed, because the decks share one shuffle stream: adding two cards to the
+    // Conspiracy pile moves every subsequent draw, so the whole game plays
+    // differently and seed 3 stopped producing `discard-voter` and `steal-any` at
+    // EVERY seat count. Nothing was wrong with the driver and nothing was wrong with
+    // the corpus — the fixture was one shuffle's luck, sampled once.
+    //
+    // That is the failure mode this file exists to prevent, wearing the costume of a
+    // passing test: an assertion whose subject is "the driver handles every kind"
+    // quietly narrowed to "one seed's headlines happened to raise three of them".
+    // So the sweep is a RANGE, and the claim is per seat count rather than over the
+    // union — a corpus change that stops raising a kind at 2 seats now says so,
+    // instead of being masked by 4 seats raising it.
+    const KINDS = ['evict-voter', 'discard-voter', 'steal-any', 'lose-any', 'gain-any'];
+    const SEEDS = [1, 2, 3, 4, 5];
     for (const n of [2, 3, 4, 5]) {
-      const run = playInProcess(freshShippedCorpus(3, n, ctx), ctx, { maxActions: 1200 });
-      expect(run.state.finished, `${n} seats did not finish: ${run.reason}`).toBe(true);
-      for (const k of run.choiceKinds) kinds.add(k);
-    }
-    // `evict-voter`, `discard-voter` and `steal-any` are the three that freeze a
-    // player. The synthetic corpus produced NONE of them.
-    for (const k of ['evict-voter', 'discard-voter', 'steal-any', 'lose-any', 'gain-any']) {
-      expect(kinds.has(k), `the driver never met a \`${k}\` decision across 2/3/4/5 seats`).toBe(true);
+      const kinds = new Set<string>();
+      for (const seed of SEEDS) {
+        const run = playInProcess(freshShippedCorpus(seed, n, ctx), ctx, { maxActions: 1200 });
+        expect(run.state.finished, `${n} seats, seed ${seed} did not finish: ${run.reason}`).toBe(true);
+        for (const k of run.choiceKinds) kinds.add(k);
+      }
+      // `evict-voter`, `discard-voter` and `steal-any` are the three that freeze a
+      // player. The synthetic corpus produced NONE of them.
+      for (const k of KINDS) {
+        expect(kinds.has(k), `the driver never met a \`${k}\` decision at ${n} seats across seeds ${SEEDS.join('/')}`).toBe(true);
+      }
     }
   });
 
@@ -295,7 +352,7 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // `Object.keys`, so this is file order, and the seed does the shuffling. An
     // unstable order would silently break replay after a restart.
     expect(new Set([...d.ideologyDeck, ...d.voterDeck, ...d.conspiracyDeck, ...d.headlineDeck]).size).toBe(
-      SHIPPED.ideology + SHIPPED.voter + SHIPPED.conspiracy + SHIPPED.headline,
+      dealtTotal,
     );
     // …and every id in them resolves to a real card, so a deck array can never name
     // something the reducer would refuse. Read through the PROJECTION, because the
@@ -305,10 +362,10 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // hand and onto the Mat: one Ideology Card and `RULES.marketSize` Voter Cards.
     const view = playerView(fresh, 'p1');
     expect(view.deckSizes, 'the projection does not report the deck sizes').toEqual({
-      ideology: SHIPPED.ideology - 1,
-      voter: SHIPPED.voter - RULES.marketSize,
-      conspiracy: SHIPPED.conspiracy,
-      headline: SHIPPED.headline,
+      ideology: dealt.ideology - 1,
+      voter: dealt.voter - RULES.marketSize,
+      conspiracy: dealt.conspiracy,
+      headline: dealt.headline,
     });
     expect(view.awaitingAnswer, 'a fresh setup should be awaiting an answer').toBe(true);
   });
