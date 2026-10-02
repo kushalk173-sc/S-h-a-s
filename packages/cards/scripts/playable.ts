@@ -32,11 +32,12 @@ import {
   toEngineVoterCard,
   type Corpus,
 } from '../src/corpus.js';
-import { unexecutedEffectProblems } from '../src/executable.js';
-import { RULES, type CardIndex, type Effect } from '../src/engine.js';
+import { unexecutedEffectProblems, unexecutedCardProblems } from '../src/executable.js';
+import { RULES, type CardIndex, type Effect, type Interrupt } from '../src/engine.js';
 
 import { reduce } from '../../engine/src/reduce';
 import { setup } from '../../engine/src/setup';
+import type { Action } from '../../engine/src/actions';
 import type { AreaID, ChoiceScope, GameState, PlayerID } from '../../engine/src/state';
 
 /** Sum of a signed pool. `state.ts` owns it; mirrored here rather than imported as a value. */
@@ -63,15 +64,36 @@ type Probe = {
   readonly gap: string;
   /** Why `reduction` is null, when it is. */
   readonly note?: string;
+  /**
+   * G13. When set, the card carries this `interrupt` instead of being played for its
+   * own effects, and the harness drives the RESPONSE WINDOW: somebody else plays a
+   * card, and then this card is played into the open window by `responder`.
+   *
+   * `played` is the card that goes under response — the one the reactive card acts
+   * ON. It is a separate synthetic card, and it is what makes the probe measure the
+   * mechanic rather than the reactive card's (empty) effect list.
+   */
+  readonly interrupt?: Interrupt;
+  /** The seat holding the reactive card, and where a DEFLECT is pointed. */
+  readonly responder?: PlayerID;
+  readonly at?: PlayerID;
+  /** The card played first, for `block` and `deflect`. Defaults to a fixed payout. */
+  readonly played?: { readonly name: string; readonly effects: readonly Effect[] };
+};
+
+/** The card the response-window probes put on the table. A plain, visible payout. */
+const UNDER_RESPONSE: { readonly name: string; readonly effects: readonly Effect[] } = {
+  name: 'The card under response',
+  effects: [{ op: 'gain', res: { funds: 3 } }],
 };
 
 const PROBES: readonly Probe[] = [
   // ── Earth 2040 Conspiracy Cards, REF §4.2.1 ────────────────────────────────
   { name: 'A Grave Inheritance', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'steal-any', n: 2, target: 'each-opponent' }], gap: 'G2' },
-  { name: 'Block', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13', note: 'out-of-turn reactive cancellation' },
+  { name: 'Block', ref: '4.2.1', kind: 'conspiracy', reduction: [], gap: 'G13', interrupt: { op: 'block', window: 'always', target: 'any-card' }, responder: 'p2', note: 'the REACTIVE half, and it is the half the product replays: BLOCK is played out of turn into the response window and cancels the card under response, including a lasting clause. Dropped: the alternative "Discard an open Conspiracy Card or Headline Card", which needs a discard-the-top op that no recovered card needs' },
   { name: 'Cut, Copy, and Paste', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G16/G22', note: 'zone-scoped, spans two turns' },
   { name: 'Deep Thoughts', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G20', note: "borrow an opponent's powers" },
-  { name: 'Deflect', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G13', note: 'retargeting a partial effect' },
+  { name: 'Deflect', ref: '4.2.1', kind: 'conspiracy', reduction: [], gap: 'G13', interrupt: { op: 'deflect', window: 'always', target: 'any-card' }, responder: 'p2', at: 'p3', note: 'the REACTIVE half: DEFLECT redirects the card under response onto a third player. Two named deviations, both on the type: it redirects the WHOLE resolution rather than "only that partial effect" on the defender (applyEffect computes one target for the effect list, so per-effect granularity is G20), and it ships target: any-card rather than card-affecting-you because "a card that affects YOU" needs a decision over players, which is G1' },
   { name: 'Eradicating Germs', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'refresh-market', until: 'rest-of-game' }], gap: 'G3', note: 'the RECURRING obligation — "discard an open Voter Card every turn (mandatory)" — is now installed as a standing live effect and re-applied at the top of every one of your turns; the per-card reward is dropped' },
   { name: 'Holo Sapiens', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G15/G20', note: 'dynamic price, card moves, expiry on purchase' },
   { name: 'If You Like Pina Colada', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'gain', res: { funds: 1, clout: 1, media: 1, trust: 1 }, per: { of: 'held-of-each-resource' } }], gap: 'G4', note: 'FAITHFUL: a res of 1 in each resource multiplied by what you hold of each IS a doubling of the mat, and the cap still applies on top — the card own second sentence' },
@@ -152,6 +174,9 @@ const CTX = { rules: RULES, cards: INDEX };
 /** A synthetic id for each probe card, so nothing here needs a deck file. */
 const probeId = (p: Probe) => `probe-${p.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
 
+/** The synthetic id of the card a response-window probe puts under response. */
+const underResponseId = (p: Probe) => `under-${probeId(p)}`;
+
 /**
  * A legal opening position, built from fixture decks rather than the corpus.
  *
@@ -173,6 +198,83 @@ const FIXTURE_IDEOLOGY = [
     ],
   },
 ] as const;
+
+/**
+ * THE NEGATIVE CONTROL FOR THE NEW MECHANIC, and it is per-probe rather than
+ * global.
+ *
+ * The control above proves the harness can report a card that does nothing. It
+ * cannot prove a BLOCK did something, because a BLOCK's entire effect is an ABSENCE:
+ * the card under response does not pay out, so the blocked and the never-played states
+ * agree on every pool, and against the no-op control a correct BLOCK would read as
+ * "did nothing". The fingerprint therefore carries the log, and the honest gate for
+ * an interrupt probe is DIFFERENTIAL: the same card, played by the same seat, with
+ * the same effects, resolved the other way.
+ *
+ * For `block` that is the un-blocked play, and the two must differ. For `deflect` it
+ * is the same play answered, and the pools must have moved onto the named player.
+ */
+function resolveInterruptProbe(p: Probe, base: GameState): GameState | { readonly error: string } {
+  const responder = p.responder ?? 'p2';
+  const playedId = underResponseId(p);
+  const actor = 'p1';
+
+  let s: GameState = {
+    ...base,
+    players: {
+      ...base.players,
+      p1: { ...base.players.p1!, conspiracies: [playedId] },
+      [responder]: { ...base.players[responder]!, conspiracies: [probeId(p)] },
+    },
+  };
+  const play = reduce(s, actor, { type: 'PLAY_CONSPIRACY', cardId: playedId }, PROBE_CTX);
+  if (!play.ok) return { error: `the card under response was refused: ${play.error}` };
+  if (play.state.interrupt === null) {
+    return { error: 'no response window opened, so nothing was actually answered' };
+  }
+  s = play.state;
+
+  // Everyone the window is waiting on declines first, so the probe measures the
+  // RESPONSE and not a pass round. p1 already answered the Ideology Card in
+  // `opening()`, so it is not a player the reducer will accept a card from here.
+  const outOfTurnOk = s.phase === 'answer' || s.phase === 'actions';
+  if (!outOfTurnOk) return { error: `the card under response was played in phase ${s.phase}` };
+  for (const seat of s.turnOrder) {
+    if (seat === actor || seat === responder) continue;
+    if (s.interrupt === null) break;
+    const r = reduce(s, seat, { type: 'PASS_INTERRUPT' }, PROBE_CTX);
+    if (!r.ok) return { error: `${seat} could not decline: ${r.error}` };
+    s = r.state;
+  }
+  if (s.interrupt === null) return { error: 'the window closed before the reactive card was played' };
+
+  const answer: Action = { type: 'RESPOND_INTERRUPT', cardId: probeId(p), ...(p.at ? { at: p.at } : {}) };
+  const answered = reduce(s, responder, answer, PROBE_CTX);
+  if (!answered.ok) return { error: `the reactive card was refused: ${answered.error}` };
+  if (answered.state.interrupt !== null) return { error: 'the window did not close on the answer' };
+
+  const settled = settleChoices(answered.state);
+  if ('error' in settled) return settled;
+  return settled.state;
+}
+
+/** The same play with NOBODY holding a reactive card, for the differential gate. */
+function resolveWithoutResponse(p: Probe, base: GameState): GameState | { readonly error: string } {
+  const playedId = underResponseId(p);
+  const s: GameState = {
+    ...base,
+    players: {
+      ...base.players,
+      p1: { ...base.players.p1!, conspiracies: [playedId] },
+    },
+  };
+  const play = reduce(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId: playedId }, PROBE_CTX);
+  if (!play.ok) return { error: play.error };
+  if (play.state.interrupt !== null) return { error: 'a window opened with an empty table' };
+  const settled = settleChoices(play.state);
+  if ('error' in settled) return settled;
+  return settled.state;
+}
 
 /**
  * Route one card through the path its kind really takes, and settle what it raises.
@@ -255,7 +357,30 @@ const PROBE_INDEX: CardIndex = {
     ...Object.fromEntries(
       ALL_PROBE_CARDS.filter((p) => p.kind === 'conspiracy' && p.reduction !== null).map((p) => [
         probeId(p),
-        { id: probeId(p), name: p.name, text: `probe: ${p.name}`, cost: 4, effects: p.reduction ?? [] },
+        {
+          id: probeId(p),
+          name: p.name,
+          text: `probe: ${p.name}`,
+          cost: 4,
+          effects: p.reduction ?? [],
+          ...(p.interrupt ? { interrupt: p.interrupt } : {}),
+        },
+      ]),
+    ),
+    // The card a response-window probe answers. It is an ordinary Conspiracy Card
+    // with an ordinary visible payout, and its whole job is to be cancelled or
+    // redirected — which is why it needs to be a REAL card in the index rather than
+    // something the harness special-cases.
+    ...Object.fromEntries(
+      ALL_PROBE_CARDS.filter((p) => p.interrupt !== undefined).map((p) => [
+        underResponseId(p),
+        {
+          id: underResponseId(p),
+          name: (p.played ?? UNDER_RESPONSE).name,
+          text: 'probe: the card under response',
+          cost: 4,
+          effects: (p.played ?? UNDER_RESPONSE).effects,
+        },
       ]),
     ),
   },
@@ -352,8 +477,29 @@ function opening(): GameState {
  * `until` and `when` card would be reported as "played, NO-OP", which is the one
  * wrong answer a playability measurement must never give: it would read as a
  * capability that does not exist.
+ *
+ * AND, SINCE G13, the log TAIL — with every quoted string normalised to "…" and the
+ * per-play bookkeeping line dropped. A card whose entire effect is an ABSENCE is the
+ * one shape this fingerprint could not see: a BLOCK's whole job is that the card
+ * under response does NOT pay out, so a blocked state and a never-played state agree
+ * on every pool and the block would read as a no-op. The log is where a block is
+ * recorded (`Blocked "…".`, a `system` entry).
+ *
+ * Two normalisations, and both are load-bearing rather than cosmetic:
+ *  - the quoted NAMES are normalised, or every card's `Played "…".` line would differ
+ *    from the control's and the fingerprint would report EVERY probe as changed;
+ *  - the `Played "…".` / `HEADLINE — …` line itself is dropped, because it is
+ *    bookkeeping every card produces and including it makes the no-op control report
+ *    as having moved the state. That is asserted at the bottom of this file, and the
+ *    first version of this change failed exactly there, which is what the control is
+ *    for.
  */
-function fingerprint(s: GameState): string {
+function fingerprint(s: GameState, base?: GameState): string {
+  const from = base?.log.length ?? 0;
+  const tail = s.log
+    .slice(from)
+    .filter((e) => !e.text.startsWith('Played "') && !e.text.startsWith('HEADLINE — '))
+    .map((e) => `${e.kind}:${e.player ?? '-'}:${e.text.replace(/"[^"]*"/g, '"…"')}`);
   return JSON.stringify({
     pools: s.turnOrder.map((id) => s.players[id]?.resources),
     pending: s.turnOrder.map((id) => s.players[id]?.pending),
@@ -368,9 +514,13 @@ function fingerprint(s: GameState): string {
     // SNOOP B-O-DOUBLE-T and DON'T KISS THE BABIES would all report "played, NO-OP"
     // even though the tax they impose is live from this moment on.
     restrictions: s.turnOrder.map((id) => s.players[id]?.restrictions),
+    // G13: a response window holds a card's effects un-applied, and the window's
+    // existence is part of what the mechanic changed.
+    interrupt: s.interrupt,
     pegs: s.zones.flatMap((z) => z.areas).map((a) => (a.peg ? `${a.id}:${a.peg.owner}` : null)),
     market: s.market.map((m) => m.cardId),
     draw: { i: s._ideologyDraw, v: s._voterDraw, c: s._conspiracyDraw },
+    logTail: tail,
   });
 }
 
@@ -506,14 +656,37 @@ function play(p: Probe, base: GameState, controlPrint: string): Verdict {
     return { how: 'inexpressible', why: p.note ?? 'no expressible effect list' };
   }
 
-  const unexecuted = p.reduction.flatMap((e) => unexecutedEffectProblems(e, ''));
+  // G13: a card carrying an `interrupt` is judged on the CARD, not on its (empty)
+  // effect list — `applyEffect` never reads `interrupt`, so asking the effect registry
+  // about a probe with no effects would report it shippable for the wrong reason.
+  const unexecuted = [
+    ...p.reduction.flatMap((e) => unexecutedEffectProblems(e, '')),
+    ...unexecutedCardProblems(
+      { effects: p.reduction, ...(p.interrupt ? { interrupt: p.interrupt } : {}) },
+      '',
+    ),
+  ];
   if (unexecuted.length > 0) {
     return { how: 'unexecutable', why: unexecuted.map((u) => u.message).join('; ') };
   }
 
+  if (p.interrupt !== undefined) {
+    const after = resolveInterruptProbe(p, base);
+    if ('error' in after) return { how: 'refused', why: after.error };
+    // The differential gate. For a BLOCK, "it changed something" is not provable
+    // against the no-op control — its effect is an absence — so the honest test is
+    // that the same card, resolved the other way, lands somewhere else.
+    const unblocked = resolveWithoutResponse(p, base);
+    if ('error' in unblocked) return { how: 'refused', why: `the differential could not run: ${unblocked.error}` };
+    if (fingerprint(after, base) === fingerprint(unblocked, base)) {
+      return { how: 'played', changed: fingerprint(after, base) !== controlPrint };
+    }
+    return { how: 'played', changed: true };
+  }
+
   const after = resolve(p, base);
   if ('error' in after) return { how: 'refused', why: after.error };
-  return { how: 'played', changed: fingerprint(after) !== controlPrint };
+  return { how: 'played', changed: fingerprint(after, base) !== controlPrint };
 }
 
 // ─────────────────────────── the control verdict ───────────────────────────
@@ -523,7 +696,7 @@ const CONTROL_STATE = controlState();
 const controlSound: true | string =
   'error' in CONTROL_STATE
     ? `CONTROL FAILED: the harness could not route a no-op card at all (${CONTROL_STATE.error})`
-    : fingerprint(CONTROL_STATE) === fingerprint(BASE)
+    : fingerprint(CONTROL_STATE, BASE) === fingerprint(BASE, BASE)
       ? true
       : 'CONTROL FAILED: a card that does nothing moved the state, so the fingerprint is not measuring effects';
 
@@ -531,7 +704,7 @@ const rows = PROBES.map((p) => {
   if ('error' in CONTROL_STATE) {
     return { p, v: { how: 'refused', why: 'the control failed; no verdict is trustworthy' } as Verdict };
   }
-  return { p, v: play(p, BASE, fingerprint(CONTROL_STATE)) };
+  return { p, v: play(p, BASE, fingerprint(CONTROL_STATE, BASE)) };
 });
 
 const pad = (s: string, n: number) => s.padEnd(n);
