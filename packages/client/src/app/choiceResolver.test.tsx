@@ -169,6 +169,16 @@ function makePlayer(id: PlayerID, pool: Pool): PlayerState {
     manifesto: [],
     manifestoCards: [],
     conspiracies: [],
+    /*
+     * `restrictions` is OPTIONAL on `PlayerState` (see the engine's note on it: the
+     * field is optional only so this package's hand-built literals kept compiling,
+     * and `setup()` always writes `[]`). It is spelled out here rather than left
+     * absent, because an optional field on a state type is exactly the thing that
+     * quietly becomes load-bearing — a fixture reading `undefined` is
+     * indistinguishable, to every read that goes through the engine's own helper,
+     * from a player with no restrictions.
+     */
+    restrictions: [],
     pending: [],
     powerUses: {
       prospecting: 0,
