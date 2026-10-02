@@ -237,6 +237,21 @@ export function GameScreen({ store }: GameScreenProps) {
       };
     }
 
+    /*
+      G13 — THE BOARD FREEZES, AND IT IS CHECKED *BELOW* THE OWED CHOICE ON PURPOSE.
+
+      `reduce.ts` keeps `RESOLVE_CHOICE` legal for the whole length of an open
+      window precisely so a player frozen by p12's cap discard can thaw; the
+      window's required set excludes anybody with a pending `PendingChoice` for the
+      same reason. So a seat that owes a decision keeps a LIVE board — freezing it
+      would make a player who is not waiting on anybody the only player who cannot
+      move. Every other mode below is frozen, because every action they can reach
+      is refused with `"…" is resolving — answer it or decline first`.
+    */
+    if (windowOpen) {
+      return { ...IDLE_INTERACTION, disabled: true };
+    }
+
     if (app.gerryZoneId !== null) {
       return {
         mode: 'gerry',
@@ -281,7 +296,7 @@ export function GameScreen({ store }: GameScreenProps) {
     }
 
     return { ...IDLE_INTERACTION, disabled: !isMyTurn };
-  }, [state, app.placingGroupId, app.pickedAreaIds, app.gerryZoneId, app.gerrySourceAreaId, app.toughLovePicks, app.powerTarget, isMyTurn, me, you]);
+  }, [state, app.placingGroupId, app.pickedAreaIds, app.gerryZoneId, app.gerrySourceAreaId, app.toughLovePicks, app.powerTarget, isMyTurn, me, you, windowOpen]);
 
   // ─────────────────────────── board interaction ───────────────────────────
 
@@ -322,6 +337,22 @@ export function GameScreen({ store }: GameScreenProps) {
           return;
         }
         addToughLovePick(areaId);
+        return;
+      }
+
+      /*
+        1b. G13 — a slot press while a card is being answered.
+
+        Placed after the owed choice and before every other board mode, because
+        `RESOLVE_CHOICE` stays legal while a window is open and nothing else does.
+        The board is already rendered `disabled` (the `interaction` memo), so this
+        is the belt to that braces: a click that arrives anyway — a queued pointer
+        event, a keyboard activation that beat the re-render — gets §9.10's named
+        refusal rather than a silent no-op. The message is the engine's own shape,
+        because it is the one the player will see if the board ever does accept.
+      */
+      if (windowOpen) {
+        setRefusal('a card is being answered — answer it or decline first');
         return;
       }
 
@@ -392,7 +423,7 @@ export function GameScreen({ store }: GameScreenProps) {
         addPick(areaId);
       }
     },
-    [state, you, app, me, isMyTurn],
+    [state, you, app, me, isMyTurn, windowOpen],
   );
 
   // ─────────────────────────── dispatches ───────────────────────────
@@ -660,7 +691,7 @@ export function GameScreen({ store }: GameScreenProps) {
             />
           </div>
 
-          {placingGroup !== null ? (
+          {placingGroup !== null && !windowOpen ? (
             <PlacementBar
               state={state}
               you={you as PlayerID}
@@ -673,7 +704,7 @@ export function GameScreen({ store }: GameScreenProps) {
             />
           ) : null}
 
-          {app.gerryZoneId !== null && you !== null ? (
+          {app.gerryZoneId !== null && you !== null && !windowOpen ? (
             <GerryBar
               state={state}
               you={you}
@@ -698,7 +729,7 @@ export function GameScreen({ store }: GameScreenProps) {
               isMyTurn={isMyTurn}
               link={app.link}
               framed={isMyTurn && state.phase === 'actions'}
-              showControls={role === 'player' && you !== null}
+              showControls={role === 'player' && you !== null && !windowOpen}
               onSelectGroup={(id) => beginPlacement(id)}
               onRedraw={() => openPicker({ forKind: 'redraw', total: UI_RULES.redrawCost, pick: {} })}
               onTradeWith={(other) => openTrade(other)}
@@ -733,7 +764,7 @@ export function GameScreen({ store }: GameScreenProps) {
               <MarketPanel
                 state={state}
                 you={you}
-                disabled={!isMyTurn || app.link !== 'live'}
+                disabled={windowOpen || !isMyTurn || app.link !== 'live'}
                 onBuy={(index) => buyMarketCard(state, you, index, app, dispatch)}
                 onBuyConspiracy={() => {
                   const cost = state.conspiracyTopCost;
@@ -799,7 +830,7 @@ export function GameScreen({ store }: GameScreenProps) {
         ))}
       </div>
 
-      {isMyTurn && state.phase === 'actions' ? (
+      {isMyTurn && state.phase === 'actions' && !windowOpen ? (
         <div className="endturn-dock">
           <button
             type="button"
@@ -820,7 +851,22 @@ export function GameScreen({ store }: GameScreenProps) {
       {isMyTurn && state.phase === 'actions' && !isMyTurn ? null : null}
 
       {/* ── Overlays, in priority order. ── */}
-      {store.blind !== null && isMyTurn && state.phase === 'answer' ? (
+      {/*
+        G13 — THE TWO OVERLAYS WHOSE COMMIT IS A REFUSAL WHILE A WINDOW IS OPEN.
+
+        `ANSWER` and `ACK_HEADLINE` are both in `reduce.ts`'s window guard, so while
+        a card is being answered neither prompt can be paid. Rendering either would
+        put a full-viewport takeover on screen whose only button earns a toast —
+        and in the answer case it would be worse than a dead control, because the
+        blind prompt is the one screen in this game a player must not be able to
+        read past. Both reappear the moment `state.interrupt` goes back to `null`,
+        with the prompt exactly as it was left, because `store.blind` and
+        `state.activeHeadline` are untouched by any of this.
+
+        The one thing that is NOT suppressed is `ChoiceResolver`, below:
+        `RESOLVE_CHOICE` is legal for the whole length of the window on purpose.
+      */}
+      {store.blind !== null && isMyTurn && state.phase === 'answer' && !windowOpen ? (
         <AnswerScreen
           state={state}
           prompt={store.blind as BlindPrompt}
@@ -845,7 +891,7 @@ export function GameScreen({ store }: GameScreenProps) {
         />
       ) : null}
 
-      {state.phase === 'headlines' ? (
+      {state.phase === 'headlines' && !windowOpen ? (
         <HeadlineDialog state={state} you={you} onAcknowledge={() => dispatch(actions.ackHeadline())} />
       ) : null}
 

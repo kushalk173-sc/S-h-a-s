@@ -160,6 +160,20 @@ export function ResponseWindow({
   const effects = describeEffects(w.effects, w.duration);
   const waiting = outstanding(state, w);
   const required = mustRespond(state, w);
+  /*
+    DOES THIS SEAT OWE SOMETHING THE WINDOW HAS FROZEN?
+
+    `reduce.ts` refuses every action except the two window moves and
+    `RESOLVE_CHOICE`, and `GameScreen` hides the two overlays whose commit is one of
+    those refusals — the blind answer and the Headline acknowledgement. So a seat
+    can be looking at a window while an action of theirs is owed and unreachable:
+    the actor who played a Conspiracy out of turn *during* somebody's answer is
+    mid-answer and cannot answer until the window closes. Saying so is the
+    difference between a player who knows to wait and a player who thinks the game
+    has eaten their card.
+  */
+  const owedElsewhere =
+    state.phase === 'answer' && state.awaitingAnswer && you === state.activePlayer;
   const body = (
     <>
       <p className="eyebrow window__eyebrow">
@@ -212,7 +226,7 @@ export function ResponseWindow({
         so this is a description of its effects rather than the card&apos;s own text.
       </p>
 
-      {stage === 'open' ? waitingLine(role, required.length, waiting.length) : null}
+      {stage === 'open' ? waitingLine(role, required.length, waiting.length, owedElsewhere) : null}
 
       {mayPress ? (
         <div className="row window__actions">
@@ -319,12 +333,16 @@ function waitingLine(
   role: WindowRole,
   requiredCount: number,
   outstandingCount: number,
+  owedElsewhere: boolean,
 ): string | null {
   if (role === 'decliner') {
     return 'If you hold a card that can answer this, you may play it instead. You may also decline.';
   }
   if (role === 'actor') {
-    return 'You played this card, so you may not answer it. Your own card comes next, once the window closes.';
+    const wait = owedElsewhere
+      ? ' An Ideology Card is still put to you, and it cannot be answered until this window closes.'
+      : '';
+    return `You played this card, so you may not answer it. Nobody can move until the window closes.${wait}`;
   }
   if (role === 'declined') {
     return outstandingCount === 1

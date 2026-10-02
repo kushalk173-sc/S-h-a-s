@@ -855,6 +855,216 @@
   margin: var(--sp-1) 0;
 }
 
+/* ── The response window ─────────────────────────────────────────────────────
+   §8/§9: one card's effects are held for a beat so a BLOCK or a DEFLECT can land.
+   `state.interrupt` is a nullable field and NOT a phase, so this is a suspension
+   inside a phase — which is why it has two presentations rather than one:
+
+     `.window-scrim` / `.window-sheet`  the ONE seat that has a decision to make. A
+                                      scrim, because a full-viewport takeover is
+                                      the most robust way to guarantee that a
+                                      stray click on the board behind cannot be
+                                      mistaken for a decline.
+     `.window-band`                   every other seat — the actor, a player who
+                                      has already declined, a player frozen by a
+                                      decision of their own, and the spectator. A
+                                      modal with nothing to press is the dead
+                                      dialog `choiceResolver.test.tsx` exists to
+                                      prevent, so those seats get a status and no
+                                      control at all.
+
+   NO MOTION, AND NOT AS AN OMISSION. §9.3 forbids animating a resolution and §9.4
+   forbids anything attention-seeking; a panel that slides, pulses or counts while
+   somebody is deciding whether to spend a card from their hand is precisely the
+   failure both rules exist for. The only rules below that change anything between
+   states are `border-width` and `text-transform` — static properties, computed
+   before the first paint, with no transition to interrupt. The reduced-motion block
+   at the foot of this file says so explicitly as well, because a rule that only
+   *happens* to be motionless is not a guarantee. */
+
+.window-scrim {
+  /* `.scrim` supplies the fixed inset box, the table wash and z-index 20. */
+  align-items: flex-start;
+  padding-block: var(--sp-8);
+}
+
+.window-sheet {
+  max-width: 640px;
+}
+
+.window-sheet:focus-visible {
+  /*
+   * The dialog itself takes focus when it opens (never its button — see the header
+   * of `ResponseWindow.tsx` for why a stray <Enter> must not decline for anybody),
+   * so the focus indicator has to be visible on the CONTAINER as well as on the
+   * controls. The dual tone is §8.3's rule, reused verbatim.
+   */
+  outline: 2px solid var(--focus-outer);
+  outline-offset: 2px;
+}
+
+.window-band {
+  background: var(--table-900);
+  border-bottom: 2px solid var(--seal);
+  color: var(--paper-100);
+  max-height: 42vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.window-band__inner {
+  box-sizing: border-box;
+  padding: var(--sp-3) var(--sp-4);
+  max-width: 62rem;
+  margin-inline: auto;
+}
+
+.window-band .sheet__title,
+.window-band .window__title {
+  color: var(--paper-100);
+}
+
+.window-band .sheet__body {
+  color: var(--paper-300);
+}
+
+.window-band .window__effect {
+  color: var(--paper-100);
+}
+
+.window__eyebrow {
+  /* The banner sits on the table wash rather than on paper, so the eyebrow needs
+     the paper ramp rather than the ink ramp. Colour is never the only channel
+     here anyway — the eyebrow is text. */
+  color: var(--paper-300);
+}
+
+.window__title {
+  font: var(--type-display-m);
+  margin: 0 0 var(--sp-2);
+}
+
+/*
+ * THE STATE LINE, and the reason it is three spans rather than one.
+ *
+ * §8.2 forbids colour as the only channel for a state, and the most damaging
+ * failure here would be a player believing a resolution has landed when it is
+ * still held. So the line carries a WORD (`HELD` / `ANSWERED`) and a GLYPH
+ * (`‖` / `✔`) that are always both rendered, in plain text, and the colour is
+ * decoration on top of them. A greyscale render, a colour-blind player and a
+ * screen reader all read the same sentence.
+ */
+.window__state {
+  font: var(--type-card-side-label);
+  letter-spacing: 0.08em;
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  align-items: baseline;
+}
+
+.window__state[data-state='open'] {
+  color: var(--warn-volatile);
+}
+
+.window__state[data-state='answered'] {
+  color: var(--positive);
+}
+
+.window__glyph {
+  font-weight: 800;
+}
+
+.window__word {
+  font-weight: 800;
+}
+
+.window__outcome {
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink-500);
+}
+
+.window-band .window__outcome {
+  color: var(--paper-300);
+}
+
+/*
+ * THE STATE LINE ON THE DARK BANNER.
+ *
+ * `--warn-volatile` and `--positive` are measured against PARCHMENT (§2.6: 7.19
+ * and 4.93), and the banner is the table wash, so carrying them over would put a
+ * "HELD" line at roughly 1.6:1 — invisible, and worse than invisible because the
+ * word would look like it was set in a muted ink on purpose. The ramp is swapped
+ * for the paper ramp instead, which measures 15:1 on the wash. The WORD and the
+ * GLYPH are unchanged, so nothing that carries state depends on which ramp this is.
+ */
+.window-band .window__state[data-state='open'] {
+  color: var(--paper-100);
+}
+
+.window-band .window__state[data-state='answered'] {
+  color: var(--paper-300);
+}
+
+.window__effects {
+  margin: 0 0 var(--sp-3);
+  padding-left: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.window__effect {
+  font: var(--type-log);
+  color: var(--ink-700);
+}
+
+.window__actions {
+  align-items: stretch;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--paper-300);
+}
+
+.window__why {
+  margin: 0;
+}
+
+.window__respond {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--paper-300);
+}
+
+.window__deflect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
+}
+
+.window__deflect .btn[aria-pressed='true'] {
+  /* A picked DEFLECT target is a toggle, so it gets a non-colour channel of its own
+     (§8.2): the pressed state is a box-shadow inset as well as the seal fill. */
+  box-shadow: inset 0 0 0 2px var(--ink-900);
+  font-weight: 800;
+}
+
+/* The banner is in the flow above the board, so the board's `max-height` reserve
+   has to know it is there — the same reason `.shell[data-reveal]` does. Without
+   this the band and the board fight over the viewport and the mat goes under the
+   fold (§9.5). The modal needs no rule: it is `position: fixed`. */
+.shell[data-window='true'] .board__canvas {
+  max-height: calc(100vh - 380px);
+}
+
 /* ── Lobby ──────────────────────────────────────────────────────────────────
    §5.1: a sheet of paper on the table, centre column max-width 720px. */
 
@@ -1303,6 +1513,24 @@
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     animation: none;
+  }
+
+  /*
+   * G13 — THE RESPONSE WINDOW NAMES ITS OWN MOTIONLESSNESS HERE TOO.
+   *
+   * Nothing above animates: no `transition`, no `animation`, no `transform` on any
+   * `.window*` rule, so a reduced-motion user is already seeing the static end
+   * state. This block is here because a rule that is only *accidentally* motionless
+   * stops being one the moment somebody adds a transition, and §9.3/§9.4 are not
+   * worth relying on an accident for. `transition: none` on the container and the
+   * controls is the belt; the braces are the comments above.
+   */
+  .window-band,
+  .window-sheet,
+  .window-band *,
+  .window-sheet * {
+    transition: none !important;
+    animation: none !important;
   }
 
   .btn {
