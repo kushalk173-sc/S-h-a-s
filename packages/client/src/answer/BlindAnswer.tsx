@@ -1,44 +1,58 @@
 /**
- * The blind answer.
+ * The answer.
  *
- * "The blind answer is the product; everything else is table furniture."
- * — UI-SPEC §1.1. A player answering an Ideology Card sees ONLY the scenario
- * text and two neutral labels. No resource icons, no payout numerals, no
- * colour, no ordering convention, nothing that hints which Ideologue a side
- * favours. A design that is 5% better at everything else and leaks one bit is a
- * failed design.
+ * The filename and the class names still say `blind`, and they are kept rather than
+ * renamed for one reason worth stating: the AVERAGE mechanic is still the property that
+ * is protected. What the player may not learn is which SIDE of the card a display
+ * position is, because a card's two answers belong to two different Ideologues and the
+ * shipped answer pool is not balanced side-to-side. Everything else about the card — the
+ * question, both answers, both Ideologues, both payouts — is published to the whole
+ * table before anybody answers.
  *
- * THREE SEPARATE GUARANTEES, because "don't leak the payout" is not one
- * requirement but three failure modes:
+ * ── THE THREE GUARANTEES THAT SURVIVED, and the one that did not ─────────────
  *
- * 1. ORDER IS RANDOMISED PER CARD, FROM THE SEED.
- *    A card's two answers belong to two DIFFERENT Ideologues, and card authors
- *    will not be balanced left-vs-right mechanically. So a fixed "A is on the
- *    left" would leak the deck's Ideologue balance, and a player who noticed
- *    could exploit it. The draw is a deterministic function of the engine's
- *    `_seed` — never `Math.random`, so a replay renders identically — and it is
- *    applied here rather than trusting the network to send an `order` field
- *    (UI-SPEC B1 flags that field as an open PLAN.md amendment).
- *    A player therefore cannot build a position-independent left/right
- *    heuristic. This is the single most important line in §1.2.
+ * WHAT DID NOT SURVIVE, stated first because a reader who only reads the old comment
+ * would be misled: the payout is now printed on the card, for the answering player and
+ * for everyone else. §1.2's "no payouts, no ideologue names" is deliberately reversed, and
+ * the reversal is recorded — in `net/protocol.ts`, in `app/blindWire.ts` and in the
+ * server's `PublicQuestion` — together with what it costs the GAME rather than the wire:
+ * with the payout visible, a player computes the better side instead of deliberating, so
+ * dominance in the shipped Ideology deck is now permanently exploitable rather than
+ * merely risky. That is a balance problem for the corpus, and the balance checker is
+ * where it is argued; it is not a leak and there is no version of this component that
+ * could have prevented it while also showing the payout.
+ *
+ * 1. ORDER IS RANDOMISED PER CARD, FROM THE SEED.  ← STILL LOAD-BEARING, AND MORE SO
+ *    The draw is a deterministic function of the match seed — never `Math.random`, so a
+ *    replay renders identically — and it is applied by the SERVER
+ *    (`broadcast.ts#orderFor`), not here. This component takes a seed that pins the
+ *    order to "as given" and has no way to learn which side of the card that is. The
+ *    player therefore cannot build a position-independent left/right heuristic, and — the
+ *    part that is new — neither can a stylesheet: see 2.
  *
  * 2. BOTH SIDES ARE THE SAME ELEMENT WITH THE SAME CLASS.
- *    Not "similar styles" — the same class, the same tokens, the same geometry.
- *    There is no `nth-child`, no `data-side` selector, no modifier class, and
- *    no per-side inline style anywhere in `blindAnswer.css`. The chosen state
- *    is also identical on both sides (`aria-pressed`, not a class).
+ *    Not "similar styles" — the same class, the same tokens, the same geometry. There is
+ *    no `nth-child`, no `data-side` selector, no modifier class, and no per-side inline
+ *    style anywhere in `blindAnswer.css`. **And now the payout and the Ideologue are on
+ *    screen, so this rule has teeth it did not have before**: the Ideologue is per-side
+ *    and differs between the two cells, so tinting a cell by its Ideologue would publish
+ *    which Ideologue the left-hand position is — a position channel, and exactly what
+ *    PLAN.md §2 amendment A′ forbids. The chosen state is also identical on both sides
+ *    (`aria-pressed`, not a class).
  *
- * 3. THERE IS NO PROP THROUGH WHICH A PAYOUT COULD ARRIVE.
- *    The type below has eight fields and none of them is numeric, monetary, or
- *    Ideologue-shaped. The client has never held the value, so there is nothing
- *    for an accessibility technology, a devtools inspector, or a curious player
- *    to find. `blindAnswer.types.ts` proves it at the type level and
- *    `blindAnswer.test.tsx` proves it at the DOM level.
+ * 3. THERE IS NO PROP THROUGH WHICH THE `order` DRAW COULD ARRIVE.
+ *    It used to say "no prop through which a PAYOUT could arrive". Full information
+ *    makes that false, so the guarantee is restated on the thing that is still protected:
+ *    the component has no prop carrying which face of the card a position is, no prop
+ *    carrying a card id, and no numeric field except the presentation seed — which is
+ *    pinned to a constant by `app/blindWire.ts` and is therefore not a channel.
+ *    `blindAnswer.types.ts` proves the closed prop set at the type level and
+ *    `blindAnswer.test.tsx` proves the identical-styles rule at the DOM level.
  *
- * And what must not exist here at all, per §1.2 and §9.6: no resource icon, no
- * payout numeral, no Ideologue colour, no `title=` or `aria-label=` naming a
- * resource, no tween or count-up, and no "reveal" affordance other than the
- * commit button itself.
+ * And what must not exist here at all, per §1.2 and §9.6, restated for a card whose
+ * payout IS printed: no per-side tint, no positional selector, no `order` reaching the
+ * DOM, no tween or count-up on the payout, and no "reveal" affordance — the payout is
+ * simply there, in the same frame as the answer, because a reveal implies it was hidden.
  *
  * ── ONE COMMIT CONTROL, AND TWO WORDS FOR TWO STEPS ───────────────────────
  *
@@ -49,8 +63,10 @@
  * `ANSWER` to the server. So a player who pressed "Confirm" was told, in the
  * most safety-critical screen in the game, that something had happened when
  * nothing had: they had selected a side and had not committed it. A control
- * that lies about commitment on the one screen whose entire premise is that
- * you cannot see the payout before committing is not a wording bug.
+ * that lies about commitment is not a wording bug, and under full information it
+ * is WORSE: with the payout on screen, a player who believes they have committed
+ * a side and has not is a player who believes they have banked a resource they
+ * have not.
  *
  * The rule now, and it is a structural one rather than a copy one:
  *
@@ -72,20 +88,32 @@
 import { useMemo } from 'react';
 import './blindAnswer.css';
 
+/**
+ * One side of the card, as printed. `pays` is a `Delta`: a pool the card does not
+ * mention is absent rather than zero, so the payout line prints only what the card
+ * printed and a side that pays nothing reads as a side that pays nothing.
+ */
+export type PrintedSide = {
+  readonly label: string;
+  readonly ideologue: 'capitalist' | 'supremo' | 'showstopper' | 'idealist';
+  readonly pays: Readonly<Partial<Record<'funds' | 'clout' | 'media' | 'trust', number>>>;
+};
+
 export type BlindAnswerProps = {
   /** The scenario prose. `TYPE_CARD_SCENARIO` — 17/27, INK_700. */
   readonly question: string;
   /**
-   * Side A's label, PRE-MAPPED by the server. Deliberately not derived from
-   * anything client-side: side identity ("the Trusts' answer") must never be a
-   * client-side lookup keyed on A/B, or the mapping itself becomes the leak.
+   * Side A, PRE-MAPPED by the server: label, Ideologue and payout together. Deliberately
+   * not derived from anything client-side: side identity ("the Trusts' answer") must
+   * never be a client-side lookup keyed on A/B, or the mapping itself becomes the leak.
    */
-  readonly labelA: string;
-  /** Side B's label, pre-mapped. Same contract as `labelA`. */
-  readonly labelB: string;
+  readonly sideA: PrintedSide;
+  /** Side B, pre-mapped. Same contract as `sideA`. */
+  readonly sideB: PrintedSide;
   /**
-   * The engine's deterministic PRNG cursor, `_seed`. Presentation order is a
-   * pure function of this, so replays are stable.
+   * Presentation pin, NOT a channel. It is the constant `WIRE_ORDER_SEED`, so
+   * `presentationOrder` is the identity on the server's already-display-ordered sides.
+   * There is no per-card value here for a stylesheet or a devtools reader to learn.
    */
   readonly seed: number;
   /**
@@ -96,7 +124,7 @@ export type BlindAnswerProps = {
   /** The chosen side, if any. Rendered identically on both sides. */
   readonly selected?: 'A' | 'B' | null;
   /**
-   * What the SERVER has done with this answer. The caller derives all three;
+   * What the SERVER has done with this answer. The caller derives all four;
    * this component stores none of them.
    *
    *   `idle`      nothing chosen — the commit control is disabled
@@ -147,7 +175,7 @@ export function commitLabel(state: CommitState): string {
  * The status line's text, in each state. `role="status"`, so this is what a
  * screen-reader user hears when the answer state changes — the same information
  * the button's own label carries, so neither audience is worse served than the
- * other. No digits and no resource names, per §1.2.
+ * other.
  */
 export function commitStatus(state: CommitState): string {
   switch (state) {
@@ -163,8 +191,52 @@ export function commitStatus(state: CommitState): string {
 }
 
 /**
+ * A side's payout as the card printed it, in the card's own pool order.
+ *
+ * NO COUNT-UP AND NO REVEAL, because there is nothing to reveal: UI-SPEC §9
+ * anti-patterns 1 and 3 are about animating a number a player did not have, and
+ * with the payout on the card from the first frame an animation of it would be
+ * theatre. One string, in the frame the card was dealt.
+ *
+ * POOL ORDER IS `RESOURCES` ORDER AND NOT IDEOLOGUE ORDER, deliberately. The Ideologue
+ * is printed separately as a NAME — "the Trusts' answer" — because that is how the card
+ * reads aloud, and the resource names are printed in the engine's fixed order rather
+ * than sorted by amount, so a card that pays 4 Funds cannot be told apart at a glance
+ * from one that pays 1 Fund by how many words come first.
+ */
+export function payoutLine(pays: PrintedSide['pays']): string {
+  const parts: string[] = [];
+  for (const pool of ['funds', 'clout', 'media', 'trust'] as const) {
+    const n = pays[pool];
+    if (n === undefined || n === 0) continue;
+    parts.push(`${n} ${POOL_NAMES[pool]}`);
+  }
+  return parts.length === 0 ? 'nothing' : parts.join(' · ');
+}
+
+/**
+ * §1.2's names, spelled the way the rulebook spells them. A `Record` rather than four
+ * constants so the loop above cannot drift from the spelling and a new pool cannot be
+ * printed as its raw key.
+ */
+const POOL_NAMES: Readonly<Record<'funds' | 'clout' | 'media' | 'trust', string>> = {
+  funds: 'Fund',
+  clout: 'Clout',
+  media: 'Media',
+  trust: 'Trust',
+};
+
+/** How an Ideologue is named on a printed card. Capitalised: it is a faction. */
+export const IDEOLOGUE_FACTION: Readonly<Record<PrintedSide['ideologue'], string>> = {
+  capitalist: "the Capitalists'",
+  supremo: "the Supremos'",
+  showstopper: "the Showstoppers'",
+  idealist: "the Idealists'",
+};
+
+/**
  * A deterministic 32-bit integer hash (FNV-1a) of the seed, so the order is a
- * pure function of `_seed` with no dependence on call order, no shared
+ * pure function of the seed with no dependence on call order, no shared
  * mutable PRNG cursor on the client, and no `Math.random` anywhere.
  */
 export function hashSeed(seed: number): number {
@@ -183,6 +255,13 @@ export function hashSeed(seed: number): number {
  * `'ab'` puts A in the left cell; `'ba'` puts B there. Exactly half of all
  * seeds take each branch, so over a deck the order carries no information
  * about which side is which Ideologue.
+ *
+ * **THE SERVER DECIDES, AND THIS IS NOT WHERE THE CARD'S ORDER IS DRAWN.** The draw
+ * that matters is `broadcast.ts#orderFor`, a function of the match seed and the card id,
+ * and it has already happened by the time these sides arrive. The only thing this
+ * function is still used for is pinning a locally-authored fixture's order, so the app
+ * passes a constant (`WIRE_ORDER_SEED`) and the value is the identity. Keeping the helper
+ * is what lets `blindAnswer.test.tsx` exercise both orders without a server.
  */
 export function presentationOrder(seed: number): 'ab' | 'ba' {
   return (hashSeed(seed) & 1) === 0 ? 'ab' : 'ba';
@@ -195,8 +274,8 @@ export function orderedSides(seed: number): readonly [BlindSide, BlindSide] {
 
 export function BlindAnswer({
   question,
-  labelA,
-  labelB,
+  sideA,
+  sideB,
   seed,
   onSelect,
   selected = null,
@@ -205,8 +284,8 @@ export function BlindAnswer({
 }: BlindAnswerProps) {
   const order = useMemo(() => orderedSides(seed), [seed]);
 
-  // The label lookup is by side, and it is the ONLY content in the button.
-  const labelFor = (side: BlindSide): string => (side === 'A' ? labelA : labelB);
+  // The side lookup is by side, and it is the ONLY content in the button.
+  const sideFor = (side: BlindSide): PrintedSide => (side === 'A' ? sideA : sideB);
 
   // Once the frame is in flight or the server has taken the answer, the sides
   // stop being selectable — a second selection after a commit is a state the
@@ -240,6 +319,7 @@ export function BlindAnswer({
         aria-labelledby="blind-answer-choose"
       >
         {order.map((side) => {
+          const printed = sideFor(side);
           const chosen = selected === side;
           return (
             <button
@@ -248,8 +328,9 @@ export function BlindAnswer({
               /* THE SAME CLASS ON BOTH SIDES. There is no second class, no
                  modifier, no per-side style, and no side-derived attribute that
                  any stylesheet could key on. `data-wire-side` is the WIRE side
-                 (which label came from the server), never anything about value;
-                 no rule in blindAnswer.css matches it. */
+                 (which side came from the server), never anything about value;
+                 no rule in blindAnswer.css matches it. In particular there is
+                 nothing here an Ideologue could be styled by — see the header. */
               className="blind-answer__side"
               data-wire-side={side}
               aria-pressed={chosen}
@@ -259,7 +340,19 @@ export function BlindAnswer({
               }}
             >
               <span className="blind-answer__label" data-testid="side-label">
-                {labelFor(side)}
+                {printed.label}
+              </span>
+              {/* THE FULLY VISIBLE CARD, in one frame. The Ideologue is a NAME in
+                  prose, the payout is a NAME in prose, and neither is given a
+                  class, an icon, a colour or a `title`. The point of printing them
+                  as words rather than badges is structural: a word cannot be
+                  styled per-side without a stylesheet rule keyed on it, and the
+                  audit in blindAnswer.test.tsx forbids exactly that. */}
+              <span className="blind-answer__faction" data-testid="side-ideologue">
+                {IDEOLOGUE_FACTION[printed.ideologue]} answer
+              </span>
+              <span className="blind-answer__payout" data-testid="side-payout">
+                pays {payoutLine(printed.pays)}
               </span>
               {/* The chosen state is identical on both: the same seal border,
                   the same paper fill, the same check glyph in the same corner. */}

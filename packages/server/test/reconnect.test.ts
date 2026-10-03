@@ -19,7 +19,7 @@
  *      damage, not a permanent seat takeover.
  *
  *   C. RESUMING MID-ANSWER RE-DELIVERS THE PROMPT, AND STILL WITHOUT THE PAYOUT.
- *      The blind prompt is rebuilt from the rehydrated state and the order is a
+ *      The answer prompt is rebuilt from the rehydrated state and the order is a
  *      pure function of that state, so the player sees the same two labels in the
  *      same order — otherwise a click they already made gets reinterpreted.
  */
@@ -471,7 +471,7 @@ describe('B — a resume token cannot be guessed, reused, or moved between rooms
 
 // ─────────────────────────── C. mid-answer resume ───────────────────────────
 
-describe('C — resuming mid-answer re-delivers the same blind prompt, with no payout', () => {
+describe('C — resuming mid-answer re-delivers the same answer prompt, with the same order', () => {
   it('re-sends the identical prompt on a different socket', async () => {
     const h = await boot();
     const { a, sessionA, matchId } = await seatedGame(h);
@@ -479,8 +479,8 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     // The active player is mid-answer with a card in front of them.
     const first = a.latestState();
     expect(first.state.phase).toBe('answer');
-    expect(first.blind, 'the active player must be owed a prompt').not.toBeNull();
-    const beforePrompt = first.blind;
+    expect(first.answer, 'the active player must be owed a prompt').not.toBeNull();
+    const beforePrompt = first.answer;
 
     // Drop the connection entirely — the tab was closed, not the process.
     await a.close();
@@ -497,14 +497,14 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     // IDENTICAL, not merely equivalent: the order is a pure function of the match,
     // so a player who reconnects mid-answer is not shown a different left/right
     // than the one they were about to click.
-    expect(state.blind).toEqual(beforePrompt);
-    expect(state.blind?.order).toBe(beforePrompt?.order);
+    expect(state.answer).toEqual(beforePrompt);
+    expect(state.answer?.order).toBe(beforePrompt?.order);
   });
 
-  it('the re-delivered prompt still carries no payout, no card id and no ideologue', async () => {
+it('the re-delivered prompt still carries NO card id, and the same whole card', async () => {
     const h = await boot();
     const { a, sessionA, matchId } = await seatedGame(h);
-    const beforePrompt = a.latestState().blind;
+    const beforePrompt = a.latestState().answer;
     await a.close();
     await new Promise((r) => setTimeout(r, 60));
 
@@ -521,81 +521,88 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     expect(card, 'expected a real pending card to audit against').toBeDefined();
     if (card === undefined) return;
 
-    // The whole frame, not just the prompt: the resume path is a fresh projection
-    // and a fresh projection is exactly where a leak would be introduced.
+    // The whole frame, not just the prompt: the resume path is a fresh projection and a
+    // fresh projection is exactly where a leak would be introduced.
     const frame = JSON.stringify(state);
     expect(frame.includes(pending!)).toBe(false);
     expect(frame.includes(String(room.state._seed))).toBe(false);
-    // The payout, structurally. `pays` is the field name on a card, so its absence
-    // is the first assertion.
-    expect(frame.includes('"pays"')).toBe(false);
 
-    // …and then the payout as a UNIT, which is the assertion that had to be rewritten.
+    // ═════════════════════════════════════════════════════════════════════════════
+    // WHAT THIS TEST USED TO ASSERT, and why it is now its own inverse.
     //
-    // The old version scanned the frame for each `"res":n` pair of each side's
-    // `pays` on its own. That was a sound instrument only while no player could
-    // legitimately hold the numbers a card pays. p7's staggered start broke that:
-    // seat 2 opens on 2 Funds, `bigCards`' side 0 pays `{funds: 2, media: 1}`, and
-    // `"funds":2` is now in the frame because Ada's own pool says so. The test
-    // failed on a substring that had nothing to do with a payout — and its own
-    // comment two lines up already said a bare `"funds":2` is meaningless.
+    // It was "the re-delivered prompt still carries no payout, no card id and no
+    // ideologue", and it searched the whole frame for each side's `pays` as a Delta-shaped
+    // object — a genuinely careful instrument, including the comment explaining why the
+    // unit had to be the whole Delta rather than `"funds":2`. All of it was true.
     //
-    // So the unit of assertion is the whole Delta, not its components. `side.pays`
-    // is a complete `{funds: 2, media: 1}` and a leak would ship it whole — there is
-    // no way to attach a payout to a side without shipping that object. Searching
-    // for the object is specific to THIS card's actual payouts AND immune to a
-    // player legitimately holding one of its numbers, because a `resources` bag is
-    // always all four keys and so is never equal to a two-key Delta.
+    // Full information makes it false, and asserting it would be asserting a premise the
+    // codebase no longer holds. The payout is now ON the card, for every seat, and the
+    // reconnect path must carry it: a client that resumed mid-answer and found the card's
+    // payouts missing would be showing a player a different card from the one they were
+    // about to answer, and the whole of "the table sees one card" would be a claim rather
+    // than a property.
+    //
+    // So the payout detectors are replaced by the POSITIVE version — the frame DOES carry
+    // both sides' payouts — and the two things that are still withheld keep their own
+    // assertions: the card id and the seed.
+    // ═════════════════════════════════════════════════════════════════════════════
+    const prompt = state.answer;
+    expect(prompt, 'the resumed seat was owed no prompt mid-answer').not.toBeNull();
+    if (prompt === null) return;
+    expect(prompt.sides).toHaveLength(2);
     for (const [i, side] of card.sides.entries()) {
-      expect(findDeltaIn(state, side.pays), `side ${i} of ${pending} is on the wire as a payout`).toEqual([]);
-      // …and the specific pairs are absent too, but only inside the one place a
-      // payout could hide: a Delta-shaped object. A bare pair elsewhere in the
-      // frame is a player's own pool and is not evidence of anything.
+      // The side is on the wire WHOLE: its text, its Ideologue and its payout. Compared
+      // as a set of sides, because which face is first is the one thing not published.
+      const shown = prompt.sides.map((p) => JSON.stringify(p)).sort();
+      const real = card.sides
+        .map((p) => JSON.stringify({ label: p.answer, ideologue: p.ideologue, pays: p.pays }))
+        .sort();
+      expect(shown, `side ${i} of ${pending} did not survive the reconnect whole`).toEqual(real);
+      // …and it is in the table-wide copy too, which is the field that existed to be a
+      // fidelity restoration and is now the whole card.
+      const open = (state.state as { openQuestion?: { sides: unknown[] } | null }).openQuestion;
+      expect(open, 'the resumed projection published no open question').not.toBeNull();
       expect(
-        findDeltasIn(state).filter((d) => Object.entries(side.pays).every(([r, n]) => d[r] === n)),
-        `side ${i} of ${pending} is on the wire, split across a Delta`,
-      ).toEqual([]);
+        (open?.sides ?? []).map((p) => JSON.stringify(p)).sort(),
+        `side ${i} is on the answerer's prompt but not on the table's`,
+      ).toEqual(real);
+      // And it really is on the wire, in the shape the client reads.
+      expect(frame.includes('"pays"'), 'the frame carries no payout at all').toBe(true);
     }
 
-    // And the prompt itself is the three-field shape and nothing else.
-    expect(Object.keys(state.blind ?? {}).sort()).toEqual(['labels', 'order', 'question']);
+    // Still three fields, still exactly one of them the order draw.
+    expect(Object.keys(prompt).sort()).toEqual(['order', 'question', 'sides']);
     expect(beforePrompt).not.toBeNull();
+    expect(prompt.order).toBe(beforePrompt?.order);
 
-    // THE COMPENSATION FOR THE `$.state.market` EXCLUSION, and it is a stronger
-    // statement than the shape check it replaces.
-    //
-    // The detectors above skip `state.market`, because a Voter Card's printed price
-    // is public and on the real corpus a side payout can equal it exactly. That
-    // exclusion would be a hole if the Mat could hold anything other than real
-    // prices — so this asserts the stronger property directly: every price on the
-    // Mat is the shipped card's OWN cost, read from the corpus.
-    //
-    // A payout smuggled into the Mat would have to overwrite a real price to get
-    // there, and the price is checked here. A payout smuggled anywhere else is
-    // caught by the detectors. Between them there is no gap, which the shape check
-    // on its own could not claim.
+    // THE `$.state.market` COMPENSATION, unchanged and still load-bearing. The old
+    // detectors skipped the Mat, because a Voter Card's printed price is public and a
+    // side payout can equal it exactly; now that the card's payout IS on the wire that
+    // exclusion would be a hole in the frame audit, so the stronger property is asserted
+    // directly: every price on the Mat is the shipped card's OWN cost, read from the
+    // corpus. Nothing on the Mat is a smuggled payout.
     expect(state.state.market.length, 'the Mat is empty, so the market exclusion covers nothing').toBeGreaterThan(0);
     for (const [i, slot] of state.state.market.entries()) {
-      const card = h.ctx.cards.voter[slot.cardId];
-      expect(card, `market[${i}] names ${slot.cardId}, which is not a shipped Voter Card`).toBeDefined();
-      if (card === undefined) continue;
-      expect(slot.cost, `market[${i}] (${slot.cardId}) is not that card's own printed cost`).toEqual(card.cost);
-      expect(slot.voters, `market[${i}] (${slot.cardId}) is not that card's own voter count`).toBe(card.voters);
+      const voter = h.ctx.cards.voter[slot.cardId];
+      expect(voter, `market[${i}] names ${slot.cardId}, which is not a shipped Voter Card`).toBeDefined();
+      if (voter === undefined) continue;
+      expect(slot.cost, `market[${i}] (${slot.cardId}) is not that card's own printed cost`).toEqual(voter.cost);
+      expect(slot.voters, `market[${i}] (${slot.cardId}) is not that card's own voter count`).toBe(voter.voters);
     }
 
-    // NOT asserted, deliberately: that the Ideologue name is absent from the
-    // frame. It cannot be. `players[].manifesto` is a public array of Ideologues —
-    // a player's answered cards sit face up under their mat at a real table, and
-    // the manifesto IS their public identity (rules-reference.md:190-191). So the
-    // string "capitalist" is in every payload by design. What must not be present
-    // is the *association* between this card and its sides, which is what the
-    // three-field prompt type and the missing `pays` above actually establish.
+    // STILL not asserted, and the reason has not changed: that the Ideologue NAME is
+    // absent from the frame. It cannot be. `players[].manifesto` is a public array of
+    // Ideologues — a player's answered cards sit face up under their mat at a real
+    // table, and the manifesto IS their public identity (rules-reference.md:190-191).
+    // What was never acceptable is the `order` draw, which is asserted one layer up in
+    // `secret-state.test.ts` — that is the only field that would let a resumed client
+    // map a display position onto an Ideologue.
   });
 
   it('a player who resumes mid-answer can then answer it, and only once', async () => {
     const h = await boot();
     const { a, sessionA } = await seatedGame(h);
-    const order = a.latestState().blind?.order;
+    const order = a.latestState().answer?.order;
     await a.close();
     await new Promise((r) => setTimeout(r, 60));
 
@@ -611,7 +618,7 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     back.send({ t: 'match:action', action: { type: 'ANSWER', side: 0 } });
     const after = await back.expect(back.is('match:state'), 'answered');
     expect(after.state.phase).toBe('actions');
-    expect(after.blind).toBeNull();
+    expect(after.answer).toBeNull();
 
     // A second answer for the same card is refused by the engine.
     back.clear();
@@ -634,6 +641,6 @@ describe('C — resuming mid-answer re-delivers the same blind prompt, with no p
     a.send({ t: 'match:sync' });
     const two = await a.expect(a.is('match:state'), 'sync 2');
     expect(digest(two.state)).toBe(digest(one.state));
-    expect(Object.keys(two).sort()).toEqual(['blind', 'matchId', 'state', 't', 'viewId', 'you']);
+    expect(Object.keys(two).sort()).toEqual(['answer', 'matchId', 'state', 't', 'viewId', 'you']);
   });
 });

@@ -88,7 +88,7 @@ export type ServerMessage =
       readonly matchId: MatchId;
       readonly viewId: number;
       readonly state: ClientState;
-      readonly blind: BlindPrompt | null;
+      readonly answer: AnswerPrompt | null;
       readonly you: { readonly role: 'player' | 'spectator'; readonly playerId: PlayerID | null };
     }
   | {
@@ -101,24 +101,38 @@ export type ServerMessage =
   | { readonly t: 'match:over'; readonly matchId: MatchId; readonly winners: readonly PlayerID[] }
   | { readonly t: 'error'; readonly id?: string; readonly code: ErrorCode; readonly message: string };
 
+/** One side of the card: the printed answer, its Ideologue, and what it pays. */
+export type AnswerSide = {
+  readonly label: string;
+  readonly ideologue: 'capitalist' | 'supremo' | 'showstopper' | 'idealist';
+  readonly pays: Readonly<Partial<Record<'funds' | 'clout' | 'media' | 'trust', number>>>;
+};
+
 /**
- * The blind prompt.
+ * The answer prompt — the WHOLE card, plus the one thing the table does not have.
  *
- * The security control is the TYPE, not the runtime filter: there is no `pays`, no
- * `ideologue`, no `cardId` and no number anywhere in it, so there is nothing for a
- * later refactor to bind into the DOM by accident.
+ * It is not blind and the name says so. The card used to be withheld here and published
+ * to nobody; now `openQuestion` on `state` carries the same card to every seat and this
+ * field adds exactly one thing on top: `order`, the seed-derived coin flip saying which
+ * face of the card is the first display position.
  *
- * `labels` are in DISPLAY order. `labels[0]` is what the player sees first, in a
- * fixed DOM position — the two cells must never be styled differently
- * (UI-SPEC §9 anti-pattern 1), so position carries no information. `order` is a
- * seed-derived coin flip saying which side of the card that is, and the server maps
- * the clicked index back through it. The client must NOT try to work it out: it
- * has nothing to work it out from, and a client that could override it would make
- * the whole exercise decorative.
+ * ── WHAT THE CLIENT MUST NOT DO WITH ANY OF IT, which is now the whole rule ──
+ *
+ * `sides[0]` is what renders first, in a fixed DOM position. `order` says which side of
+ * the card that is, and the server maps the clicked index back through it — the client
+ * must NOT try to work it out or use it. It has nothing to work it out from beyond this
+ * one field, and a client that branched on it would make the whole exercise decorative.
+ *
+ * **AND THE SIDE MUST NOT BE STYLED BY ITS IDEOLOGUE.** This is the sharpest form of the
+ * old rule and it is the reason `order` is still worth protecting: with the Ideologue
+ * printed beside each answer, a stylesheet that tinted the left cell by Ideologue would
+ * publish the left-hand cell's Ideologue, which is exactly the position channel PLAN.md
+ * §2 amendment A′ exists to prevent. Same text, same geometry, same class on both cells;
+ * the payout differs because the payout differs, and NOTHING ELSE may.
  */
-export type BlindPrompt = {
+export type AnswerPrompt = {
   readonly question: string;
-  readonly labels: readonly [string, string];
+  readonly sides: readonly [AnswerSide, AnswerSide];
   readonly order: 'ab' | 'ba';
 };
 

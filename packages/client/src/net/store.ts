@@ -32,7 +32,7 @@
 
 import type { ClientState, GameEvent, PlayerID } from '@shasn/engine';
 
-import type { BlindPrompt, Lobby, LobbySummary, ServerMessage, Session } from './protocol.ts';
+import type { AnswerPrompt, Lobby, LobbySummary, ServerMessage, Session } from './protocol.ts';
 
 export type Phase = 'offline' | 'connecting' | 'lobby' | 'match';
 
@@ -55,8 +55,18 @@ export type ClientStore = {
   /** Buffered until the matching `match:state` lands. */
   readonly pendingEvents: readonly { readonly viewId: number; readonly events: readonly GameEvent[] }[];
   readonly recentEvents: readonly GameEvent[];
-  /** From the server. Cleared the moment it is not this player's blind answer. */
-  readonly blind: BlindPrompt | null;
+  /**
+   * From the server: the whole card, plus the `order` draw. Cleared the moment it is
+   * not this player's turn to answer it.
+   *
+   * NOTE WHAT IS NOT HERE ANY MORE. This used to be described as the private half of a
+   * blind answer, and the card content in it was withheld from the table. Under full
+   * information `state.openQuestion` carries the identical card to every seat, so the
+   * only thing stored here that is not already public is `order` — and it is stored for
+   * the same reason as before, which is not secrecy: a client must not keep rendering a
+   * card the player is no longer being asked about.
+   */
+  readonly answer: AnswerPrompt | null;
   readonly error: PendingError | null;
   readonly you: { readonly role: 'player' | 'spectator'; readonly playerId: PlayerID | null };
 };
@@ -71,7 +81,7 @@ const INITIAL: ClientStore = {
   viewId: 0,
   pendingEvents: [],
   recentEvents: [],
-  blind: null,
+  answer: null,
   error: null,
   you: { role: 'spectator', playerId: null },
 };
@@ -120,7 +130,7 @@ export function applyState(msg: {
   readonly matchId: string;
   readonly viewId: number;
   readonly state: ClientState;
-  readonly blind: BlindPrompt | null;
+  readonly answer: AnswerPrompt | null;
   readonly you: { readonly role: 'player' | 'spectator'; readonly playerId: PlayerID | null };
 }): void {
   const flushable = store.pendingEvents.filter((e) => e.viewId <= msg.viewId);
@@ -129,7 +139,7 @@ export function applyState(msg: {
 
   const mine = msg.you.playerId;
   const owed =
-    msg.blind !== null &&
+    msg.answer !== null &&
     msg.state.phase === 'answer' &&
     msg.state.activePlayer === mine &&
     msg.you.role === 'player';
@@ -142,10 +152,9 @@ export function applyState(msg: {
     you: msg.you,
     // The prompt is not stored because the server said so; it is stored because it
     // is still this player's to answer. Anything else and the UI would be showing
-    // a question the player is no longer being asked — which is both a UX bug and
-    // a small information leak, because the two labels are the private half of
-    // the blind answer.
-    blind: owed ? msg.blind : null,
+    // a question the player is no longer being asked, which is a UX bug and the
+    // one thing this field is still gatekeeping: the stale `order` draw.
+    answer: owed ? msg.answer : null,
     pendingEvents: stillWaiting,
     recentEvents: [...store.recentEvents, ...recent].slice(-200),
   });
@@ -175,9 +184,9 @@ export function applyEvents(viewId: number, events: readonly GameEvent[]): void 
  * chosen — what it must never keep is the QUESTION or the two labels of a card
  * that is still face down, and it does not.
  */
-export function clearBlind(): void {
-  if (store.blind === null) return;
-  set({ blind: null });
+export function clearAnswer(): void {
+  if (store.answer === null) return;
+  set({ answer: null });
 }
 
 export function applyServerMessage(msg: ServerMessage): void {
@@ -191,7 +200,7 @@ export function applyServerMessage(msg: ServerMessage): void {
       // The credential is gone. Everything derived from it is meaningless now, and
       // leaving a stale ClientState on screen would be a state the player believes
       // but is not.
-      set({ session: null, matchId: null, state: null, blind: null, phase: 'offline', viewId: 0 });
+      set({ session: null, matchId: null, state: null, answer: null, phase: 'offline', viewId: 0 });
       return;
     case 'lobby:list':
       set({ lobbies: msg.lobbies });
@@ -252,7 +261,7 @@ export function isMyTurn(): boolean {
 
 export function awaitingMyAnswer(): boolean {
   if (store.state === null) return false;
-  return isMyTurn() && store.state.phase === 'answer' && store.blind !== null;
+  return isMyTurn() && store.state.phase === 'answer' && store.answer !== null;
 }
 
 /** Decisions the engine owes THIS player. The engine's out-of-turn channel. */

@@ -2,7 +2,7 @@
  * The exhaustive render.
  *
  * This is the layer that has real teeth, and the reason is worth stating plainly:
- * the layer-1 walk exercises `viewFor` and `blindPromptFor` — two functions. A new
+ * the layer-1 walk exercises `viewFor` and `answerPromptFor` — two functions. A new
  * `ServerMessage` could easily carry state without passing through either of them
  * (a `match:debug` that inlines a state, a `match:log` that forwards a log entry,
  * an error that embeds something), and the layer-1 test would stay green.
@@ -20,26 +20,26 @@
 
 import { winners, type Ctx, type GameState, type PlayerID } from '@shasn/engine';
 
-import { blindPromptFor, viewFor } from '../src/broadcast.ts';
+import { answerPromptFor, viewFor } from '../src/broadcast.ts';
 import type { ServerMessage } from '../src/protocol.ts';
 
 /** `Room.viewFor` returns this; the render mirrors the server's own send paths. */
 function project(state: GameState, ctx: Ctx, viewer: PlayerID | null) {
   return {
     state: viewFor(state, ctx.cards, viewer),
-    blind: viewer === null ? null : blindPromptFor(state, ctx.cards, viewer),
+    answer: viewer === null ? null : answerPromptFor(state, ctx.cards, viewer),
   };
 }
 
 /**
  * Every message the server can emit for a state, for one viewer.
  *
- * `viewer` is `null` for a spectator. Note that `blind` is `null` in that case by
- * construction: `blindPromptFor` is only ever handed a real player id, and it
+ * `viewer` is `null` for a spectator. Note that `answer` is `null` in that case by
+ * construction: `answerPromptFor` is only ever handed a real player id, and it
  * returns `null` for anyone who is not the player currently holding the card.
  */
 export function renderAll(state: GameState, ctx: Ctx, viewer: PlayerID | null = null): readonly ServerMessage[] {
-  const { state: view, blind } = project(state, ctx, viewer);
+  const { state: view, answer } = project(state, ctx, viewer);
   const matchId = 'm_render';
   const viewId = 0;
   const out: ServerMessage[] = [];
@@ -84,7 +84,7 @@ export function renderAll(state: GameState, ctx: Ctx, viewer: PlayerID | null = 
     matchId,
     viewId,
     state: view,
-    blind,
+    answer,
     you: { role: viewer === null ? 'spectator' : 'player', playerId: viewer },
   });
   out.push({ t: 'match:events', matchId, viewId, events: [] });

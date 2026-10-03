@@ -44,6 +44,31 @@ const REPO = resolve(SERVER, '..', '..');
  * The engine's server-only fields, by name. Kept as a literal list rather than
  * read from the engine's type — the point of the grep is that it works when
  * somebody is mid-refactor and the type no longer says anything useful.
+ *
+ * ── WHAT FULL INFORMATION CHANGED HERE, AND WHAT IT DID NOT ──────────────────
+ *
+ * `_pendingCard` IS STILL IN THIS LIST, and that is a decision rather than an
+ * oversight. The Ideology Card's CONTENT is now public — question, both answers,
+ * both Ideologues and both payouts, to every seat and every spectator — so what stopped
+ * being secret is the payout, and what is still withheld is the card's ID.
+ *
+ * The reason is this file. These three greps are the ONLY mechanism in the repository
+ * that stops a server-only field reaching the wire, and they work by the field being
+ * `_`-prefixed and named here. Publishing the pending card by id would move that value
+ * onto an unprefixed field, where no grep on this list would cover it — and the payout
+ * is precisely the field PLAN.md §9 risk #2 says somebody might later want to
+ * re-hide. So: the card is public, the pointer is not, and the pointer stays on the
+ * list so that this file keeps watching it.
+ *
+ * WHAT BECAME PUBLIC, stated because it is the consequence worth writing down rather
+ * than because it is a violation: anyone can now look up every Ideology Card's payout
+ * from the public corpus, because every card in the deck is dealt to somebody during a
+ * game and its two payouts are printed when it is. That is the intended change, and it
+ * costs the GAME — a player computes the better side instead of deliberating — rather
+ * than the wire.
+ *
+ * Nothing else moved. The four draw piles, the four discard piles, `_seed` and `_idSeq`
+ * are exactly as secret as they were.
  */
 const SECRET_NAMES = [
   'pendingCard',

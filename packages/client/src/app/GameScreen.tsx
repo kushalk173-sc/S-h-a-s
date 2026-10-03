@@ -41,7 +41,7 @@ import type {
 } from '@shasn/engine';
 
 import { BoardSvg } from '../board/BoardSvg.tsx';
-import type { BlindPrompt, ClientStore } from '../net/index.ts';
+import type { AnswerPrompt, ClientStore } from '../net/index.ts';
 
 import { AnswerReveal, AnswerScreen } from './AnswerScreen.tsx';
 import { ChoiceResolver } from './ChoiceResolver.tsx';
@@ -617,7 +617,7 @@ export function GameScreen({ store }: GameScreenProps) {
   const liveMessage = describeForScreenReader(
     state,
     isMyTurn,
-    store.blind !== null,
+    store.answer !== null,
     you,
     openWindow,
   );
@@ -907,18 +907,18 @@ export function GameScreen({ store }: GameScreenProps) {
         a card is being answered neither prompt can be paid. Rendering either would
         put a full-viewport takeover on screen whose only button earns a toast —
         and in the answer case it would be worse than a dead control, because the
-        blind prompt is the one screen in this game a player must not be able to
+        the answer prompt is the one screen in this game a player must not be able to
         read past. Both reappear the moment `state.interrupt` goes back to `null`,
-        with the prompt exactly as it was left, because `store.blind` and
+        with the prompt exactly as it was left, because `store.answer` and
         `state.activeHeadline` are untouched by any of this.
 
         The one thing that is NOT suppressed is `ChoiceResolver`, below:
         `RESOLVE_CHOICE` is legal for the whole length of the window on purpose.
       */}
-      {store.blind !== null && isMyTurn && state.phase === 'answer' && !windowOpen ? (
+      {store.answer !== null && isMyTurn && state.phase === 'answer' && !windowOpen ? (
         <AnswerScreen
           state={state}
-          prompt={store.blind as BlindPrompt}
+          prompt={store.answer as AnswerPrompt}
           you={you as PlayerID}
           viewId={store.viewId}
           errorAt={store.error === null ? null : store.error.at}

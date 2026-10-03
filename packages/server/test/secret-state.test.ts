@@ -1,16 +1,22 @@
 /**
- * THE SECRET-STATE GATE.
+ * THE SECRET-STATE GATE — after full information.
  *
- * If this file is deleted, the project has no defence against the one leak that
- * ends the game permanently. Everything else in the server is an ordinary
- * correctness concern; this is the one where a single success is unrecoverable —
- * a player who learns one payout cannot be made to forget it, the match cannot be
- * reset, and the table's central mechanic is over for good.
+ * If this file is deleted, the project has no defence against the one leak that ends
+ * the game permanently. The blind answer is gone, so "one payout cannot be un-known"
+ * is no longer the stake; what replaced it is smaller and sharper:
  *
- * The three layers the architecture calls for, in the order they bite:
+ *   · the `_`-prefix walk, which is unchanged and still the load-bearing gate for the
+ *     DECKS, the draw piles, the seed and the pending card's ID;
+ *   · the `order` draw, which is the last channel by which POSITION could carry the
+ *     deck's Ideologue balance (PLAN.md §2 amendment A′). With the Ideologue printed on
+ *     every card, publishing `order` would rebuild that channel in one line — so it is
+ *     the one thing this suite now refuses hardest;
+ *   · the conspiracy hand, which is still a hidden hand, owner included.
+ *
+ * The four layers, in the order they bite:
  *
  *   LAYER 1  A structural walk over the PRODUCTION broadcast path — `viewFor` and
- *           `blindPromptFor`, reached through `Room.viewFor`, which is what the
+ *           `answerPromptFor`, reached through `Room.viewFor`, which is what the
  *           server's fan-out actually calls. Recursive, via the engine's `allKeys`,
  *           at every depth, for every viewer including a spectator, at several
  *           points in a REAL played-out game rather than a hand-built state.
@@ -24,9 +30,12 @@
  *           layer 1 walks the two projection functions, and a new message could
  *           easily carry state without passing through either of them.
  *
-*   LAYER 3  The type system. `blindPromptFor` admits only `{question, labels,
- *           order}` — no `Delta`, no `Ideologue`, no `CardID`, no number. Asserted
- *           both at compile time (below) and structurally at runtime.
+ *   LAYER 3  THE PUBLIC CARD, and the one field it must not carry. `PublicQuestion`
+ *           admits no `CardID` and no `order`; `answerPromptFor` adds exactly the
+ *           `order` and is owed by exactly one seat. Under full information the whole
+ *           card — question, both answers, both Ideologues, both payouts — goes to
+ *           every viewer, and this layer asserts that as a POSITIVE fact over the
+ *           production path rather than asserting its absence.
  *
  *   LAYER 4  The one deliberately viewer-scoped projection: `playableConspiracies`,
  *           the ids/names/text of the VIEWER'S OWN Conspiracy Cards that `reduce`
@@ -56,7 +65,7 @@ import {
   type PlayerID,
 } from '@shasn/engine';
 
-import { answerSideFor, blindPromptFor, viewFor } from '../src/broadcast.ts';
+import { answerSideFor, answerPromptFor, viewFor } from '../src/broadcast.ts';
 import { Room } from '../src/room.ts';
 import { makeCtx, realCards } from './fixtures.ts';
 import { decksOf } from '../src/store.ts';
@@ -72,7 +81,7 @@ import { LEAK_PATHS, CHOICE_KINDS, SECRET_FIELDS } from './secret-inventory.ts';
  * NEVER produced an effect-generated `PendingChoice`, and the 22 Conspiracy Cards were
  * all `voters n:1`. The shipped corpus's 26 headlines carry twelve distinct ops and
  * its conspiracies carry ten, and three of those ops open a decision that freezes a
- * player — so the real corpus exercises projection paths — `blindPromptFor` under a
+ * player — so the real corpus exercises projection paths — `answerPromptFor` under a
  * mid-resolution effect, an `evict` target list, a `steal-any` victim — that this
  * suite structurally could not reach.
  *
@@ -350,7 +359,7 @@ const LEAK_CORPUS: readonly GameState[] = [...CORPUS, ...REDRAW_CORPUS];
 
 if (process.env['SHASN_DEBUG_CORPUS'] === '1') {
   for (const [i, s] of CORPUS.entries()) {
-    const b = s.phase === 'answer' ? blindPromptFor(s, CARDS, s.activePlayer) : null;
+    const b = s.phase === 'answer' ? answerPromptFor(s, CARDS, s.activePlayer) : null;
     console.log(i, s.phase, 'active=' + s.activePlayer, 'pending=' + s._pendingCard, 'order=' + (b?.order ?? '-'));
   }
 }
@@ -533,7 +542,7 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
       const viewers: (PlayerID | null)[] = [null, ...s.turnOrder, 'p_not_a_real_seat'];
       for (const viewer of viewers) {
         const v = room.viewFor(viewer);
-        const keys = [...allKeys(v.state), ...(v.blind === null ? [] : allKeys(v.blind))].filter((k) =>
+        const keys = [...allKeys(v.state), ...(v.answer === null ? [] : allKeys(v.answer))].filter((k) =>
           k.startsWith('_'),
         );
         expect(keys, `room state ${i} (${s.phase}), viewer ${String(viewer)}`).toEqual([]);
@@ -674,7 +683,7 @@ it('no secret VALUE survives: no card id, and not the seed', () => {
     const before = JSON.stringify(s);
     for (const viewer of [null, ...s.turnOrder]) {
       viewFor(s, CARDS, viewer);
-      blindPromptFor(s, CARDS, viewer ?? '');
+      answerPromptFor(s, CARDS, viewer ?? '');
     }
     expect(JSON.stringify(s)).toBe(before);
   });
@@ -747,40 +756,148 @@ it('no message carries a secret card id or the seed', () => {
   });
 });
 
-describe('LAYER 3 — the blind prompt type admits nothing that could help a player choose', () => {
-  it('has exactly three fields, and two of them are the labels', () => {
+/**
+ * LAYER 3 — THE WHOLE CARD IS PUBLIC, AND `order` IS THE ONE THING THAT IS NOT.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * THIS DESCRIBE USED TO BE THE OPPOSITE, and the change is stated first because a
+ * reader who only reads the old header would be misled about what the wire carries.
+ *
+ * It was "the blind prompt type admits nothing that could help a player choose", and its
+ * tests asserted that the prompt held no `Delta`, no `Ideologue`, no number, and that a
+ * player who was not answering was owed no prompt at all. All of that was true. Full
+ * information makes it false: the whole card — question, both answers, both Ideologues,
+ * both payouts — is published to every seat, and the prompt the answerer receives is the
+ * same card plus the `order` draw.
+ *
+ * So the surviving guarantee is restated on the thing that is actually still protected,
+ * and the tests below are the POSITIVE version of the same walk:
+ *
+ *   · EVERY VIEWER GETS THE WHOLE CARD — question, both labels, both Ideologues, both
+ *     payouts — over the PRODUCTION broadcast, not over `playerView` in isolation.
+ *   · NO VIEWER GETS A `CardID` for it. The corpus is public JSON, so the payout was
+ *     always one lookup away; the id is withheld because the thing that withholds it is
+ *     `check-secrets.mjs`, whose whole mechanism is a name-based grep over `_`-prefixed
+ *     fields. See `PublicQuestion` in `broadcast.ts` for the ruling.
+ *   · ONLY THE ANSWERER GETS `order`, and it is a two-value union. This is the last
+ *     channel by which position could carry the deck's Ideologue balance
+ *     (PLAN.md §2 amendment A′), and with the Ideologue now on the card it is the one
+ *     that matters.
+ *   · The two payloads are the SAME card, byte for byte apart from `order` — asserted,
+ *     because "two projections of one card" is a claim and one computation is the only
+ *     thing that makes it true.
+ */
+describe('LAYER 3 — the whole card is public, and `order` is the one thing that is not', () => {
+  it('has exactly three fields, and one of them is the order draw', () => {
     const mid = CORPUS.find((s) => s.phase === 'answer');
     if (mid === undefined) throw new Error('no mid-answer state in the corpus');
     const me = mid.activePlayer;
-    const blind = blindPromptFor(mid, CARDS, me);
-    expect(blind, 'the active player must be owed a prompt mid-answer').not.toBeNull();
-    expect(Object.keys(blind!).sort()).toEqual(['labels', 'order', 'question']);
+    const prompt = answerPromptFor(mid, CARDS, me);
+    expect(prompt, 'the active player must be owed a prompt mid-answer').not.toBeNull();
+    expect(Object.keys(prompt!).sort()).toEqual(['order', 'question', 'sides']);
   });
 
-  it('contains no number anywhere — no payout, no count, no seed', () => {
-    const mid = CORPUS.find((s) => s.phase === 'answer');
-    if (mid === undefined) throw new Error('no mid-answer state in the corpus');
-    const blind = blindPromptFor(mid, CARDS, mid.activePlayer);
-    expect(blind).not.toBeNull();
-    expect(typeof blind!.question).toBe('string');
-    expect(blind!.labels.every((l) => typeof l === 'string')).toBe(true);
-    expect(blind!.labels).toHaveLength(2);
-    // `order` is 'ab' | 'ba'. Nothing else, and no numeric field at all: a Delta
-    // is four numbers and one of them is enough to bias the choice.
-    expect(['ab', 'ba']).toContain(blind!.order);
+  it('EVERY VIEWER receives question, both labels, both Ideologues and both payouts', () => {
+    // THE ACCEPTANCE CLAIM, over the production projection — `viewFor` is what
+    // `Room.viewFor` returns and what `#sendMatchState` writes to a socket, and it is
+    // walked for every seat AND for `null` (a spectator). An engine-only assertion would
+    // pass while the server dropped the field on the way out.
+    let checked = 0;
+    for (const s of CORPUS) {
+      if (s.phase !== 'answer') continue;
+      const cardId = s._pendingCard;
+      if (cardId === null) continue;
+      const card = CARDS.ideology[cardId];
+      if (card === undefined) continue;
+      const [a, b] = card.sides;
+      if (a === undefined || b === undefined) continue;
+
+      for (const viewer of [null, ...s.turnOrder]) {
+        const open = viewFor(s, CARDS, viewer).openQuestion;
+        expect(open, `viewer ${String(viewer)} got no card mid-answer`).not.toBeNull();
+        if (open === null) continue;
+        expect(open.question).toBe(card.question);
+        expect(open.sides).toHaveLength(2);
+        // The two sides in DISPLAY order, each a whole printed side: the text, the
+        // Ideologue it belongs to, and the resources it pays. Compared as a SET of
+        // sides rather than positionally, because which face is first is exactly the
+        // thing the table is not told.
+        const shown = open.sides.map((side) => JSON.stringify(side)).sort();
+        const real = [a, b]
+          .map((side) => JSON.stringify({ label: side.answer, ideologue: side.ideologue, pays: side.pays }))
+          .sort();
+        expect(shown, `viewer ${String(viewer)} did not get both printed sides whole`).toEqual(real);
+        checked += 1;
+      }
+    }
+    // The corpus must actually reach this, or the loop proves nothing.
+    expect(checked, 'no viewer ever received a card — the claim is untested').toBeGreaterThan(0);
+  });
+
+  it('carries NO card id, for any viewer — the corpus is public, the pointer is not', () => {
+    // The ruling on `PublicQuestion`: public by CONTENT, never by id. This is the
+    // assertion that keeps it a ruling rather than a hope, and it is the one that fails
+    // if somebody "helpfully" adds `cardId` to the published side so a client can key
+    // the card.
+    for (const s of CORPUS) {
+      const cardId = s._pendingCard;
+      if (cardId === null) continue;
+      for (const viewer of [null, ...s.turnOrder]) {
+        const payload = JSON.stringify(viewFor(s, CARDS, viewer));
+        expect(payload.includes(cardId), `viewer ${String(viewer)} received the pending card's id`).toBe(false);
+      }
+    }
   });
 
   it('is owed ONLY by the player who is answering', () => {
     for (const s of CORPUS) {
       for (const pid of s.turnOrder) {
-        const owed = blindPromptFor(s, CARDS, pid) !== null;
+        const owed = answerPromptFor(s, CARDS, pid) !== null;
         expect(owed, `${pid} was given a prompt in ${s.phase} (active ${s.activePlayer})`).toBe(
           pid === s.activePlayer && s.phase === 'answer',
         );
       }
       // A spectator's viewer is null and there is no such thing as a spectator
       // prompt, so this is the `null`-viewer case as well as the wrong-player one.
-      expect(blindPromptFor(s, CARDS, 'p_outsider')).toBeNull();
+      expect(answerPromptFor(s, CARDS, 'p_outsider')).toBeNull();
+    }
+  });
+
+  it('the table copy and the answerer copy are the SAME card, byte for byte', () => {
+    // Two projections of one card is a CLAIM; one computation (`pendingCardFor`) is what
+    // makes it true. If they ever drift, the table reads one answer aloud and the
+    // answerer is shown another — and a click then buys the other side's payout, which
+    // is precisely the failure the shared computation exists to prevent.
+    let checked = 0;
+    for (const s of CORPUS) {
+      if (s.phase !== 'answer') continue;
+      const me = s.activePlayer;
+      const prompt = answerPromptFor(s, CARDS, me);
+      const open = viewFor(s, CARDS, me).openQuestion;
+      if (prompt === null || open === null) continue;
+      expect(JSON.stringify(open.sides)).toBe(JSON.stringify(prompt.sides));
+      expect(open.question).toBe(prompt.question);
+      checked += 1;
+    }
+    expect(checked, 'no state had both a table card and an answerer prompt').toBeGreaterThan(0);
+  });
+
+  it('the table copy carries NO `order`, and the answerer copy carries ONLY that', () => {
+    // The two halves of the whole surviving guarantee, asserted together because they
+    // are two halves of one thing: `order` is the channel, and it must be in exactly one
+    // payload.
+    for (const s of CORPUS) {
+      if (s.phase !== 'answer') continue;
+      const me = s.activePlayer;
+      const prompt = answerPromptFor(s, CARDS, me);
+      const open = viewFor(s, CARDS, me).openQuestion;
+      if (prompt === null || open === null) continue;
+      expect(['ab', 'ba']).toContain(prompt.order);
+      // Not on the table's copy, at ANY depth — a nested `order` on a side would be the
+      // same channel one level down.
+      expect(allKeys(open)).not.toContain('order');
+      // And the answerer's copy has nothing else that is not already public.
+      expect(Object.keys(prompt).sort()).toEqual(['order', 'question', 'sides']);
     }
   });
 
@@ -792,8 +909,8 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
       const me = s.activePlayer;
       const card = CARDS.ideology[s._pendingCard ?? ''];
       if (card === undefined) continue;
-      const blind = blindPromptFor(s, CARDS, me);
-      if (blind === null) continue;
+      const prompt = answerPromptFor(s, CARDS, me);
+      if (prompt === null) continue;
 
       const side0 = answerSideFor(s, CARDS, me, 0);
       const side1 = answerSideFor(s, CARDS, me, 1);
@@ -801,27 +918,37 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
       expect(side1).not.toBeNull();
       expect(side0 === 0 ? 1 : 0).toBe(side1);
 
-      // The label at each display index must be the answer text of the side it maps
-      // to. If this drifts, the player is shown one answer and charged for another.
-      const shown0 = blind.labels[0];
-      const actual0 = card.sides[side0 ?? 0]?.answer;
-      expect(shown0).toBe(actual0);
-      const shown1 = blind.labels[1];
-      const actual1 = card.sides[side1 ?? 0]?.answer;
-      expect(shown1).toBe(actual1);
+      // The side shown at each display index must be the card's own side at the index
+      // the remap produced — label, Ideologue and payout together. If this drifts, the
+      // player is shown one answer and charged for another.
+      const shown0 = prompt.sides[0];
+      const actual0 = card.sides[side0 ?? 0];
+      expect(shown0.label).toBe(actual0?.answer);
+      expect(shown0.ideologue).toBe(actual0?.ideologue);
+      expect(shown0.pays).toEqual(actual0?.pays);
+      const shown1 = prompt.sides[1];
+      const actual1 = card.sides[side1 ?? 0];
+      expect(shown1.label).toBe(actual1?.answer);
+      expect(shown1.ideologue).toBe(actual1?.ideologue);
+      expect(shown1.pays).toEqual(actual1?.pays);
     }
   });
 
   it('the order is a pure function of the match, and is not a fixed left/right', () => {
-    // A FIXED order is a channel. The two sides belong to different Ideologues and
-    // the answer pool is not balanced side-to-side, so "the left one" would let a
-    // player learn the slot instead of deliberating (PLAN.md §2 amendment A′).
+    // A FIXED order is a channel. The two sides belong to different Ideologues and the
+    // answer pool is not balanced side-to-side, so "the left one" would let a player
+    // learn the slot instead of deliberating (PLAN.md §2 amendment A′).
     //
-    // This deliberately tests the DISTRIBUTION over a whole deck rather than
-    // "the corpus happened to show both". A 14-state corpus is a sample of seven
-    // cards and asserting both appear in it is a coin flip, not a test — the first
-    // version of this assertion failed for exactly that reason, which is worth
-    // recording because it is the trap: a flaky leak test gets deleted.
+    // **AND UNDER FULL INFORMATION THIS IS THE ONLY CHANNEL.** The Ideologue is printed
+    // beside each answer, so a table that could read `order` would know which Ideologue
+    // the first position holds — the position leak rebuilt in one step from a field that
+    // used to be one of four things being withheld.
+    //
+    // This deliberately tests the DISTRIBUTION over a whole deck rather than "the
+    // corpus happened to show both". A 14-state corpus is a sample of seven cards and
+    // asserting both appear in it is a coin flip, not a test — the first version of this
+    // assertion failed for exactly that reason, which is worth recording because it is
+    // the trap: a flaky leak test gets deleted.
     const mid = CORPUS.find((s) => s.phase === 'answer');
     if (mid === undefined) throw new Error('no mid-answer state in the corpus');
 
@@ -830,10 +957,9 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
       // Same seed, same state shape, varying card — which is exactly the axis the
       // order must be unpredictable along.
       const probe = { ...mid, _pendingCard: id } as GameState;
-      const blind = blindPromptFor(probe, CARDS, mid.activePlayer);
-      if (blind === null) throw new Error(`probe for ${id} produced no prompt`);
-      const b = blind as { order: 'ab' | 'ba' };
-      tally[b.order] = (tally[b.order] ?? 0) + 1;
+      const prompt = answerPromptFor(probe, CARDS, mid.activePlayer);
+      if (prompt === null) throw new Error(`probe for ${id} produced no prompt`);
+      tally[prompt.order] = (tally[prompt.order] ?? 0) + 1;
     }
     const total = Object.values(tally).reduce((a, b) => a + b, 0);
     expect(total).toBe(Object.keys(CARDS.ideology).length);
@@ -844,9 +970,9 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
 
     // And it is STABLE: a player who reconnects mid-answer must be shown the same
     // order they were shown before, or a click is silently reinterpreted.
-    const first = blindPromptFor(mid, CARDS, mid.activePlayer);
+    const first = answerPromptFor(mid, CARDS, mid.activePlayer);
     for (let i = 0; i < 5; i += 1) {
-      expect(blindPromptFor(mid, CARDS, mid.activePlayer)).toEqual(first);
+      expect(answerPromptFor(mid, CARDS, mid.activePlayer)).toEqual(first);
       expect(answerSideFor(mid, CARDS, mid.activePlayer, 0)).toBe(
         answerSideFor(mid, CARDS, mid.activePlayer, 0),
       );
@@ -861,10 +987,9 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
     const flips = new Set<number>();
     for (let k = 0; k < 64; k += 1) {
       const probe = { ...mid, _seed: k * 2654435761 } as GameState;
-      const blind = blindPromptFor(probe, CARDS, mid.activePlayer);
-      if (blind === null) throw new Error('no prompt');
-      const b = blind as { order: 'ab' | 'ba' };
-      flips.add(b.order === 'ab' ? 0 : 1);
+      const prompt = answerPromptFor(probe, CARDS, mid.activePlayer);
+      if (prompt === null) throw new Error('no prompt');
+      flips.add(prompt.order === 'ab' ? 0 : 1);
     }
     expect(flips.size).toBe(2);
   });
@@ -873,7 +998,7 @@ describe('LAYER 3 — the blind prompt type admits nothing that could help a pla
     for (const s of CORPUS) {
       const other = s.turnOrder.find((p) => p !== s.activePlayer);
       if (other === undefined) continue;
-      expect(blindPromptFor(s, CARDS, other)).toBeNull();
+      expect(answerPromptFor(s, CARDS, other)).toBeNull();
       expect(answerSideFor(s, CARDS, other, 0)).toBeNull();
     }
   });

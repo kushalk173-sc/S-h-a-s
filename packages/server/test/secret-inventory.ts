@@ -43,6 +43,54 @@ export const SECRET_FIELDS = [
 ] as const;
 
 /**
+ * `_pendingCard` IS STILL HERE, AND THAT IS A RULING rather than an omission.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * Full information made the card's CONTENT public: the question, both answers, both
+ * Ideologues and both payouts go to every seat and every spectator, on `openQuestion`, in
+ * `PublicQuestion`. So what is no longer secret is the PAYOUT — which was never a secret
+ * anyway in any strong sense, because the Ideology corpus is public JSON in this
+ * repository and every card's payout is one lookup away. What the old withholding actually
+ * protected was *which* card was on the table.
+ *
+ * The id stays behind the underscore for a reason that is about MECHANISM rather than
+ * about this card:
+ *
+ *  1. **`scripts/check-secrets.mjs` is the whole gate.** It fails the build on the mere
+ *     MENTION of a `_`-prefixed field's name, in any file, comments included, and it works
+ *     by the field being `_`-prefixed and named in `SECRET_NAMES` — the list above. That
+ *     is the only mechanism in the repository that stops a server-only field reaching the
+ *     wire, and it is worth more than the convenience of a public card id. Moving the
+ *     value onto an unprefixed field would remove the mechanism's coverage of this one
+ *     value, and PLAN.md §9 risk #2 means the payout is exactly the field somebody might
+ *     later want to re-hide.
+ *  2. **THE `manifestoCards` PRECEDENT DOES NOT TRANSFER, and it is worth saying why
+ *     because it is the argument that would be made.** That precedent is safe because an
+ *     ANSWERED card's payout has already been paid and revealed, so publishing its id adds
+ *     nothing. Full information deletes exactly that condition — it makes an UNANSWERED
+ *     card's payout public too — so the precedent is silent on this case and cannot be
+ *     borrowed to justify publishing the id.
+ *  3. **A narrower projection whose only job is to be less revealing than the broad one is
+ *     the shape `broadcast.ts`'s own header calls the failure mode** ("second projections
+ *     leak"). `openQuestion` is not that: it is the card, in content, for everybody, and it
+ *     exists because the card belongs to the table. What it does NOT do is hand out the
+ *     pointer.
+ *
+ * So the line is: **the card is public, its id is not.** `secret-state.test.ts` asserts
+ * both halves over the production broadcast — that every viewer receives both whole
+ * sides, and that no viewer's payload contains the pending card's id.
+ *
+ * WHAT BECAME PUBLIC, stated plainly because it is the consequence worth writing down:
+ * **anyone can now look up every Ideology Card's payout from the public corpus**, at any
+ * moment of any match, because every card in the deck is dealt to somebody in the course of
+ * a game and its two payouts are printed when it is. That is not a leak — it is the change
+ * — and what it costs is the GAME rather than the wire: a player computes the better side
+ * instead of deliberating, so dominance in the shipped Ideology deck is now permanently
+ * exploitable rather than merely a risk. See the `cardId` assertion in
+ * `secret-state.test.ts` and the balance check in `packages/cards`.
+ */
+
+/**
  * The hidden fields that are NOT `_`-prefixed, and so are invisible to the prefix
  * walk. Each one is a separate leak class, and each needs its own assertion.
  */

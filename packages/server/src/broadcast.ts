@@ -8,19 +8,40 @@
  *   viewFor        — the broad public view. `playerView`, plus the strip of
  *                    every other player's Conspiracy hand, plus the one
  *                    viewer-scoped addition described below, plus
- *                    `openQuestion`: the card on the table, said in public.
- *   blindPromptFor — the narrow one. Question text and two answer strings, and
- *                    nothing else that could help a player choose.
+ *                    `openQuestion`: the WHOLE card on the table, said in public.
+ *   answerPromptFor — the narrow one. The same card, plus the seed-derived `order`
+ *                    coin flip, and only for the player who has to answer it.
  *
- * THE PUBLIC QUESTION IS NOT A THIRD PROJECTION, and the distinction is the
- * interesting one. `openQuestion` is a FIELD of the broad view rather than a
- * projection of its own, because it has no viewer in it at all: `openQuestionFor`
- * takes `(state, cards)` and no player, because at a physical table the question
- * is read aloud and belongs to the table (AUTHENTIC-SHASN-REFERENCE §7.2 step 1).
- * What is private is not the question — it is the seed-derived `order` coin flip
- * and the commit control, and both of those arrive on the `blind` field, which is
- * still built for the answering player alone. So the table sees one card and the
- * answerer additionally holds the means to answer it.
+ * ── FULL INFORMATION, AND WHAT THE TWO PROJECTIONS ARE NOW ─────────────────
+ *
+ * The whole card is public: the question, both answers, both Ideologues and both
+ * payouts, to every seat and every spectator, before anyone answers. The blind
+ * answer is gone. `openQuestion` is a FIELD of the broad view rather than a
+ * projection of its own because it has no viewer in it at all: `openQuestionFor`
+ * takes `(state, cards)` and no player, because at a physical table the card is read
+ * aloud and belongs to the table (AUTHENTIC-SHASN-REFERENCE §7.2 step 1). What is
+ * still private is exactly two things — the seed-derived `order` draw, and the commit
+ * control — and both arrive on the `answer` field, which is still built for the
+ * answering player alone.
+ *
+ * So the separator has not gone away, it has MOVED. It used to separate "what the
+ * table may know" from "what the answerer may know"; it now separates "what everybody
+ * knows" from "who is allowed to answer". That is a smaller and much more honest
+ * division than the one it replaced, and it is the reason `blindPromptFor` was
+ * RENAMED rather than kept: a function called `blind` that returns two payouts is a
+ * lie in a name.
+ *
+ * ── THE `_pendingCard` RULING, IN ONE PLACE ─────────────────────────────────
+ *
+ * `_pendingCard` KEEPS its underscore and keeps its place in the secret inventory.
+ * The thing that stopped being secret is the PAYOUT, not the card's identity: the
+ * entire Ideology corpus is public JSON in this repository, so every card's payout was
+ * already one lookup away and the only thing the old withholding protected was *which*
+ * card was on the table. The id is still withheld, and the reason that matters is
+ * `scripts/check-secrets.mjs`: the name-based grep below is the whole mechanism by
+ * which this repository keeps a server-only field off the wire, and it works by the
+ * field being `_`-prefixed and named in `SECRET_NAMES`. See `PublicQuestion` for the
+ * full argument.
  *
  * THE VIEWER-SCOPED ADDITION — `playableConspiracies` — and why it is here and
  * not in `playerView.ts`. The D25 ruling (ARCHITECTURE §8.1.1) holds that a hand
@@ -52,12 +73,14 @@
  * of the viewer's hand, and every card in it is one the engine will actually
  * accept a `PLAY_CONSPIRACY` for.
  *
- * The separator is the design. A single `playerView` that conditionally included
- * the prompt would still pass the structural leak test, because a prompt is not a
- * `_`-prefixed key — the game would be dead and the test green. Keeping them apart
- * means the prompt's output type is `{question, labels, order}`, which admits no
- * payout, no Ideologue and no card id, and which can therefore be asserted
- * structurally too.
+ * The separator is still the design, and its SHAPE is what survived the change. A
+ * single `playerView` that conditionally included the answerer's `order` would still
+ * pass the structural leak test, because `order` is not a `_`-prefixed key — and now
+ * that the card is public, `order` is the ONLY thing left to protect. Keeping the two
+ * projections apart means the answerer's payload is `{question, sides, order}`, whose
+ * `order` field is a closed two-value union, and can therefore be asserted
+ * structurally too: no prompt carries a payout the table does not already have, and
+ * no table copy carries an `order`.
  *
  * This is also the ONLY file in the server permitted to read a `_`-prefixed field.
  * `scripts/check-secrets.mjs` fails the build on any other occurrence, in any
@@ -75,20 +98,30 @@ import {
   type CardID,
   type CardIndex,
   type ClientState,
+  type Delta,
   type GameState,
+  type Ideologue,
   type PlayerID,
 } from '@shasn/engine';
 
-import type { BlindPrompt } from './protocol.ts';
+import type { AnswerPrompt } from './protocol.ts';
 
 /**
- * Which side of the card the player was shown first.
+ * WHICH SIDE OF THE CARD THE PLAYER WAS SHOWN FIRST — and this is now the LAST
+ * secret in the mechanic rather than the second of two.
  *
  * PLAN.md §2 amendment A': a card's two answers belong to two different
  * Ideologues, and the shipped answer pool is not balanced side-to-side, so a
  * fixed left/right order is a channel. Players who notice that one flavour
- * clusters on one side learn the position instead of deliberating — the same class
- * of leak as shipping the payout, only slower.
+ * clusters on one side learn the position instead of deliberating.
+ *
+ * **FULL INFORMATION DOES NOT RETIRE THIS, AND IT MAKES IT LOUDER.** Before, hiding the
+ * payout meant a player who wanted an edge had to notice the Ideologue split by position
+ * — a slow, optional inference. Now `PublicQuestion` prints the Ideologue beside each
+ * answer, so a client that tinted the left cell by its Ideologue would publish the very
+ * mapping A′ exists to withhold, in one CSS rule. The order draw is therefore what stands
+ * between the shipped corpus and a position channel, and `PublicQuestion` carries no
+ * `order` for exactly that reason.
  *
  * The draw is a pure function of the match's own PRNG cursor and the card being
  * answered. It is NEVER `Math.random`: replay determinism is what makes the action
@@ -103,7 +136,7 @@ import type { BlindPrompt } from './protocol.ts';
  *  - a spectator and the other players see no order at all, because the prompt is
  *    only ever built for the player who is answering.
  */
-export type AnswerOrder = BlindPrompt['order'];
+export type AnswerOrder = AnswerPrompt['order'];
 
 /**
  * Placeholder viewer for spectators.
@@ -141,59 +174,90 @@ export type PlayableConspiracy = {
 };
 
 /**
- * THE OPEN QUESTION — what is on the table, said in public.
+ * ONE SIDE OF THE CARD ON THE TABLE, in public.
  *
- * ── THE RULING, AND THE THREE THINGS IT IS ABOUT ──────────────────────────
+ * Everything a physical table can read off a card face: the printed answer, the
+ * Ideologue it belongs to, and the resources it pays. p13's "THE ▼ AND THE PAYOUT ARE NOW
+ * REVEALED" used to be the moment the payout became public; under full information it is
+ * public from the moment the card is read aloud, which is §7.2 step 1's own description
+ * of a physical card being held up.
  *
- * Before this field, only the player holding the card was told the question. That
- * was a fidelity DEVIATION, and the rulebook says so plainly:
+ * **`ideologue` IS HERE AND IT IS THE ONE FIELD THAT HAD TO BE THOUGHT ABOUT.** Printing
+ * the Ideologue next to the answer is a deliberate reversal of §1.2's ban on it, and the
+ * reason it is safe is that §1.2's ban was about POSITION, not about knowledge: what must
+ * not happen is a side being *styled* by its Ideologue, because then the left-hand cell's
+ * colour says which Ideologue that card happened to be, and a player could learn the
+ * deck's Ideologue balance by position. That is PLAN.md §2 amendment A′, and it is the one
+ * property of the old design that SURVIVES this change. So the field is published and the
+ * tint is forbidden — see `PublicQuestion` below for the exact form of the rule.
+ */
+export type PublishedSide = {
+  /** The answer as it is read aloud. */
+  readonly label: string;
+  readonly ideologue: Ideologue;
+  /** p13: "Every answer will yield a different set of resources." */
+  readonly pays: Delta;
+};
+
+/**
+ * THE OPEN QUESTION — the whole card, said in public, to EVERY viewer including a
+ * spectator.
  *
- *   · `docs/AUTHENTIC-SHASN-REFERENCE.md` §7.2 step 1 (p764): "The player to your
- *     right takes the top Ideology Card and READS BOTH SIDES ALOUD TO YOU." Reading
- *     aloud to a table is a public act. Every other player is looking at the same
- *     two faces of the same piece of card.
- *   · §7.2 step 2 (p768-770): the redraw window is open to "ANY player", which is
- *     only a decision-shaped window if the table knows which question is being
- *     gambled on. A digital table that cannot see the question cannot participate
- *     in the moment the rulebook calls the social centre (§7.4 step 3, p815).
+ * ── WHAT CHANGED, AND WHY IT IS NOT SIMPLY A WIDER TYPE ─────────────────────
  *
- * So the QUESTION and BOTH LABELS are public while the card is out. That is change
- * A, and it is the physical game.
+ * This used to be `{question, labels}` — the question and the two printed answers, with
+ * the payout, the Ideologue and the card id all withheld on the reasoning that §7.2 step 3
+ * reveals the payout only *after* the answer. Full information removes that premise: the
+ * card is now published whole, before anyone answers, to every seat.
  *
- * WHAT IS NOT PUBLIC, AND WHY NOT — the line is drawn by the rulebook, not by
- * taste. §7.2 step 3 (p774-775): "You answer. You say which side. The card goes
- * under your mat, answer-side up, into the notch. THE ▼ AND THE PAYOUT ARE NOW
- * REVEALED." The payout is revealed *after* the answer, and §7.2 step 2 (p772)
- * spells out why that ordering is load-bearing: "Because the reading player does
- * not know what the card pays, the redraw is a BET, not a decision." Publicising
- * the question therefore does not turn the redraw into a decision, and publicising
- * the payout would. Change C — payout before anyone answers — is REFUSED here, and
- * this type is the proof: there is no `Delta`, no `Ideologue`, no `CardID` and no
- * number anywhere in it, exactly as in `BlindPrompt` (§7.2 step 1, p767: "no
- * payouts, no ideologue names").
+ * **WHY THAT IS NOT A LEAK WORTH ARGUING AGAINST.** The whole Ideology corpus is public
+ * JSON in this repository. Every card's payout is therefore already known to anybody who
+ * wants to know it — the only thing the old withholding protected was *which* card was on
+ * the table, and a player at a physical table reads the whole card off the card. So the
+ * change publishes content that was one lookup away, and what it costs is written down in
+ * full in the report that accompanies it: the game stops being a deliberation and becomes
+ * an optimisation whenever one side of a card is worth more than the other, which makes
+ * dominance in the shipped corpus worse rather than better (PLAN.md §9, risk #2).
  *
- * `order` IS DELIBERATELY ABSENT, and that is the seed-derived draw from PLAN.md §2
- * amendment A′: it says which face of the card a position is, so it is the one
- * field the table must not be able to line up against the deck's Ideologue balance.
- * The answerer gets it from `blind`, and it is the answerer's alone. What the table
- * gets instead is `labels` ALREADY IN DISPLAY ORDER, so everybody is looking at one
- * card rather than at two orderings of it — and position still carries no
- * information, because which position means which face is not published.
+ * ── STILL NO `id`, AND THE REASON IS NOT "SECRECY" ──────────────────────────
  *
- * PUBLIC BY CONTENT, NOT BY ID, AND THE PRECEDENT IS `manifestoCards`. The
- * rulebook's line is "until the active player confirms their answer" (p13, quoted
- * in `playerView.ts`): an ANSWED card is face up on the mat and is published by id
- * in `PlayerState.manifestoCards`, which is safe precisely because the payout has
- * already been paid and revealed, so the id adds nothing. An UNANSWERED card is on
- * the other side of that line, and every card in the shipped corpus is public
- * content — so publishing its id would hand the table a lookup key into the payout
- * table for a card nobody has answered yet. Content-only is therefore the same
- * ruling the project already applies to `manifestoCards`, not a third category.
+ * `_pendingCard` keeps its underscore and keeps its place in the secret inventory, and
+ * this type is the whole argument for that. Two reasons, and the second is the one that
+ * decided it:
+ *
+ *  1. The `manifestoCards` precedent does NOT transfer. It is safe to publish an answered
+ *     card by id because an answered card's payout has already been paid and revealed, so
+ *     the id adds nothing. Full information deletes exactly that condition — it makes the
+ *     payout of an UNANSWERED card public too — so the precedent is silent here and cannot
+ *     be borrowed.
+ *  2. **The gate.** `scripts/check-secrets.mjs` fails the build on the mere MENTION of a
+ *     server-only field's name, in any file, comments included. That name-based grep is
+ *     the entire mechanism by which this repository prevents a secret field from reaching
+ *     the wire, and it works by the field being `_`-prefixed and named in `SECRET_NAMES`.
+ *     Publishing this card by id would mean moving the value onto an unprefixed,
+ *     ungreppable field — and the value it protects is the only thing standing between a
+ *     future change that re-hides the payout and a silent leak. A narrower projection
+ *     whose only function is to be less revealing than the broad one is also the shape
+ *     this file's own header calls out as the failure mode ("second projections leak").
+ *
+ * So: **public by content, never by id.** The card is on the table; which card of the
+ * deck it is, is still the engine's business.
+ *
+ * ── AND `order` IS STILL ABSENT, WHICH IS NOW LOAD-BEARING RATHER THAN COSMETIC ──
+ *
+ * `order` says which face of the card a position is. Under the old design withholding it
+ * was tidy; under full information it is the ONLY thing standing between the table and a
+ * position→Ideologue lookup, because `ideologue` is now published per side. PLAN.md §2
+ * amendment A′ — "a card's two answers belong to two different Ideologues, and the shipped
+ * answer pool is not balanced side-to-side, so a fixed left/right order is a channel" —
+ * SURVIVES this change intact and is asserted in `secret-state.test.ts`. The sides arrive
+ * already in display order, so the table is looking at one card rather than at two
+ * orderings of it, and position still carries no information.
  */
 export type PublicQuestion = {
   readonly question: string;
   /** Display order, and the SAME order the answerer is shown. Never `order`. */
-  readonly labels: readonly [string, string];
+  readonly sides: readonly [PublishedSide, PublishedSide];
 };
 
 /**
@@ -238,7 +302,7 @@ export function viewFor(
  * is a property of the state and the cards, not of who is asking, because at a
  * physical table it is a property of the table. It is computed per call rather than
  * cached, for the same reason `playableConspiraciesFor` is — a redraw swaps the
- * card and therefore the question and both labels, and the next projection must say
+ * card and therefore the question and both sides, and the next projection must say
  * so with no invalidation step to forget.
  *
  * `null` at every moment there is no card out: wrong phase, no pending card, or a
@@ -248,9 +312,9 @@ export function viewFor(
  */
 export function openQuestionFor(state: GameState, cards: CardIndex): PublicQuestion | null {
   if (state.phase !== 'answer') return null;
-  const prompt = pendingPromptFor(state, cards);
-  if (prompt === null) return null;
-  return { question: prompt.question, labels: prompt.labels };
+  const card = pendingCardFor(state, cards);
+  if (card === null) return null;
+  return { question: card.question, sides: card.display };
 }
 
 /** The empty list. Shared so the common case allocates nothing per viewer. */
@@ -342,37 +406,49 @@ export function playableConspiraciesFor(
 }
 
 /**
- * The one place a card's *content* is ever written to a socket.
+ * The answerer's copy of the card: the whole card, plus the `order` coin flip.
  *
- * Returns `null` for anyone who is not the player currently holding the card,
- * which is every other player and every spectator. The type admits no `Delta`, no
- * `Ideologue`, no `CardID` and no number. Those other players and that spectator
- * are told the same words by `openQuestionFor` instead — see the ruling on
- * `PublicQuestion` — and the difference between the two payloads is exactly the
- * `order` coin flip and the fact that only one of them comes with a commit control.
+ * NOT BLIND ANY MORE, and the rename is the point. `blindPromptFor` existed to enforce
+ * a property — "the prompt admits no payout, no Ideologue, no card id" — that the
+ * `PublicQuestion` type proved structurally. Full information makes that property false, so
+ * leaving a function called `blindPromptFor` in place returning a prompt with two payouts
+ * in it would leave the codebase asserting something it no longer believes. It is renamed,
+ * not deleted, because a prompt the answering player needs is still a prompt; what changed
+ * is what is IN it.
+ *
+ * **WHAT STILL DIFFERS FROM THE TABLE'S COPY, and it is exactly one field.** `order`.
+ * Everything else — question, both labels, both Ideologues, both payouts — is byte-identical
+ * to `openQuestion`, because both are projections of one computation (`pendingCardFor`) and
+ * never of two transcriptions. `secret-state.test.ts` asserts the identity rather than
+ * trusting it, which is the only way two projections stay one card.
+ *
+ * Returns `null` for anyone who is not the player currently holding the card, which is
+ * every other player and every spectator. Those viewers are told the same card by
+ * `openQuestionFor` instead; the difference between the two payloads is the `order` draw
+ * and the fact that only one of them comes with a commit control.
  */
-export function blindPromptFor(
+export function answerPromptFor(
   state: GameState,
   cards: CardIndex,
   viewer: PlayerID,
-): BlindPrompt | null {
+): AnswerPrompt | null {
   if (viewer !== state.activePlayer) return null;
-  const prompt = pendingPromptFor(state, cards);
-  if (prompt === null) return null;
-  return { question: prompt.question, labels: prompt.labels, order: prompt.order };
+  const card = pendingCardFor(state, cards);
+  if (card === null) return null;
+  return { question: card.question, sides: card.display, order: card.order };
 }
 
 /**
  * The pending card's words and its presentation order, computed ONCE.
  *
  * Both public projections read this, and that is the whole reason it exists: the
- * table's copy of the question and the answerer's copy are the same card seen from
- * the same two positions, so a second transcription of the label order would be a
+ * table's copy of the card and the answerer's copy are the same card seen from the
+ * same two positions, so a second transcription of the label order would be a
  * place where the table and the answerer could silently disagree about which face
  * is on the left — and the answerer's click would then buy the other side's
  * payout. One computation, two narrow projections over it.
  */
-function pendingPromptFor(state: GameState, cards: CardIndex): PendingPrompt | null {
+function pendingCardFor(state: GameState, cards: CardIndex): PendingCard | null {
   if (state.phase !== 'answer') return null;
   const cardId = readPendingCard(state);
   if (cardId === null) return null;
@@ -384,17 +460,19 @@ function pendingPromptFor(state: GameState, cards: CardIndex): PendingPrompt | n
   if (a === undefined || b === undefined) return null;
 
   const order = orderFor(state, cardId);
-  // Display order. `labels[0]` is what renders first, always, in a fixed DOM
+  // Display order. `display[0]` is what renders first, always, in a fixed DOM
   // position — the client is forbidden from styling the two cells differently
   // (UI-SPEC §9 anti-pattern 1), so position carries no information.
-  const labels: readonly [string, string] = order === 'ab' ? [a.answer, b.answer] : [b.answer, a.answer];
-  return { question: card.question, labels, order };
+  const first: PublishedSide = { label: a.answer, ideologue: a.ideologue, pays: a.pays };
+  const second: PublishedSide = { label: b.answer, ideologue: b.ideologue, pays: b.pays };
+  const display: readonly [PublishedSide, PublishedSide] = order === 'ab' ? [first, second] : [second, first];
+  return { question: card.question, display, order };
 }
 
 /** What both projections publish. `order` is the answerer's alone; see above. */
-type PendingPrompt = {
+type PendingCard = {
   readonly question: string;
-  readonly labels: readonly [string, string];
+  readonly display: readonly [PublishedSide, PublishedSide];
   readonly order: AnswerOrder;
 };
 
@@ -417,7 +495,7 @@ export function answerSideFor(
   viewer: PlayerID,
   displayIndex: 0 | 1,
 ): 0 | 1 | null {
-  const prompt = blindPromptFor(state, cards, viewer);
+  const prompt = answerPromptFor(state, cards, viewer);
   if (prompt === null) return null;
   return displayIndex === 0 ? (prompt.order === 'ab' ? 0 : 1) : prompt.order === 'ab' ? 1 : 0;
 }

@@ -27,7 +27,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
-  BlindPrompt as ServerBlind,
+  AnswerPrompt as ServerAnswer,
   ClientMessage as ServerClientMessage,
   ErrorCode as ServerErrorCode,
   Lobby as ServerLobby,
@@ -41,7 +41,7 @@ import type {
 // Type-only, so nothing from the client package ends up in the server's module
 // graph at runtime. `verbatimModuleSyntax` guarantees the import is erased.
 import type {
-  BlindPrompt as ClientBlind,
+  AnswerPrompt as ClientAnswer,
   ClientMessage as ClientClientMessage,
   ErrorCode as ClientErrorCode,
   Lobby as ClientLobby,
@@ -77,7 +77,7 @@ const S2C = {
   lobby: true as Assignable<ServerLobby, ClientLobby>,
   lobbySeat: true as Assignable<ServerLobbySeat, ClientLobbySeat>,
   lobbySummary: true as Assignable<ServerLobbySummary, ClientLobbySummary>,
-  blind: true as Assignable<ServerBlind, ClientBlind>,
+  answer: true as Assignable<ServerAnswer, ClientAnswer>,
   errorCode: true as Assignable<ServerErrorCode, ClientErrorCode>,
   seatCount: true as Assignable<ServerSeatCount, ClientSeatCount>,
 };
@@ -89,7 +89,7 @@ const C2S = {
   lobby: true as Assignable<ClientLobby, ServerLobby>,
   lobbySeat: true as Assignable<ClientLobbySeat, ServerLobbySeat>,
   lobbySummary: true as Assignable<ClientLobbySummary, ServerLobbySummary>,
-  blind: true as Assignable<ClientBlind, ServerBlind>,
+  answer: true as Assignable<ClientAnswer, ServerAnswer>,
   errorCode: true as Assignable<ClientErrorCode, ServerErrorCode>,
   seatCount: true as Assignable<ClientSeatCount, ServerSeatCount>,
 };

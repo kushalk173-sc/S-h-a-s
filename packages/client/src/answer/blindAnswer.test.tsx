@@ -47,6 +47,11 @@ const QUESTION = 'The trusts have quietly bought the land your party needs for a
 const LABEL_A = 'Sue them and stall the project for three years.';
 const LABEL_B = 'Let it stand. The bypass goes in, and the party gets the credit.';
 
+/** Side A as the server sends it under full information: label, Ideologue, payout. */
+const SIDE_A = { label: LABEL_A, ideologue: 'idealist', pays: { funds: 4, trust: 1 } } as const;
+/** Side B. A DIFFERENT Ideologue and a smaller payout, which is the case that matters. */
+const SIDE_B = { label: LABEL_B, ideologue: 'capitalist', pays: { funds: 1 } } as const;
+
 /** The §1.2 contract table, as a list of computed properties. */
 const CONTRACT_PROPERTIES = [
   'background-color',
@@ -127,7 +132,7 @@ function styleSnapshot(el: HTMLElement): Record<string, string> {
 describe('the CSS actually reached the document (guard for vitest `css: true`)', () => {
   it('injects the stylesheet, so the equality assertions below are not vacuous', () => {
     render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
     const styleTags = [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join('\n');
     expect(styleTags).toContain('.blind-answer__side');
@@ -142,7 +147,7 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
     const { ab, ba } = seedsForBothOrders();
     for (const seed of [ab, ba]) {
       const { container, unmount } = render(
-        <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={seed} />,
+        <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={seed} />,
       );
       const [left, right] = sides(container);
       expect(left, 'two sides rendered').toBeDefined();
@@ -171,8 +176,8 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
       const { container, unmount } = render(
         <BlindAnswer
           question={QUESTION}
-          labelA={LABEL_A}
-          labelB={LABEL_B}
+          sideA={SIDE_A}
+          sideB={SIDE_B}
           seed={1}
           selected={side}
         />,
@@ -205,7 +210,7 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
 
   it('gives both sides the same class list, the same element, and no inline style', () => {
     const { container } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
     for (const el of sides(container)) {
       expect(el.tagName).toBe('BUTTON');
@@ -225,7 +230,7 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
 
   it('resolves the contract tokens it declares, to the §1.2 values', () => {
     const { container, unmount } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
     const [left] = sides(container);
     if (left === undefined) {
@@ -278,7 +283,7 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
 
   it('caps the label at 22ch so a long answer cannot widen its own column', () => {
     const { container, unmount } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
     for (const label of container.querySelectorAll<HTMLElement>('.blind-answer__label')) {
       expect(window.getComputedStyle(label).getPropertyValue('max-width')).toBe('22ch');
@@ -316,12 +321,12 @@ describe('the presentation order is seed-derived and actually varies', () => {
 
   it('puts the same label on the same side regardless of seed, and swaps position', () => {
     const { ab, ba } = seedsForBothOrders();
-    const one = render(<BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={ab} />);
+    const one = render(<BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={ab} />);
     const firstOrder = sides(one.container).map((s) => s.getAttribute('data-wire-side'));
     const firstLabels = sides(one.container).map((s) => s.textContent);
     one.unmount();
 
-    const two = render(<BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={ba} />);
+    const two = render(<BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={ba} />);
     const secondOrder = sides(two.container).map((s) => s.getAttribute('data-wire-side'));
     const secondLabels = sides(two.container).map((s) => s.textContent);
     two.unmount();
@@ -329,54 +334,137 @@ describe('the presentation order is seed-derived and actually varies', () => {
     // Position swaps…
     expect(firstOrder).toEqual(['A', 'B']);
     expect(secondOrder).toEqual(['B', 'A']);
-    // …while the label follows its side. A player cannot learn "the long one is
-    // always on the right" or "the Trusts' answer is always first".
-    expect(firstLabels).toEqual([LABEL_A, LABEL_B]);
-    expect(secondLabels).toEqual([LABEL_B, LABEL_A]);
+    // …while the WHOLE SIDE follows it. A player cannot learn "the long one is always
+    // on the right", "the Trusts' answer is always first", or — and this is the part
+    // that only became checkable under full information — "the Capitalists' answer is
+    // always on the left". A side is label, Ideologue and payout together, and all
+    // three move as one.
+    const wholeSide = (label: string, side: typeof SIDE_A | typeof SIDE_B): string =>
+      `${label}${side.ideologue === 'idealist' ? "the Idealists'" : "the Capitalists'"} answerpays ${
+        side.ideologue === 'idealist' ? '4 Fund · 1 Trust' : '1 Fund'
+      }`;
+    expect(firstLabels).toEqual([wholeSide(LABEL_A, SIDE_A), wholeSide(LABEL_B, SIDE_B)]);
+    expect(secondLabels).toEqual([wholeSide(LABEL_B, SIDE_B), wholeSide(LABEL_A, SIDE_A)]);
   });
 });
 
-describe('no payout can reach the DOM', () => {
-  it('renders nothing but the scenario, the two labels, and the two step labels', () => {
+/**
+ * FULL INFORMATION: the whole card is on screen, and the only thing that cannot reach
+ * the DOM is the `order` draw.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * THIS DESCRIBE USED TO ASSERT THE OPPOSITE, and the replacement is stated first
+ * because a reader who only reads the old comment would be misled about what the
+ * component does.
+ *
+ * It was called `no payout can reach the DOM`, and every test in it was about a card
+ * whose payout and Ideologue were withheld. Full information reverses that: the server
+ * publishes the whole card to every seat (`PublicQuestion` in the server's
+ * `broadcast.ts`), so the question, both answers, both Ideologues and both payouts are
+ * now on the card from the first frame, and the tests below assert THAT rather than its
+ * absence.
+ *
+ * What is still forbidden is the one field that remains: `order`, the seed-derived face
+ * order. With the Ideologue printed beside each answer, a client that knew `order` could
+ * publish which Ideologue the left-hand position is — the channel PLAN.md §2 amendment A′
+ * exists to prevent, and the last surviving property of the old design. So: no prop
+ * carries it, no `order` key appears in the DOM, and nothing in the markup encodes it.
+ */
+describe('the whole card is on screen, and the `order` draw is not', () => {
+  it('renders the scenario, both answers, both Ideologues and both payouts', () => {
     const { container } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
-    // The scenario, the two labels, and the ONE commit control with its status
-    // line. Nothing else. The expectation is built from the same parts rather
-    // than hard-coded prose, so a rewording that did not add information cannot
-    // silently pass, and a rewording that DID add a number could not pass either.
     expect(container.querySelector('[data-testid="scenario"]')?.textContent).toBe(QUESTION);
-    const labels = sides(container).map((s) => s.textContent);
-    expect([...labels].sort()).toEqual([LABEL_A, LABEL_B].sort());
+
+    // The three lines per side, in the order the card prints them.
+    const faction = [...container.querySelectorAll('[data-testid="side-ideologue"]')].map((e) => e.textContent);
+    expect([...faction].sort()).toEqual(["the Capitalists' answer", "the Idealists' answer"].sort());
+    const payout = [...container.querySelectorAll('[data-testid="side-payout"]')].map((e) => e.textContent);
+    expect([...payout].sort()).toEqual(['pays 1 Fund', 'pays 4 Fund · 1 Trust'].sort());
+
+    // …and the whole prompt is EXACTLY those parts, in DOM order. Built from the
+    // pieces the component rendered rather than from hard-coded prose, so a rewording
+    // that added something could not pass and one that dropped something could not
+    // either — and read per-SIDE, because that is the order they appear in: a side is
+    // its label, then its Ideologue, then its payout, and they travel together.
+    const perSide = [...sides(container)].map((el) => [
+      el.querySelector('[data-testid="side-label"]')?.textContent ?? '',
+      el.querySelector('[data-testid="side-ideologue"]')?.textContent ?? '',
+      el.querySelector('[data-testid="side-payout"]')?.textContent ?? '',
+    ]);
     const text = (container.textContent ?? '').replace(/\s+/g, ' ').trim();
-    // `textContent` concatenates without separators, so the expectation is built
-    // from the same parts rather than hard-coded prose — a rewording that added
-    // information could not pass, and one that added a number could not either.
     expect(text).toBe(
       [
         QUESTION,
         'CHOOSE ONE',
-        ...labels,
+        ...perSide.flat(),
         commitLabel('idle'),
         commitStatus('idle'),
       ].join(''),
     );
-    // Not a single digit anywhere on the prompt: no cost, no payout, no count,
-    // no turn number, no resource total.
-    expect(text).not.toMatch(/\d/);
-    // §1.2's forbidden list, verbatim.
-    for (const word of ['Funds', 'Clout', 'Media', 'Trust', '₹']) {
-      expect(text, `the prompt must not mention ${word}`).not.toContain(word);
+  });
+
+  it('names every pool the card prints, and only those', () => {
+    // The rule the old version asserted inverted. A `Delta` is PARTIAL: a pool the
+    // card does not mention is absent, not zero, so "pays 1 Fund" must not print Clout,
+    // Media or Trust as zeroes — a player reading "0 Clout" would learn nothing and a
+    // reader of the card would learn something false.
+    const { container } = render(
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+    );
+    const b = [...container.querySelectorAll('[data-testid="side-payout"]')].find(
+      (e) => e.textContent === 'pays 1 Fund',
+    );
+    expect(b?.textContent).toBe('pays 1 Fund');
+    for (const absent of ['Clout', 'Media', 'Trust', '₹']) {
+      expect(b?.textContent ?? '', `${absent} must not be printed for a side that does not pay it`).not.toContain(absent);
+    }
+    // And a side that pays nothing at all says so, rather than printing an empty line.
+    const { container: flat } = render(
+      <BlindAnswer
+        question={QUESTION}
+        sideA={{ label: 'a', ideologue: 'supremo', pays: {} }}
+        sideB={{ label: 'b', ideologue: 'showstopper', pays: {} }}
+        seed={1}
+      />,
+    );
+    expect(flat.querySelector('[data-testid="side-payout"]')?.textContent).toBe('pays nothing');
+  });
+
+  it('carries NO `order`, and no attribute or node that could stand in for it', () => {
+    const { container } = render(
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+    );
+    // No `order` anywhere in the markup, and no attribute a stylesheet could key the
+    // position's identity on: the only data attribute is `data-wire-side`, which is the
+    // wire side ('A'/'B') and not the card's side — mapping it back needs the `order`
+    // this component cannot see.
+    expect(container.innerHTML).not.toMatch(/order/i);
+    const attrs = new Set<string>();
+    for (const el of container.querySelectorAll('*')) {
+      for (const a of el.attributes) attrs.add(a.name);
+    }
+    for (const forbidden of ['data-side', 'data-ideologue', 'data-pays', 'data-face']) {
+      expect([...attrs], `${forbidden} would let CSS key the position's Ideologue`).not.toContain(forbidden);
+    }
+    // The Ideologue and the payout are TEXT, so a per-side rule would need a selector
+    // over the text — which the stylesheet audit below forbids.
+    for (const el of container.querySelectorAll('.blind-answer__faction, .blind-answer__payout')) {
+      expect(el.className).toBe(el.className.trim());
+      expect(el.getAttribute('style')).toBeNull();
+      expect(el.getAttribute('title')).toBeNull();
     }
   });
 
-  it('has no element that could carry a value: no icon, meter, bar, or title', () => {
+  it('has no element that could carry a value out of band: no icon, meter, bar or title', () => {
     const { container } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
-    // No svg, no img, no progress/meter, no title attribute, no aria-label at
-    // all on the sides — the visible text IS the accessible name, so there is
-    // nothing hidden to correlate with a payout.
+    // UI-SPEC §9 anti-patterns 1 and 3 survive the reversal of the payout ban: there is
+    // still no icon, no meter and no `title` tooltip, because a graphical reading of a
+    // number is a number that can be compared between the two sides at a glance in a way
+    // prose is not — and the payout is the one thing both seats may read.
     expect(container.querySelector('svg')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('progress')).toBeNull();
@@ -385,39 +473,28 @@ describe('no payout can reach the DOM', () => {
     for (const el of sides(container)) expect(el.getAttribute('aria-label')).toBeNull();
   });
 
-  it('drops a payout smuggled past the types, rather than rendering it', () => {
-    // The type-level half of this guarantee is `blindAnswer.types.ts`, gated by
-    // `npm run typecheck`. This is the runtime half: even with the types
-    // bypassed by a cast, a payout has nowhere to go.
+  it('drops an `order` smuggled past the types, rather than rendering it', () => {
+    // The runtime half of guarantee 3. Even with the types bypassed by a cast, an
+    // `order` prop has nowhere to go: it is not read, so it cannot be rendered.
     const smuggled = {
       question: QUESTION,
-      labelA: LABEL_A,
-      labelB: LABEL_B,
+      sideA: SIDE_A,
+      sideB: SIDE_B,
       seed: 1,
-      payoutA: 12,
-      payoutB: 3,
-      payout: { funds: 12, clout: 0, media: 0, trust: 0 },
-      ideologueA: 'capitalist',
-      resources: { funds: 4 },
-      value: 99,
+      order: 'ba',
+      faceA: 1,
+      cardId: 'id-core-001',
     } as unknown as React.ComponentProps<typeof BlindAnswer>;
 
-    const { container } = render(<BlindAnswer {...smuggled} />);
-    const text = container.textContent ?? '';
-    for (const leak of ['12', '99', 'capitalist', 'funds', 'value', 'payout']) {
-      expect(text.toLowerCase(), `payout leaked as "${leak}"`).not.toContain(leak);
-    }
-    // The markup is byte-identical to a clean render's structure: two sides,
-    // same class, no extra nodes for the extra props.
-    const markup = container.querySelector('.blind-answer__panel')?.innerHTML ?? '';
-    expect((markup.match(/blind-answer__side/g) ?? []).length).toBe(2);
-    expect(markup).not.toContain('style=');
+    const clean = render(<BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />);
+    const smuggledRender = render(<BlindAnswer {...smuggled} />);
+    expect(smuggledRender.container.innerHTML).toBe(clean.container.innerHTML);
   });
 
   it('reports only the wire side on selection — never a value', () => {
     const onSelect = vi.fn();
     const { container } = render(
-      <BlindAnswer question={QUESTION} labelA={LABEL_A} labelB={LABEL_B} seed={1} onSelect={onSelect} />,
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} onSelect={onSelect} />,
     );
     for (const el of sides(container)) fireEvent.click(el);
     const reported = onSelect.mock.calls.map((c) => c[0]).sort();
@@ -428,6 +505,7 @@ describe('no payout can reach the DOM', () => {
     }
   });
 });
+
 
 /**
  * THE REGRESSION GATE FOR THE TWO-COMMIT-CONTROLS DEFECT.
@@ -461,8 +539,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
       return (
         <BlindAnswer
           question={QUESTION}
-          labelA={LABEL_A}
-          labelB={LABEL_B}
+          sideA={SIDE_A}
+          sideB={SIDE_B}
           seed={1}
           selected={selected}
           commitState={selected === null ? 'idle' : 'ready'}
@@ -500,8 +578,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
     const { container } = render(
       <BlindAnswer
         question={QUESTION}
-        labelA={LABEL_A}
-        labelB={LABEL_B}
+        sideA={SIDE_A}
+        sideB={SIDE_B}
         seed={1}
         selected="A"
         commitState="ready"
@@ -536,8 +614,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
     const { container, getByTestId } = render(
       <BlindAnswer
         question={QUESTION}
-        labelA={LABEL_A}
-        labelB={LABEL_B}
+        sideA={SIDE_A}
+        sideB={SIDE_B}
         seed={1}
         selected="A"
         commitState="ready"
@@ -560,8 +638,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
     const { getByTestId, rerender } = render(
       <BlindAnswer
         question={QUESTION}
-        labelA={LABEL_A}
-        labelB={LABEL_B}
+        sideA={SIDE_A}
+        sideB={SIDE_B}
         seed={1}
         selected="A"
         commitState="ready"
@@ -575,8 +653,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
     rerender(
       <BlindAnswer
         question={QUESTION}
-        labelA={LABEL_A}
-        labelB={LABEL_B}
+        sideA={SIDE_A}
+        sideB={SIDE_B}
         seed={1}
         selected="A"
         commitState="sending"
@@ -599,8 +677,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
     const { container, getByTestId } = render(
       <BlindAnswer
         question={QUESTION}
-        labelA={LABEL_A}
-        labelB={LABEL_B}
+        sideA={SIDE_A}
+        sideB={SIDE_B}
         seed={1}
         selected="A"
         commitState="committed"
@@ -650,8 +728,8 @@ describe('exactly one control commits, and it is the only one that says so', () 
     const { container, getByTestId } = render(
       <BlindAnswer
         question={QUESTION}
-        labelA={LABEL_A}
-        labelB={LABEL_B}
+        sideA={SIDE_A}
+        sideB={SIDE_B}
         seed={1}
         selected="A"
         commitState="ready"

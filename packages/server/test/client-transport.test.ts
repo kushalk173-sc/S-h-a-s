@@ -12,7 +12,7 @@
  * THE THREE PROPERTIES THAT MATTER:
  *
  *  1. A drop RESUMES. A refresh must re-seat, not re-lobby. A client that came
- *     back as a stranger would lose its seat, its board, and — worst — its blind
+ *     back as a stranger would lose its seat, its board, and — worst — its answer
  *     prompt, in a 4-hour game.
  *
  *  2. THE PROMPT IS NEVER CACHED. It is rebuilt from the server's state on every
@@ -31,7 +31,7 @@ import {
   applyEvents,
   applyServerMessage,
   applyState,
-  clearBlind,
+  clearAnswer,
   getStore,
   resetStore,
 } from '../../client/src/net/store.ts';
@@ -144,7 +144,7 @@ function matchState(
     matchId: 'm_1',
     viewId: 1,
     state: testClientState(),
-    blind: null,
+    answer: null,
     you: { role: 'player', playerId: 'p_1' },
     ...over,
   };
@@ -285,8 +285,17 @@ describe('the store never applies an action locally', () => {
   });
 });
 
-describe('the blind prompt is rebuilt from the server, never cached', () => {
-  const prompt = { question: 'Q?', labels: ['Left', 'Right'] as const, order: 'ab' as const };
+describe('the answer prompt is rebuilt from the server, never cached', () => {
+  // A whole printed card under full information: label, Ideologue and payout per side,
+  // plus the `order` draw. The client keeps it only while it is this player's to answer.
+  const prompt = {
+    question: 'Q?',
+    sides: [
+      { label: 'Left', ideologue: 'idealist', pays: { funds: 4 } },
+      { label: 'Right', ideologue: 'capitalist', pays: { funds: 1 } },
+    ],
+    order: 'ab',
+  } as const;
 
   it('holds the prompt only while it is this player\'s answer to give', () => {
     const state = testClientState({ phase: 'answer', activePlayer: 'p_1' });
@@ -294,34 +303,35 @@ describe('the blind prompt is rebuilt from the server, never cached', () => {
       matchId: 'm_1',
       viewId: 1,
       state,
-      blind: { question: 'Q?', labels: ['Left', 'Right'], order: 'ab' },
+      answer: { question: 'Q?', sides: prompt.sides, order: 'ab' },
       you: { role: 'player', playerId: 'p_1' },
     });
-    expect(getStore().blind).not.toBeNull();
+    expect(getStore().answer).not.toBeNull();
 
     // Phase moves on. The prompt must go, immediately, with no action from anyone.
     applyState({
       matchId: 'm_1',
       viewId: 2,
       state: testClientState({ phase: 'actions', activePlayer: 'p_1' }),
-      blind: null,
+      answer: null,
       you: { role: 'player', playerId: 'p_1' },
     });
-    expect(getStore().blind).toBeNull();
+    expect(getStore().answer).toBeNull();
   });
 
   it('drops a prompt addressed to somebody else, even if the server sent it', () => {
     // Defence in depth. The server does not do this, but a client that renders a
-    // prompt it was handed without checking whose it is would display another
-    // player's blind question — and the two labels are the private half of it.
+    // prompt it was handed without checking whose it is would display the `order`
+    // draw for a card this seat is not answering — which, under full information, is
+    // the ONLY field in the prompt the rest of the table does not already have.
     applyState({
       matchId: 'm_1',
       viewId: 1,
       state: testClientState({ phase: 'answer', activePlayer: 'p_2' }),
-      blind: { question: 'Q?', labels: ['Left', 'Right'], order: 'ba' },
+      answer: { question: 'Q?', sides: prompt.sides, order: 'ba' },
       you: { role: 'player', playerId: 'p_1' },
     });
-    expect(getStore().blind).toBeNull();
+    expect(getStore().answer).toBeNull();
   });
 
   it('a spectator is never given a prompt', () => {
@@ -329,10 +339,10 @@ describe('the blind prompt is rebuilt from the server, never cached', () => {
       matchId: 'm_1',
       viewId: 1,
       state: testClientState({ phase: 'answer', activePlayer: 'p_1' }),
-      blind: { question: 'Q?', labels: ['Left', 'Right'], order: 'ab' },
+      answer: { question: 'Q?', sides: prompt.sides, order: 'ab' },
       you: { role: 'spectator', playerId: null },
     });
-    expect(getStore().blind).toBeNull();
+    expect(getStore().answer).toBeNull();
   });
 
   it('does not restore a prompt from anywhere on reconnect', async () => {
@@ -342,42 +352,42 @@ describe('the blind prompt is rebuilt from the server, never cached', () => {
     s.deliver(
       matchState({
         state: testClientState({ phase: 'answer', activePlayer: 'p_1' }),
-        blind: { question: 'Q?', labels: ['Left', 'Right'], order: 'ab' },
+        answer: { question: 'Q?', sides: prompt.sides, order: 'ab' },
       }),
     );
-    expect(getStore().blind).not.toBeNull();
+    expect(getStore().answer).not.toBeNull();
 
     s.drop();
     await new Promise((r) => setTimeout(r, 25));
     // The moment the socket is gone the prompt is gone. It comes back only if the
     // server sends it again, and it is the SERVER's copy.
-    expect(getStore().blind).toBeNull();
+    expect(getStore().answer).toBeNull();
 
     const next = FakeSocket.instances.at(-1);
     next?.open();
     next?.deliver({ t: 'session:granted', session: { ...SESSION, resumeToken: 'tok-2' } });
-    expect(getStore().blind).toBeNull();
+    expect(getStore().answer).toBeNull();
     next?.deliver(
       matchState({
         state: testClientState({ phase: 'answer', activePlayer: 'p_1' }),
-        blind: { question: 'Q?', labels: ['Left', 'Right'], order: 'ab' },
+        answer: { question: 'Q?', sides: prompt.sides, order: 'ab' },
       }),
     );
-    expect(getStore().blind?.question).toBe('Q?');
+    expect(getStore().answer?.question).toBe('Q?');
   });
 
-  it('clearBlind is idempotent', () => {
-    clearBlind();
+  it('clearAnswer is idempotent', () => {
+    clearAnswer();
     applyState({
       matchId: 'm_1',
       viewId: 1,
       state: testClientState({ phase: 'answer', activePlayer: 'p_1' }),
-      blind: { question: 'Q?', labels: ['Left', 'Right'], order: 'ab' },
+      answer: { question: 'Q?', sides: prompt.sides, order: 'ab' },
       you: { role: 'player', playerId: 'p_1' },
     });
-    clearBlind();
-    clearBlind();
-    expect(getStore().blind).toBeNull();
+    clearAnswer();
+    clearAnswer();
+    expect(getStore().answer).toBeNull();
   });
 });
 
@@ -391,7 +401,7 @@ describe('state and events are ordered by viewId', () => {
       matchId: 'm_1',
       viewId: 1,
       state: testClientState(),
-      blind: null,
+      answer: null,
       you: { role: 'player', playerId: 'p_1' },
     });
     expect(getStore().recentEvents).toHaveLength(1);
@@ -403,7 +413,7 @@ describe('state and events are ordered by viewId', () => {
       matchId: 'm_1',
       viewId: 5,
       state: testClientState(),
-      blind: null,
+      answer: null,
       you: { role: 'player', playerId: 'p_1' },
     });
     applyEvents(5, [{ type: 'turn-ended', player: 'p_1' }]);
@@ -416,7 +426,7 @@ describe('state and events are ordered by viewId', () => {
       matchId: 'm_1',
       viewId: 1,
       state: testClientState(),
-      blind: null,
+      answer: null,
       you: { role: 'player', playerId: 'p_1' },
     });
     // Out of order: the event for viewId 3 arrives before the state for 2.
@@ -428,7 +438,7 @@ describe('state and events are ordered by viewId', () => {
       matchId: 'm_1',
       viewId: 2,
       state: testClientState(),
-      blind: null,
+      answer: null,
       you: { role: 'player', playerId: 'p_1' },
     });
     expect(getStore().pendingEvents).toHaveLength(1);
@@ -436,7 +446,7 @@ describe('state and events are ordered by viewId', () => {
       matchId: 'm_1',
       viewId: 3,
       state: testClientState(),
-      blind: null,
+      answer: null,
       you: { role: 'player', playerId: 'p_1' },
     });
     expect(getStore().pendingEvents).toHaveLength(0);

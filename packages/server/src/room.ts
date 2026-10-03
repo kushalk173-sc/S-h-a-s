@@ -9,7 +9,7 @@
  *  1. THE SERVER NEVER RE-IMPLEMENTS A RULE. Turn order, phase legality, costs and
  *     caps are the reducer's business. The only server-side rejections are "you are
  *     not in this match", "that is not your seat", "the message was malformed", and
- *     the blind-prompt remap, which is a presentation concern rather than a rule.
+ *     the answer-prompt remap, which is a presentation concern rather than a rule.
  *     Every other refusal is `Result.error` forwarded verbatim. The cost is that a
  *     determined client can fuzz engine internals out of error strings; the
  *     benefit is that there is exactly one implementation of Shasn.
@@ -32,8 +32,8 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { reduce, type Action, type Ctx, type GameEvent, type GameState, type PlayerID, type Result } from '@shasn/engine';
 
-import { answerSideFor, blindPromptFor, viewFor } from './broadcast.ts';
-import type { BlindPrompt } from './protocol.ts';
+import { answerSideFor, answerPromptFor, viewFor } from './broadcast.ts';
+import type { AnswerPrompt } from './protocol.ts';
 import {
   cardsVersion,
   rulesVersion,
@@ -86,7 +86,7 @@ export type ViewerView = {
   readonly viewer: PlayerID | null;
   readonly viewId: number;
   readonly state: ReturnType<typeof viewFor>;
-  readonly blind: BlindPrompt | null;
+  readonly answer: AnswerPrompt | null;
 };
 
 /**
@@ -218,14 +218,14 @@ export class Room {
       viewer,
       viewId: this.#viewId,
       state: viewFor(this.#state, this.ctx.cards, viewer),
-      blind: viewer === null ? null : blindPromptFor(this.#state, this.ctx.cards, viewer),
+      answer: viewer === null ? null : answerPromptFor(this.#state, this.ctx.cards, viewer),
     };
   }
 
   // ─────────────────────────── the write door ───────────────────────────
 
   /**
-   * The engine-facing action, after the blind-prompt remap.
+   * The engine-facing action, after the answer-prompt remap.
    *
    * The client sends the DISPLAY position it was shown, because that is all it
    * was shown. `reduce` is written against the card's own `sides` tuple, so the

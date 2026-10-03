@@ -41,7 +41,7 @@ import type { PlayerID, Resource } from '@shasn/engine';
 
 import { BlindAnswer } from '../answer/BlindAnswer.tsx';
 import type { CommitState } from '../answer/BlindAnswer.tsx';
-import type { BlindPrompt } from '../net/index.ts';
+import type { AnswerPrompt } from '../net/index.ts';
 
 import { committedSideToDisplayIndex, promptToProps } from './blindWire.ts';
 import { ResourcePicker } from './ResourcePicker.tsx';
@@ -50,7 +50,7 @@ import type { PickerDraft } from './store.ts';
 
 export type AnswerScreenProps = {
   readonly state: ClientState;
-  readonly prompt: BlindPrompt;
+  readonly prompt: AnswerPrompt;
   readonly you: PlayerID;
   /**
    * The server's state ENVELOPE version (`net/protocol.ts`), not a `ClientState`
@@ -111,7 +111,18 @@ export function AnswerScreen(props: AnswerScreenProps) {
    * discards and immediately re-runs. A `useEffect` would paint one frame with
    * the old selection, which is exactly the frame the spec forbids.
    */
-  const promptKey = [prompt.question, prompt.labels[0], prompt.labels[1]].join('\u0000');
+  // The whole card is the key, not just the labels: under full information a REDRAW
+  // swaps the question AND both payouts, so keying on the labels alone would keep a
+  // selection the player made about a card that is no longer on the table.
+  const promptKey = [
+    prompt.question,
+    prompt.sides[0].label,
+    prompt.sides[1].label,
+    prompt.sides[0].ideologue,
+    prompt.sides[1].ideologue,
+    JSON.stringify(prompt.sides[0].pays),
+    JSON.stringify(prompt.sides[1].pays),
+  ].join('\u0000');
   const [lastPromptKey, setLastPromptKey] = useState(promptKey);
   if (lastPromptKey !== promptKey) {
     setLastPromptKey(promptKey);
@@ -225,7 +236,7 @@ export function AnswerScreen(props: AnswerScreenProps) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Ideology Card: answer blind"
+        aria-label="Ideology Card: answer"
         style={{ outline: 'none', width: '100%' }}
       >
         {/* §5.3 constraint 6: the prompt's own language is symmetric. "Question",
@@ -248,8 +259,8 @@ export function AnswerScreen(props: AnswerScreenProps) {
         */}
         <BlindAnswer
           question={wire.question}
-          labelA={wire.labelA}
-          labelB={wire.labelB}
+          sideA={wire.sideA}
+          sideB={wire.sideB}
           seed={wire.seed}
           selected={selected}
           commitState={commitState}
@@ -257,12 +268,29 @@ export function AnswerScreen(props: AnswerScreenProps) {
           onCommit={commit}
         />
 
-        {/* The redraw offer (§5.3.5), and the honest statement that the payout is
-            not shown. This bar is a PAYMENT control, not a hint about the card,
-            which is why it is the one piece of chrome the spec allows here — and
-            it deliberately contains no second commit affordance. Nothing before
-            the commit is derived from the card's contents, which is the promise
-            the copy makes. */}
+        {/* ── THE REDRAW, AND WHAT IT NOW MEANS. p13 keeps it, and the reason it used
+            to exist is gone. ─────────────────────────────────────────────────────
+            "pay any 4 resources to have your Ideology Card redrawn before answering"
+            was a BET: §7.2 step 2 says so in as many words — "Because the reading
+            player does not know what the card pays, the redraw is a BET, not a
+            decision." Under full information the payout is printed on the card
+            above, so this is no longer a bet and the honest description is "pay 4 for
+            a different card" — a reroll, priced at 4, which every player can now
+            compute against the two payouts they are looking at.
+
+            It is KEPT rather than deleted, and the ruling is on this bar: a mechanic
+            whose justification evaporated is a decision to be made, not one to be
+            quietly inherited, and the two available answers both close the game. Delete
+            it and a player holding a genuinely bad card has no out, because the engine
+            has no legal action that returns a card to the draw pile mid-turn. Keep it
+            and it is the only priced escape from a dominated card — which, with the
+            payout visible, is a real and frequent situation rather than a rare one.
+            Deleting it would also be a rulebook change, and this is not the package
+            that owns the rulebook.
+
+            What it is NOT, and the copy below is what says so: it is not a hint about
+            the card, and it contains no second commit affordance. It buys a different
+            card, not a better answer to this one. */}
         <div
           className="row"
           style={{ justifyContent: 'center', maxWidth: '46rem', margin: '0 auto' }}
@@ -283,8 +311,9 @@ export function AnswerScreen(props: AnswerScreenProps) {
           className="panel__note panel__note--quiet"
           style={{ textAlign: 'center', maxWidth: '46rem', margin: 'var(--sp-3) auto 0' }}
         >
-          You must choose before the turn can continue. The payout is not shown until you
-          commit.
+          You must choose before the turn can continue. Redrawing costs {UI_RULES.redrawCost}{' '}
+          resources and swaps the card for a different one — both payouts are printed, so you
+          are buying a different question rather than taking a chance at this one.
         </p>
 
         {props.picker?.forKind === 'redraw' && me !== undefined ? (

@@ -287,7 +287,7 @@ let actions = 0;
     //   `playableConspiracies` is viewer-scoped BY DESIGN — a player learns which of
     //   their OWN cards they may play (broadcast.ts's long note on why that is not a
     //   hand), and it is empty for both at `finished`, because the game is over.
-    //   `blind` is viewer-scoped by design and is `null` for both at `finished`,
+    //   `answer` is viewer-scoped by design and is `null` for both at `finished`,
     //   because nobody is mid-answer.
     //
     // Everything else — the whole board, both players' resources, both manifestos,
@@ -314,8 +314,8 @@ let actions = 0;
     for (const [i, offered] of projections.entries()) {
       expect(offered, `a finished game must offer no conspiracies to ${seats[i]?.playerId}`).toEqual([]);
     }
-    expect(ada.latestState().blind, 'nobody is mid-answer in a finished game').toBeNull();
-    expect(bo.latestState().blind).toBeNull();
+    expect(ada.latestState().answer, 'nobody is mid-answer in a finished game').toBeNull();
+    expect(bo.latestState().answer).toBeNull();
 
     // And now the blanket equality, which is still asserted — it is the actual
     // detector. Anything viewer-scoped that creeps into `ClientState` changes one of
@@ -414,13 +414,13 @@ describe('a spectator can read everything public and write nothing', () => {
     expect(spec.latestState().you.playerId).toBeNull();
   });
 
-  it('is never given a blind prompt, in any phase', () => {
+  it('is never given the answer prompt, in any phase', () => {
     // The prompt is only ever built for the player holding the card. A spectator who
     // could see it would see the question — which is public at a real table, but the
     // two LABELS with no payout attached is the answering player's private
     // deliberation space and nobody else's.
     for (const m of spec.ever('match:state')) {
-      expect(m.blind, 'a spectator was handed a blind prompt').toBeNull();
+      expect(m.answer, 'a spectator was handed an answer prompt').toBeNull();
     }
   });
 

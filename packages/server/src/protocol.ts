@@ -101,9 +101,12 @@ export type ServerMessage =
   /**
    * THE ONLY MESSAGE THAT CARRIES GAME STATE.
    *
-   * `state` came out of `viewFor`, and `blind` out of `blindPromptFor`. Neither
-   * admits a card payout, a card id, an Ideologue, or a PRNG cursor. `blind` is
-   * populated only for the player who is actually answering.
+   * `state` came out of `viewFor` and `answer` out of `answerPromptFor`, and under
+   * full information BOTH carry the whole card — question, both answers, both
+   * Ideologues, both payouts. The Ideology corpus is public JSON in this repository,
+   * so a card's payout was always one lookup away; what is deliberately NOT here is a
+   * card id, and `answer` alone carries the `order` draw. Both of those rulings, and
+   * what they cost, are argued on `PublicQuestion` in `broadcast.ts`.
    *
    * ONE FIELD IS UNDER-DECLARED, AND IT IS DELIBERATE. `viewFor` returns a
    * `PublicView` — `ClientState` plus `playableConspiracies`, the viewer's own
@@ -119,17 +122,17 @@ export type ServerMessage =
    * keeps protocol parity in both directions, and the client's
    * `app/GameScreen.tsx` reads it through a narrow cast that fails closed.
    *
-   * `order` is a seed-derived coin flip deciding which side of the card renders
-   * first. Without it, "the left one" is a channel: a card's two sides belong to
-   * different Ideologues and the answer pool is not balanced side-to-side, so a
-   * fixed order lets a player learn the slot instead of deliberating.
+   * `answer` is renamed from `blind`, and that is a rename rather than a redefinition:
+   * it is still the per-answerer payload and it is still the only field carrying the
+   * commit side. What changed is its CONTENT, and a field called `blind` carrying two
+   * payouts would have left the codebase asserting a premise it no longer holds.
    */
   | {
       readonly t: 'match:state';
       readonly matchId: MatchId;
       readonly viewId: number;
       readonly state: ClientState;
-      readonly blind: BlindPrompt | null;
+      readonly answer: AnswerPrompt | null;
       readonly you: {
         readonly role: 'player' | 'spectator';
         readonly playerId: PlayerID | null;
@@ -146,20 +149,57 @@ export type ServerMessage =
   | { readonly t: 'error'; readonly id?: string; readonly code: ErrorCode; readonly message: string };
 
 /**
- * The blind prompt. Its type is the security control: there is no `Delta`, no
- * `Ideologue`, no `CardID`, no `campaign`, and no numeric payout field, so there
- * is nothing for a later refactor to accidentally bind into the DOM.
+ * ONE SIDE OF THE CARD AS THE ANSWERER SEES IT. Mirrors the server's
+ * `PublishedSide`; the two are kept mutually assignable by `protocol-parity.test.ts`.
  *
- * `labels` are in DISPLAY order. `labels[0]` is what the player sees first, and
- * `order` says which side of the underlying card that is. The client sends the
- * index it clicked; the server maps it back through `order` before the reducer
- * ever sees the action. The order is derived on the server from the match seed —
- * never from a value the client can see, or a patched client just overrides it.
+ * `pays` is `Partial<Record<Resource, number>>` and deliberately so: it is the engine's
+ * `Delta`, in which an absent pool means zero. A hand-written all-required record would
+ * force the projection to invent `{funds: 0, clout: 0, media: 0, trust: 0}` for a side that
+ * pays nothing in three pools, and the client would then have to decide whether a zero it
+ * was handed is the same thing as a pool the card does not mention. It is not, for a
+ * payout line: a card that says "2 Funds" says two Funds and says nothing about Clout,
+ * and the UI must be able to print only what the card printed.
  */
-export type BlindPrompt = {
+export type AnswerSide = {
+  readonly label: string;
+  readonly ideologue: 'capitalist' | 'supremo' | 'showstopper' | 'idealist';
+  readonly pays: Readonly<Partial<Record<'funds' | 'clout' | 'media' | 'trust', number>>>;
+};
+
+/**
+ * THE ANSWER PROMPT — the whole card, plus the one thing the table does not have.
+ *
+ * ── IT IS NOT BLIND, AND THE RENAME IS THE POINT ─────────────────────────────
+ *
+ * This type used to be `BlindPrompt` and its type WAS the security control: no
+ * `Delta`, no `Ideologue`, no `CardID`, no number, "so there is nothing for a later
+ * refactor to accidentally bind into the DOM". Full information makes that a
+ * description of a type that no longer exists, so it is renamed rather than left
+ * behind asserting something false. A prompt carrying two payouts and still called
+ * `BlindPrompt` would be a lie in a name, and a lie in a name is how the next person
+ * decides the payout is still hidden.
+ *
+ * ── WHAT IS STILL PROTECTED, AND IT IS ONE FIELD ─────────────────────────────
+ *
+ * `order`. It says which face of the card a display position is, and the Ideologue
+ * is now printed beside each answer, so publishing `order` to the table would let a
+ * client line the deck's Ideologue balance up against the left-hand cell — the
+ * channel PLAN.md §2 amendment A′ exists to prevent. `order` therefore stays on a
+ * field that is populated for the answering player alone, and `PublicQuestion`
+ * carries the same card without it. The two payloads are one computation apart, and
+ * `secret-state.test.ts` asserts they are byte-identical in every other field, so
+ * "the table sees the same card the answerer does" is checked rather than claimed.
+ *
+ * `sides` are in DISPLAY order. `sides[0]` is what the player sees first, and
+ * `order` says which side of the underlying card that is. The client sends the
+ * index it clicked; the server maps it back through `order` before the reducer ever
+ * sees the action. The order is derived on the server from the match seed — never
+ * from a value the client can see, or a patched client just overrides it.
+ */
+export type AnswerPrompt = {
   readonly question: string;
-  readonly labels: readonly [string, string];
-  /** 'ab' — labels[0] is side 0. 'ba' — labels[0] is side 1. */
+  readonly sides: readonly [AnswerSide, AnswerSide];
+  /** 'ab' — sides[0] is side 0. 'ba' — sides[0] is side 1. */
   readonly order: 'ab' | 'ba';
 };
 

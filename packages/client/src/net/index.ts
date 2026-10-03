@@ -39,7 +39,7 @@ export {
   resetStore,
   applyState,
   applyEvents,
-  clearBlind,
+  clearAnswer,
   applyServerMessage,
   setPhase,
   clearError,
@@ -53,7 +53,8 @@ export {
 export type { ClientStore, Phase, PendingError } from './store.ts';
 
 export type {
-  BlindPrompt,
+  AnswerPrompt,
+  AnswerSide,
   ClientMessage,
   ErrorCode,
   Lobby,

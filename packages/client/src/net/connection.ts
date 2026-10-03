@@ -11,10 +11,10 @@
  *     is drawn at the socket: everything before it is a render, everything after it
  *     is the server's.
  *
- *  2. IT NEVER KEEPS THE PROMPT. On reconnect it does not restore a cached blind
+ *  2. IT NEVER KEEPS THE PROMPT. On reconnect it does not restore a cached answer
  *     prompt, because the correct one is rebuilt from the server's state and a
  *     cached copy could disagree with it. `session:resume` returns a full
- *     `match:state` with the prompt attached, or with `blind: null`.
+ *     `match:state` with the prompt attached, or with `answer: null`.
  *
  *  3. IT NEVER LOGS THE PAYLOAD. Not in a debug mode, not behind a flag, not
  *     commented out. A console.log of a `match:state` would be the answer key in
@@ -31,7 +31,7 @@
 import type { Action } from '@shasn/engine';
 
 import type { ClientMessage, ServerMessage, Session } from './protocol.ts';
-import { applyServerMessage, clearBlind, getStore, resetStore, setPhase } from './store.ts';
+import { applyServerMessage, clearAnswer, getStore, resetStore, setPhase } from './store.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -309,7 +309,7 @@ export class Connection {
       // hand them a different card, in which case the question on screen is a
       // question they were never asked. The correct copy always arrives with the
       // `match:state` that follows a resume.
-      clearBlind();
+      clearAnswer();
       if (!this.#wanted) {
         this.#setStatus('closed');
         return;

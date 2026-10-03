@@ -98,18 +98,27 @@ export function BoardHarness() {
           />
         </section>
 
-        <section className="harness__answer" aria-label="Blind answer">
-          <h2>The blind answer</h2>
+        <section className="harness__answer" aria-label="The answer card">
+          <h2>The answer card</h2>
           <p className="harness__note">
             Two surfaces that must be provably indistinguishable. Same class, no per-side
-            override, no prop through which a payout could arrive. Change the seed: the order
-            flips, the styles do not.
+            override, and no prop through which the `order` draw could arrive — the payout and
+            the Ideologue ARE printed now, and they are the one thing that may differ between the
+            two cells. Change the seed: the order flips, the styles do not.
           </p>
           <BlindAnswer
             seed={seed}
             question="The trusts have quietly bought the land your party needs for a bypass. Do you let the deal stand, or sue?"
-            labelA="Sue them and stall the project for three years."
-            labelB="Let it stand. The bypass goes in, and the party gets the credit."
+            sideA={{
+              label: 'Sue them and stall the project for three years.',
+              ideologue: 'idealist',
+              pays: { funds: 4, trust: 1 },
+            }}
+            sideB={{
+              label: 'Let it stand. The bypass goes in, and the party gets the credit.',
+              ideologue: 'capitalist',
+              pays: { funds: 1 },
+            }}
           />
         </section>
       </div>

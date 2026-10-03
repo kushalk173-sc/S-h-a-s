@@ -511,7 +511,7 @@ async listen(): Promise<{ port: number; host: string }> {
    * client never names a room in a resume at all.
    *
    * The order that matters afterwards: what happens to a player who reconnects
-   * mid-answer. They re-receive the SAME blind prompt, in the SAME order, with no
+   * mid-answer. They re-receive the SAME answer prompt, in the SAME order, with no
    * payout, because the prompt is rebuilt from the rehydrated state and the order
    * is a pure function of that state. The state is a full state at the current
    * `viewId`, computed here rather than read out of the store, so a player
@@ -727,7 +727,7 @@ async listen(): Promise<{ port: number; host: string }> {
       room.matchId,
       room.onBroadcast((_view, events) => {
         // One broadcast reaches every watcher, but each gets ITS OWN projection:
-        // the answering player gets the blind prompt, everyone else does not. The
+        // the answering player gets the answer prompt, everyone else does not. The
         // fan-out is the only place that knows who is watching.
         for (const conn of this.#watchers.get(room.matchId) ?? []) {
           if (conn.session === null) continue;
@@ -792,10 +792,15 @@ async listen(): Promise<{ port: number; host: string }> {
   /**
    * The one message that carries game state.
    *
-   * `state` came out of `viewFor` and `blind` out of `blindPromptFor`. Both are
+   * `state` came out of `viewFor` and `answer` out of `answerPromptFor`. Both are
    * built per recipient here; neither is cached, shared, or filtered afterwards.
    * There is no post-hoc redaction pass, because a redaction pass is where leaks
    * get introduced.
+   *
+   * Under full information both carry the whole card, which is the point of this file's
+   * shape rather than an accident of it: there is one place a card's content is written
+   * to a socket, it is written by `pendingCardFor`, and the two payloads differ by
+   * exactly the `order` draw.
    */
   #sendMatchState(conn: Conn, room: Room, rec: SessionRecord): void {
     const view = room.viewFor(rec.role === 'spectator' ? null : rec.playerId);
@@ -804,7 +809,7 @@ async listen(): Promise<{ port: number; host: string }> {
       matchId: room.matchId,
       viewId: view.viewId,
       state: view.state,
-      blind: view.blind,
+      answer: view.answer,
       you: { role: rec.role, playerId: rec.role === 'spectator' ? null : rec.playerId },
     });
   }

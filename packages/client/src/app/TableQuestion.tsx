@@ -1,24 +1,27 @@
 /**
  * THE CARD ON THE TABLE — what every seat except the answerer's sees.
  *
- * THE DEFECT THIS FIXES IS A FIDELITY ONE, NOT A LEAK. In the physical game the
- * player to your right takes the top Ideology Card and reads both sides aloud
- * (`docs/AUTHENTIC-SHASN-REFERENCE.md` §7.2 step 1, p764), so the question and the
- * two answers are the table's business while the answerer deliberates — which is
- * also what makes the redraw window a decision-shaped window open to "any player"
- * (step 2, p768) and the interception window "the social centre of the game"
- * (§7.4 step 3, p815). A digital table that could not see the question was not
- * playing the same game.
+ * ── FULL INFORMATION, AND WHAT THIS PANEL IS NOW ───────────────────────────
  *
- * ── WHAT IS DELIBERATELY NOT HERE, AND IT IS THE SAME LIST `BlindAnswer` HAS ──
+ * It used to show the question and the two printed answers and nothing else, because
+ * that was all the server published to the table. Under full information the server
+ * publishes the WHOLE card and so does this: question, both answers, both Ideologues and
+ * both payouts, for every seat and every spectator, before anyone answers. The
+ * answerer's panel shows the identical card plus a commit control. Two panels, one card.
  *
- * No payout, no Ideologue, no card id, no `order`, no number, and — the one that
- * matters most for the control count — NO COMMIT CONTROL. Not a disabled one
- * either. This seat cannot answer this card, so a `COMMIT ANSWER` button here would
- * be a control that looks like it works and does not, which is UI-SPEC §9.10's
- * named prohibited case; and the whole point of the two-commit-controls fix was
- * that exactly one control in the product may claim a commitment. The answering
- * seat has it. This one has none, and the two sides here are not even focusable.
+ * THE ONE THING STILL MISSING IS `order`, and that is not an omission — it is the whole
+ * remaining mechanic. `order` says which face of the card the first display position is,
+ * and with the Ideologue now printed beside each answer, a table that knew it could line
+ * positions up against the deck's Ideologue balance (PLAN.md §2 amendment A′).
+ *
+ * ── WHAT IS DELIBERATELY NOT HERE, AND IT IS ONLY ONE THING ────────────────
+ *
+ * No commit control. Not a disabled one either. This seat cannot answer this card, so a
+ * `COMMIT ANSWER` button here would be a control that looks like it works and does not,
+ * which is UI-SPEC §9.10's named prohibited case; and the whole point of the
+ * two-commit-controls fix was that exactly one control in the product may claim a
+ * commitment. The answering seat has it. This one has none, and the two sides here are
+ * not even focusable.
  *
  * ── WHY THE SAME CLASSES, AND WHY THAT IS THE POINT ─────────────────────────
  *
@@ -49,22 +52,23 @@
  * takeover here would take that away from the seats this component exists to inform.
  */
 
-import type { OpenQuestion } from './blindWire.ts';
+import { IDEOLOGUE_FACTION, payoutLine, type PrintedSide } from '../answer/BlindAnswer.tsx';
+import type { PublishedOpenQuestion } from './blindWire.ts';
 
 export type TableQuestionProps = {
-  /** The published question and its two labels, in display order. */
-  readonly question: OpenQuestion;
+  /** The published card: question and both sides, in display order. */
+  readonly question: PublishedOpenQuestion;
   /** Whose card it is. A name, never an id — this panel is prose, not state. */
   readonly answererName: string;
 };
 
 export function TableQuestion({ question, answererName }: TableQuestionProps) {
-  const [first, second] = question.labels;
+  const [first, second] = question.sides;
   return (
     <section className="table-question" data-testid="table-question">
       <p className="eyebrow">ON THE TABLE</p>
       <p className="panel__note panel__note--quiet">
-        {answererName} is answering, blind to the payout.
+        {answererName} is answering, and the whole card is visible to everyone.
       </p>
 
       <p className="blind-answer__scenario" data-testid="table-question-text">
@@ -87,15 +91,16 @@ export function TableQuestion({ question, answererName }: TableQuestionProps) {
         aria-labelledby="table-question-answers"
         data-testid="table-question-panel"
       >
-        <p className="blind-answer__side" data-testid="table-question-side">
-          <span className="blind-answer__label">{first}</span>
-        </p>
-        <p className="blind-answer__side" data-testid="table-question-side">
-          <span className="blind-answer__label">{second}</span>
-        </p>
+        {[first, second].map((side, i) => (
+          <p className="blind-answer__side" data-testid="table-question-side" key={i}>
+            <span className="blind-answer__label">{side.label}</span>
+            <span className="blind-answer__faction">{IDEOLOGUE_FACTION[side.ideologue]} answer</span>
+            <span className="blind-answer__payout">pays {payoutLine(side.pays)}</span>
+          </p>
+        ))}
       </div>
 
-      {/* The honest statement of what happens next, and where B is delivered: the
+      {/* The honest statement of what happens next, and where it is delivered: the
           chosen side is announced, exactly as it is at a table ("You say which
           side", §7.2 step 3, p774), and it lands in the log every seat reads. */}
       <p className="panel__note panel__note--quiet">
@@ -104,5 +109,7 @@ export function TableQuestion({ question, answererName }: TableQuestionProps) {
     </section>
   );
 }
+
+export type { PrintedSide };
 
 export default TableQuestion;

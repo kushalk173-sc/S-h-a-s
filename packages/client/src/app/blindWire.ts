@@ -1,34 +1,37 @@
 /**
- * The blind answer, wired to the wire.
+ * The answer, wired to the wire.
  *
  * This is the whole of `app/`'s involvement in the game's central mechanic, and
- * it is deliberately about forty lines. Everything security-relevant was already
- * settled before this file existed:
+ * it is deliberately about forty lines. What is security-relevant was settled in
+ * `net/protocol.ts` and `answer/BlindAnswer.tsx`:
  *
- *   · The server sends `{question, labels, order}` and NOTHING ELSE. No payout,
- *     no Ideologue, no card id, no number (`net/protocol.ts:BlindPrompt`).
- *   · `BlindAnswer` has no prop through which a payout could arrive, proven at
- *     the type level (`answer/blindAnswer.types.ts`) and at the DOM level
- *     (`answer/blindAnswer.test.tsx`).
- *   · The two sides are the same element with the same class, and
- *     `blindAnswer.css` fails the build if any positional or side-identity
- *     selector appears in it.
+ *   · The server publishes the WHOLE card to every seat — question, both answers,
+ *     both Ideologues, both payouts (`net/protocol.ts:AnswerPrompt`, and the
+ *     identical `openQuestion` on `state`). Nothing is withheld from the table,
+ *     because nothing is: the Ideology corpus is public JSON in this repository.
+ *   · The ONE thing withheld is `order`, the seed-derived face order, and it is
+ *     withheld because with the Ideologue now printed beside each answer, a client
+ *     that knew it could publish which Ideologue the left-hand cell is — the channel
+ *     PLAN.md §2 amendment A′ exists to prevent. This file does not consult it.
+ *   · The two sides are the same element with the same class, and neither may be
+ *     styled by anything that differs between them. `blindAnswer.css` fails the
+ *     build if any positional or side-identity selector appears in it.
  *
- * So this file's job is arithmetic, not security: put the server's display
- * labels into the component in the order the server sent them, and translate the
- * committed wire side back into the display index the server expects.
+ * So this file's job is arithmetic, not security: put the server's sides into the
+ * component in the order the server sent them, and translate the committed wire
+ * side back into the display index the server expects.
  *
  * ── THE ORDER, AND WHY THE CLIENT NEVER SORTS ──────────────────────────────
  *
- * `BlindAnswer` takes `labelA` / `labelB` and a `seed`, and renders them in a
+ * `BlindAnswer` takes `sideA` / `sideB` and a `seed`, and renders them in a
  * seed-derived order. That is correct for a component that holds both sides
- * un-mapped. This app holds them ALREADY MAPPED: the server's `labels` tuple is
+ * un-mapped. This app holds them ALREADY MAPPED: the server's `sides` tuple is
  * in display order, decided by the seed-derived `order` in `broadcast.ts`, and
  * the server maps the clicked display index back through that same `order` in
  * `room.ts#toEngineAction`.
  *
- * So the client does not re-derive an order. It puts `labels[0]` in `labelA` and
- * `labels[1]` in `labelB` and picks a seed that renders A first — which means the
+ * So the client does not re-derive an order. It puts `sides[0]` in `sideA` and
+ * `sides[1]` in `sideB` and picks a seed that renders A first — which means the
  * component's own ordering becomes an identity function and the server's order
  * is what the player sees. The `order` field is not consulted, and could not be:
  * it names which side of the card is which, and a client that branched on it
@@ -45,14 +48,14 @@
 
 import type { ClientState } from '@shasn/engine';
 
-import type { BlindPrompt } from '../net/index.ts';
+import type { AnswerPrompt, AnswerSide } from '../net/index.ts';
 import { presentationOrder } from '../answer/BlindAnswer.tsx';
 
 /**
  * A seed whose `presentationOrder` is `'ab'`, i.e. A renders first.
  *
- * A constant, chosen so that `labelA` (which this app sets to the server's
- * FIRST-displayed label) is the one the player sees on the left. There is no
+ * A constant, chosen so that `sideA` (which this app sets to the server's
+ * FIRST-displayed side) is the one the player sees on the left. There is no
  * randomness here and no per-card variation: the server already randomised the
  * order before it reached us, and doing it twice would mean one of the two
  * randoms is the one that leaks.
@@ -66,25 +69,25 @@ export const WIRE_ORDER_SEED = 1;
 /** The props `BlindAnswer` needs, derived from the server's prompt and nothing else. */
 export type WirePrompt = {
   readonly question: string;
-  /** `labels[0]` — what the server put in the FIRST position. */
-  readonly labelA: string;
-  /** `labels[1]`. */
-  readonly labelB: string;
+  /** `sides[0]` — what the server put in the FIRST display position. */
+  readonly sideA: AnswerSide;
+  /** `sides[1]`. */
+  readonly sideB: AnswerSide;
   readonly seed: number;
 };
 
 /**
  * The server's prompt, in the component's shape.
  *
- * The `labels` tuple is used positionally and is NEVER sorted, compared, or
+ * The `sides` tuple is used positionally and is NEVER sorted, compared, or
  * branched on. There is no branch here at all, which is the point: the only
  * thing this function can do is copy.
  */
-export function promptToProps(prompt: BlindPrompt): WirePrompt {
+export function promptToProps(prompt: AnswerPrompt): WirePrompt {
   return {
     question: prompt.question,
-    labelA: prompt.labels[0],
-    labelB: prompt.labels[1],
+    sideA: prompt.sides[0],
+    sideB: prompt.sides[1],
     seed: WIRE_ORDER_SEED,
   };
 }
@@ -113,50 +116,88 @@ export function committedSideToDisplayIndex(side: 'A' | 'B'): 0 | 1 {
  * `(state, cards)` and no player, because at a physical table the question is read
  * aloud and belongs to the table (AUTHENTIC-SHASN-REFERENCE §7.2 step 1). It
  * arrives as an ordinary property of `state` for the same reason
- * `playableConspiracies` does — see `GameScreen.tsx` — and it is read here through
- * the same fail-closed narrow cast.
+ * `playableConspiracies` does — see `GameScreen.tsx` — and it is read here through the
+ * same fail-closed narrow cast.
  *
- * THE TYPE IS THE SECURITY CONTROL, exactly as `BlindPrompt` is, and it is the
- * reason the table can be told the question without being told the payout:
- * `PublicQuestion` is `{question, labels}` and admits no `Delta`, no `Ideologue`, no
- * `CardID`, no `order` and no number. There is no prop on the table's panel through
- * which a payout could arrive even if a caller smuggled one past the cast, which is
- * asserted at the DOM level in `tableQuestion.test.tsx`.
+ * ── WHAT IS IN IT NOW, AND WHAT IT COST ────────────────────────────────────
  *
- * NO `order` EITHER, and that is load-bearing rather than an omission: `order` says
- * which face of the card a position is, so publishing it would let the table line
- * positions up against the deck's Ideologue balance — the exact leak PLAN.md §2
- * amendment A′ exists to prevent. The labels arrive ALREADY IN DISPLAY ORDER, so
- * the table and the answerer are looking at one card rather than two orderings.
+ * Under full information it carries the whole card: the question, both answers, both
+ * Ideologues and both payouts, to every seat and every spectator. That is a reversal of
+ * §1.2's "no payouts, no ideologue names", and the reversal is deliberate — see
+ * `broadcast.ts` for why the old withholding was protecting something that was already
+ * public content, and for what the change costs the game rather than the wire.
+ *
+ * ── NO `order`, AND THAT IS NOW THE WHOLE POINT ────────────────────────────
+ *
+ * `order` says which face of the card a display position is. With the Ideologue printed
+ * beside each answer, a client that could read `order` could publish the left-hand cell's
+ * Ideologue in one line, which is precisely the channel PLAN.md §2 amendment A′ exists to
+ * prevent — and A′ is the one property of the old blind design that survives this change
+ * intact. So `PublishedOpenQuestion` admits no `order`, the validation below rejects a
+ * payload that carries one, and the sides arrive ALREADY IN DISPLAY ORDER so the table and
+ * the answerer are looking at one card rather than two orderings of it.
  */
-export type OpenQuestion = {
+export type PublishedOpenQuestion = {
   readonly question: string;
-  readonly labels: readonly [string, string];
+  readonly sides: readonly [PublishedOpenSide, PublishedOpenSide];
 };
+
+/** One published side. `pays` is a `Delta`: an absent pool means the card said nothing. */
+export type PublishedOpenSide = {
+  readonly label: string;
+  readonly ideologue: 'capitalist' | 'supremo' | 'showstopper' | 'idealist';
+  readonly pays: Readonly<Partial<Record<'funds' | 'clout' | 'media' | 'trust', number>>>;
+};
+
+const IDEOLOGUES: ReadonlySet<string> = new Set(['capitalist', 'supremo', 'showstopper', 'idealist']);
+const POOLS: ReadonlySet<string> = new Set(['funds', 'clout', 'media', 'trust']);
 
 /**
  * The open question, or `null`.
  *
  * FAIL-CLOSED, and the shape is validated rather than merely checked for
  * existence: a payload is attacker-adjacent input, so `undefined`, `null`, a
- * non-object, a non-string question and a one-element `labels` all produce `null`.
- * The caller's honest "there is nothing on the table" is the only thing it can
- * render — it can never render half a card, and it can never be talked into
- * rendering a payout because there is no shape here that holds one.
+ * non-object, an empty question, a `sides` array of the wrong length, a side with
+ * a blank label, an unknown Ideologue, a non-numeric payout, a payout naming a
+ * pool that does not exist, and an `order` key all produce `null`.
  *
  * It is deliberately NOT keyed on the viewer's identity. Every seat, including a
- * spectator, gets the same strings; the one thing that differs between seats is
- * whether `blind` — and with it the commit control — was sent at all.
+ * spectator, gets the same card; the one thing that differs between seats is whether
+ * `answer` — and with it the `order` draw and the commit control — was sent at all.
  */
-export function openQuestionOf(state: ClientState): OpenQuestion | null {
+export function openQuestionOf(state: ClientState): PublishedOpenQuestion | null {
   const raw = (state as { openQuestion?: unknown }).openQuestion;
   if (typeof raw !== 'object' || raw === null) return null;
   const q = raw as Record<string, unknown>;
+  // An `order` on the table's copy is not a harmless extra field: it is the one thing
+  // the `PublicQuestion` type does not admit, and a payload carrying it has been built
+  // against a different (or forged) projection. Refuse the whole card rather than
+  // render a card whose face order the server may have intended to be ambiguous.
+  if ('order' in q) return null;
   if (typeof q['question'] !== 'string' || q['question'].length === 0) return null;
-  const labels = q['labels'];
-  if (!Array.isArray(labels) || labels.length !== 2) return null;
-  const [first, second] = labels as unknown[];
-  if (typeof first !== 'string' || typeof second !== 'string') return null;
-  if (first.length === 0 || second.length === 0) return null;
-  return { question: q['question'], labels: [first, second] };
+  const sides = q['sides'];
+  if (!Array.isArray(sides) || sides.length !== 2) return null;
+  const [first, second] = sides as unknown[];
+  const a = readSide(first);
+  const b = readSide(second);
+  if (a === null || b === null) return null;
+  return { question: q['question'], sides: [a, b] };
+}
+
+/** One side, validated. `null` for anything that is not a whole, readable side. */
+function readSide(raw: unknown): PublishedOpenSide | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const s = raw as Record<string, unknown>;
+  if (typeof s['label'] !== 'string' || s['label'].length === 0) return null;
+  const ideologue = s['ideologue'];
+  if (typeof ideologue !== 'string' || !IDEOLOGUES.has(ideologue)) return null;
+  const pays = s['pays'];
+  if (typeof pays !== 'object' || pays === null) return null;
+  const out: Record<string, number> = {};
+  for (const [pool, amount] of Object.entries(pays as Record<string, unknown>)) {
+    if (!POOLS.has(pool)) return null;
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return null;
+    out[pool] = amount;
+  }
+  return { label: s['label'], ideologue: ideologue as PublishedOpenSide['ideologue'], pays: out };
 }
