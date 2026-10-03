@@ -615,6 +615,120 @@
           "pays": { "trust": 2, "media": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-in2020-033",
+      "source": "original; register per REF 8.2. Authored to open the register's smallest scale. REF 2.3 infers the recovered question pool is entirely national and international in framing; no recovered card concerns a village panchayat, a water right or a local allocation, so the deck had no small-scale question at all.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the panchayat's water allocation favour the fields that have always had water?",
+      "sides": [
+        {
+          "answer": "Yes. Every new borewell is a subsidy to whoever drilled deepest.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Entitlement is the only inheritance that does not need a lawyer.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-034",
+      "source": "original; register per REF 8.2. A creditor-versus-debtor question. The recovered pool contains one wealth question (REF 8.1 item 7) and one taxation question (item 8) and no question about who absorbs a loss already booked, which is a different trade.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should farm loan waivers be paid to the banks or to the farmers?",
+      "sides": [
+        {
+          "answer": "Yes. A bank that cannot lend stops lending to everyone.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. The debt was raised at the farmer's table, not the bank's.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-035",
+      "source": "original; register per REF 8.2. Authored to put the two sides on opposite sides of an international obligation, where the recovered pool's only non-domestic questions are about invading and bombing other countries.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should India pay more than its agreed share of the climate fund?",
+      "sides": [
+        {
+          "answer": "Yes. A payer in arrears loses the vote on where it is spent.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. A share that grows with capacity is a share nobody signs.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-036",
+      "source": "original; register per REF 8.2. Authored because the recovered welfare questions (REF 8.1 items 6 and 8) are all about whether a benefit exists, and none about who inside the household is measured by it. The Capitalist side is the restrained one here, which is the deck's answer to a greedy side reading as the obvious one.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a working spouse's earnings count in the family's means test?",
+      "sides": [
+        {
+          "answer": "Yes. A benefit measured on the household measures both incomes.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. The second income becomes the reason the first is refused.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-037",
+      "source": "original; register per REF 8.2. The incumbent-hedging question. REF 8.1 recovers campaign questions from the American material; the recovered pool contains no question about the timing advantage of the party already in office.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the ruling party campaign on the day the budget is presented?",
+      "sides": [
+        {
+          "answer": "Yes. Six weeks of undivided attention beats one week of it.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. On the day it lands, the number is already the story.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-038",
+      "source": "original; register per REF 8.2. REF 8.1 item 5 is the only recovered question about spending, and it asks about space. This asks about the ordinary recurring purchase every district makes, where visibility and price pull in opposite directions.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the district's advertising contract go to the highest bidder?",
+      "sides": [
+        {
+          "answer": "Yes. The highest bidder has at least proved it can pay.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. The highest bidder is on every hoarding for a decade.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
     }
   ]
 }
