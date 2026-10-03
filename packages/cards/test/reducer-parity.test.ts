@@ -311,7 +311,7 @@ describe('no shipped card uses an effect the reducer cannot execute', () => {
    * pair of kinds.
    *
    * The walk below used to read `[...corpus.conspiracy, ...corpus.headline]`, which
-   * is 48 of the 118 cards and is right for the EFFECT vocabulary -- Ideology and
+   * is fewer than the corpus and is right for the EFFECT vocabulary -- Ideology and
    * Voter Cards have no `effects` array, so there is no op for the registry to rule
    * on. But "the walk covers the X-cards" is a claim about a list comprehension in a
    * test, and a list comprehension that grew a `.slice()` would still read as
@@ -322,7 +322,7 @@ describe('no shipped card uses an effect the reducer cannot execute', () => {
    * payouts are honest. That is a different invariant with a different oracle --
    * `validateIdeologySide` for the Ideologue/Resource pairing and `balance.ts` for
    * the lean -- and it is asserted by `validateCorpus()` in the last case of this
-   * block, which walks the same 118 cards. Stating the boundary is the point: a
+   * block, which walks the same cards. Stating the boundary is the point: a
    * coverage claim that quietly covered less than it said is the failure this file
    * exists to prevent.
    */
@@ -402,7 +402,7 @@ describe('no shipped card uses an effect the reducer cannot execute', () => {
     ).toEqual(['ct-et2040-014', 'ct-et2040-015']);
   });
 
-  it('the CI gate agrees with the test, over the same 118 cards', () => {
+  it('the CI gate agrees with the test, over the whole corpus', () => {
     // Same corpus, different entry point. If these two ever disagree, the one that
     // matters is the stricter — so make both fail rather than choosing. The count is
     // carried alongside so a validator that silently stopped walking a deck is

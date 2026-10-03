@@ -61,8 +61,11 @@ mechanisms rather than missing wording. So the eligibility was real and the exec
 still not complete, and the honest disposition of the whole recovered X-card corpus is
 unchanged:
 
-- **16** ship as `adapted`, each with the dropped clause named in its `source`.
-- **36** do not ship at all, each listed in §4 below with the gap that blocks it.
+- **30** ship as `adapted`, each with the dropped clause named in its `source`.
+- **20** do not ship at all, each listed in §4 below with the gap that blocks it.
+- **1** — LAB-GROWN EARWORM — is *played* by `npm run playable` and still does not
+  ship, because its reduction is **strictly stronger** than the printed card and
+  that needs an engine-side ruling. See §4.1.
 - **0** ship as `verbatim`.
 
 **What genuinely improved in this pass** is the Ideology deck, which is the deck players
@@ -85,7 +88,7 @@ actually see: 20 → 52 Ideology Cards, and the number carrying recovered questi
 
 ---
 
-## 3. Per-card index, all 118 shipped cards
+## 3. Per-card index, all 127 shipped cards
 
 ### `in2020` / ideology — 32 cards
 
@@ -152,7 +155,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 19 | `ig-et2040-019` | Should the seawall be named after the engineer or the town? | `inferred` |
 | 20 | `ig-et2040-020` | Should the climate curriculum be taught in every school? | `inferred` |
 
-### `et2040` / conspiracy — 12 cards
+### `et2040` / conspiracy — 16 cards
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
@@ -164,19 +167,20 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 6 | `ct-et2040-006` | Quiet Redrafting | `inferred` | original; REF §8.2 |
 | 7 | `ct-et2040-007` | The Wet Season Argument | `inferred` | original; REF §8.2 |
 | 8 | `ct-et2040-008` | Filed Under Normal | `inferred` | original; REF §8.2 |
-| 9 | `ct-et2040-009` | Dry Dock | `inferred` | original; REF §8.2. Deliberately does **not** restate PYTHONPOST (G9) |
-| 10 | `ct-et2040-010` | The Long Commute | `inferred` | original; REF §8.2 |
-| 11 | `ct-et2040-011` | Load Shedding, Properly Explained | `inferred` | original; REF §8.2 |
-| 12 | `ct-et2040-012` | Server Space | `inferred` | original; REF §8.2. Deliberately does **not** restate SELECTIVE ACCESS MEMORY (G17) |
-| 13 | `ct-et2040-013` | Holo Sapiens | `adapted` | REF §4.2.1 verbatim, on its first sentence alone. G20 `move-card`. Same archetype as `ct-in2020-011`; see KNOWN-GAPS.md G20 |
-| 14 | `ct-et2040-014` | Block | `adapted` | REF §4.2.1 verbatim, clause by clause against the reducer. **Ships the whole reactive half** — G13's phase machine executes it and §1 tabulates all eight clauses. Drops three: discard an open card, block a card stealing itself, cleanse an already-active card. The `Otherwise: gain 1 Clout` clause is **authored**; the schema requires an effect list |
-| 15 | `ct-et2040-015` | Deflect | `adapted` | REF §4.2.1 verbatim, clause by clause. Ships the reactive half with two named deviations: the **whole** effect list is redirected, not one partial effect (G20), and `target` is `any-card` rather than `card-affecting-you` (G1). The `Otherwise: gain 1 Trust` clause is **authored** |
+| 9 | `ct-et2040-011` | Load Shedding, Properly Explained | `inferred` | original; REF §8.2 |
+| 10 | `ct-et2040-013` | Holo Sapiens | `adapted` | REF §4.2.1 verbatim, on its first sentence alone. G20 `move-card`. Same archetype as `ct-in2020-011`; see KNOWN-GAPS.md G20 |
+| 11 | `ct-et2040-014` | Block | `adapted` | REF §4.2.1 verbatim, clause by clause against the reducer. **Ships the whole reactive half** — G13's phase machine executes it and §1 tabulates all eight clauses. Drops three: discard an open card, block a card stealing itself, cleanse an already-active card. The `Otherwise: gain 1 Clout` clause is **authored**; the schema requires an effect list |
+| 12 | `ct-et2040-015` | Deflect | `adapted` | REF §4.2.1 verbatim, clause by clause. Ships the reactive half with two named deviations: the **whole** effect list is redirected, not one partial effect (G20), and `target` is `any-card` rather than `card-affecting-you` (G1). The `Otherwise: gain 1 Trust` clause is **authored** |
+| 13 | `ct-et2040-016` | Cut, Copy, and Paste | `adapted` | REF §4.2.1, first turn only. G16 landed for the selector. Named drops: the second turn (G22), **"1 of your MAJORITIES"** — the one clause this card is *wider* on — and *"all"* as a count |
+| 14 | `ct-et2040-017` | If You Like Pina Colada | `adapted` | REF §4.2.1. **No clause dropped.** G4 + G15: a `res` of 1 in each resource times `held-of-each-resource` *is* the doubling, and the cap is the card's own second sentence. Still `adapted` because a Conspiracy Card also needs a `cost` the recovered text does not print. `npm run balance` reports it **NOT MEASURED**, by design — see `test/balance.test.ts` |
+| 15 | `ct-et2040-018` | Selective Access Memory | `adapted` | REF §4.2.1. Ships the top of the discard pile. Drops *"pick any card, in any order"* — a `choose-card` decision **refused at the type level** because rendering it would list a `_`-prefixed pile (G17) |
+| 16 | `ct-et2040-019` | Power Trip | `adapted` | REF §4.2.1. The trigger is performed (G14). **Wider than printed**: drops *"non-majority"*, so a majority can be struck; and the printed *"you can"* becomes mandatory. **Replaced** `inferred` DRY DOCK, whose own source said PYTHONPOST was unrepresentable |
 
-### `et2040` / headline — 15 cards
+### `et2040` / headline — 19 cards
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
-| 1 | `hl-et2040-001` | New Face Who Dis | `adapted` | S4 / REF §4.3. Drops the Volatile-Area prohibition (G5) and the every-player targeting (G8) |
+| 1 | `hl-et2040-001` | New Face Who Dis | `adapted` | S4 / REF §4.3. Drops the Volatile-Area prohibition (G5) and the every-player targeting (G8). Same card as SUBMERGED, so **not double-counted** |
 | 2 | `hl-et2040-002` | Red Blooded | `adapted` | S4 / REF §4.3. Drops the per-voter scaling (G4) and the self-discard (G-new) |
 | 3 | `hl-et2040-003` | Ain't No Cure For Love | `adapted` | S4 / REF §4.3. The self-discard branch is now the PRINTED clause (`target: 'you'`; G-new is closed). Drops only the OR-branch donate (G1) |
 | 4 | `hl-et2040-004` | Quietly, The Ceiling Moved | `inferred` | original; REF §8.2 |
@@ -187,12 +191,22 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 9 | `hl-et2040-009` | The Four Horsemen | `adapted` | S4 / REF §4.3. The denomination choice is expressed exactly; drops the purchase lock (G5) |
 | 10 | `hl-et2040-010` | Married With Bits | `adapted` | S4 / REF §4.3. Drops the 2-opponent target set and the opt-out (G1) |
 | 11 | `hl-et2040-011` | Good Gig Well Played | `adapted` | S4 / REF §4.3. Keep-one branch only; drops the two gifts and the discard fallback (G17, G20) |
-| 12 | `hl-et2040-012` | Tide Warnings | `inferred` | original; REF §8.2. Deliberately does **not** restate JUST BREATHE (G16) |
-| 13 | `hl-et2040-013` | As Clear As Water | `adapted` | S4 / REF §4.3. Ships the top-up clause (`onlyIfEmpty`) and `target: everyone`. Drops both REVEAL clauses: a reveal has no state consequence in this engine. **Replaced** the `inferred` THREE DAY WEEKEND reskin |
-| 14 | `hl-et2040-014` | The Policy Review | `inferred` | original; REF §8.2 |
-| 15 | `hl-et2040-015` | Movement Anxiety Disorder | `adapted` | S4 / REF §4.3. Ships the trigger (`when: on-gerrymander` + `movedMyVoter` + `until: next-turn`) and needs G-new to reach your own pegs. Drops the counter (G10) and the multi-turn block (G13). **Replaced** the `inferred` SILICON RAIN, whose own `source` said it refused to restate any recovered card |
+| 12 | `hl-et2040-013` | As Clear As Water | `adapted` | S4 / REF §4.3. Ships the top-up clause (`onlyIfEmpty`) and `target: everyone`. Drops both REVEAL clauses: a reveal has no state consequence in this engine. **Replaced** the `inferred` THREE DAY WEEKEND reskin |
+| 13 | `hl-et2040-015` | Movement Anxiety Disorder | `adapted` | S4 / REF §4.3. Ships the trigger (`when: on-gerrymander` + `movedMyVoter` + `until: next-turn`). Drops the counter (G10) and the multi-turn block (G13). **Replaced** the `inferred` SILICON RAIN |
+| 14 | `hl-et2040-016` | Just Breathe | `adapted` | S4 / REF §4.3. G16 landed: `zone: your-strongest` is performed. Drops *"into an adjacent zone"*, the tie-break as a decision, and *"move"* as EVICT (strictly weaker) |
+| 15 | `hl-et2040-017` | Nero's Guests | `adapted` | REF §4.1. G16 landed: `zone: this-zone` reads `headlineQueue[0].areaId`. Drops *"move"* as EVICT (strictly weaker), the adjacent-zone destination, and the pairing of the two clauses |
+| 16 | `hl-et2040-018` | Fatality | `adapted` | REF §4.3. G1 landed for the named opponent. Drops *"for free"* (G15 `price`), *"the voters"* as 1 (no number was recovered), and *"right away"* |
+| 17 | `hl-et2040-019` | Why The Long Face? | `adapted` | REF §4.3. **Whole bar one clause, and that clause makes it stronger**: `condition: { byOwner: true }` is left off, so the hook fires on any influence |
+| 18 | `hl-et2040-020` | Gender Trouble | `adapted` | REF §4.3. G5's `no-power` restriction is executed. **Weaker than printed**: takes ALL Level 3 powers rather than one chosen (G1, a decision over POWERS), and drops the *"discard 2 resources instead"* conditional. **Replaced** `inferred` THE POLICY REVIEW (`hl-et2040-014`) |
+| 19 | `hl-et2040-021` | Don't Kiss The Babies | `adapted` | REF §4.3. G5's `surcharge` is executed. **Wider than printed**: `surchargeFor` is one function read by INFLUENCE and BUY_CONSPIRACY, so the tax reaches Conspiracy Cards too. **Replaced** `inferred` TIDE WARNINGS (`hl-et2040-012`) |
 
-### `in2020` / conspiracy — 10 cards
+> Four placeholders were retired to make room, and every one of them had already
+> named the recovered card it was standing in for: THREE DAY WEEKEND → AS CLEAR AS
+> WATER, SILICON RAIN → MOVEMENT ANXIETY DISORDER (both earlier passes), THE POLICY
+> REVIEW → GENDER TROUBLE, TIDE WARNINGS → DON'T KISS THE BABIES (this pass). Each
+> retirement kept the deck's SIZE unchanged, so nothing the server measures moves.
+
+### `in2020` / conspiracy — 11 cards
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
@@ -203,7 +217,7 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 5 | `ct-in2020-005` | Khel Adhoora Chhodo | `inferred` | original; REF §8.2 rule 5 |
 | 6 | `ct-in2020-006` | Baap Rekho | `inferred` | original; REF §8.2 rule 5. Singularity archetype |
 | 7 | `ct-in2020-007` | Sadak Ka Hisab | `inferred` | original; REF §8.2 rule 5 |
-| 8 | `ct-in2020-008` | Kharcha Uthao | `inferred` | original; REF §8.2 rule 5. Does **not** restate COUGH IT UP (G2) |
+| 8 | `ct-in2020-008` | Kharcha Uthao | `inferred` | original; REF §8.2 rule 5. Does **not** restate COUGH IT UP — that ships recovered as `hl-in2020-013` |
 | 9 | `ct-in2020-009` | Chhoti Si Chori | `inferred` | original; REF §8.2 rule 5 |
 | 10 | `ct-in2020-010` | Pet Ka Register | `inferred` | original; REF §8.2 rule 5 |
 | 11 | `ct-in2020-011` | Jumla | `adapted` | REF §4.2.2 verbatim, on its first sentence alone. G20 `move-card`. The India skin of the Holo Sapiens archetype; see KNOWN-GAPS.md G20 |
@@ -219,17 +233,17 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 1 | `hl-in2020-001` | Bhaag, Koi Nahi Rukega | `inferred` | original; REF §8.2 rule 5 |
 | 2 | `hl-in2020-002` | Chai-Paani, Dobara | `inferred` | original; REF §8.2 rule 5 |
 | 3 | `hl-in2020-003` | Aakhri Pehchaan | `inferred` | original; REF §8.2 rule 5 |
-| 4 | `hl-in2020-004` | Ghadi Ka Aakhri Ghanta | `inferred` | original; REF §8.2 rule 5 |
-| 5 | `hl-in2020-005` | Aadha Kisan, Poora Bazaar | `inferred` | original; REF §8.2 rule 5 |
-| 6 | `hl-in2020-006` | Chuppi Ke Baad | `inferred` | original; REF §8.2 rule 5 |
-| 7 | `hl-in2020-007` | Khaki Terror | `adapted` | S2 / REF §4.1. The donation is expressed exactly; drops *"you cannot make any purchases until you do so"* (G5, G10) |
-| 8 | `hl-in2020-008` | Bijli Ka Hisaab | `inferred` | original; REF §8.2 rule 5 |
-| 9 | `hl-in2020-009` | Pani Ki Kammi | `inferred` | original; REF §8.2 rule 5 |
-| 10 | `hl-in2020-010` | Sarkar Ki Charcha | `inferred` | original; REF §8.2 rule 5 |
-| 11 | `hl-in2020-011` | Chhoti Si Kasam | `inferred` | original; REF §8.2 rule 5 |
+| 4 | `hl-in2020-005` | Aadha Kisan, Poora Bazaar | `inferred` | original; REF §8.2 rule 5 |
+| 5 | `hl-in2020-006` | Chuppi Ke Baad | `inferred` | original; REF §8.2 rule 5 |
+| 6 | `hl-in2020-007` | Khaki Terror | `adapted` | S2 / REF §4.1. The donation is expressed exactly; drops *"you cannot make any purchases until you do so"* (G5, G10) |
+| 7 | `hl-in2020-008` | Bijli Ka Hisaab | `inferred` | original; REF §8.2 rule 5 |
+| 8 | `hl-in2020-012` | Stay In Your Limits | `adapted` | REF §4.1. **G-new, not G18** — `convert-voter` with no target reaches the caster. Drops *"every player"* and *"to their left"* (the second is **wider**), plus the majority-conditional 2 resources (G2). **Replaced** `inferred` GHADI KA AAKHRI GHANTA |
+| 9 | `hl-in2020-013` | Cough It Up | `adapted` | REF §4.1. The eviction is performed exactly and `evict` is the printed verb. Drops the majority-conditional payout (G2). **Replaced** `inferred` CHHOTI SI KASAM |
+| 10 | `hl-in2020-014` | Growing Dissent | `adapted` | REF §4.1. The G9 + G14 card with nothing approximated. Drops *"gained voters are placed immediately"*. **Replaced** `inferred` PANI KI KAMMI |
+| 11 | `hl-in2020-015` | Pythonpost | `adapted` | REF §4.1, and REF §4.3 records SNOOP B-O-DOUBLE-T as the **same card** so one name covers both. **Wider than printed**: taxes every purchase, not only Conspiracy Cards. **Replaced** `inferred` SARKAR KI CHARCHA |
 
 > Naming note: `hl-in2020-002` ("Chai-Paani, Dobara") is **not** the recovered card
-> CHAI-PAANI. See §4 row 17.
+> CHAI-PAANI, whose base effect was never recovered. See §4 row 17.
 
 ### `core` / voter — 18 cards
 
@@ -260,16 +274,28 @@ Every one is `inferred`. **There is no verbatim Voter Card to import** — see �
 
 ## 4. Disposition of every recovered card — the audit trail
 
-Nothing recovered is dropped silently. **52 distinct recovered cards** are accounted for
-below. 17 ship `adapted`; 35 do not ship, each with the reason. (Net: one `inferred` placeholder RETIRED and one recovered card SHIPPED, so every deck SIZE is unchanged and `packages/server/test/corpus.test.ts` `SHIPPED.headline` still reads 26.)
+Nothing recovered is dropped silently. **54 distinct recovered card rows** are
+accounted for below, of which **3 pairs are the same archetype under two campaign
+names** (SUBMERGED ≡ NEW FACE WHO DIS, SNOOP B-O-DOUBLE-T ≡ PYTHONPOST, CARD GAMES ≡
+A COWARD OR A JOURNALIST?) and BLOCK is listed once although REF names it twice. So
+the corpus is **51 distinct recovered cards with a recovered effect**, plus 2 names with
+no recovered effect (CRUSHED UNDER BELLY, IFTAR PARTY). Of the 51: **30 ship
+`adapted`**, **1 is playable and held back on a ruling** (LAB-GROWN EARWORM), and **20
+are not representable**, each with the reason.
 
-Counting note: REF §4 lists 56 card rows across its four tables. Four are duplicates by
-effect (REF §4.3: *"Deduplicate by effect, not by name"*) — SUBMERGED ≡ NEW FACE WHO DIS,
-SNOOP B-O-DOUBLE-T ≡ PYTHONPOST, CARD GAMES ≡ A COWARD OR A JOURNALIST?, and BLOCK listed
-twice. Two more (CRUSHED UNDER BELLY, IFTAR PARTY) carry a name but **no verified effect**.
-56 − 4 duplicates = 52 distinct, which reconciles exactly with `KNOWN-GAPS.md` §0.1's
-"50 recovered X-cards with complete official rules text" once the 2 unverified ones are
-excluded.
+**THE FIGURES ABOVE ARE CORRECTED FROM THE PREVIOUS REVISION OF THIS FILE**, which
+said 56 rows and 52 distinct. The count of 52 came from subtracting 4 "duplicates"
+from 56, and 56 was itself a total that does not reconcile with the tables below: they
+list 16 + 3 + 15 + 20 = **54** rows, and the duplicate pairs among those 54 are **3**,
+not 4 — BLOCK is the fourth only because REF prints it in two places and §4.3's
+name-only block is counted separately as CRUSHED UNDER BELLY / IFTAR PARTY. The
+reconciled figures are the ones above, and `npm run playable` counts **54 probed
+rows** for the same reason: the probe keeps the campaign reskins separate because
+`recoveries` are cheaper to keep visible than to deduplicate by hand.
+
+Counting note: REF §4's own headings disagree with its tables (16 rows under a
+"15 cards" heading; 20 rows under an "18 cards" heading). The tables are what is
+listed; see §6.
 
 ### 4.1 Earth 2040 Conspiracy Cards — S3, REF §4.2.1
 
@@ -282,15 +308,16 @@ excluded.
 | Deflect | **ships** `adapted` as `ct-et2040-015` | the reactive half only. G13 landed. Still dropped: *"only that partial effect is deflected"* — `applyEffect` computes one target per effect list, so the whole resolution is redirected (G20). And widened: `target: 'any-card'` rather than `card-affecting-you`, which resolves through an approximation (G1) |
 | Eradicating Germs | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
 | Holo Sapiens | **ships** `adapted` as `ct-et2040-013` | G20 landed — only *"This is an extra Ideology Card"*. G15 dynamic price, G17 the "of your choice", G23 re-filing, G12 expiry-on-purchase |
-| If You Like Piña Colada | not representable | mat-wide doubling with a cap check; no `gain`/`lose` op scales a whole pool |
-| Lab-Grown Earworm | not representable | G14 trigger on *another* player's purchase; plus self-limiting copies |
-| Power Trip | not representable | G14 trigger |
+| If You Like Piña Colada | **ships** `adapted` as `ct-et2040-017` | G4 + G15. **No clause dropped**: a `res` of 1 in *each* resource times `per: { of: 'held-of-each-resource' }` *is* a doubling of the mat, and p12's cap is the card's own second sentence, enforced by the same `gain` path. `npm run balance` reports it **NOT MEASURED** rather than scoring it zero, which is the checker's designed verdict for a card whose value it cannot compute with no player state in scope. Still `adapted`, not `verbatim`: a Conspiracy Card also needs a `cost` the recovered rules text does not print |
+| Lab-Grown Earworm | **plays, and does NOT ship** | the only recovered card in this file that is playable and held back, and the reason is a ruling rather than a gap. Its reduction is **strictly stronger than the printed card**: the real one binds ONE chosen opponent, while the reduction fires on ANY influence including your own and the thief picks the victim. `"There are two such cards"` (the self-limiting copies) is dropped as well. Shipping it needs the engine owner's ruling; `scripts/playable.ts` carries the same warning on its probe row |
+| Power Trip | **ships** `adapted` as `ct-et2040-019` | G14 landed, so the trigger is performed: `on-voter-influenced` with `influencedVotersAtLeast: 3` and `byOwner` **is** "every time you influence a 3-Voter Card". **Wider than printed**: `"non-majority"` is dropped, so a majority peg can be struck, and the printed `"you can"` becomes mandatory because the hook fires |
 | Quantum Wristband | not representable | G14 + G13 (auction of 3 headlines, self-immunity, IOU bids) |
+| Selective Access Memory | **ships** `adapted` as `ct-et2040-018` | G17 half-closed, and the half that shipped is the deal: `draw-conspiracy` carries `from: 'discard'` and a Conspiracy Card discard pile is honest to read, because a Conspiracy Card is bought and held and never answered face up. `"Pick any Conspiracy Card … in any order"` needs a decision over a pile's contents, and a `'choose-card'` kind was **refused at the type level**: rendering it would have to list the pile, the piles are `_`-prefixed and stripped by `playerView`, so the choice's CONTENTS would be the leak |
 | Selective Access Memory | **now partially playable** — see §4.7 | the remaining clause, *"in any order"*, needs a decision over a pile's contents, and a `'choose-card'` kind was considered and **refused at the type level** this round: rendering it would have to list the pile, the piles are `_`-prefixed and stripped by `playerView`, so the choice's CONTENTS would be the leak. G17 stays open for exactly that reason |
 | Singularity | **ships** `adapted` as `ct-et2040-003` (branch 1 of 2) | G6 |
 | The Greta Effect | not representable | G14 persistent debuff, N-target |
 | The Psychohistorian | **ships** `adapted` as `ct-et2040-004` (branch 1 of 2) | G7/G19 |
-| Thoughts and Prayers | not representable | G4 — scales off an opponent's pegs on the board |
+| Thoughts and Prayers | not representable | G4, and the reason is sharper than "scales off the board". "Pick a player and get any 2 resources for each of their voters inside a Volatile Area" needs the READ aimed at one player and the PAYOUT aimed at another. `chosen-player` now exists, and it makes this card **worse**, not better: `n` resolves against the player the effect resolves FOR (KNOWN-GAPS 0b.1 item 6), so `target: 'chosen-player'` would count the chosen player's own volatile voters and pay the reward to *them*. There is no field that separates whose state is read from who the effect lands on |
 
 > REF §4.2.1's heading says *"15 cards"* but the table has **16** rows. The 16 are listed.
 
@@ -314,17 +341,17 @@ excluded.
 
 | card | disposition | blocking gap |
 |---|---|---|
-| GREAT LEADER, BAD ECONOMY | not representable | G9 + G14 — rest-of-game trigger on another player's influence |
+| GREAT LEADER, BAD ECONOMY | not representable | G1 + G14. The trigger half is expressible (`on-voter-influenced` + `byOwner` + a rest-of-game lifetime), but the payload is "the player after you may move 1 of your non-majority voters to an adjacent zone", and `convert-voter`/`evict` aimed at a NAMED player are raised **to that player** with scope `'own'`, which is a decision somebody cannot answer. Narrowing it to "1 of your voters is evicted" would be a different card that happens to share the trigger — it changes who acts and adds a penalty — so it is refused rather than shipped |
 | DOSTI BANI RAHE | not representable | G15 + G22 — *your* Gerrymandering Rights, read on *their* turn |
 | KHAKI TERROR | **ships** `adapted` as `hl-in2020-007` | G5, G10 |
-| GROWING DISSENT | not representable | G9 + G14 |
+| GROWING DISSENT | **ships** `adapted` as `hl-in2020-014` | G9 + G14, with nothing approximated: the hook fires on `on-gerrymander`, `movedMyVoter` **is** "any opponent Gerrymanders your voters", and "for 1 round" is the `round` lifetime. Dropped, named: `"gained voters are placed immediately"` — the engine grants the voter to your Mat and you place it |
 | A CALL FROM KARACHI | not representable | G13 auction (ruled out with a cost) + G17 deck search + G18; also explicitly *"you don't need to reveal this card"* |
-| STAY IN YOUR LIMITS | not representable | G2 — per-player iteration plus a conditional bonus |
+| STAY IN YOUR LIMITS | **ships** `adapted` as `hl-in2020-012` | **the ledger had this filed under the wrong gap.** The blocker is G-new, not G18: a `convert-voter` with NO `target` reaches the CASTER, because `voterScope` returns `'others'` when `chooser === source`. So "every player converts 2 voters of the player to their left" is expressible. Dropped, named: "every player" (only the resolving player acts) and "to their left" (any opponent may donate, which is **wider**). The 2-resource payout for breaking no majority is still G2 |
 | POLO RETREAT | not representable | no op borrows another player's Level 3 powers. **Not G20**: nothing here moves a card |
 | NEXT BILLION DATA POINTS | not representable | G13 vote (no self-votes, re-vote on tie) |
-| PYTHONPOST | not representable | G9 rest-of-game purchase surcharge + G5 |
+| PYTHONPOST | **ships** `adapted` as `hl-in2020-015` | G9 + G5 landed, so the permanent tax is executed. REF §4.3 records SNOOP B-O-DOUBLE-T as the **same card**, so one shipped name covers both archetypes and neither is counted twice. **Wider than printed**: `"every Conspiracy Card that you buy"` becomes every purchase, because `surchargeFor` is one function read by INFLUENCE and BUY_CONSPIRACY and no field says which kind of purchase a restriction prices |
 | SUBMERGED | ships as `hl-et2040-001` | same card as NEW FACE WHO DIS (REF §4.3); **not double-counted** |
-| COUGH IT UP | **now partially playable** — see §4.7 | `evict` carries `target` since commit `9d1326c`, so *"All your opponents evict 1 voter"* plays. The conditional bonus — *"if a player breaks a majority using this action, all other players gain 1 resource of their choice"* — is still G2: no op reads board state to decide a payout |
+| COUGH IT UP | **ships** `adapted` as `hl-in2020-013` | `evict` carries `target` since commit `9d1326c`, so *"All your opponents evict 1 voter"* plays. The conditional bonus — *"if a player breaks a majority using this action, all other players gain 1 resource of their choice"* — is still G2: no op reads board state to decide a payout |
 | NERO'S GUESTS | **ships** `adapted` as `hl-et2040-017` | G16 landed. `zone: this-zone` is read off `GameState.headlineQueue[0].areaId` - the Volatile Area whose placement drew the Headline - which is exactly REF 4.1's own gloss (*"this zone" = the volatile zone that triggered it*) and needs **no new state field**, so `reduce()` stays pure and a replay derives it. Still dropped, named: *"move"* ships as EVICT (strictly weaker for everyone affected), the adjacent-zone destination, and the all-or-nothing pairing of the two clauses |
 | ON THE "HIGH" SEAS | not representable | G11 hostage — a persistent board-resident object holding 4 pegs |
 | A COWARD OR A JOURNALIST? | not representable | **G20 has landed and this is STILL blocked**, which is the interesting entry here. It needs `from: 'pending'` — donating the card you have been PUT — and that is refused AT THE TYPE LEVEL, because it would tell a mid-answer player the card exists, offer a look at it by proxy, and empty `_pendingCard` into a soft-lock where `ANSWER` and `END_TURN` are both illegal. It needs G12's in-flight queue (an owner, a seat, a deadline) besides. See KNOWN-GAPS.md G20 |
@@ -337,23 +364,23 @@ excluded.
 | 404 | not representable | G18 — swaps who answers which card |
 | Ain't No Cure For Love | **ships** `adapted` as `hl-et2040-003` | G1 only (G-new closed) |
 | As Clear As Water | **ships** `adapted` as `hl-et2040-013` (replacing the `inferred` THREE DAY WEEKEND) | Both REVEAL clauses, and a reveal has **no state consequence in this engine** — a missing mechanism, not missing wording. The top-up is shipped in full |
-| Brave New Worlds | not representable | G18 — and it suppresses passive income |
+| Brave New Worlds | not representable | G18. Worth recording because it is the closest call in this file: the SECOND clause, "Players will not receive any resources (active & passive) for doing so", **is** expressible as `restrict` kind `no-income`, which `ANSWER` consults. But without G18's answer-phase control that clause has a different referent — it would read "no answer ever pays out again", a permanent global nerf rather than this one immediate round — and the card's identity IS the phase change. Shipping the clause alone would be a different card under a recovered name, so it is not shipped and the mechanism is recorded here instead |
 | Card Games | not representable | identical to A COWARD OR A JOURNALIST?, so identically blocked: G12 plus the `from: 'pending'` refusal. See that row |
-| Don't Kiss The Babies | not representable | G5 — a purchase surcharge, i.e. a cost modifier |
-| Fatality | not representable | G1 — donate voters to any opponent, placed immediately |
+| Don't Kiss The Babies | **ships** `adapted` as `hl-et2040-021` | G5's `surcharge` restriction is executed and read by INFLUENCE and BUY_CONSPIRACY. **Wider than printed**, and the card says so on its face: the printed tax is on **Voter Cards** and this taxes **every purchase**, Conspiracy Cards included, because `surchargeFor` is one function with no field saying which kind of purchase a restriction prices |
+| Fatality | **ships** `adapted` as `hl-et2040-018` | G1 landed for the named opponent. Dropped, named: "for free" is a PURCHASE the engine cannot grant (G15's `price` field); "the voters" ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; "right away" needs an *immediately* placement |
 | Fuelling The News | not representable | G17 (draw 3 Headlines) + G18 (choose the resolution order). The *giving* half moves Headline Cards, and move-card is Ideology-only. **Not G20-blocked** now |
-| Gender Trouble | not representable | G5 + G22 |
+| Gender Trouble | **ships** `adapted` as `hl-et2040-020` | G5's `no-power` restriction is executed and read by `powers.ts usesLeft`, the one consult point every `POWER_*` case already asks. **Weaker than printed, and named on the card rather than hidden**: the printed card takes ONE CHOSEN Level 3 power and this takes **all** of them, because naming one power is a decision over POWERS rather than over players (G1). The printed `"if you do not have a Level 3 Ideologue Power, discard 2 resources in your next turn"` is dropped: a conditional over a whole effect list. It was held back for three iterations by a **corpus gate** rather than by the engine, and that gate is gone |
 | Good Gig Well Played | **ships** `adapted` as `hl-et2040-011` (keep-one branch) | G17, G20 |
 | Higgs Moron | not representable | G10 (tokens on a card) + G12 (timed pass) |
 | Just Breathe | **ships** `adapted` as `hl-et2040-016` | G16 landed. `zone: your-strongest` is a pure function of the board, so *"the zone where you have the most voters"* is now **performed** rather than approximated. Still dropped, named: *"into an adjacent zone"* (a destination is a second decision on top of a source one), the tie-break (broken deterministically by `ZONE_IDS` order instead of offered as a decision), and *"move"* as EVICT (strictly weaker) |
 | Married With Bits | **ships** `adapted` as `hl-et2040-010` | G1 |
 | Movement Anxiety Disorder | **ships** `adapted` as `hl-et2040-015` (replacing the `inferred` SILICON RAIN) | G10 (the counter), G13 (multi-turn block). Both of its recorded gaps, G9 and G22, were already CLOSED when the playability probe wrote the row down |
-| New Face Who Dis | **ships** `adapted` as `hl-et2040-001` | G5, G8 |
+| New Face Who Dis | **ships** `adapted` as `hl-et2040-001` | the Volatile-Area placement ban is G5 and still (c); the every-player targeting dropped when G8 closed on the reducer. SUBMERGED is the same card and is **not** counted twice |
 | Red Blooded | **ships** `adapted` as `hl-et2040-002` | G4, G-new |
-| Snoop B-O-Double-T | not representable | G9. Same card as PYTHONPOST |
+| Snoop B-O-Double-T | ships as `hl-in2020-015` | REF §4.3 says outright that this is the **same card** as PYTHONPOST, so it is not dispositioned twice: one shipped name covers both |
 | The Big Freeze | not representable | G5 + G9 + G15 + G22 |
 | The Four Horsemen | **ships** `adapted` as `hl-et2040-009` | G5 |
-| Why The Long Face? | not representable | G14 + G22 |
+| Why The Long Face? | **ships** `adapted` as `hl-et2040-019` | G1 names the opponent, G14 fires the hook, G22 is the lifetime, and the printed "1 voter **not card**" parenthetical holds because `voters` grants a group rather than drawing. **One clause dropped and it makes the card STRONGER**: `condition: { byOwner: true }` is left off, so the hook fires on ANY influence rather than only yours |
 
 > REF §4.3's heading says *"18 cards"* but the table has **20** rows. All 20 are listed.
 
@@ -382,7 +409,7 @@ effect list today's vocabulary can carry, and **drives it through the real `redu
 counts as playable only if the reducer accepts it *and* the state it leaves differs
 from a control card's.
 
-**14 of 54 probed cards are playable.** 40 are not expressible at all. **0 are refused
+**34 of 54 probed cards are playable.** 20 are not expressible at all. **0 are refused
 at play time** and **0 are expressible-but-unexecutable** — which is the finding worth
 stating: `src/executable.ts` has no remaining hole between "the validator will accept
 this card" and "the reducer will perform it". Every unshipped recovered card is
@@ -395,8 +422,8 @@ the difference:
 
 | card | ledger said | measured |
 |---|---|---|
-| SELECTIVE ACCESS MEMORY | not representable, G17 | **plays.** `draw-conspiracy.from: 'discard'` takes the top of the discard pile. *"in any order"* still needs a new `Choice` kind — G17 half-closed, not closed |
-| COUGH IT UP | not representable, G2 (`evict` had no `target`) | **plays its first branch.** `evict` carries `target` since `9d1326c`, so *"all your opponents evict 1 voter"* resolves. The majority-conditional bonus is still G2 |
+| SELECTIVE ACCESS MEMORY | not representable, G17 | **plays, and now SHIPS** as `ct-et2040-018`. `draw-conspiracy.from: 'discard'` takes the top of the discard pile. *"in any order"* still needs a `choose-card` kind, which is **refused at the type level** because rendering it would list a `_`-prefixed pile — G17 half-closed, not closed |
+| COUGH IT UP | not representable, G2 (`evict` had no `target`) | **plays its first branch, and now SHIPS** as `hl-in2020-013`. `evict` carries `target` since `9d1326c`, so *"all your opponents evict 1 voter"* resolves. The majority-conditional bonus is still G2 |
 
 Two harness artifacts were also found and fixed while building the measurement, and
 they are recorded because either would have inflated the count: resolving a Headline
@@ -410,9 +437,15 @@ against a control card that must come back NO-OP or the script exits 1.
 1. **`convert-voter` cannot resolve for any target other than `you`.**
    `raiseVoterDecision` gives a non-source target scope `'own'`, so the *opponent* is
    asked to convert; `resolveChoice` then refuses with *"that voter is already yours"*.
-   The decision is raised to a player who cannot answer it, every time. No shipped card
-   uses it — `hl-et2040-003` was written as a `discard-voter` — which is why this has
-   never surfaced. It is in `reduce.ts`, not here.
+   The decision is raised to a player who cannot answer it, every time. It is in
+   `reduce.ts`, not here.
+
+   **STILL TRUE, AND IT IS NOW WHY A CARD DEPENDS ON IT.** `hl-in2020-012` STAY IN YOUR
+   LIMITS ships `convert-voter` with **no `target` at all**, which is the only shape that
+   works: `voterScope` returns `'others'` when `chooser === source`, so the CASTER is the
+   chooser and the pick is an opponent's peg. Adding `target: 'chosen-player'` to that card
+   would ship the defect above rather than fix it, and `test/recovered-cards.test.ts`
+   asserts the peg changes hands to p1 so the shape cannot drift back.
 2. **REF §4.3 reads AIN'T NO CURE FOR LOVE as *"Discard 2 of your own voters"*, which
    did not play** (G-new). What shipped as `hl-et2040-003` for three iterations was the
    **opponents'** reading, with the `text` weakened to match — the card and its printed
@@ -472,17 +505,21 @@ quote numbers from an earlier pass, it quotes today's.
 
 | | before | after (measured) |
 |---|---:|---:|
-| Total cards shipped | 64 | **122** |
+| Total cards shipped | 64 | **127** |
 | Ideology Cards | 20 | **52** |
 | Voter Cards | 12 | 18 |
-| Conspiracy Cards | 14 | **26** |
-| Headline Cards | 18 | 26 |
+| Conspiracy Cards | 14 | **27** |
+| Headline Cards | 18 | **30** |
 | `verbatim` | 0 | **0** — see §1, and BLOCK/DEFLECT are why |
-| `adapted` (carries recovered material) | 19 | **25** |
-| `inferred` | 45 | **97** |
-| Cards carrying recovered text | 19 | **25** |
-| Recovered cards not representable | 41 | **37** — each in §4 |
-| Recovered cards playable, by playing | — | **25 of 54** (`npm run playable`) |
+| `adapted` (carries recovered material) | 19 | **41** — 30 X-cards and 11 Ideology stems |
+| `inferred` | 45 | **86** |
+| Cards carrying recovered text | 19 | **41** |
+| Distinct recovered cards with a recovered effect | 52 *(wrong; see §4)* | **51** — 54 rows less 3 campaign-reskin pairs |
+| …shipping `adapted` | — | **30** |
+| …playable but held back on a ruling | — | **1** — LAB-GROWN EARWORM, strictly stronger than printed |
+| Recovered cards not representable | 41 | **20** — each in §4 |
+| Recovered cards playable, by playing | 14 of 54 | **34 of 54** (`npm run playable`) |
+| `inferred` placeholders retired for a recovered card | 0 | **9** — see the note under §3's 2040 headline table |
 
 **The one number that matters for playability:** REF §2.3 records 8–12 Ideology Cards in a
 player's hand after a 5-player game. The India deck went from 12 cards — so players saw the

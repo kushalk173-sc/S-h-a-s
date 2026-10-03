@@ -17,8 +17,7 @@ Two engine changes, in this order, each a green commit. `npm run playable` — w
 schema accepts it — went from **14 of 54** to **18 of 54**, and then from **21 of 54**
 to **23 of 54** in the phase-machine iteration recorded in 2 G13. Shipping BLOCK and DEFLECT did not
 move that number - the probe writes its own reduction rather than reading the deck - but it turned
-**23 into a shipped fact**; the count is **25 of 54** today, and `packages/server/test/
-interrupt-window.test.ts` is what proves the window itself is safe to ship.
+**23 into a shipped fact**. *(HISTORY: the count on the day that iteration landed was 25 of 54, and `packages/server/test/interrupt-window.test.ts` is what proved the window itself safe to ship. The present-tense figure is **34 of 54** — see §2 G5 and `npm run playable`.)*
 
 | gap | what landed | cards moved |
 |---|---|---|
@@ -116,15 +115,25 @@ does — which ops have a `case`, and which fields each case reads — and
 `test/reducer-parity.test.ts` re-derives that registry from `reduce.ts`'s own source
 text and re-asserts it over every shipped card, so the promise cannot drift.
 
-### 0.1 The counts
-
-| | before | after |
+| **MEASURED, not remembered.** `npm run validate` prints the census and `npm run playable` prints
+the playability count; a table here that disagrees with the decks is worse than no table. |
+| | first substrate pass | **today** |
 |---|---:|---:|
-| Recovered X-cards with complete official rules text (REF §4) | 50 | 50 |
-| …shipped, with the dropped clause named in `source` (`adapted`) | **7** | **11** |
-| …**not shipped at all** | **43** | **39** |
-| Shipped as `inferred` | 45 | 45 |
-| Total cards shipped | 60 | 64 |
+| Recovered X-card rows probed (REF §4.1–§4.3) | 54 | **54** |
+| …distinct after de-duplicating the campaign reskins | 51 | **51** |
+| …**PLAYED**, measured by driving each through `reduce()` | 14 | **34** |
+| …shipped `adapted`, dropped clause named in `source` | 7 | **30** |
+| …playable but **held back on a ruling** (LAB-GROWN EARWORM) | 0 | **1** |
+| …**not representable at all** | 43 | **20** |
+| Cards shipped in the corpus | 60 | **127** |
+| `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 41 / 86** |
+| `inferred` placeholders retired for a recovered card | 0 | **9** |
+
+The 51 distinct recovered cards are 30 shipping + 1 held back + 20 not representable, and
+`npm run playable` agrees: 54 rows probed (the three campaign reskin pairs are probed under both
+names, because a duplicate is cheaper to keep visible than to deduplicate by hand), 34 played,
+0 refused, 0 played-but-no-op, 20 inexpressible.
+
 
 ### 0.2 The finding, and what changed about it
 
@@ -260,7 +269,8 @@ turn state machine.
 EVENT.** `n` may be `{ of: 'volatile-voters' }` and `gain` / `lose` may carry `per`,
 so *"as many as there are"* is expressible against a player's own board.
 
-**Card gained: IF YOU LIKE PIÑA COLADA** (with G15). ERADICATING GERMS is a standing
+**Card gained: IF YOU LIKE PIÑA COLADA, and it SHIPS as `ct-et2040-017`** (with G15; no clause is dropped — see SOURCES.md §4.1). ERADICATING GERMS is a standing
+no clause dropped — see §4.1 of SOURCES.md). ERADICATING GERMS is a standing
 obligation rather than a per-card read.
 
 **Still (c), and the reason is a missing FIELD rather than a missing computation.**
@@ -391,7 +401,7 @@ when every player it is waiting on has declined.
 
 **Cards gained: 2, and they are the two the product replays most.**
 `npm run playable`, measured by playing each reduction through the real reducer, went
-**from 21 of 54 to 23 of 54**. BLOCK and DEFLECT both report PLAYED. Two named
+**from 21 of 54 to 23 of 54** *(history: that iteration's measurement)*. BLOCK and DEFLECT both report PLAYED. Two named
 deviations, both on the type and both in the probe's `note`: DEFLECT redirects the
 **whole** resolution rather than "only that partial effect" on the defender
 (`applyEffect` computes one `target` for an effect list, so per-effect granularity is
@@ -559,8 +569,8 @@ through the real reducer: 2 — turn 40/53/69; 3 — 46/57/96; 4 — 55/66/114; 
 exercised** (20 answers and 80 all-declines at two seats; at 3, 4 and 5 the driver is
 greedy and answers every window it is asked first on, so the all-declines route is measured
 on the uninformed table instead — 101/137/206/204 windows, every one closed by declines).
-`npm run playable` is unchanged at **25 of 54**, because the probe writes its own reduction
-rather than reading the deck.
+`npm run playable` was unchanged at **25 of 54** by this iteration, because the probe writes
+its own reduction rather than reading the deck. *(History. The present-tense figure is 34 of 54.)*
 
 ### G14 — no `when`: effects that trigger on other events
 
@@ -600,7 +610,7 @@ and every loop bound is a resolved number, so a computed value can never reach t
 engine as one. The guarantee this gap originally wanted from the type system now
 comes from the reducer, and `reducer-parity.test.ts` asserts it from the source.
 
-**Card gained: IF YOU LIKE PIÑA COLADA** — `"per": {"of": "held-of-each-resource"}` on
+**Card gained: IF YOU LIKE PIÑA COLADA, and it SHIPS as `ct-et2040-017`** — `"per": {"of": "held-of-each-resource"}` on
 a `res` of 1 in each resource *is* *"double all the resources on your player mat"*,
 and the cap still applies on top, which is the card's own second sentence.
 
@@ -625,7 +635,7 @@ owner. THE BIG FREEZE is a cap change or a per-turn donation, and a cap change i
 
 **State: (a) for the SELECTOR. The selector is done; the `fill-zone` op is not, and
 one clause got WIDER rather than narrower.** Cards: JUST BREATHE, NERO'S GUESTS and CUT
-COPY AND PASTE **all ship** - **27 -> 30 of 54, measured by playing.** Zero refused,
+COPY AND PASTE **all ship** - **27 -> 30 of 54, measured by playing** *(history; the present-tense figure is 34 of 54)*. Zero refused,
 zero no-op.
 
 `ZoneSelector` in `packages/engine/src/cards.ts` is three values, and each is a
@@ -739,7 +749,7 @@ card and suppress passive income; `Effect` is a list applied inside one turn.
 
 **State: (c) → the MECHANISM LANDED, and two real cards with it.** `move-card` executes,
 `PlayerState.ideologyCards` exists, and the ruling on blind answers is made, argued and
-tested. **23 → 25 of 54.**
+tested. **23 → 25 of 54** *(history; the present-tense figure is 34 of 54)*.
 
 **The ruling, in one line: a moved Ideology Card is HELD AND HIDDEN — from everyone,
 including the player it was given to — and is put to that player at their next turn
@@ -902,6 +912,7 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 | # | change | where | unblocks | cost |
 |---|---|---|---|---|
 | ~~1~~ | ~~loop `resolveTargets` in the `gerrymander` case~~ | — | **DONE** | — |
+| ~~1b~~ | ~~give `convert-voter` a `target`~~ | — | **NOT DONE, and not wanted.** STAY IN YOUR LIMITS ships `convert-voter` with NO `target`, which is the only shape that resolves (see SOURCES.md §4.7 finding 1). Adding `target` to that card would ship the defect | — |
 | ~~2~~ | ~~live-effects list on `GameState` + expiry ticked in `advanceTurn`~~ | — | **DONE** — G9 + G22, the substrate for 3 and 4 | — |
 | ~~3~~ | ~~trigger registry consulted by `INFLUENCE` / `BUY_CONSPIRACY` / `GERRYMANDER` / `PLACE_VOTERS` / `setArea`~~ | — | **DONE** — G14 | — |
 | **G4 + G5** | `n: number \| ComputedCount` and `per` on `gain`/`lose`; `PlayerState.restrictions` | **DONE** — G15, G4, and 3 of G5's 5 | — |
@@ -986,11 +997,42 @@ restriction lives one turn too long in one place and not another.
 `until: 'next-turn'` restriction is in force for exactly the owner's next turn and no
 longer -- that test is the only thing holding the two clocks together.
 
-**Card gained: NONE, and the reason is a corpus gate rather than an engine one.**
-GENDER TROUBLE (`REF 4.3`: *"You cannot use one of your unlocked Level 3 Ideologue
-Powers in your next turn"*) is now **expressible and executable** — `restrict` with kind
-`no-power` — and the playability probe reports it PLAYED, which is the honest reading.
-It is **not shipped**, for two measured reasons:
+**Card gained: GENDER TROUBLE, as `hl-et2040-020`. It is `adapted`, and it says so on
+its face.** GENDER TROUBLE (`REF 4.3`: *"You cannot use one of your unlocked Level 3
+Ideologue Powers in your next turn"*) is expressible and executable — `restrict` with kind
+`no-power`, read by `powers.ts usesLeft` — and it shipped as soon as the corpus gate below
+was removed by the server owner. `npm run playable` is **34 of 54** with it PLAYED.
+
+**THE GATE IS GONE, and it was a corpus gate rather than an engine one — which is what
+this section always said it was.** `packages/server/test/corpus.test.ts` used to pin the
+number of DISTINCT effect ops across the shipped Headline Cards at 12, and `restrict`
+appeared in no shipped Headline, so the first one made it 13. **That equality is now a
+derived FLOOR** (`toBeGreaterThan(syntheticOps().headline)`) with the three freezing ops
+named individually, on the reasoning in that file: *"A guard that punishes progress is a
+guard that gets deleted, and then there is no guard."* I read it before shipping rather
+than taking the report on trust, and the decline-only sweep concern raised here is no
+longer attached to an assertion.
+
+**WHAT THE CARD COSTS, in the direction that matters.** The printed card takes ONE
+chosen Level 3 power away and this takes ALL of them, because naming one power is a
+decision over **powers** and G1's `'chosen-player'` is a decision over **players** — so
+this is strictly *less* for the caster: a Headline that only hurts the player who
+resolved it. The *"if you do not have a Level 3 power, discard 2 resources instead"*
+fallback is also dropped; it needs a conditional over the whole effect list. Both are on
+the card's `text` and in its `source`, rather than reproduced as printed wording.
+
+**A RULING THIS PACKAGE MAY NOT TAKE.** It retired `inferred` THE POLICY REVIEW to keep
+the deck at 19, and it should be said plainly that the balance checker was **not**
+consulted on that trade: GENDER TROUBLE is a card whose whole value accrues to the table
+except its own player. `npm run balance` reports no dominance error, which is the only
+claim being made here.
+
+**THE HISTORICAL RECORD, kept because it is why the card took three iterations.** The
+earlier attempt retired `inferred` PANI KI KAMMI instead and **regressed the server
+suite**: `interrupt-window.test.ts`'s decline-only sweep, 5 seats, seed 14, finished
+**19/20** on a reasons budget where it had finished 20/20. That was an uninformed socket
+driver running out of budget rather than a soft-lock, and retiring a *different*
+placeholder was chosen partly so the corpus swap would not reproduce it.
 
 1. **`packages/server/test/corpus.test.ts:197` pins the number of DISTINCT effect ops
    across all shipped Headline Cards at 12**, because that number is how many driver
@@ -1014,10 +1056,11 @@ It is **not shipped**, for two measured reasons:
    a conditional over the whole effect list. Whoever ships it should say that in the
    card's `text` rather than reproducing the printed wording.
 
-**The one-line unblock for the server owner:** bump `corpus.test.ts:197` from 12 to 13
-**and** re-run the decline-only sweep; if the sweep is still red, the card is blocked on
-the corpus's interaction with that driver and the mechanism above is still worth having
-— it is the last of G5's two named consult points and it cost one line in `powers.ts`.
+~~**The one-line unblock for the server owner:** bump `corpus.test.ts:197` from 12 to 13.~~
+**DONE, and no longer needed.** The server owner replaced the equality with a derived
+floor and named the freezing ops individually; GENDER TROUBLE ships as `hl-et2040-020`.
+The mechanism remains worth having: it is the last of G5's two named consult points and
+it cost one line in `powers.ts`.
 
 **`no-volatile-placement` is still (c).** NEW FACE WHO DIS's *"these voters cannot be
 placed into Volatile Areas"* needs a consult point in `PLACE_VOTERS` and `GERRYMANDER`,
