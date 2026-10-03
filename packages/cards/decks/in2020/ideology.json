@@ -843,6 +843,120 @@
           "pays": { "clout": 2, "trust": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-in2020-045",
+      "source": "original; register per REF 8.2. Disclosure of a number that the state controls. The recovered pool contains no question about a published statistic, which is the ordinary instrument of the register.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the district hospital publish its death rate every quarter?",
+      "sides": [
+        {
+          "answer": "Yes. A number that is published is one somebody answers for.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. A quarterly number is a quarterly campaign for whoever it hurts.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-046",
+      "source": "original; register per REF 8.2. Eligibility rather than existence. ig-in2020-017 asks whether a scheme should reach further geographically; this asks whether it should be universal or means-tested, which is the same money for a different named group.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should free travel serve everyone or only those who cannot pay?",
+      "sides": [
+        {
+          "answer": "Yes. Everyone, and the fare is what pays for everyone else.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Those who can pay, and the scheme stays legible from a bus.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-047",
+      "source": "original; register per REF 8.2. Language policy. Neither recovered welfare question nor any of the eight recovered stems asks who has to be addressed in what language to receive a benefit.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the state's message be issued in the states' own languages?",
+      "sides": [
+        {
+          "answer": "Yes. A message nobody reads in the first hour is issued twice.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. One message, one spokesperson, and one number to correct.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-048",
+      "source": "original; register per REF 8.2. Extends the transparency family of ig-in2020-016 and ig-in2020-041 from records to money actually moved, and both sides agree the deadline is correct and disagree about whether it has force.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should every transfer to a panchayat be published within a month?",
+      "sides": [
+        {
+          "answer": "Yes. Published in a month, spent and accounted for.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Published in a month, read in a quarter, disputed in a year.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-049",
+      "source": "original; register per REF 8.2. Two constituencies with incompatible reasons, which is the register's preferred shape: both sides are defending somebody, neither is defending a self-interest.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the pension fund be lent to a new manufacturing scheme?",
+      "sides": [
+        {
+          "answer": "Yes. A factory that employs people funds their pensions better.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. The fund is the only promise kept fifty years without a vote.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-050",
+      "source": "original; register per REF 8.2. Borders. REF 2.3 [INFERRED] that Idealist and Supremo sit in largely disjoint question space, and ig-in2020-001 and ig-in2020-032 already touch the seam; this is the fourth card on it and the first that asks who an administrative line is drawn for.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the state border be redrawn where the people live?",
+      "sides": [
+        {
+          "answer": "Yes. A line that ignores a village produces two governments for it.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. The line is the one thing everyone agreed on at the start.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
     }
   ]
 }
