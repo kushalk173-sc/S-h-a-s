@@ -1050,7 +1050,15 @@ function squeezeBuy(view: ClientState, me: PlayerID): { readonly type: 'INFLUENC
   if (pool === undefined) return null;
   const affordable = view.market
     .map((slot, i) => ({ slot, i }))
-    .filter(({ slot }) => POOLS.every((r) => (pool[r] ?? 0) >= (slot.cost[r] ?? 0)))
+    .filter(({ slot }) => {
+      // The engine's price, not the printed cost — the same rule `nextAction` and the
+      // in-process squeeze follow. This one was missed the first time and the socket
+      // tests paid for it: a squeezed purchase under a PYTHONPOST surcharge is refused,
+      // the room does not advance, and the test waits out its timeout on a game that
+      // was never stuck, only priced wrong.
+      const price = purchasePrice(view, me, slot.cost);
+      return price !== null && POOLS.every((r) => (pool[r] ?? 0) >= (price[r] ?? 0));
+    })
     .sort((a, b) => value(a.slot) - value(b.slot))[0];
   return affordable === undefined ? null : { type: 'INFLUENCE', slot: affordable.i };
 }

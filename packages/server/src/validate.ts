@@ -394,6 +394,36 @@ function choicePick(value: unknown): ChoicePick | null {
       const areaIds = strList(value['areaIds'], MAX_ID, 32);
       return areaIds === null ? null : { kind, areaIds };
     }
+    /**
+     * G1 — the card's actor named a player. One id, not a list, because
+     * `'choose-player'.count` is 1 for every card the corpus can express.
+     *
+     * **This arm was missing while the engine could already raise the decision**, which
+     * is the shape of the bug worth naming: a client could be handed a `choose-player`
+     * dialog and every answer to it was refused `malformed action`, so the seat froze
+     * with no legal reply. `reduce` validates the pick properly (it is the only
+     * authority on the candidate set); this is the shape check that decides what the
+     * wire may carry at all, and a kind it does not know is not a wrong answer, it is
+     * no answer. `id` is a `PlayerID` as an opaque bounded string here for the reason
+     * every other id in this file is: which seats exist is not this file's business.
+     */
+    case 'player': {
+      if (!keysOnly(value, ['kind', 'id'])) return null;
+      const id = str(value['id'], MAX_ID);
+      return id === null ? null : { kind, id };
+    }
+    /**
+     * G16 — the card's actor named one of the nine constituencies. The zone is checked
+     * against `ZONE_IDS` rather than accepted as a string, because nine fixed names is a
+     * closed set and a pick naming anything else cannot be a constituency whatever the
+     * client meant. `reduce` still decides whether this one is LEGAL; this only decides
+     * whether it is a thing.
+     */
+    case 'zone': {
+      if (!keysOnly(value, ['kind', 'zoneId'])) return null;
+      const zoneId = zone(value['zoneId']);
+      return zoneId === null ? null : { kind, zoneId };
+    }
     default:
       return null;
   }

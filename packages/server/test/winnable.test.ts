@@ -403,7 +403,7 @@ describe('a real-corpus game runs to completion over a real socket, at every sea
       const errorsBefore = seat.client.all('error').length;
       seat.client.send({ t: 'match:action', action });
       actions += 1;
-      await waitForView(room, before);
+      await waitForView(room, before, () => seat.client.all('error').length - errorsBefore);
 
       const errors = seat.client.all('error').slice(errorsBefore);
       const refused = errors[0];
@@ -422,15 +422,29 @@ describe('a real-corpus game runs to completion over a real socket, at every sea
   }
 
   /**
-   * Wait until the room has committed an action past `viewId`.
+   * Wait until the room has committed an action past `viewId` — or the seat has been
+   * refused, whichever comes first.
    *
    * A bounded poll, not a fixed sleep: a sleep is a timing assumption and a timing
    * assumption is a flaky test. This returns as soon as the room has actually moved,
    * so it is as fast as the server and as patient as the timeout.
+   *
+   * **AND IT WAKES ON A REFUSAL, because a refusal does not move the room.** It used to
+   * poll `viewId` alone, so a refused action - which by definition leaves the room where
+   * it was - was indistinguishable from a stalled table, and the test spent its whole
+   * 10 seconds waiting before reporting "the room did not advance" for a game that was
+   * never stuck. It reported that three times on this corpus before anyone read it as
+   * what it was. The refusal message is the diagnosis; the timeout is the loss of it.
    */
-  async function waitForView(room: { viewId: number }, before: number, timeoutMs = 10_000): Promise<void> {
+  async function waitForView(
+    room: { viewId: number },
+    before: number,
+    refused: () => number,
+    timeoutMs = 10_000,
+  ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (room.viewId <= before) {
+      if (refused() > 0) return;
       if (Date.now() > deadline) {
         throw new Error(`the room did not advance past viewId ${before} within ${timeoutMs}ms`);
       }
