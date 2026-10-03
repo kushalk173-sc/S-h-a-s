@@ -551,6 +551,59 @@ describe('LAYER 1 — the production broadcast path leaks no server-only field',
     }
   });
 
+  it('the PRODUCTION room path gives EVERY seat the whole card, and the room not on it', () => {
+    // The positive half of the acceptance claim, at the same place the leak walk is — so
+    // a test that only walked `viewFor` in isolation cannot pass while the room ships
+    // something narrower. `Room.viewFor` is literally what `#sendMatchState` puts on the
+    // wire, so this is the last point before the socket.
+    //
+    // Every viewer including `null` (a spectator) and including a seat that is not on
+    // move; the answerer additionally gets the `order` draw on the `answer` field and
+    // nobody else does.
+    let seats = 0;
+    for (const [i, s] of CORPUS.entries()) {
+      if (s.phase !== 'answer') continue;
+      const cardId = s._pendingCard;
+      if (cardId === null) continue;
+      const card = CARDS.ideology[cardId];
+      if (card === undefined) continue;
+      const room = roomFor(s);
+      const real = card.sides
+        .map((side) => JSON.stringify({ label: side.answer, ideologue: side.ideologue, pays: side.pays }))
+        .sort();
+
+      for (const viewer of [null, ...s.turnOrder] as (PlayerID | null)[]) {
+        const v = room.viewFor(viewer);
+        const open = (v.state as { openQuestion?: { question: string; sides: readonly unknown[] } | null })
+          .openQuestion;
+        expect(open, `room state ${i}, viewer ${String(viewer)}: no card on the table`).not.toBeNull();
+        if (open === undefined || open === null) continue;
+        expect(open.question, `room state ${i}, viewer ${String(viewer)}: wrong question`).toBe(card.question);
+        expect(
+          open.sides.map((side) => JSON.stringify(side)).sort(),
+          `room state ${i}, viewer ${String(viewer)}: did not get both sides whole`,
+        ).toEqual(real);
+        // `order` is in exactly one payload: the answerer's.
+        expect(allKeys(open), `room state ${i}, viewer ${String(viewer)}: the table got an order`).not.toContain(
+          'order',
+        );
+        const isAnswerer = viewer === s.activePlayer;
+        expect(
+          v.answer === null,
+          `room state ${i}, viewer ${String(viewer)}: ${isAnswerer ? 'no' : 'a stray'} answer prompt`,
+        ).toBe(!isAnswerer);
+        if (v.answer !== null) {
+          expect(['ab', 'ba']).toContain(v.answer.order);
+          expect(JSON.stringify(v.answer.sides.map((x) => JSON.stringify(x)).sort())).toBe(
+            JSON.stringify(real),
+          );
+        }
+        seats += 1;
+      }
+    }
+    expect(seats, 'the room path was never reached with a card out — the claim is untested').toBeGreaterThan(0);
+  });
+
 it('no secret VALUE survives: no card id, and not the seed', () => {
     for (const [i, s] of LEAK_CORPUS.entries()) {
       const { cards, seed } = allSecretValues(s);
