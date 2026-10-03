@@ -57,24 +57,79 @@ const shipped = loadCards();
 // ───────────────────────────── A. the corpus may grow ─────────────────────────────
 
 /**
- * GENDER TROUBLE, as this suite would see it: the first Headline Card whose effect op
- * is `restrict`. `'no-power'` is the kind the engine's `Restriction` union names for
- * it, and no shipped headline uses the op at all — which is the whole reason the op
- * count moved.
+ * EVERY op in `Effect['op']`, each with the smallest legal effect that uses it.
+ *
+ * A transcription, and it says so: `Effect` is a type, so there is no runtime list to
+ * read. What keeps it honest is `expectMinimalEffectTableIsCurrent`, which asserts that
+ * every op the SHIPPED corpus uses appears here — so an op that lands without a row fails
+ * this file with a message naming the op, instead of silently becoming an op this suite
+ * has no minimal example of.
+ */
+const MINIMAL_EFFECT: Readonly<Record<string, Effect>> = {
+  gain: { op: 'gain', res: { funds: 1 } },
+  lose: { op: 'lose', res: { funds: 1 } },
+  'gain-any': { op: 'gain-any', n: 1 },
+  'lose-any': { op: 'lose-any', n: 1 },
+  'steal-any': { op: 'steal-any', n: 1 },
+  voters: { op: 'voters', n: 1 },
+  evict: { op: 'evict', n: 1 },
+  'discard-voter': { op: 'discard-voter', n: 1 },
+  'convert-voter': { op: 'convert-voter', n: 1 },
+  gerrymander: { op: 'gerrymander', n: 1 },
+  discount: { op: 'discount', n: 1 },
+  'draw-conspiracy': { op: 'draw-conspiracy', n: 1 },
+  'refresh-market': { op: 'refresh-market' },
+  restrict: { op: 'restrict', kind: 'no-power', value: 0, until: 'next-turn' },
+};
+
+/**
+ * One more headline, carrying an op derived from the corpus.
  *
  * This is a TEST-ONLY corpus. It is never written to disk and never booted; it exists
  * so "the corpus grew" is a thing the suite can do rather than a thing that only
  * happens between releases.
+ *
+ * The op is the one the deck uses LEAST, ties broken by name — derived because a
+ * hardcoded op is a landmine: this fixture stood in for GENDER TROUBLE with a `restrict`
+ * headline, which stopped being "an op the corpus lacks" the moment a real `restrict`
+ * headline shipped. Ranking by use is stable under growth and needs no maintenance, and
+ * it keeps the added card on an axis the corpus exercises least, which is where a new
+ * invariant is most likely to bite.
  */
-function withRestrictHeadline(cards: CardIndex): CardIndex {
-  const effect: Effect = { op: 'restrict', kind: 'no-power', value: 0, until: 'next-turn' };
+function withOneMoreHeadline(cards: CardIndex): CardIndex {
+  const used = new Map<string, number>();
+  for (const card of Object.values(cards.headline)) {
+    for (const e of card.effects) used.set(e.op, (used.get(e.op) ?? 0) + 1);
+  }
+  const op = Object.keys(MINIMAL_EFFECT).sort((a, b) => {
+    const byUse = (used.get(a) ?? 0) - (used.get(b) ?? 0);
+    return byUse !== 0 ? byUse : a.localeCompare(b);
+  })[0];
+  const effect = MINIMAL_EFFECT[op as string];
+  if (effect === undefined) throw new Error(`no minimal effect for ${op as string}`);
   const card: HeadlineCard = {
-    id: 'hl-test-gender-trouble',
-    name: 'GENDER TROUBLE (test-only stand-in)',
-    text: 'Test-only. Stands in for the first `restrict` headline.',
+    id: 'hl-test-one-more',
+    name: 'TEST-ONLY HEADLINE',
+    text: `Test-only. Carries \`${op as string}\`, which the shipped deck uses least.`,
     effects: [effect],
   };
   return { ...cards, headline: { ...cards.headline, [card.id]: card } };
+}
+
+/**
+ * `MINIMAL_EFFECT` is a transcription of `Effect['op']`, and a stale one is invisible,
+ * so it is checked against the corpus on every run: an op the shipped deck uses with no
+ * row here fails this, by name, rather than becoming an op this suite cannot reason
+ * about. `Effect` is a type and there is no runtime list to read, which is why this is
+ * an assertion and not a derivation.
+ */
+function expectMinimalEffectTableIsCurrent(): void {
+  for (const op of factsOf(shipped).headlineOps) {
+    expect(
+      MINIMAL_EFFECT[op],
+      `a shipped headline uses \`${op}\`, which MINIMAL_EFFECT does not carry; add a minimal effect for it`,
+    ).toBeDefined();
+  }
 }
 
 /** One more card in each of the other three pools, for the same reason. */
@@ -105,31 +160,64 @@ function withOneMoreOfEach(cards: CardIndex): CardIndex {
 }
 
 describe('shipping a card is not a test-suite event', () => {
-  it('a headline carrying a brand-NEW effect op keeps every corpus invariant', () => {
+  it('a headline added to the deck keeps every corpus invariant', () => {
     // THE REGRESSION TEST FOR GENDER TROUBLE'S BLOCKER, and the reason the old
     // `toBe(12)` had to go rather than be bumped to 13.
     //
-    // Bumping it to 13 would have been the same mistake wearing a different number:
-    // it fixes the card that happened to be in flight and leaves the next one blocked.
+    // Bumping it to 13 would have been the same mistake wearing a different number: it
+    // fixes the card that happened to be in flight and leaves the next one blocked.
     // Asserting "the corpus exercises strictly more of the effect vocabulary than the
     // synthetic fixture" is true of 12 ops and of 13 and of 20, and stops being true
     // only if the corpus goes flat — which is the failure the count was invented to
     // catch.
-    const grown = factsOf(withRestrictHeadline(shipped));
+    //
+    // ## AND THE OP IS DERIVED FROM THE CORPUS, WHICH IS HOW IT GOT HERE TWICE
+    //
+    // The fixture used to add a hardcoded `restrict` headline, on the reasoning that no
+    // shipped headline used the op. GENDER TROUBLE landed and made that false, and the
+    // test went red for a reason that had nothing to do with the bug it guards. So the
+    // op became derived, and then the derived version failed too — correctly and with a
+    // message worth having: the shipped headlines now use ALL FOURTEEN ops in
+    // `Effect['op']`, so "a headline carrying an op the corpus does not have" is no
+    // longer a thing this corpus can be.
+    //
+    // So the axis moved rather than the assertion moving. What this test actually guards
+    // is that adding a card cannot turn a corpus fact red, and that claim does not need
+    // a novel op: it needs a card in the deck and `corpusProblems` empty. The next test
+    // is what keeps that honest — it proves the checker can still fail, which is the
+    // property the op count was standing in for.
     const base = factsOf(shipped);
+    expectMinimalEffectTableIsCurrent();
+    const grown = factsOf(withOneMoreHeadline(shipped));
 
-    // The card is really in, really new, and really a new op.
     expect(grown.dealt.headline).toBe(base.dealt.headline + 1);
-    expect(grown.headlineOps.has('restrict'), 'the fixture failed to add a new op').toBe(true);
-    expect(grown.headlineOps.size, `the new op did not register: ${[...grown.headlineOps].join(',')}`).toBe(
-      base.headlineOps.size + 1,
+    expect(grown.dealt.headline, 'the fixture headline is not in the deck it claims to grow').toBe(
+      base.dealt.headline + 1,
     );
-    expect(base.headlineOps.has('restrict'), 'a shipped headline already uses `restrict`; the fixture proves nothing').toBe(
-      false,
-    );
-
     // And nothing that is a corpus fact went red.
     expect(corpusProblems(grown)).toEqual([]);
+  });
+
+  it('and the invariant checker can still FAIL, so the test above is not vacuous', () => {
+    // The claim `corpusProblems(grown) === []` is only worth anything if `corpusProblems`
+    // can return something, and "the corpus grew" is exactly the condition under which a
+    // checker rots into a function that always answers "fine". So it is provoked: a
+    // Voter Card with FOUR voters breaks p10 outright — a zone with one slot left can
+    // only be finished by a 1-voter card, so a 4-voter card makes a zone unfinishable —
+    // and the checker has to say so, by name.
+    //
+    // This is the assertion that replaced "the op count went up". The op count was a
+    // proxy for "the guard is still looking at something"; this is the thing itself, and
+    // unlike the proxy it cannot be exhausted by a card landing.
+    const broken = factsOf({
+      ...shipped,
+      voter: { ...shipped.voter, 'vt-test-four': { id: 'vt-test-four', cost: { funds: 2 }, voters: 4 } },
+    });
+    expect(corpusProblems(broken), 'a 4-voter card broke nothing, so corpusProblems is vacuous').not.toEqual([]);
+    expect(
+      corpusProblems(broken).some((p) => p.includes('4')),
+      `corpusProblems did not name the four-voter card: ${corpusProblems(broken).join(' | ')}`,
+    ).toBe(true);
   });
 
   it('one more card in each of the other three pools keeps every corpus invariant', () => {
