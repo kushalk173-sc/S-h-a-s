@@ -479,35 +479,81 @@ describe('G13d — a window opens, closes, and the table keeps playing, at every
  * test while having asserted nothing about the BLOCK. So the search is done up front and
  * its FAILURE is asserted — if no measurable window exists, these tests fail rather than
  * pass vacuously.
+ *
+ * ## AND EVERY WINDOW IN THE GAME IS SEARCHED, NOT ONLY THE FIRST
+ *
+ * This used to look at ONE window per seed — the first one the game opens — and it was
+ * enough while the corpus was small enough that some seed's first window paid the actor
+ * a plain `gain` to somebody other than the card's holder. Two cards later it stopped
+ * being enough, and it failed for a reason worth stating exactly rather than papering
+ * over: at 4 players, across all 20 seeds, the ONLY first-window that stages a
+ * deterministic payout is seed 15's `I11`, and its actor is `p4` — which is the seat
+ * `reactiveGame` deals the DEFLECT to at 4 and 5 seats. So the DEFLECT had no answerer
+ * available at any seed and the search correctly reported that it had measured nothing,
+ * while the BLOCK at the same seat count passed off the same window because the BLOCK is
+ * dealt to `p2`.
+ *
+ * That is a corpus coincidence, not a fact about DEFLECTs: those 20 games open 206
+ * windows between them (measured, `logSweep` above), and the predicate — "stages a
+ * deterministic payout AND some seat other than the actor holds this card" — is a
+ * property of a WINDOW, not of a game. So the search walks each game until it finds one,
+ * driving past every window that fails the predicate with the same uninformed driver
+ * `playUntilWindow` uses (which declines, so the window closes and the game continues).
+ * The FAILURE is still asserted: a corpus where no window in 20 games is measurable still
+ * fails these tests, and now it fails for the true reason instead of a coincidence of
+ * which window happened to come first.
  */
 function measurableWindow(
   n: number,
   cardId: CardID,
 ): { readonly held: GameState; readonly w: InterruptWindow; readonly owed: number; readonly answerer: PlayerID } | null {
   for (const seed of SEEDS) {
-    const held = playUntilWindow(seed, n);
-    const w = held.interrupt;
-    if (w === null) throw new Error(`no window at ${n} players, seed ${seed}`);
-    const answerer = held.turnOrder.find(
-      (p) =>
-        p !== w.actor &&
-        !w.passed.includes(p) &&
-        (held.players[p]?.conspiracies ?? []).includes(cardId),
-    );
-    const owed = deterministicActorGain(w.effects, w.actor);
-    if (answerer !== undefined && owed > 0) {
-      // The answerer is handed `cardId` and NOTHING ELSE. `reactiveAnswer` prefers a BLOCK
-      // over a DEFLECT by design (a BLOCK needs no target and cannot be refused for a
-      // missing one), and at 3 seats the fixture deals both cards to one seat — so without
-      // this the DEFLECT test at 3 seats would watch the BLOCK answer and assert the
-      // DEFLECT's redirect, which is a test that passes for the wrong reason. The window is
-      // untouched: same id, same actor, same staged effects.
-      const only = redistribute(held, [cardId], [answerer]);
-      expect(only.interrupt?.id, `redistributing the hand moved the window`).toBe(w.id);
-      return { held: only, w, owed, answerer };
-    }
+    const found = firstMeasurableWindow(seed, n, cardId);
+    if (found !== null) return found;
   }
   return null;
+}
+
+/** One seed: every window it opens, in the order the driver meets them. */
+function firstMeasurableWindow(
+  seed: number,
+  n: number,
+  cardId: CardID,
+): { readonly held: GameState; readonly w: InterruptWindow; readonly owed: number; readonly answerer: PlayerID } | null {
+  let state = reactiveGame(seed, n, ctx);
+  for (let step = 0; step < 1200 && !state.finished; step += 1) {
+    const hit = measurableAt(state, cardId);
+    if (hit !== null) return hit;
+    // Drive on. With no `SeatKnowledge` this is the DECLINING table, so a window the
+    // predicate rejected closes by all-declines and the game reaches its next one.
+    const seat = state.choices[0]?.player ?? (state.interrupt === null ? state.activePlayer : windowResponder(playerView(state, state.activePlayer)));
+    if (seat === null) return null;
+    state = reduceOrThrow(state, seat, driverAction(state, seat), 'ordinary play');
+  }
+  return null;
+}
+
+/** Is THIS window measurable for `cardId`, and if so with which seat answering? */
+function measurableAt(
+  held: GameState,
+  cardId: CardID,
+): { readonly held: GameState; readonly w: InterruptWindow; readonly owed: number; readonly answerer: PlayerID } | null {
+  const w = held.interrupt;
+  if (w === null) return null;
+  const answerer = held.turnOrder.find(
+    (p) => p !== w.actor && !w.passed.includes(p) && (held.players[p]?.conspiracies ?? []).includes(cardId),
+  );
+  const owed = deterministicActorGain(w.effects, w.actor);
+  if (answerer === undefined || owed <= 0) return null;
+  // The answerer is handed `cardId` and NOTHING ELSE. `reactiveAnswer` prefers a BLOCK
+  // over a DEFLECT by design (a BLOCK needs no target and cannot be refused for a
+  // missing one), and at 3 seats the fixture deals both cards to one seat — so without
+  // this the DEFLECT test at 3 seats would watch the BLOCK answer and assert the
+  // DEFLECT's redirect, which is a test that passes for the wrong reason. The window is
+  // untouched: same id, same actor, same staged effects.
+  const only = redistribute(held, [cardId], [answerer]);
+  expect(only.interrupt?.id, `redistributing the hand moved the window`).toBe(w.id);
+  return { held: only, w, owed, answerer };
 }
 
 /** Answer a window with `answerer`'s own hand and settle it through the real reducer. */

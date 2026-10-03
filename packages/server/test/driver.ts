@@ -465,10 +465,21 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
      * real chooser is not shown. Holding nothing is therefore still an OFFER, and the
      * driver names a seat whether or not there is anything there — a `steal-any`
      * against an empty victim is a legal zero-width answer, not a failure.
+     *
+     * **AND NO PREFERENCE IS EXPRESSED AMONG THE SEATS, WHICH WAS ALSO MEASURED.** The
+     * obvious refinement is to name the seat a single voter can still win a
+     * constituency with — `targetZone(view, them, 1) !== null` — and it does fix a real
+     * seed: 5 players, seed 14, decline-only, which hands its free voters to the seats
+     * that can use them and finishes at 370 actions where naming the first seat spent
+     * 1200 and stalled with `south` one free area short. But it fills the board faster
+     * and strands two other seeds at 4 players (3 and 16) on 114-119 of 129 pegs with a
+     * full zone and no majority in it, which is a stalemate no purchase can fix. Trading
+     * one seed for two is not a competence, so the driver names the first seat on the
+     * table: the pick a table makes, and the one the engine's own driver makes.
      */
     case 'choose-player': {
-      const other = s.turnOrder.find((p) => p !== me);
-      return other === undefined ? null : { kind: 'player', id: other };
+      const first = s.turnOrder.find((p) => p !== me);
+      return first === undefined ? null : { kind: 'player', id: first };
     }
     /**
      * G16 — the card's actor named a constituency. The set is `legalZone`'s, which is
@@ -510,13 +521,37 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
  * zones, and p10 forbids splitting one card's voters across zones so the
  * concentration has to happen one card at a time.
  *
- * There is deliberately NO "any zone with room" fallback here. Relaxing the "can win
+* There is deliberately NO "any zone with room" fallback here. Relaxing the "can win
  * it" test to "has room" was measured and it is much worse: across 20 seeds at each
  * seat count it took 4 seats from 20/20 nine-majority endings to 12/20 and 5 seats
  * from 20/20 to 6/20, because a seat with no winnable zone spends its voters filling
  * a board that will then hit p20's board-full ending before the last two zones are
- * ever decided. It was also measured as a fix for the one seed that stalls
+* ever decided. It was also measured as a fix for the one seed that stalls
  * (3 seats, seed 11) and it did not fix it. See `test/winnable.test.ts`.
+ *
+ * ## AND WHAT A TIE IS NOT: a lead. Measured, and it did not pay.
+ *
+ * `mine + free >= majority` is a test about ONE seat, and two seats routinely pass it
+ * at the same time, so the seat that moves second does not learn that the zone is dead
+ * — it finds a zone it can still win and puts a peg into a race it is about to lose.
+ * The shape that costs the game is measured: `north_west`, 11 areas, 6 for a majority,
+ * finishing `p4 p4 p3 _ p3 p3 p1 p3 p1 p1 p1` — four for one seat, four for another,
+ * one free, and no way for either to reach six. So ranking a zone this seat does not
+ * LEAD below every zone it does is the obvious refinement.
+ *
+ * **IT WAS MEASURED AND IT IS NOT IN THE CODE.** It fixed nothing: the same
+ * unwinnable-last-zone shape appeared in five of the 160 reactive-corpus games with
+ * the refinement and four without, in different seeds. What it does do is perturb every
+ * trajectory, so it buys a reshuffle of the same failure rather than an exit from it —
+ * which is the signature of a fix aimed at the symptom. It is recorded here because
+ * the next person to read `mine + free >= majority` will have the same idea.
+ *
+ * **THE REAL CONSTRAINT, WHICH IS NOT IN THIS FUNCTION.** Once a zone satisfies
+ * `max(mine) + free < majority` for every seat, no action in the driver's union can win
+ * it: `PLACE_VOTERS` needs room, `INFLUENCE` needs a card, and there is no player action
+ * that moves somebody else's peg. The board cannot fill either, so p20's timer ending is
+ * unreachable and the game has no ending at all — `END_TURN` for 1200 actions. See
+ * `./winnable.test.ts`, which is where that is asserted rather than absorbed.
  */
 export function targetZone(s: ClientState, me: PlayerID, need: number): string | null {
   let best: string | null = null;
@@ -785,9 +820,12 @@ export function nextAction(view: ClientState, me: PlayerID, knowledge?: SeatKnow
 
   // `canAfford` is PER-POOL, not against the total: a card costing 1 Fund is not
   // affordable for a player holding 0 Funds and 4 Clout, and the reducer is right
-  // to refuse it.
-  const affordable = (cost: Readonly<Record<string, number>>): boolean =>
-    POOLS.every((r) => (pool[r] ?? 0) >= (cost[r] ?? 0));
+  // to refuse it. The PRICE is `purchasePrice`'s, which is the printed cost plus
+  // whatever this seat is being charged on top of it.
+  const affordable = (cost: Readonly<Record<string, number>>): boolean => {
+    const price = purchasePrice(view, me, cost);
+    return price !== null && POOLS.every((r) => (pool[r] ?? 0) >= (price[r] ?? 0));
+  };
 
   // Place what is already in hand BEFORE buying more. p10 discards unplaced voters
   // at end of turn, so buying first spends money on voters that may not fit
@@ -832,11 +870,54 @@ function value(slot: { readonly cost: Readonly<Record<string, number>>; readonly
  * legal and cycles the Mat until a card that fits comes up — which is what a human
  * does. Bounded, so a genuine livelock still fails rather than spinning.
  */
+/**
+ * What a purchase of `cost` will ACTUALLY be charged to `me`, or `null` if this seat
+ * may not buy at all.
+ *
+ * ## THE PRINTED COST IS NOT THE PRICE, AND THE DIFFERENCE IS A REFUSAL
+ *
+ * `reduce`'s `INFLUENCE` charges `applyDiscounts(slot.cost, …)` and then adds
+ * `surchargeFor(state, playerId)` on top, so the printed cost is a LOWER bound and a
+ * driver that checks only the printed cost will happily fire a purchase the reducer
+ * refuses with `'you cannot afford that Voter Card'`. That is not a rare corner: PYTHONPOST
+ * taxes every purchase in the table until it expires, and KHAKI TERROR refuses purchases
+ * outright while a donation is still owed.
+ *
+ * `playInProcess` turns a refusal into `reason: 'refused: …'` and the run is reported as
+ * a stall, which is the correct handling of a driver bug and not a way to live with one.
+ * So the driver reads the two `Restriction`s that move a price — both of which are PUBLIC,
+ * because `PlayerState.restrictions` is not in `PRIVATE_PLAYER_KEYS` and the projection
+ * already carries every other live rule — and prices the card the way the reducer will.
+ *
+ * Discounts are deliberately NOT credited. Ignoring a discount makes the driver require
+ * MORE than the engine demands, which is the safe direction for the same reason the
+ * `stealable` clamp is: a pick the engine accepts is a pick that was always going to
+ * work. Two cards that each tax you are SUMMED here, matching `surchargeFor`'s own
+ * "which is what two cards means".
+ */
+export function purchasePrice(
+  view: ClientState,
+  me: PlayerID,
+  cost: Readonly<Record<string, number>>,
+): Record<string, number> | null {
+  const self = view.players[me];
+  if (self === undefined) return null;
+  let surcharge = 0;
+  for (const r of self.restrictions ?? []) {
+    if (r.kind === 'no-purchases' && r.remaining > 0) return null;
+    if (r.kind === 'surcharge') surcharge += Math.max(0, r.value);
+  }
+  if (surcharge === 0) return { ...cost };
+  return { ...cost, funds: (cost.funds ?? 0) + surcharge };
+}
+
 export function shouldSqueeze(view: ClientState, me: PlayerID): boolean {
   const pool = view.players[me]?.resources;
   if (pool === undefined) return false;
-  const affordable = (cost: Readonly<Record<string, number>>): boolean =>
-    POOLS.every((r) => (pool[r] ?? 0) >= (cost[r] ?? 0));
+  const affordable = (cost: Readonly<Record<string, number>>): boolean => {
+    const price = purchasePrice(view, me, cost);
+    return price !== null && POOLS.every((r) => (pool[r] ?? 0) >= (price[r] ?? 0));
+  };
   const slots = view.market.filter((slot) => affordable(slot.cost));
   if (slots.length === 0) return false;
   // If ANY affordable card can be placed somewhere it can still win, buy it the
@@ -1084,7 +1165,12 @@ export function playInProcess(
     if (view.phase === 'actions' && squeezes < maxSqueezes && shouldSqueeze(view, p)) {
       const cheap = view.market
         .map((slot, i) => ({ slot, i }))
-        .filter(({ slot }) => POOLS.every((r) => (view.players[p]?.resources[r] ?? 0) >= (slot.cost[r] ?? 0)))
+        .filter(({ slot }) => {
+          // The same price `nextAction` would charge, for the same reason: a squeeze
+          // that fires a purchase the reducer refuses is a stall, not a squeeze.
+          const price = purchasePrice(view, p, slot.cost);
+          return price !== null && POOLS.every((r) => (view.players[p]?.resources[r] ?? 0) >= (price[r] ?? 0));
+        })
         .sort((a, b) => value(a.slot) - value(b.slot))[0];
       if (cheap !== undefined) {
         const r = reduce(state, p, { type: 'INFLUENCE', slot: cheap.i }, ctx);
