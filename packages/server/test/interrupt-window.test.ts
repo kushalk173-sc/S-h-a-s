@@ -74,6 +74,7 @@ import {
 } from '@shasn/engine';
 
 import { viewFor } from '../src/broadcast.ts';
+import { BOARD, factsOf } from './corpus-facts.ts';
 import {
   majoritiesOn,
   nextAction,
@@ -106,8 +107,15 @@ const SEEDS: readonly number[] = Array.from({ length: 20 }, (_, i) => i + 1);
 
 const POOLS: readonly Resource[] = ['funds', 'clout', 'media', 'trust'];
 
-/** Pegs needed to hold a majority in all nine zones. */
-const MAJORITY_PEGS = 69;
+/**
+ * Pegs needed to hold a majority in all nine zones, and the turn at which the shipped
+ * Ideology deck runs out. Both MEASURED: this file used to carry its own `69` and its
+ * own bare `toBeGreaterThan(52)`, and both numbers were hand-copies of facts that
+ * already existed elsewhere in the suite. `BOARD` and `factsOf` make one copy of each
+ * and it cannot drift.
+ */
+const MAJORITY_PEGS = BOARD.majorityPegs;
+const TURN_CLIFF = factsOf(ctx.cards).dealt.ideology;
 
 /** The printed keys of `InterruptWindow`. Eleven, and none of them names a holder. */
 const WINDOW_KEYS = [
@@ -367,8 +375,8 @@ describe('G13d — a window opens, closes, and the table keeps playing, at every
         ).toBe(r.run.windows.closed);
       }
 
-      // The table really kept playing: a decided board, past the 52-card Ideology cliff,
-      // so the deck recycled rather than the game ending early.
+      // The table really kept playing: a decided board, past the Ideology deck's own
+      // cliff, so the deck recycled rather than the game ending early.
       expect(
         rows.filter((r) => r.majorities !== 9).map((r) => `seed ${r.seed}: ${r.majorities} majorities, ${r.pegs} pegs`),
         `${n} players on the reactive corpus: a seed did not reach nine majorities`,
@@ -376,10 +384,16 @@ describe('G13d — a window opens, closes, and the table keeps playing, at every
       for (const r of rows) {
         expect(r.pegs, `seed ${r.seed}: nine majorities on only ${r.pegs} pegs`).toBeGreaterThanOrEqual(MAJORITY_PEGS);
       }
+      // Past the CLIFF, which is measured rather than quoted. This was a bare
+      // `toBeGreaterThan(52)` — a hand-copy of a corpus fact that also existed, as a
+      // different literal, in `winnable.test.ts` and `corpus.test.ts`. Three copies of
+      // the turn at which the shipped game used to die is three chances for the suite
+      // to be quietly wrong about the one number that decides whether the shipped game
+      // can be won.
       expect(
         Math.max(...rows.map((r) => r.turn)),
-        `${n} players: no reactive-corpus seed reached past turn 52, so recycling was never exercised`,
-      ).toBeGreaterThan(52);
+        `${n} players: no reactive-corpus seed reached past turn ${TURN_CLIFF}, so recycling was never exercised`,
+      ).toBeGreaterThan(TURN_CLIFF);
     });
 
     it(`${n} players: the run both RESPONDS and DECLINES — both paths, not one`, () => {

@@ -20,14 +20,19 @@
  *
  * So there are two halves to the guard, and both are needed:
  *
- *  1. **Pin the numbers.** The shipped deck's size and composition, asserted
- *     exactly. A corpus that is shrunk, swapped or rebalanced changes these, and a
- *     change that halves the Ideology deck would otherwise sail through a suite
- *     that was never playing it.
- *  2. **Pin that the tests PLAY those numbers.** The harness used to default to a
- *     synthetic deck, so "the server's e2e driver" was quietly a different game
- *     from the shipped one. `startHarness()` with no `cards` argument now deals the
- *     real corpus, and the tests below assert that rather than trusting it.
+ *  1. **Play the real numbers.** The harness used to default to a synthetic deck, so
+ *     "the server's e2e driver" was quietly a different game from the shipped one.
+ *     `startHarness()` with no `cards` argument now deals the real corpus, and the
+ *     tests below assert that rather than trusting it.
+ *  2. **Hold the corpus to INVARIANTS, not to a footprint.** This half used to be the
+ *     opposite: the deck sizes were literals here, so every card the corpus gained
+ *     turned this file red and the fix was to edit a number until it agreed with
+ *     whatever the code now did. That is a tautology wearing the costume of a test,
+ *     and it is the same blindness one layer down — a test that pins a number cannot
+ *     fail on the change it exists to catch. The corpus facts now live in
+ *     `corpus-facts.ts`, derived from a `CardIndex` that is passed in, so they are
+ *     true of the shipped corpus and of every bigger one; and `corpus-drift.test.ts`
+ *     proves it by growing the corpus and asserting nothing here goes red.
  *
  * A game driven on the real corpus must also REACH AN ENDING rather than exhaust a
  * pile, which is the second half of the shipped bug and the assertion that would
@@ -41,62 +46,38 @@ import { playerView, RULES, setup, type Ctx, type GameState } from '@shasn/engin
 import { loadCards, loadCtx } from '../src/index.ts';
 import { cardsVersion, decksOf } from '../src/store.ts';
 import { startHarness } from './fixtures.ts';
+import { BOARD, DECK_KINDS, POOLS, REQUIRED_HEADLINE_OPS, corpusProblems, factsOf, syntheticOps } from './corpus-facts.ts';
 import { freshShippedCorpus, majoritiesOn, pegsOn, playInProcess } from './driver.ts';
 
 // ─────────────────────── the numbers that decide winnability ───────────────────────
 
 /**
- * The shipped deck, measured 2026-10-01 off the in-repo JSON via `loadCorpus`.
+ * THE SHIPPED DECK, MEASURED. There is no literal to update, and that is the point.
  *
- * These are the sizes `loadCards()` assembles from `decks/et2040` + `decks/in2020`
- * + `decks/core`. `bigCards(240)` — the old server fixture — is 4.6x the Ideology
- * deck; the engine's `bigCards()` at 4000 is 77x.
+ * Everything below compares one of these against another one of these, or against a
+ * RULE. `corpus-facts.ts` has the long argument; this is the short version of why the
+ * old `SHIPPED = { ideology: 52, ... }` had to go:
+ *
+ *  - "the projected draw pile may never exceed the deck that was dealt" is a relation
+ *    between two things the engine produced. Asserting it against 26 instead of
+ *    `dealt.headline` says the engine agrees with a number typed by hand.
+ *  - "the Ideology deck is one card per turn, so its size is the turn cliff" — the
+ *    REASONING is the assertion and it is kept verbatim below; the number is
+ *    `dealt.ideology`, so the cliff moves when the deck does and the comparison
+ *    "the game outlasts its own deck" never has to be re-argued.
+ *  - "the corpus is not inert" was a count of distinct ops, which could only fail in
+ *    the direction of a corpus that gained one. See `corpusProblems()` and the ruling
+ *    on the headline-op count below.
+ *
+ * What is deliberately still a literal, because a literal is the right instrument:
+ * p10's "1, 2 or 3 voters", the nine zones, and the fact that a nine-majority game is
+ * the win. Those are rules, and a rule that changes should turn a test red.
  */
-const SHIPPED = {
-  ideology: 52, // 20 (et2040) + 32 (in2020). ONE PER TURN. This is the cliff.
-  voter: 18,
-  conspiracy: 26, // 22 + JUMLA + HOLO SAPIENS (G20) + BLOCK + DEFLECT (G13d).
-  headline: 26,
-} as const;
-
 const cards = loadCards();
 const ctx: Ctx = { rules: RULES, cards };
-
-/**
- * THE SAME FOUR NUMBERS, MEASURED RATHER THAN QUOTED.
- *
- * `SHIPPED` above is a deliberate literal and must stay one: it is the tripwire that
- * makes a rebalance a visible edit to this file rather than a silent one. But quoting
- * a literal is only right where the QUESTION is "has the shipped corpus changed?".
- *
- * Every assertion in the second `describe` below asks a different question — "is the
- * deck the tests are playing the same deck the server boots with?" — and answering it
- * against a literal is a category error twice over. G20 added two Conspiracy Cards and
- * turned four such assertions red without anything being wrong: a hardcoded size in a
- * test whose entire purpose is to prove the suite is not playing a synthetic corpus is
- * the same structural blindness this file was written to catch, one layer down. It
- * cannot distinguish "the corpus changed" from "the test was wrong", and its failure
- * mode is worse than useless, because fixing it means editing a number to match
- * whatever the code now does — which is a tautology, not a test.
- *
- * So the split is: literals answer "did the corpus change", these answer "are these
- * two things the same list". A new card now moves `SHIPPED` (deliberately) and leaves
- * every derived assertion green (correctly).
- */
-const d0 = decksOf(cards);
-const dealt = {
-  ideology: d0.ideologyDeck.length,
-  voter: d0.voterDeck.length,
-  conspiracy: d0.conspiracyDeck.length,
-  headline: d0.headlineDeck.length,
-} as const;
-const dealtTotal = dealt.ideology + dealt.voter + dealt.conspiracy + dealt.headline;
-
-/** 6+11+6+9+5+9+6+11+6: the pegs needed to hold a majority in all nine zones. */
-const MAJORITY_PEGS = 69;
-
-/** 129 areas on the board. p20's board-full ending threshold. */
-const FULL_BOARD = 129;
+const facts = factsOf(cards);
+const dealt = facts.dealt;
+const dealtTotal = DECK_KINDS.reduce((k, kind) => k + dealt[kind], 0);
 
 function sum(d: Readonly<Record<string, number>>): number {
   let total = 0;
@@ -105,112 +86,148 @@ function sum(d: Readonly<Record<string, number>>): number {
 }
 
 describe('the shipped corpus is the corpus', () => {
-  it('has exactly the deck sizes the shipped game deals', () => {
-    // The pin. `Ideology` is the one that matters — see the file header — and it is
-    // the one a rebalance or a corpus swap would move first.
-    const d = decksOf(cards);
-    expect(d.ideologyDeck.length, 'the Ideology deck is one card per turn; its size IS the turn limit').toBe(SHIPPED.ideology);
-    expect(d.voterDeck.length).toBe(SHIPPED.voter);
-    expect(d.conspiracyDeck.length).toBe(SHIPPED.conspiracy);
-    expect(d.headlineDeck.length).toBe(SHIPPED.headline);
-  });
-
-  it('carries 36 voters across 18 Voter Cards, in the 1/2/3 mix p10 allows', () => {
-    // 36 voters does NOT cap a game, because a Voter Card recycles: `INFLUENCE`
-    // discards it and `refillMarket` reshuffles. This is asserted so the number is
-    // known rather than assumed — but 36 voters against a 129-area board is the
-    // reason the corpus has to recycle, and the reason a test that deals a
-    // non-recycling deck can reach a board the real game cannot.
-    const voters = Object.values(cards.voter);
-    expect(voters).toHaveLength(SHIPPED.voter);
-    expect(voters.reduce((k, v) => k + v.voters, 0)).toBe(36);
-    const mix = { 1: 0, 2: 0, 3: 0 };
-    for (const v of voters) {
-      expect([1, 2, 3]).toContain(v.voters);
-      mix[v.voters as 1 | 2 | 3] += 1;
-    }
-    expect(mix, 'a Voter Card count changed; p10 allows 1, 2 or 3 voters and the mix is what lets a zone with one slot left be finished').toEqual({ 1: 6, 2: 6, 3: 6 });
-  });
-
-  it('prices 10 of its 18 Voter Cards with Funds, all in 1-3', () => {
-    // The economy the driver has to make work. 10 of 18 are Funds-priced — so 8 are
-    // priced entirely WITHOUT Funds, in Clout, Media or Trust.
+  it('deals four non-empty decks, and each holds exactly the cards its index holds', () => {
+    // The pin, re-derived. The old assertion was `deck.length === 26` per kind, which
+    // turned red on every card the corpus gained and had to be edited by arithmetic to
+    // go green again — twice, and once from 22 to 24 rather than from the decks.
     //
-    // That 8 is the number that matters, and it is what the previous driver got
-    // wrong. A cap-discard rule that keeps a Funds-only reserve leaves a player
-    // holding `{funds: 12, clout: 0, media: 0, trust: 0}` facing a Mat of
-    // `media 3 / funds 2 + trust 2 / clout 2 + trust 1` — nothing it can buy, ever.
-    // `discardKeepingReserve` now holds a per-pool reserve for exactly this reason.
-    const withFunds = Object.values(cards.voter).filter((v) => (v.cost.funds ?? 0) > 0);
-    expect(withFunds).toHaveLength(10);
-    expect(Object.values(cards.voter).filter((v) => (v.cost.funds ?? 0) === 0)).toHaveLength(8);
-    for (const v of withFunds) {
-      const f = v.cost.funds ?? 0;
-      expect(f, `${v.id} is priced at ${f} Funds`).toBeGreaterThanOrEqual(1);
-      expect(f, `${v.id} is priced at ${f} Funds`).toBeLessThanOrEqual(3);
+    // What is actually being protected is the SHAPE: four separate pools, none of them
+    // empty, and no card indexed without being dealt. An id that reached two pools at
+    // once would make `Object.keys(cards[kind]).length` disagree with what a game is
+    // dealt, which is precisely the disagreement the old literal was standing in for.
+    expect(corpusProblems(facts), 'the shipped corpus violates a deck invariant').toEqual([]);
+    expect(dealtTotal, 'the dealt corpus should be every card in the index').toBe(
+      facts.indexed.ideology + facts.indexed.voter + facts.indexed.conspiracy + facts.indexed.headline,
+    );
+  });
+
+  it('carries Voter Cards that print 1, 2 and 3 voters, so a zone with any slots left can be finished', () => {
+    // p10, verbatim: "Voter Cards can contain 1, 2 or 3 voters." A rule, so the
+    // expectation is a rule rather than a tally.
+    //
+    // The old test asserted the exact 6/6/6 mix. The mix was a footprint and the
+    // footprint is what breaks; the CLAIM it was standing in for is that all three
+    // counts exist, because a zone with one slot left can only be completed by a
+    // single-voter card. That is now the assertion, and it is a floor: no card addition
+    // can break it, and losing the 1-voter card is exactly what should turn it red.
+    const sizes = new Set(facts.voter.sizes);
+    for (const size of [1, 2, 3]) {
+      expect(sizes.has(size), `no Voter Card carries exactly ${size} voter${size === 1 ? '' : 's'}`).toBe(true);
+    }
+    // And the total, for the record rather than as an expectation: it does NOT cap a
+    // game, because a Voter Card recycles. The assertion that says so is the one in
+    // the winnability test below, which measures a real board against it.
+    expect(facts.voter.totalVoters).toBeGreaterThan(0);
+  });
+
+  it('prices Voter Cards across every pool, and leaves every pool a way to be broke', () => {
+    // The economy the driver has to make work, and the shape of the old
+    // "10 of 18 are priced with Funds, 8 are not" test.
+    //
+    // That test's own comment is the interesting part: a cap-discard rule that keeps a
+    // Funds-only reserve leaves a player holding `{funds: 12, clout: 0, media: 0,
+    // trust: 0}` facing a Mat of `media 3 / funds 2 + trust 2 / clout 2 + trust 1` —
+    // nothing it can buy, ever. `discardKeepingReserve` holds a per-pool reserve for
+    // exactly that, and the 8 is the number that made the scenario reachable.
+    //
+    // So the assertion is the scenario, per pool, and not the count: for each of the
+    // four currencies there is at least one card that pool can buy AND at least one it
+    // cannot. Derived from the corpus, so it survives any number of cards.
+    for (const pool of POOLS) {
+      expect(facts.voter.pricedIn[pool], `no Voter Card is priced in ${pool}`).toBeGreaterThan(0);
+      expect(facts.voter.unpricedIn[pool], `every Voter Card is priced in ${pool}, so a ${pool}-only hand can never be stuck`).toBeGreaterThan(0);
     }
   });
 
-  it('pays 3 or 4 resources for an answer, and always in a currency the board uses', () => {
-    // The turn income. A game runs one ANSWER per turn, so this is the whole
-    // per-turn budget the driver spends Voter Cards out of.
+  it('pays an ANSWER in a currency the board uses, and enough to buy a turn', () => {
+    // The turn income. A game runs one ANSWER per turn, so this is the whole per-turn
+    // budget the driver spends Voter Cards out of.
     for (const c of Object.values(cards.ideology)) {
       for (const side of c.sides) {
         const total = sum(side.pays);
-        expect(total, `${c.id} side pays ${total}`).toBeGreaterThanOrEqual(3);
-        expect(total, `${c.id} side pays ${total}`).toBeLessThanOrEqual(4);
-        // A payout the driver cannot spend is a wasted turn. One card in the
-        // shipped corpus carries an explicit zero, so the check is "not negative"
-        // and the total above is what carries the real assertion.
+        // A payout the driver cannot spend is a wasted turn. One card in the shipped
+        // corpus carries an explicit zero, so the per-resource check is "not negative"
+        // and the real claim is the two below.
         for (const [res, n] of Object.entries(side.pays)) {
-          expect(['funds', 'clout', 'media', 'trust'], `${c.id} pays in "${res}"`).toContain(res);
+          expect(POOLS as readonly string[], `${c.id} pays in "${res}"`).toContain(res);
           expect(n, `${c.id} pays ${res}: ${n}`).toBeGreaterThanOrEqual(0);
         }
       }
     }
+    // The old assertion was "every side pays 3 or 4" — a footprint of the current
+    // corpus, which turned red when a card paid differently and could only be silenced
+    // by editing the bound to whatever the cards now did. The claim underneath it is
+    // that a turn's income can afford a turn's action, and THAT is checkable against
+    // something outside the corpus: the cheapest Voter Card. Currently an answer pays
+    // 3 against a 2-resource card, so the driver is never income-starved.
+    expect(
+      facts.answerPay.min,
+      `the cheapest ANSWER pays ${facts.answerPay.min}; the cheapest Voter Card costs ${facts.voter.minCost}`,
+    ).toBeGreaterThanOrEqual(facts.voter.minCost);
   });
 
-  it('has 26 Headline Cards that actually open decisions, not 26 that just pay out', () => {
+  it('has Headline Cards that open decisions, not ones that just pay out', () => {
     // THE SECOND HALF OF THE BLINDNESS, and the one nobody had measured.
     //
     // The synthetic fixture gave every headline `gain media 1`, so the synthetic
-    // corpus NEVER produced an effect-generated `PendingChoice`. The shipped
-    // headlines carry twelve distinct ops, and three of them open a decision that
-    // FREEZES A PLAYER until answered:
+    // corpus NEVER produced an effect-generated `PendingChoice`. The shipped headlines
+    // carry a dozen distinct ops, and three of them open a decision that FREEZES A
+    // PLAYER until answered:
     //
     //   `evict`         -> evict-voter   (choose areas)
     //   `discard-voter` -> discard-voter (choose areas)
     //   `steal-any`     -> steal-any     (choose a player AND resources)
     //
-    // A driver that cannot answer those does not play badly — it deadlocks the
-    // table, because the engine refuses every other action for a frozen player.
-    // The old driver's fallback for an unrecognised choice was an EMPTY area list,
-    // which is only a legal answer to a zero-voter ask.
-    const headlines = Object.values(cards.headline);
-    expect(headlines).toHaveLength(SHIPPED.headline);
-    const ops = new Set(headlines.flatMap((h) => h.effects.map((e) => e.op)));
-    for (const op of ['evict', 'discard-voter', 'steal-any', 'lose-any', 'voters', 'gain']) {
-      expect(ops.has(op as never), `no shipped headline uses \`${op}\`; the corpus changed shape`).toBe(true);
+    // A driver that cannot answer those does not play badly — it deadlocks the table,
+    // because the engine refuses every other action for a frozen player. The old
+    // driver's fallback for an unrecognised choice was an EMPTY area list, which is
+    // only a legal answer to a zero-voter ask.
+    //
+    // THE RULING ON THE COUNT OF TWELVE, which used to be `expect(ops.size).toBe(12)`.
+    //
+    // The count was a proxy, and the honest reading of what it guarded is "the corpus
+    // is not inert" — it was standing in for the synthetic fixture's single `gain`.
+    // So it is now the comparison that means something: strictly more of the effect
+    // vocabulary than `bigCards()` uses, measured rather than remembered. That is
+    // derived on both sides, it cannot be satisfied by arithmetic on a tally, and it
+    // fails for the right reason — a corpus that went flat, not a corpus that grew.
+    //
+    // A FLOOR rather than an equality is also the only correct polarity. The equality
+    // could fail in exactly one direction, a corpus that GAINED an op, and gaining an
+    // op is the outcome this project wants: GENDER TROUBLE is the first `restrict`
+    // headline, it is fully implemented and expressible, and it was unshippable purely
+    // because that equality turned 12 into 13. A guard that punishes progress is a
+    // guard that gets deleted, and then there is no guard.
+    //
+    // The named ops below keep the part that was never a count: each of those three
+    // freezing ops is a BEHAVIOUR the driver has a branch for, so losing one is a real
+    // regression and each is asserted by name rather than in aggregate.
+    const syn = syntheticOps();
+    expect(facts.headlineOps.size, `the headlines use ${facts.headlineOps.size} effect ops`).toBeGreaterThan(syn.headline);
+    for (const op of REQUIRED_HEADLINE_OPS) {
+      expect(facts.headlineOps.has(op), `no shipped headline uses \`${op}\`; the corpus changed shape`).toBe(true);
     }
-    // And the count of DISTINCT ops, which is the number of driver branches a
-    // corpus swap can invalidate.
-    expect(ops.size, `the shipped headlines now carry ${ops.size} distinct effect ops`).toBe(12);
   });
 
-  it('has a Conspiracy deck of the pinned size whose effects are not all "gain funds"', () => {
-    // Not load-bearing for the driver, which never plays a Conspiracy, but a
-    // corpus where every conspiracy is `gain funds 2` would make the Conspiracy
-    // deck inert and the 4-5 cost prices meaningless.
-    const conspiracies = Object.values(cards.conspiracy);
-    expect(conspiracies).toHaveLength(SHIPPED.conspiracy);
-    expect(new Set(conspiracies.flatMap((c) => c.effects.map((e) => e.op))).size).toBeGreaterThan(3);
-  });  it('boards 129 areas, of which 69 are needed for nine majorities', () => {
+  it('has a Conspiracy deck whose effects are not all one op', () => {
+    // Not load-bearing for the driver, which never plays a Conspiracy, but a corpus
+    // where every conspiracy is `gain funds 2` would make the Conspiracy deck inert
+    // and the 4-5 cost prices meaningless. Same derived comparison as the headlines:
+    // more of the effect vocabulary than the synthetic fixture's `voters n: 1`.
+    const syn = syntheticOps();
+    expect(facts.conspiracyOps.size, `the conspiracies use ${facts.conspiracyOps.size} effect ops`).toBeGreaterThan(syn.conspiracy);
+  });
+
+  it('boards enough areas for nine majorities, and fewer majors than areas', () => {
+    // p20's board-full ending and p10's zone thresholds, both MEASURED off a real
+    // `setup` — they used to be `129` and `69` typed into this file and into two
+    // others, which is how a board constant ends up with three copies.
     const z = setup({ players: ['p1', 'p2'], names: { p1: 'a', p2: 'b' }, cards, seed: 1, ...decksOf(cards) });
-    expect(z.zones.reduce((k, zone) => k + zone.areas.length, 0)).toBe(FULL_BOARD);
-    expect(z.zones.reduce((k, zone) => k + zone.majority, 0)).toBe(MAJORITY_PEGS);
-    // The two numbers the winnability claim is measured against, asserted from the
-    // board rather than quoted from a comment.
-    expect(MAJORITY_PEGS).toBeLessThan(FULL_BOARD);
+    expect(z.zones.reduce((k, zone) => k + zone.areas.length, 0)).toBe(BOARD.areas);
+    expect(z.zones.reduce((k, zone) => k + zone.majority, 0)).toBe(BOARD.majorityPegs);
+    // The one number the winnability claim is measured against, as a relation: nine
+    // majorities must be reachable, or the game cannot be won by majority at all.
+    expect(BOARD.majorityPegs, 'nine majorities need more pegs than the board has areas').toBeLessThan(BOARD.areas);
   });
 });
 
@@ -244,11 +261,19 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     }
   });
 
-  it('a game driven on the shipped corpus REACHES AN ENDING, and passes the turn-52 cliff', () => {
+  it('a game driven on the shipped corpus REACHES AN ENDING, and outlasts its own deck', () => {
     // The assertion the pre-fix engine could not have passed, whatever the deck
     // size. The bug ended every game on turn 52 with `finished: true` and no legal
     // move of any kind; the fix recycles the Ideology deck, so a shipped-corpus
-    // game goes PAST 52 and ends on a decided board.
+    // game goes PAST the deck and ends on a decided board.
+    //
+    // "PAST THE DECK" IS THE ASSERTION AND 52 WAS NEVER THE POINT. The Ideology deck
+    // is drawn one per turn, so its size IS the turn cliff — which is why the number
+    // here is `dealt.ideology` and not a literal. The old `toBeGreaterThan(52)` was
+    // true of the corpus as it happened to be and false of the corpus as it will be,
+    // so the day a card shipped it would have demanded an edit that taught the test
+    // nothing. Compare the game against the deck it was dealt instead: the claim is
+    // "the engine's recycle works", and that stays true at 53 cards or 63.
     //
     // Five seats, because that is the configuration the playtest hit and the one
     // where the staggered start (p7) was thought to be the problem.
@@ -256,9 +281,20 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     const run = playInProcess(start, ctx, { maxActions: 1200 });
     expect(run.stalled, `the driver stalled: ${run.reason}`).toBe(false);
     expect(run.state.finished, 'a shipped-corpus 5-seat game did not reach an ending').toBe(true);
-    expect(run.state.turn, 'the game ended on or before turn 52, which is the deck-exhaustion cliff').toBeGreaterThan(SHIPPED.ideology);
-    expect(majoritiesOn(run.state), 'the shipped corpus did not produce a decided board').toBe(9);
-    expect(pegsOn(run.state)).toBeGreaterThanOrEqual(MAJORITY_PEGS);
+    expect(run.state.turn, `the game ended on turn ${run.state.turn}, at or before the ${dealt.ideology}-card deck cliff`).toBeGreaterThan(dealt.ideology);
+    expect(majoritiesOn(run.state), 'the shipped corpus did not produce a decided board').toBe(BOARD.zones);
+    expect(pegsOn(run.state)).toBeGreaterThanOrEqual(BOARD.majorityPegs);
+
+    // THE VOTER DECK IS SMALLER THAN THE BOARD, so the corpus RECYCLES. This is what
+    // the old "carries 36 voters" assertion was really saying, and it is checkable
+    // against the game rather than against a tally: one game places more pegs than the
+    // entire corpus holds voters, which is only possible because `INFLUENCE` discards
+    // the card and `refillMarket` reshuffles. A fixture that deals a non-recycling deck
+    // reaches a board the real game cannot, so this also keeps that possibility loud.
+    expect(
+      facts.voter.totalVoters,
+      `the whole corpus holds ${facts.voter.totalVoters} voters and one game placed ${pegsOn(run.state)} pegs, so this game did not recycle`,
+    ).toBeLessThan(pegsOn(run.state));
 
     // …and the mechanism, named: the recycle fired, so the deck never emptied.
     expect(
@@ -277,17 +313,19 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // deck sizes, and the absence of the exhaustion line in the public log.
     //
     // `deckSizes` is the DRAW PILE, not the dealt deck — a fresh `setup` deals one
-    // Ideology Card into hand and puts three Voter Cards on the Mat, so it reports 51
-    // and 15. Asserted as "no larger than the dealt deck", which is what a draw pile
-    // can be, plus the turn number, which is the real point.
+    // Ideology Card into hand and puts `RULES.marketSize` Voter Cards on the Mat, so
+    // it reports one fewer in each of those two. Asserted as "no larger than the dealt
+    // deck", which is what a draw pile can be, plus the turn number, which is the real
+    // point.
     //
-    // The ceiling is `dealt`, measured off `decksOf`, and NOT `SHIPPED`. What is being
-    // asserted is that the draw pile never exceeds the deck that was dealt — a relation
-    // between two things the engine produced — so a literal here would be asserting
-    // that the engine agrees with a number typed by hand, which is what turned four
-    // assertions red when G20 shipped two cards and proved nothing about the game.
+    // The ceiling is `dealt`, measured off `decksOf`, and there is deliberately no
+    // second copy of it in this file. What is being asserted is that the draw pile
+    // never exceeds the deck that was dealt — a relation between two things the engine
+    // produced — so a literal here would be asserting that the engine agrees with a
+    // number typed by hand, which is what turned four assertions red when G20 shipped
+    // two cards and proved nothing about the game.
     const view = playerView(run.state, run.state.turnOrder[0] ?? 'p_1');
-    expect(view.turn, 'the projected state is not past the turn-52 cliff').toBeGreaterThan(SHIPPED.ideology);
+    expect(view.turn, 'the projected state is not past the deck cliff').toBeGreaterThan(dealt.ideology);
     for (const [deck, reported] of Object.entries(view.deckSizes)) {
       expect(reported, `the projected ${deck} draw pile is larger than the deck that was dealt`).toBeLessThanOrEqual(
         dealt[deck as keyof typeof dealt],

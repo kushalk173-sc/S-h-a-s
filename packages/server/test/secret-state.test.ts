@@ -43,8 +43,12 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import {
   allKeys,
+  ideologyHandOf,
   reduce,
   setup,
   type ClientState,
@@ -57,7 +61,7 @@ import { Room } from '../src/room.ts';
 import { makeCtx, realCards } from './fixtures.ts';
 import { decksOf } from '../src/store.ts';
 import { renderAll } from './render-all.ts';
-import { LEAK_PATHS, SECRET_FIELDS } from './secret-inventory.ts';
+import { LEAK_PATHS, CHOICE_KINDS, SECRET_FIELDS } from './secret-inventory.ts';
 
 /**
  * THE SHIPPED CORPUS, and this used to be `bigCards(60)`.
@@ -1365,4 +1369,282 @@ const PROBE_ACTIONS = [
   { type: 'PLACE_VOTERS', groupId: 'nope', areaIds: [] },
 ] as const;
 
-void LEAK_PATHS;
+// ─────────────────── the declared leak paths, walked GENERICALLY ───────────────────
+
+/**
+ * `LEAK_PATHS` used to be imported and then `void`ed.
+ *
+ * That is worth naming, because it is the same failure as a pinned number wearing a
+ * different hat: a list that no assertion reads cannot fail, so it cannot catch
+ * anything, and the file's own header argues at length that "a list that rots
+ * silently is worse than no list" — while this one was decorative. The entries were
+ * real rulings; nothing was checking them.
+ *
+ * So the walk below is generic: it reads every path the inventory declares and asserts
+ * the projection carries nothing for it, for every viewer, in every state of both
+ * corpora. Adding a hidden-but-unprefixed field to the inventory is now a one-line
+ * edit that immediately becomes an assertion, and a hidden field that is NOT in the
+ * inventory is caught by the walk below the one after it.
+ */
+function valuesAt(view: ClientState, path: string): unknown[] {
+  const root = view as unknown as Record<string, unknown>;
+  if (path.startsWith('players[].')) {
+    const key = path.slice('players[].'.length);
+    const players = (root['players'] ?? {}) as Record<string, Record<string, unknown>>;
+    return Object.values(players).map((p) => p[key]);
+  }
+  const key = path.endsWith('[]') ? path.slice(0, -2) : path;
+  const v = root[key];
+  return Array.isArray(v) ? v : [v];
+}
+
+/** The same path read off the AUTHORITATIVE state, so the walk is not vacuous. */
+function authoritativeAt(s: GameState, path: string): unknown[] {
+  if (path === 'playableConspiracies[]') return [viewFor(s, CARDS, null).playableConspiracies];
+  const key = path.slice('players[].'.length);
+  return s.turnOrder.map((p) => (s.players[p] as unknown as Record<string, unknown>)[key]);
+}
+
+describe('the DECLARED leak paths, walked rather than trusted', () => {
+  it('every path in LEAK_PATHS is present in the inventory and names a real field', () => {
+    // The shape check, so a typo in a path cannot quietly turn the walk below into a
+    // walk over `undefined`.
+    for (const [field, path] of Object.entries(LEAK_PATHS)) {
+      expect(path, `${field} has no path recorded`).toMatch(/^(players\[\]\.[a-zA-Z]+|[a-zA-Z]+\[\])$/);
+    }
+  });
+
+  it('no viewer sees anything at any declared leak path, in any state of either corpus', () => {
+    for (const [field, path] of Object.entries(LEAK_PATHS)) {
+      for (const s of [...CORPUS, ...CONSPIRACY_CORPUS, ...IDEOLOGY_HAND_CORPUS]) {
+        for (const viewer of [null, ...s.turnOrder, 'p_not_a_seat', '']) {
+          const seen = valuesAt(viewFor(s, CARDS, viewer), path);
+          if (path.startsWith('players[].')) {
+            // A HAND: empty or absent, for every viewer INCLUDING the owner.
+            for (const v of seen) {
+              expect(Array.isArray(v) ? v.length : v, `viewer ${String(viewer)} sees ${field} in ${path}`).toBe(0);
+            }
+            continue;
+          }
+          // The declared EXCEPTION: `playableConspiracies` is non-empty by design, so
+          // "empty" would be the wrong assertion and would be wrong in the direction of
+          // forbidding the mechanic. What it must be is a subset of the VIEWER'S OWN
+          // hand — never another seat's, never a card the viewer does not hold. This is
+          // the narrow reading of D25: a player may know which of their own cards they
+          // may play, and nothing else.
+          const own = viewer === null ? [] : handOf(s, viewer);
+          for (const entry of seen as readonly { id?: string }[]) {
+            expect(
+              own,
+              `viewer ${String(viewer)} is offered ${entry.id ?? '?'}, which is not in their own hand`,
+            ).toContain(entry.id ?? '');
+          }
+        }
+      }
+    }
+  });
+
+  it('the walk is not vacuous: every declared hand was non-empty in a real state', () => {
+    // A leak test whose fixture cannot fail is a decoration, and that is not a
+    // hypothetical here — the conspiracy block above this one shipped with empty hands
+    // in every state and would have passed against a projection that computed nothing.
+    for (const field of ['conspiracyHand', 'ideologyHand']) {
+      const path = LEAK_PATHS[field as keyof typeof LEAK_PATHS];
+      let witnessed = 0;
+      for (const s of [...CORPUS, ...CONSPIRACY_CORPUS, ...IDEOLOGY_HAND_CORPUS]) {
+        for (const v of authoritativeAt(s, path)) {
+          if (Array.isArray(v) && v.length > 0) witnessed += 1;
+        }
+      }
+      expect(witnessed, `${field} was empty in every state, so the assertion above proves nothing`).toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * A state in which a player really is HOLDING a donated Ideology Card.
+ *
+ * `LEAK_PATHS.ideologyHand` was the entry the engine owed this suite, and an entry
+ * nothing produces is an entry nothing tests. HOLO SAPIENS / JUMLA are the cards that
+ * put one there (`move-card` from the draw pile into a hand, `target: 'you'`), so this
+ * searches the seeds for one where that card is on top of the draw pile, buys it, plays
+ * it, and keeps the result.
+ *
+ * Reading `_conspiracyDraw[0]` is legitimate HERE and nowhere else: this is the leak
+ * suite, and the whole point of the prefix walk is that this file is the one place
+ * allowed to look at server-only state.
+ */
+function ideologyHandCorpus(): readonly GameState[] {
+  const holo = Object.values(CARDS.conspiracy).find((c) => c.effects.some((e) => e.op === 'move-card'));
+  if (holo === undefined) throw new Error('no shipped Conspiracy moves an Ideology Card into a hand');
+  const out: GameState[] = [];
+  for (let seed = 1; seed <= 400 && out.length < 3; seed += 1) {
+    let s = setup({
+      players: ['p1', 'p2'],
+      names: { p1: 'One', p2: 'Two' },
+      cards: CARDS,
+      seed,
+      // Seat 1 can afford the printed cost on turn one, and stays UNDER p12's cap of
+      // 12 — a seat sitting exactly on the cap opens a `lose-any` decision the moment it
+      // is paid, and `PLAY_CONSPIRACY` is refused until that is resolved ("resolve
+      // \"Resource cap\" first"). The engine does not guess a split.
+      startResources: [{ funds: 5 }, { funds: 4 }],
+      ...decksOf(CARDS),
+    });
+    if (s._conspiracyDraw[0] !== holo.id) continue;
+    const me = s.turnOrder[0] as PlayerID;
+    if (s.activePlayer !== me) continue;
+    // A fresh `setup` opens in the ANSWER phase, so seat 1 owes an answer before it
+    // can buy anything. Answering also gives it the turn income the purchase needs.
+    if (s.phase === 'answer') {
+      const answered = reduce(s, me, { type: 'ANSWER', side: 0 }, { rules: ctx.rules, cards: CARDS });
+      if (!answered.ok) continue;
+      s = answered.state;
+    }
+    if (s.phase !== 'actions' || s.activePlayer !== me) continue;
+    const bought = reduce(s, me, { type: 'BUY_CONSPIRACY', pay: { funds: holo.cost } }, { rules: ctx.rules, cards: CARDS });
+    if (!bought.ok) continue;
+    s = bought.state;
+    const played = reduce(s, me, { type: 'PLAY_CONSPIRACY', cardId: holo.id }, { rules: ctx.rules, cards: CARDS });
+    if (!played.ok) continue;
+    // A reactive card in another hand stages the effect list instead of resolving it.
+    s = closeWindow(played.state);
+    if (ideologyHandOf(s.players[me]).length > 0) out.push(s);
+  }
+  if (out.length === 0) {
+    throw new Error(`no seed in 1..400 put ${holo.id} on top and resolved it into a hand`);
+  }
+  return out;
+}
+
+const IDEOLOGY_HAND_CORPUS = ideologyHandCorpus();
+
+describe('a donated Ideology Card is hidden from EVERYBODY, its holder included', () => {
+  it('the fixture really produced held cards, in more than one state', () => {
+    // Named separately so the next reader knows the states below are not empty — the
+    // failure mode this suite has already shipped once, in the conspiracy block.
+    expect(IDEOLOGY_HAND_CORPUS.length, 'no seed produced a held Ideology Card').toBeGreaterThan(0);
+    const holders = IDEOLOGY_HAND_CORPUS.flatMap((s) => s.turnOrder.filter((p) => ideologyHandOf(s.players[p]).length > 0));
+    expect(holders.length, 'every state was produced with an empty hand').toBeGreaterThan(0);
+  });
+
+  it('the authoritative state holds a card and no projection of it does', () => {
+    // The ruling, from `packages/engine/src/state.ts`: the answer to a blind card is a
+    // coin flip the player makes, and a player shown the card has not made one. p13
+    // keeps a card hidden until its answer is confirmed, so a DONATED card — not yet
+    // answered — is on the hidden side of that line.
+    for (const s of IDEOLOGY_HAND_CORPUS) {
+      const holder = s.turnOrder.find((p) => ideologyHandOf(s.players[p]).length > 0);
+      expect(holder, 'the fixture produced a state with no holder').toBeDefined();
+      if (holder === undefined) continue;
+      for (const viewer of [null, ...s.turnOrder, 'p_not_a_seat', '']) {
+        const seen = (viewFor(s, CARDS, viewer).players[holder] as unknown as Record<string, unknown>)['ideologyCards'];
+        expect(Array.isArray(seen) ? seen.length : seen, `viewer ${String(viewer)} sees ${holder}'s donated card`).toBe(0);
+      }
+    }
+  });
+
+  it('the answered half IS public, which is what makes the hidden half a ruling', () => {
+    // `manifestoCards` is the counterpart and it is deliberately public: an ANSWERED
+    // card is the player's public identity and the Ideologue power ladder is read from
+    // it. Asserting both halves together is the point — "hidden" is not the default
+    // state of this field, so the omission would be invisible if only the hidden half
+    // were tested.
+    for (const s of [IDEOLOGY_HAND_CORPUS[0], CORPUS[CORPUS.length - 1]].filter((x): x is GameState => x !== undefined)) {
+      const holder = s.turnOrder.find((p) => (s.players[p]?.manifestoCards.length ?? 0) > 0);
+      if (holder === undefined) continue;
+      const seen = (viewFor(s, CARDS, holder).players[holder] as unknown as Record<string, unknown>)['manifestoCards'];
+      expect(Array.isArray(seen) ? seen.length : 0, 'an ANSWERED card is public by rulebook and must stay so').toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * THE `Choice` UNION, CHECKED AGAINST THE INVENTORY.
+ *
+ * A `Choice` is the one place a leak can arrive with no `_`-prefixed field to trip
+ * over: it is a VALUE the engine chooses to publish, so a kind that said "pick one of
+ * these cards" would enumerate a hidden hand and neither the prefix walk nor
+ * `LEAK_PATHS` would see it. `CHOICE_KINDS` in the inventory classifies every kind with
+ * what it is allowed to ask about, and this reads the engine's own union to check the
+ * two agree.
+ *
+ * Reading the engine's SOURCE is the price of that, and it is worth paying: the union
+ * has no runtime representation — a `Choice` only exists while a decision is open — so
+ * there is no way to enumerate it from a `CardIndex` or from a played corpus, and a new
+ * kind that no fixture ever raised would otherwise arrive unclassified and unnoticed.
+ */
+function engineChoiceKinds(): string[] {
+  const src = readFileSync(fileURLToPath(new URL('../../engine/src/state.ts', import.meta.url)), 'utf8');
+  const start = src.indexOf('export type Choice =');
+  expect(start, 'the engine no longer declares `export type Choice` where this reader expects it').toBeGreaterThan(-1);
+  const rest = src.slice(start);
+  const end = rest.indexOf('\nexport ');
+  const body = end < 0 ? rest : rest.slice(0, end);
+  return [...body.matchAll(/kind: '([a-z-]+)'/g)].map((m) => m[1] ?? '').sort();
+}
+
+describe('every Choice kind is classified, and none of them may name a card', () => {
+  it("the engine's Choice union and the inventory agree", () => {
+    // A parallel agent may add a kind this round. If it enumerates a hidden hand, that
+    // is a leak and this is where it has to be caught: the new kind fails to be listed,
+    // so somebody has to look at it, and the classification below says what it is
+    // allowed to ask about.
+    const engine = engineChoiceKinds();
+    expect(engine.length, 'the Choice union reader found no kinds — the reader is stale').toBeGreaterThan(0);
+    expect(Object.keys(CHOICE_KINDS).sort(), 'a Choice kind is unclassified, or a classification is obsolete').toEqual(engine);
+  });
+
+  it('no classified kind is allowed to ask a player about CARDS', () => {
+    // The leak argument, as an assertion. Every current kind names resources, pegs,
+    // seats or zones, all four of which are public: a resource total is in the
+    // projection, a peg and a zone are on the board, and a seat is in `turnOrder`. A
+    // kind that named a card id would be a hand, and the projection strip would not
+    // catch it, because the strip only knows about FIELDS.
+    for (const [kind, about] of Object.entries(CHOICE_KINDS)) {
+      expect(['resources', 'pegs', 'players', 'zones'], `${kind} asks the player about ${about}`).toContain(about);
+    }
+  });
+
+  it('no PendingChoice names a CARD, in any state either corpus reached', () => {
+    // The teeth behind the classification above, and the check that would fire if a
+    // future choice kind were built out of card ids — which is the leak this whole entry
+    // exists for.
+    //
+    // It is checkable without classifying anything: serialise every decision the engine
+    // can raise across all three corpora and assert that not one CardID from the corpus
+    // appears in it. `choose-player` carries `source`, which is a PlayerID and looks
+    // enough like a card id to be worth checking rather than reasoning about.
+    //
+    // The decisions have to be COLLECTED rather than read off a stored state, because a
+    // stored state is the state AFTER the walk answered them — measured, every state in
+    // all three corpora ends with an empty `choices`, so a scan over them proves nothing.
+    // So this probes the same way the freeze test above does: play every card the
+    // projection offers and keep whatever the engine asks.
+    type Decision = GameState['choices'][number];
+    const decisions: Decision[] = [];
+    for (const s of [...CORPUS, ...CONSPIRACY_CORPUS, ...IDEOLOGY_HAND_CORPUS]) {
+      decisions.push(...s.choices);
+      const viewer = s.activePlayer;
+      for (const cardId of viewFor(s, CARDS, viewer).playableConspiracies.map((c) => c.id)) {
+        const played = reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS });
+        if (!played.ok) continue;
+        decisions.push(...closeWindow(played.state).choices);
+      }
+    }
+
+    const ids = [
+      ...Object.keys(CARDS.ideology),
+      ...Object.keys(CARDS.voter),
+      ...Object.keys(CARDS.conspiracy),
+      ...Object.keys(CARDS.headline),
+    ];
+    expect(decisions.length, 'no corpus state ever opened a decision, so the scan below was empty').toBeGreaterThan(0);
+    for (const d of decisions) {
+      const json = JSON.stringify(d);
+      for (const id of ids) {
+        expect(json.includes(id), `a PendingChoice names the card ${id}: ${json.slice(0, 200)}`).toBe(false);
+      }
+    }
+  });
+});

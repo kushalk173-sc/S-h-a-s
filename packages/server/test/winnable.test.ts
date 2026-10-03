@@ -96,6 +96,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { playerView, type Action, type Ctx, type GameState, type PlayerID } from '@shasn/engine';
 
 import { loadCtx } from '../src/index.ts';
+import { BOARD, factsOf } from './corpus-facts.ts';
 import { TestClient, startHarness, type Harness, type TestClient as Client } from './fixtures.ts';
 import {
   discardKeepingReserve,
@@ -110,11 +111,22 @@ import {
 
 const ctx: Ctx = loadCtx();
 
-/** Pegs needed to hold a majority in all nine zones. */
-const MAJORITY_PEGS = 69;
-
-/** The shipped Ideology deck, drawn one per turn. This is the turn cliff. */
-const SHIPPED_IDEOLOGY = 52;
+/**
+ * The two numbers every assertion in this file is measured against, DERIVED.
+ *
+ * Both used to be typed in here — `MAJORITY_PEGS = 69` and `SHIPPED_IDEOLOGY = 52` —
+ * and `69` was typed a second time in `interrupt-window.test.ts` and `129` a third in
+ * `e2e.test.ts`. Three copies of a board constant is how a board constant comes to
+ * disagree with the board; a hand-copy of the Ideology deck size is a hand-copy of the
+ * fact that decides whether a game is winnable, so the day the corpus grew it, this
+ * file would have demanded an edit that taught it nothing.
+ *
+ * So the pegs come from `BOARD`, which measures a real `setup`, and the cliff comes
+ * from `factsOf`, which measures the deck this game was actually dealt. The claim is
+ * "the game outlasts its own deck", and that is true of any corpus.
+ */
+const { majorityPegs: MAJORITY_PEGS, areas: FULL_BOARD, zones: ZONES } = BOARD;
+const TURN_CLIFF = factsOf(ctx.cards).dealt.ideology;
 
 const SEATS = [2, 3, 4, 5] as const;
 
@@ -162,7 +174,7 @@ describe('the shipped corpus is winnable at every seat count', () => {
         `SEATS ${n} (${SEEDS.length} seeds, shipped corpus): ` +
           `finished ${finished.length}/${rows.length} | ` +
           `nineMajorities ${rows.filter((r) => r.maj === 9).length}/${rows.length} | ` +
-          `fullBoard ${rows.filter((r) => r.pegs === 129).length}/${rows.length} | ` +
+          `fullBoard ${rows.filter((r) => r.pegs === FULL_BOARD).length}/${rows.length} | ` +
           `turn min ${spread(rows.map((r) => r.turn))} med ${med(finished.map((r) => r.turn))} max ${Math.max(...finished.map((r) => r.turn))} | ` +
           `actions ${spread(rows.map((r) => r.run.actions))} | ` +
           `not-nine ${rows.filter((r) => r.maj !== 9).map((r) => `s${r.seed}(maj${r.maj} peg${r.pegs})`).join(' ') || 'none'}`,
@@ -195,19 +207,24 @@ describe('the shipped corpus is winnable at every seat count', () => {
       }
     });
 
-    it(`${n} players: the game goes past the turn-52 deck cliff`, () => {
+    it(`${n} players: the game goes past its own deck's cliff`, () => {
       // The shipped bug, restated as a winnability requirement: the old build ended
-      // EVERY game on turn 52 and the game could not be won at any seat count.
+      // EVERY game on the turn the deck ran out, and the game could not be won at any
+      // seat count.
       //
-      // This is the assertion the whole exercise turns on, and it is a hard one:
-      // 52 Ideology Cards drawn one per turn cannot reach turn 53 at all.
+      // This is the assertion the whole exercise turns on, and it is a hard one: the
+      // Ideology deck is drawn one per turn, so a deck of N cards cannot reach turn
+      // N+1 at all. `TURN_CLIFF` is that N, MEASURED off the deck this game was dealt
+      // rather than typed in — the number used to be a literal `52` here and another
+      // one in `interrupt-window.test.ts`, and the day the corpus grew it, both would
+      // have gone red and asked for an edit that asserted nothing.
       const turns = sweepRows(n).filter((r) => r.run.state.finished).map((r) => r.turn);
       expect(turns.length, `${n} players produced no finished games`).toBeGreaterThan(0);
       const deepest = Math.max(...turns);
       expect(
         deepest,
-        `${n} players: no seed reached past turn ${SHIPPED_IDEOLOGY}, so the Ideology recycle is not being exercised`,
-      ).toBeGreaterThan(SHIPPED_IDEOLOGY);
+        `${n} players: no seed reached past turn ${TURN_CLIFF}, so the Ideology recycle is not being exercised`,
+      ).toBeGreaterThan(TURN_CLIFF);
 
       // THE RECYCLE ITSELF, counted rather than inferred from the turn number — and
       // this replaces a hand-tuned per-seat-count floor that was measuring the driver,
@@ -234,8 +251,8 @@ describe('the shipped corpus is winnable at every seat count', () => {
       );
       expect(
         answered,
-        `${n} players: the deepest game answered ${answered} Ideology Cards, which a ${SHIPPED_IDEOLOGY}-card deck cannot deal — so it exhausted rather than recycled`,
-      ).toBeGreaterThan(SHIPPED_IDEOLOGY);
+        `${n} players: the deepest game answered ${answered} Ideology Cards, which a ${TURN_CLIFF}-card deck cannot deal — so it exhausted rather than recycled`,
+      ).toBeGreaterThan(TURN_CLIFF);
     });
   }
 
@@ -268,7 +285,7 @@ describe('the shipped corpus is winnable at every seat count', () => {
     const run = playInProcess(freshShippedCorpus(11, 3, ctx), ctx, { maxActions: 1200 });
     expect(run.stalled, `seed 11 stalled again: ${run.reason}`).toBe(false);
     expect(run.state.finished).toBe(true);
-    expect(majoritiesOn(run.state), 'seed 11 finishes, but not with nine majorities').toBe(9);
+    expect(majoritiesOn(run.state), 'seed 11 finishes, but not with nine majorities').toBe(ZONES);
     expect(pegsOn(run.state)).toBeGreaterThanOrEqual(MAJORITY_PEGS);
     // And the deck recycled rather than exhausting, which is the mechanism the old
     // build got wrong.
@@ -475,7 +492,7 @@ describe('a real-corpus game runs to completion over a real socket, at every sea
         // the expectation above cannot leave this reading a null.
         if (won === null) throw new Error('unreachable: the expectation above fails when no attempt won');
         const s = won.state;        expect(s.finished, `${n} players over a socket: the match did not finish`).toBe(true);
-        expect(majoritiesOn(s), `${n} players over a socket: only ${majoritiesOn(s)} of 9 zones decided`).toBe(9);
+        expect(majoritiesOn(s), `${n} players over a socket: only ${majoritiesOn(s)} of 9 zones decided`).toBe(ZONES);
         expect(pegsOn(s), `${n} players over a socket: too few pegs for nine majorities`).toBeGreaterThanOrEqual(MAJORITY_PEGS);
         expect(s.turnOrder).toHaveLength(n);
         // The budget is not the assertion, but a driver that needed 3999 actions

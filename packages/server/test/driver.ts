@@ -107,6 +107,7 @@ import {
   type PendingChoice,
   type PlayerID,
   type Resource,
+  type ZoneID,
 } from '@shasn/engine';
 
 import { decksOf } from '../src/store.ts';
@@ -237,9 +238,15 @@ function foreignAreas(
   want: number,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   scope: ChoiceScope | undefined,
+  zoneId: ZoneID | undefined,
 ): readonly string[] {
   const out: string[] = [];
   for (const z of s.zones) {
+    // G16. The constituency is the CARD's, already resolved by the time the decision
+    // exists, and `reduce` refuses any pick outside it ("that voter is in another
+    // zone"). Mirrored here clause for clause, like everything else in this function:
+    // the driver picks from the set the engine will accept, not from the whole board.
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       // A Volatile Area cannot be evicted or converted — p18.
       if (a.peg === null || a.volatile) continue;
@@ -270,10 +277,11 @@ function areaPick(
   count: number,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   scope: ChoiceScope | undefined,
+  zoneId: ZoneID | undefined,
 ): { kind: 'areas'; areaIds: string[] } {
-  const usable = countableAreas(s, me, kind, scope);
+  const usable = countableAreas(s, me, kind, scope, zoneId);
   const wanted = Math.min(count, usable);
-  return { kind: 'areas', areaIds: [...foreignAreas(s, me, wanted, kind, scope)] };
+  return { kind: 'areas', areaIds: [...foreignAreas(s, me, wanted, kind, scope, zoneId)] };
 }
 
 /** How many pegs satisfy the same filters `reduce`'s `targetableCount` applies. */
@@ -282,9 +290,11 @@ function countableAreas(
   me: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   scope: ChoiceScope | undefined,
+  zoneId: ZoneID | undefined,
 ): number {
   let n = 0;
   for (const z of s.zones) {
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (a.peg === null || a.volatile) continue;
       if (scope === 'own' && a.peg.owner !== me) continue;
@@ -364,10 +374,10 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
       return hit === null ? null : { kind: 'steal', from: hit.from, res: hit.res };
     }
     case 'evict-voter':
-      return areaPick(s, me, n, 'evict-voter', choice.choice.scope);
+      return areaPick(s, me, n, 'evict-voter', choice.choice.scope, choice.choice.zoneId);
     case 'discard-voter':
     case 'convert-voter':
-      return areaPick(s, me, n, choice.choice.kind, choice.choice.scope);
+      return areaPick(s, me, n, choice.choice.kind, choice.choice.scope, choice.choice.zoneId);
     default:
       // Unreachable against a corpus the cards package has validated. Returning
       // `null` makes the caller throw with the kind in the message, which is the

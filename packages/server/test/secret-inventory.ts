@@ -56,18 +56,94 @@ export const LEAK_PATHS = {
   conspiracyHand: 'players[].conspiracies',
 
   /**
+   * G20 — `PlayerState.ideologyCards`. THE ENTRY THE ENGINE OWED THIS FILE, and it is
+   * now here.
+   *
+   * Same class as the hand above and for a stronger reason: the counterpart of an
+   * unanswered card is that its holder does not know what it is, and the answer to a
+   * blind card is a coin flip the player makes. So a player shown the card in their own
+   * hand has not made one.
+   *
+   * The rulebook draws the line at *answered*: p13 keeps a card hidden "until the active
+   * player confirms their answer", a donated card has not been answered, and the card
+   * is put to its holder at their next turn boundary. That is the hidden side of the
+   * line, along with `conspiracies`, and NOT the public side along with
+   * `manifestoCards` — so `PRIVATE_PLAYER_KEYS` strips it for every viewer with no
+   * `pid === viewer` branch.
+   *
+   * It was owed rather than missing by accident: the ruling is on the field in
+   * `packages/engine/src/state.ts` and the strip is in `playerView.ts`, both of which
+   * say in as many words that the entry beside `conspiracyHand` over here is required.
+   * A list that rots silently is worse than no list, which is why this file's own header
+   * makes that argument — and an omission nobody can distinguish from a ruling is
+   * exactly the failure mode. `secret-state.test.ts` now walks BOTH entries generically,
+   * so this is no longer documentation: the payload is checked against it.
+   */
+  ideologyHand: 'players[].ideologyCards',
+
+  /**
    * The ONE narrow exception to the rule above, and it is not an exception to the
    * hand: `playableConspiracies` is a per-VIEWER list of that viewer's own cards,
-   * narrowed to the ones `reduce` will accept for a `PLAY_CONSPIRACY` right now. It
-   * is empty whenever the viewer could not play one, and it never contains a card
+   * narrowed to the ones `reduce` will accept for a `PLAY_CONSPIRACY` right now. It is
+   * empty whenever the viewer could not play one, and it never contains a card
    * held by anybody else.
    *
    * It is listed here because it is the field a future refactor is most likely to
-   * "simplify" — widen it to the whole hand, hoist it out of the phase/turn guards,
-   * or compute it once per match instead of per projection. Each of those is a
+   * "simplify" — widen it to the whole hand, hoist it out of the phase/turn guards, or
+   * compute it once per match instead of per projection. Each of those is a
    * regression this file's block in `secret-state.test.ts` fails on.
+   *
+   * The two shapes in this list are asserted DIFFERENTLY, and that difference is the
+   * point rather than an inconvenience: a `players[].X` path must be EMPTY for every
+   * viewer including the owner, while this one must be a SUBSET OF THE VIEWER'S OWN
+   * HAND. A generic walk that demanded "empty" of both would be wrong about this entry,
+   * and a generic walk that demanded "subset of your own hand" of both would be wrong
+   * about the hands — so `secret-state.test.ts` branches on the path shape.
    */
   playableConspiracies: 'playableConspiracies[]',
+} as const;
+
+/**
+ * The `Choice` kinds this suite has CLASSIFIED, and what each one is allowed to ask a
+ * player about.
+ *
+ * WHY A LIST OF CHOICE KINDS AT ALL. `Choice` is the one place the engine hands a
+ * player a decision, and it is therefore the one place a leak can arrive without any
+ * `_`-prefixed field to trip over: a choice that said "pick one of these cards" would
+ * enumerate a hidden hand, and nothing in the prefix walk or in `LEAK_PATHS` would see
+ * it, because the leak would be in a VALUE the engine chose to publish rather than in a
+ * field it forgot to strip.
+ *
+ * `choose-player` and `choose-zone` (G1 and G16) are here because the parallel engine
+ * work added them this round and the guard did its job: they arrived unclassified, which
+ * is the moment somebody has to look at them. Both are safe, and for the same reason
+ * the two G16 selectors that need no decision are safe — the board is fully public (nine
+ * fixed areas, every peg face up) and the seats are public (`turnOrder`), so a PlayerID
+ * and a ZoneID are things every viewer already has. Neither can name a card.
+ *
+ * A `Choice` also carries the card's `source` (the ACTOR, a PlayerID — never a CardID)
+ * and the effect list to run. Neither is a card identity: the actor of a card already on
+ * the table is on the public log, and an effect list is behaviour, not an id. That is
+ * the argument; `secret-state.test.ts` asserts it rather than trusting it, by checking
+ * that no CardID from the corpus appears anywhere in a serialised `PendingChoice`.
+ */
+export const CHOICE_KINDS = {
+  /** "gain N resources of your choice" — currencies. */
+  'gain-any': 'resources',
+  /** "discard N resources of your choice" — currencies, from the chooser's own hand. */
+  'lose-any': 'resources',
+  /** "take N resources from a chosen opponent" — a player id, then currencies. */
+  'steal-any': 'resources',
+  /** "evict N voters" — pegs on the board, which are public. */
+  'evict-voter': 'pegs',
+  /** "discard N voters" — pegs on the board, which are public. */
+  'discard-voter': 'pegs',
+  /** "convert N voters" — pegs on the board, which are public. */
+  'convert-voter': 'pegs',
+  /** G1 — "a player of your choosing": names seats, which `turnOrder` already lists. */
+  'choose-player': 'players',
+  /** G16 — "a constituency of your choosing": names board areas, which are public. */
+  'choose-zone': 'zones',
 } as const;
 
 /**

@@ -46,6 +46,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { TestClient, advance, digest, startHarness, type Harness } from './fixtures.ts';
+import { BOARD } from './corpus-facts.ts';
 import { discardKeepingReserve, driverPly, targetZone } from './driver.ts';
 import type { ClientState } from '@shasn/engine';
 
@@ -239,10 +240,12 @@ let actions = 0;
     const decided = room.state.zones.filter((z) => z.majorityHolder !== null).length;
     const pegs = room.state.zones.reduce((k, z) => k + z.areas.filter((a) => a.peg !== null).length, 0);
     // The shipped corpus, 2 players. Reported so a regression is visible in the log
-    // even when the assertions below still pass.
+    // even when the assertions below still pass. The denominators are measured, not
+    // typed: `129` and `69` were both literals here and both are the board's, which
+    // means a zone edit would have needed three edits in three files to stay honest.
     console.log(
       `E2E 2 players on the shipped corpus: seed ${room.seed} turn ${room.state.turn} ` +
-        `actions ${actions} pegs ${pegs}/129 majorities ${decided}/9`,
+        `actions ${actions} pegs ${pegs}/${BOARD.areas} majorities ${decided}/${BOARD.zones}`,
     );
 
     expect(room.state.finished, 'the game did not finish within 4000 actions').toBe(true);
@@ -250,13 +253,14 @@ let actions = 0;
     // driver that barely finishes. Pinned so a regression to "grinds on forever" fails
     // here rather than as a timeout, and so the cost of the game is a number somebody
     // is watching. Measured 211-267 across 20 seeds; the in-process sweep in
-    // winnable.test.ts carries the distribution.
+    // winnable.test.ts carries the distribution. It is a DRIVER budget, not a corpus
+    // fact, so a literal is the right instrument.
     expect(actions, 'the driver took implausibly many actions to reach a decided board').toBeLessThan(600);
     // A real win, not a full board. p20's board-full ending is legal but it is not a
     // decided board, and at two seats the shipped corpus reaches nine majorities on
     // 20 of 20 seeds.
-    expect(decided, `only ${decided} of 9 zones decided, on ${pegs} of 129 pegs`).toBe(9);
-    expect(pegs, 'nine majorities need at least 69 pegs').toBeGreaterThanOrEqual(69);
+    expect(decided, `only ${decided} of ${BOARD.zones} zones decided, on ${pegs} of ${BOARD.areas} pegs`).toBe(BOARD.zones);
+    expect(pegs, `nine majorities need at least ${BOARD.majorityPegs} pegs`).toBeGreaterThanOrEqual(BOARD.majorityPegs);
 
     await settle();
     expect(ada.latestState().state.finished).toBe(true);
