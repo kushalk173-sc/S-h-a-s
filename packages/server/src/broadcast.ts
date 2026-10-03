@@ -7,9 +7,20 @@
  *
  *   viewFor        — the broad public view. `playerView`, plus the strip of
  *                    every other player's Conspiracy hand, plus the one
- *                    viewer-scoped addition described below.
+ *                    viewer-scoped addition described below, plus
+ *                    `openQuestion`: the card on the table, said in public.
  *   blindPromptFor — the narrow one. Question text and two answer strings, and
  *                    nothing else that could help a player choose.
+ *
+ * THE PUBLIC QUESTION IS NOT A THIRD PROJECTION, and the distinction is the
+ * interesting one. `openQuestion` is a FIELD of the broad view rather than a
+ * projection of its own, because it has no viewer in it at all: `openQuestionFor`
+ * takes `(state, cards)` and no player, because at a physical table the question
+ * is read aloud and belongs to the table (AUTHENTIC-SHASN-REFERENCE §7.2 step 1).
+ * What is private is not the question — it is the seed-derived `order` coin flip
+ * and the commit control, and both of those arrive on the `blind` field, which is
+ * still built for the answering player alone. So the table sees one card and the
+ * answerer additionally holds the means to answer it.
  *
  * THE VIEWER-SCOPED ADDITION — `playableConspiracies` — and why it is here and
  * not in `playerView.ts`. The D25 ruling (ARCHITECTURE §8.1.1) holds that a hand
@@ -130,12 +141,70 @@ export type PlayableConspiracy = {
 };
 
 /**
- * `ClientState` plus the single viewer-scoped field. Exported because the wire type
- * declares `match:state.state` as `ClientState` and widening it to `PublicView`
- * there would break protocol parity with the client's copy — see `protocol.ts`.
+ * THE OPEN QUESTION — what is on the table, said in public.
+ *
+ * ── THE RULING, AND THE THREE THINGS IT IS ABOUT ──────────────────────────
+ *
+ * Before this field, only the player holding the card was told the question. That
+ * was a fidelity DEVIATION, and the rulebook says so plainly:
+ *
+ *   · `docs/AUTHENTIC-SHASN-REFERENCE.md` §7.2 step 1 (p764): "The player to your
+ *     right takes the top Ideology Card and READS BOTH SIDES ALOUD TO YOU." Reading
+ *     aloud to a table is a public act. Every other player is looking at the same
+ *     two faces of the same piece of card.
+ *   · §7.2 step 2 (p768-770): the redraw window is open to "ANY player", which is
+ *     only a decision-shaped window if the table knows which question is being
+ *     gambled on. A digital table that cannot see the question cannot participate
+ *     in the moment the rulebook calls the social centre (§7.4 step 3, p815).
+ *
+ * So the QUESTION and BOTH LABELS are public while the card is out. That is change
+ * A, and it is the physical game.
+ *
+ * WHAT IS NOT PUBLIC, AND WHY NOT — the line is drawn by the rulebook, not by
+ * taste. §7.2 step 3 (p774-775): "You answer. You say which side. The card goes
+ * under your mat, answer-side up, into the notch. THE ▼ AND THE PAYOUT ARE NOW
+ * REVEALED." The payout is revealed *after* the answer, and §7.2 step 2 (p772)
+ * spells out why that ordering is load-bearing: "Because the reading player does
+ * not know what the card pays, the redraw is a BET, not a decision." Publicising
+ * the question therefore does not turn the redraw into a decision, and publicising
+ * the payout would. Change C — payout before anyone answers — is REFUSED here, and
+ * this type is the proof: there is no `Delta`, no `Ideologue`, no `CardID` and no
+ * number anywhere in it, exactly as in `BlindPrompt` (§7.2 step 1, p767: "no
+ * payouts, no ideologue names").
+ *
+ * `order` IS DELIBERATELY ABSENT, and that is the seed-derived draw from PLAN.md §2
+ * amendment A′: it says which face of the card a position is, so it is the one
+ * field the table must not be able to line up against the deck's Ideologue balance.
+ * The answerer gets it from `blind`, and it is the answerer's alone. What the table
+ * gets instead is `labels` ALREADY IN DISPLAY ORDER, so everybody is looking at one
+ * card rather than at two orderings of it — and position still carries no
+ * information, because which position means which face is not published.
+ *
+ * PUBLIC BY CONTENT, NOT BY ID, AND THE PRECEDENT IS `manifestoCards`. The
+ * rulebook's line is "until the active player confirms their answer" (p13, quoted
+ * in `playerView.ts`): an ANSWED card is face up on the mat and is published by id
+ * in `PlayerState.manifestoCards`, which is safe precisely because the payout has
+ * already been paid and revealed, so the id adds nothing. An UNANSWERED card is on
+ * the other side of that line, and every card in the shipped corpus is public
+ * content — so publishing its id would hand the table a lookup key into the payout
+ * table for a card nobody has answered yet. Content-only is therefore the same
+ * ruling the project already applies to `manifestoCards`, not a third category.
+ */
+export type PublicQuestion = {
+  readonly question: string;
+  /** Display order, and the SAME order the answerer is shown. Never `order`. */
+  readonly labels: readonly [string, string];
+};
+
+/**
+ * `ClientState` plus the one viewer-scoped field and the one table-wide field.
+ * Exported because the wire type declares `match:state.state` as `ClientState` and
+ * widening it to `PublicView` there would break protocol parity with the client's
+ * copy — see `protocol.ts`.
  */
 export type PublicView = ClientState & {
   readonly playableConspiracies: readonly PlayableConspiracy[];
+  readonly openQuestion: PublicQuestion | null;
 };
 
 /**
@@ -158,7 +227,30 @@ export function viewFor(
   return {
     ...base,
     playableConspiracies: playableConspiraciesFor(state, cards, viewer),
+    openQuestion: openQuestionFor(state, cards),
   };
+}
+
+/**
+ * The card on the table, in public, for EVERY viewer including a spectator.
+ *
+ * NO VIEWER PARAMETER, and that is the assertion the signature makes: the question
+ * is a property of the state and the cards, not of who is asking, because at a
+ * physical table it is a property of the table. It is computed per call rather than
+ * cached, for the same reason `playableConspiraciesFor` is — a redraw swaps the
+ * card and therefore the question and both labels, and the next projection must say
+ * so with no invalidation step to forget.
+ *
+ * `null` at every moment there is no card out: wrong phase, no pending card, or a
+ * card the index cannot read. It is `null`, never a partial object, so a client can
+ * distinguish "no question on the table" from "a question I could not read" without
+ * a second flag.
+ */
+export function openQuestionFor(state: GameState, cards: CardIndex): PublicQuestion | null {
+  if (state.phase !== 'answer') return null;
+  const prompt = pendingPromptFor(state, cards);
+  if (prompt === null) return null;
+  return { question: prompt.question, labels: prompt.labels };
 }
 
 /** The empty list. Shared so the common case allocates nothing per viewer. */
@@ -254,7 +346,10 @@ export function playableConspiraciesFor(
  *
  * Returns `null` for anyone who is not the player currently holding the card,
  * which is every other player and every spectator. The type admits no `Delta`, no
- * `Ideologue`, no `CardID` and no number.
+ * `Ideologue`, no `CardID` and no number. Those other players and that spectator
+ * are told the same words by `openQuestionFor` instead — see the ruling on
+ * `PublicQuestion` — and the difference between the two payloads is exactly the
+ * `order` coin flip and the fact that only one of them comes with a commit control.
  */
 export function blindPromptFor(
   state: GameState,
@@ -262,6 +357,22 @@ export function blindPromptFor(
   viewer: PlayerID,
 ): BlindPrompt | null {
   if (viewer !== state.activePlayer) return null;
+  const prompt = pendingPromptFor(state, cards);
+  if (prompt === null) return null;
+  return { question: prompt.question, labels: prompt.labels, order: prompt.order };
+}
+
+/**
+ * The pending card's words and its presentation order, computed ONCE.
+ *
+ * Both public projections read this, and that is the whole reason it exists: the
+ * table's copy of the question and the answerer's copy are the same card seen from
+ * the same two positions, so a second transcription of the label order would be a
+ * place where the table and the answerer could silently disagree about which face
+ * is on the left — and the answerer's click would then buy the other side's
+ * payout. One computation, two narrow projections over it.
+ */
+function pendingPromptFor(state: GameState, cards: CardIndex): PendingPrompt | null {
   if (state.phase !== 'answer') return null;
   const cardId = readPendingCard(state);
   if (cardId === null) return null;
@@ -279,6 +390,13 @@ export function blindPromptFor(
   const labels: readonly [string, string] = order === 'ab' ? [a.answer, b.answer] : [b.answer, a.answer];
   return { question: card.question, labels, order };
 }
+
+/** What both projections publish. `order` is the answerer's alone; see above. */
+type PendingPrompt = {
+  readonly question: string;
+  readonly labels: readonly [string, string];
+  readonly order: AnswerOrder;
+};
 
 /**
  * Map the index the player *pressed* to the side of the card they *meant*.
