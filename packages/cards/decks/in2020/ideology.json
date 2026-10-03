@@ -957,6 +957,120 @@
           "pays": { "clout": 2, "trust": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-in2020-051",
+      "source": "original; register per REF 8.2. An unprofitable service. The recovered pool has no question about whether to keep running something that loses money, which is the ordinary form of most state expenditure.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should loss-making public transport be kept running or written off?",
+      "sides": [
+        {
+          "answer": "Yes. A bus on a losing route is the only seat some people have.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. A service with no fare has no driver and a road has no police.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-052",
+      "source": "original; register per REF 8.2. The courts. REF 8.1 recovers no institutional question at all, and a deadline imposed on an institution that does not control its backlog is the register's sharpest ordinary dilemma.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the courts be told to clear all pending cases this year?",
+      "sides": [
+        {
+          "answer": "Yes. Clear them, and the reason for the delay becomes visible.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        },
+        {
+          "answer": "No. A clearance order moves the queue and keeps the count.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-053",
+      "source": "original; register per REF 8.2. Broadcast form as a question. The recovered Showstopper questions are all about whether to say something; this one is about where it is said, which the cut decides for you.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the television debate come from one studio or two?",
+      "sides": [
+        {
+          "answer": "Yes. One room, and the clip that circulates is the exchange.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Two rooms, and no single cut can be called the debate.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-054",
+      "source": "original; register per REF 8.2. Internal party discipline. Extends ig-in2020-037 from the calendar advantage of the incumbent to whether its own members are countable in public, which is a different institutional question.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the ruling party's internal vote be shown to the public?",
+      "sides": [
+        {
+          "answer": "Yes. Show it, and the next election is a count rather than a campaign.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. A party that counts itself in public cannot revise a number.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-055",
+      "source": "original; register per REF 8.2. The distribution question that every recovered card abstains from: not whether to build something but which district it goes in. The Showstopper side is the one arguing for the minister's own district, so the patronage reading is not automatically the greedy side.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the minister's own district get the new hospital?",
+      "sides": [
+        {
+          "answer": "Yes. The district asked for it and the minister has seen the file.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. A hospital in the minister's district is a poster with beds.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-056",
+      "source": "original; register per REF 8.2. A one-month bilateral concession, which is the register's preferred shape: both sides can be defended, and the disagreement is entirely about what a precedent is worth.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the border open to pilgrims without a visa for one month?",
+      "sides": [
+        {
+          "answer": "Yes. Open it, and the month is photographed from both sides.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. Open it once, and it becomes the standing arrangement.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
     }
   ]
 }
