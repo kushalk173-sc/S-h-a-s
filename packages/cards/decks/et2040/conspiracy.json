@@ -145,38 +145,35 @@
       "excludeInTwoPlayer": true
     },
     {
-      "id": "ct-et2040-009",
-      "source": "original; register per REF 8.2. PYTHONPOST (REF 4.1, scribd 814006944) and its twin SNOOP B-O-DOUBLE-T (REF 4.3, scribd 915391789) are recorded as NOT REPRESENTABLE in decks/SOURCES.md: a rest-of-game purchase surcharge is G9 and G5, and neither may be shipped as a one-shot that reads as permanent.",
-      "provenance": "inferred",
-      "name": "Dry Dock",
-      "text": "Gain 2 resources of your choice from the Public Reserve. Then gain 1 voter.",
+      "id": "ct-et2040-019",
+      "source": "REF 4.2.1 recovers POWER TRIP. The trigger is PERFORMED (G14): on-voter-influenced with influencedVotersAtLeast 3 IS 'every time you influence a 3-Voter Card', byOwner IS 'you', and no movedMyVoter is needed because the printed discard is the card's own action rather than a theft. DROPPED, named: 'non-majority' (the engine reaches any peg an opponent owns, which is WIDER) and the printed 'you can' (the hook fires, so the discard is MANDATORY). Each opponent chooses which of their own. Refires the inferred DRY DOCK.",
+      "provenance": "adapted",
+      "name": "Power Trip",
+      "text": "For the rest of the game, every time YOU influence a Voter Card carrying 3 or more voters, each opponent must strike 1 of their own voters from the board permanently — including a majority. Voters in Volatile Areas cannot be struck.",
       "cost": 4,
       "effects": [
         {
-          "op": "gain-any",
-          "n": 2
-        },
-        {
-          "op": "voters",
-          "n": 1
+          "op": "discard-voter",
+          "n": 1,
+          "target": "each-opponent",
+          "when": "on-voter-influenced",
+          "until": "rest-of-game",
+          "condition": { "byOwner": true, "influencedVotersAtLeast": 3 }
         }
       ]
     },
     {
-      "id": "ct-et2040-010",
-      "source": "original; register per REF 8.2. THE WET SEASON ARGUMENT archetype (ct-et2040-007) reskinned, per REF 8.2 rule 7.",
-      "provenance": "inferred",
-      "name": "The Long Commute",
-      "text": "Evict 2 voters from the board. Then gain 2 resources of your choice from the Public Reserve.",
+      "id": "ct-et2040-017",
+      "source": "REF 4.2.1 recovers If You Like Pina Colada: 'Double all the resources on your player mat. Your current resource cap still applies.' G4 + G15 landed for exactly this shape: a res of 1 in EACH resource times held-of-each-resource IS a doubling of the mat, and the cap is enforced by the same gain path, which is the card's own second sentence. Still `adapted`, not `verbatim`, only because the recovered text carries an accent the deck's title casing does not. Refires the inferred THE LONG COMMUTE.",
+      "provenance": "adapted",
+      "name": "If You Like Pina Colada",
+      "text": "Double every resource on your Mat: you gain one extra Funds, one extra Clout, one extra Media and one extra Trust for each one you are already holding. Your resource cap still applies, so a Mat already at the cap cannot be doubled.",
       "cost": 5,
       "effects": [
         {
-          "op": "evict",
-          "n": 2
-        },
-        {
-          "op": "gain-any",
-          "n": 2
+          "op": "gain",
+          "res": { "funds": 1, "clout": 1, "media": 1, "trust": 1 },
+          "per": { "of": "held-of-each-resource" }
         }
       ]
     },
@@ -201,20 +198,17 @@
       ]
     },
     {
-      "id": "ct-et2040-012",
-      "source": "original; register per REF 8.2. SELECTIVE ACCESS MEMORY (REF 4.2.1, scribd 915391788) is recorded as NOT REPRESENTABLE in decks/SOURCES.md: choosing a card out of the discard pile, in any order, is G17. This card is the nearest expressible reading, and it draws from the deck rather than the discard pile.",
-      "provenance": "inferred",
-      "name": "Server Space",
-      "text": "Draw the top Conspiracy Card and keep it. You also get 2 discounts on purchases this turn.",
+      "id": "ct-et2040-018",
+      "source": "REF 4.2.1 recovers SELECTIVE ACCESS MEMORY. G17 is HALF closed and the half that shipped is the deal: draw-conspiracy carries from: 'discard', and a Conspiracy Card discard pile is honest to read because such a card is bought and held and never answered face up. DROPPED, named, and it is the card's whole point: 'pick ANY ... in any order' is a 'choose-card' decision, REFUSED AT THE TYPE LEVEL because rendering it means listing the pile, and the piles are _-prefixed and stripped by playerView, so the OPTION LIST would be the leak. Refires the inferred SERVER SPACE.",
+      "provenance": "adapted",
+      "name": "Selective Access Memory",
+      "text": "Take the top Conspiracy Card from the discard pile into your hand. The printed card lets you pick ANY card from that pile in ANY order; only the top of it is reachable here.",
       "cost": 4,
       "effects": [
         {
           "op": "draw-conspiracy",
-          "n": 1
-        },
-        {
-          "op": "discount",
-          "n": 2
+          "n": 1,
+          "from": "discard"
         }
       ]
     },

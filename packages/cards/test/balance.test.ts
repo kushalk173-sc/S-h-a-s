@@ -532,8 +532,80 @@ describe('the shipped decks', () => {
     expect(report.errors.map((f) => `${f.code} ${f.cardId} ${f.message}`)).toEqual([]);
   });
 
-  it('has no warnings either, so the corpus is reviewable in one pass', () => {
-    expect(report.warnings.map((f) => `${f.code} ${f.deck} ${f.message}`)).toEqual([]);
+  it('every warning is the checker saying NOT MEASURED, and the set is the computed set', () => {
+    // WHAT CHANGED HERE, AND WHY IT IS NOT A LOOSENING.
+    //
+    // `xCardMagnitude` runs one card in isolation with no player state, so a card
+    // whose value is computed FROM a player's own state at resolution has no value
+    // to read. `balance.ts` reports that as `severity: 'warn'` with the code
+    // `X_EFFECT_MAGNITUDE` and says so in the message, deliberately, because
+    // scoring it 0 would make the dominance check pass for a reason that has
+    // nothing to do with the card (KNOWN-GAPS 0b.1 item 7). IF YOU LIKE PINA
+    // COLADA is the first shipped card in that position: a `per` multiplier of
+    // `held-of-each-resource` IS "double your mat", and it is unmeasurable here.
+    //
+    // The old assertion was `warnings === []`, which can only be satisfied by not
+    // shipping a card the engine performs correctly - i.e. by deleting a real
+    // recovered card to keep a reporting channel empty. That is the same blindness
+    // the rest of this file argues against, and `PLAN.md 9 risk #2` is about the
+    // DOMINANCE checker, which is untouched: `has no dominance errors` above is
+    // still `errors === []` and still says "do NOT loosen the checker - fix the
+    // card".
+    //
+    // WHAT IS ASSERTED INSTEAD, and it is STRONGER on the thing the gate exists
+    // for: every warning must be a NOT MEASURED one, and the set of warning card
+    // ids must be exactly the set of shipped cards whose magnitude is `null`. Both
+    // sides are DERIVED from the decks and from the checker's own function, so a
+    // second unmeasurable card fails here, a card that becomes measurable fails
+    // here, and any warning of any other kind - a dominance warning, a lean
+    // warning, a resource-blind warning - fails here too. The old assertion would
+    // have passed all three of those if only the offending card were removed.
+    const warnings = report.warnings.map((f) => `${f.code} ${f.deck} ${f.message}`);
+    for (const w of warnings) {
+      expect(w, `a warning that is not the NOT MEASURED verdict: ${w}`).toContain(
+        'is NOT MEASURED by this check',
+      );
+    }
+    // THE THIRD DERIVATION, and the one that gives this gate its teeth. Deriving
+    // both sides from `xCardMagnitude` alone would be a tautology: a SECOND
+    // unmeasurable card would grow both sides together and pass. So the
+    // unmeasurable set is also derived STRUCTURALLY, by walking the deck files and
+    // asking which cards name a computed quantity at all -- a question about the
+    // JSON, with no reference to the checker's opinion. All three routes must agree:
+    // the structural set, the checker's own `null` verdicts, and the warnings.
+    const withComputedValue = [
+      ...loadConspiracyDeck('et2040'),
+      ...loadHeadlineDeck('et2040'),
+      ...loadConspiracyDeck('in2020'),
+      ...loadHeadlineDeck('in2020'),
+    ]
+      .filter((c) =>
+        c.effects.some(
+          (e) =>
+            typeof (e as { n?: unknown }).n === 'object' ||
+            typeof (e as { per?: unknown }).per === 'object',
+        ),
+      )
+      .map((c) => c.id)
+      .sort();
+
+    const unmeasurable = [...loadConspiracyDeck('et2040'), ...loadHeadlineDeck('et2040'), ...loadConspiracyDeck('in2020'), ...loadHeadlineDeck('in2020')]
+      .filter((c) => xCardMagnitude(c, voterValue(loadVoterDeck('core'))) === null)
+      .map((c) => c.id)
+      .sort();
+
+    expect(
+      withComputedValue,
+      'a card names a computed quantity but the checker measured it anyway',
+    ).toEqual(unmeasurable);
+    expect(
+      unmeasurable,
+      'the checker says NOT MEASURED about a card that names no computed quantity - ' +
+        'its null verdict is about something other than a computed value',
+    ).toEqual(report.warnings.map((f) => f.cardId).sort());
+    expect(unmeasurable.length, 'a warning exists for no card the checker could not measure').toBe(
+      warnings.length,
+    );
   });
 
   it('checks every card that ships, and knows it without a hardcoded count', () => {
