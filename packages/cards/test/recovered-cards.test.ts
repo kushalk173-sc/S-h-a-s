@@ -13,7 +13,9 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ConspiracyCard, HeadlineCard } from '../src/engine.js';
+import { RULES } from '../src/engine.js';
 import type { Ctx } from '../../engine/src/reduce';
+import { usesLeft } from '../../engine/src/powers';
 import type { GameState } from '../../engine/src/state';
 
 import {
@@ -24,9 +26,12 @@ import {
   pegsOf,
   playConspiracy,
   resolveHeadline,
-  withPegsFor,
+  totalOf,
   volatileAreaIn,
+  withPegsFor,
   withPegsInZones,
+  withResources,
+  withUnlockedLevel3,
   type RecoveredCard,
 } from './recovered-cards.js';
 
@@ -311,6 +316,129 @@ effects: [{ op: 'discard-voter', n: 2, target: 'you', zone: 'chosen-zone' }],
       // AND the decision is NOT raised yet: a pending choice frozen into a LiveEffect
       // would outlive the turn it was raised on, which is a freeze by another name.
       expect(s.choices).toEqual([]);
+    },
+  },
+  // ── The three cards in this batch that are the FIRST SHIPPED USER of an op. Each
+  //    is a mechanism nothing else on the table exercises, so each is asserted on the
+  //    state change itself and not merely on the decision it raises. ──
+  {
+    name: 'Stay In Your Limits',
+    ref: 'REF 4.1 (2024 Headline and Conspiracy Cards Explained)',
+    kind: 'headline',
+    verbatim:
+      "Every player converts 2 voters of the player to their left. Each player that doesn't break a majority gets 2 resources.",
+    drops: [
+      "'every player converts' becomes 'YOU convert': `EffectTarget` cannot name a seat-relative neighbour, so the per-player iteration and the direction are both dropped, and the donor may be ANY opponent -- which is WIDER than the seat to your left (G18/G2).",
+      "'each player that doesn't break a majority gets 2 resources' is conditional on an OUTCOME of the conversion, which needs a per-player outcome record rather than a state (G2).",
+    ],
+    card: {
+      id: 'hl-recovered-stay-in-limits',
+      name: 'Stay In Your Limits',
+      text: "Convert 2 of an opponent's voters into your own.",
+      effects: [{ op: 'convert-voter', n: 2 }],
+    } as HeadlineCard,
+    drive: (s) => withPegsFor(s, ['p2', 'p2', 'p3']),
+    check: (s, before, _ctx, after) => {
+      // THE FIRST SHIPPED `convert-voter`, so the thing worth proving is that the peg
+      // actually CHANGES HANDS rather than that a decision was raised: a
+      // convert-voter aimed at a non-source player is raised to somebody who cannot
+      // answer it (`voterScope` gives a named player scope 'own'), and with no
+      // `target` at all the caster is the chooser with scope 'others'.
+      expect(s.choices.map((c) => c.player)).toEqual(['p1']);
+      expect(s.choices[0]?.choice).toMatchObject({ kind: 'convert-voter', scope: 'others' });
+      // Two of p2's pegs are now p1's and p3 is untouched. p2 had two, so p2 keeps
+      // none -- which is the whole point: `convert-voter` does not discard, it
+      // changes the peg's owner, so the count on the board is unchanged.
+      expect(pegsOf(before, 'p1')).toBe(0);
+      expect(pegsOf(after, 'p1')).toBe(2);
+      expect(pegsOf(after, 'p2')).toBe(0);
+      expect(pegsOf(after, 'p3')).toBe(1);
+    },
+  },
+  {
+    name: 'If You Like Pina Colada',
+    ref: 'REF 4.2.1 (2040 Deck - Conspiracy Cards)',
+    kind: 'conspiracy',
+    verbatim: 'Double all the resources on your player mat. Your current resource cap still applies.',
+    drops: [
+      'no clause is dropped, which is why this is the one entry in the file whose reduction is the whole card. It is `adapted` rather than `verbatim` only because a Conspiracy Card also needs a `cost` that the recovered rules text does not print -- G4 and G15 landed for the `per` multiplier, and the cap is the card own second sentence.',
+    ],
+    card: {
+      id: 'ct-recovered-pina-colada',
+      name: 'If You Like Pina Colada',
+      text: 'Double every resource on your Mat. Your resource cap still applies.',
+      cost: 1,
+      effects: [
+        {
+          op: 'gain',
+          res: { funds: 1, clout: 1, media: 1, trust: 1 },
+          per: { of: 'held-of-each-resource' },
+        },
+      ],
+    } as ConspiracyCard,
+    // A Lopsided Mat, and the reason is the assertion below. `per` multiplies each
+    // component by what the player holds OF THAT RESOURCE, so the pools p1 is not
+    // holding must come back at zero. A flat `gain res {1,1,1,1}` would pay all four,
+    // and that is the difference between the printed card and a different card.
+    drive: (s) => withResources(s, 'p1', { funds: 2, clout: 0, media: 0, trust: 0 }),
+    check: (s, before, _ctx, after) => {
+      // THE FIRST SHIPPED COMPUTED VALUE, so the assertion is the arithmetic the `per`
+      // multiplier stands for: a res of 1 in EACH resource times what the player holds
+      // of each IS a doubling of the mat, and p12's cap is enforced on top -- the
+      // card's own second sentence, and the reason a card that merely doubled could
+      // read as though the cap did not apply.
+      // held 2 of Funds and 0 of everything else. `PLAY_CONSPIRACY` does not charge
+      // the cost -- `BUY_CONSPIRACY` does, and a card played from the hand was
+      // already bought -- so the Mat in `before` is the Mat the `per` multiplier
+      // reads, which is the point of KNOWN-GAPS 0b.1 item 6: a computed value reads
+      // the state of the player the effect resolves FOR.
+      const held = before.players.p1!.resources;
+      const now = after.players.p1!.resources;
+      expect(now.funds, `held ${held.funds} Funds`).toBe(Math.min(held.funds * 2, RULES.resourceCap));
+      for (const pool of ['clout', 'media', 'trust'] as const) {
+        // THE DISCRIMINATING ASSERTION. A flat `gain res {1,1,1,1}` pays every pool
+        // and this one pays only what is there, so an empty pool must come back at
+        // zero rather than at 1.
+        expect(now[pool], `${pool} was empty, so a doubling must gain nothing there`).toBe(0);
+      }
+      expect(totalOf(after, 'p1')).toBeGreaterThan(totalOf(before, 'p1'));
+      void s;
+    },
+  },
+  {
+    name: 'Gender Trouble',
+    ref: 'REF 4.3 (2040 Deck – Headline Cards)',
+    kind: 'headline',
+    verbatim:
+      'You cannot use one of your unlocked Level 3 Ideologue Powers in your next turn. If you do not have a Level 3 Ideologue Power, discard 2 resources in your next turn.',
+    drops: [
+      "'one of your unlocked Level 3 Ideologue Powers' becomes ALL of them: naming one power is a decision over POWERS rather than over players, so no `EffectTarget` can say it (G1). That makes the card WEAKER for the caster, and it is named rather than approximated.",
+      "'if you do not have a Level 3 Ideologue Power, discard 2 resources in your next turn' is a conditional over a whole effect list, which the `Effect` union has no way to state (G5).",
+    ],
+    card: {
+      id: 'hl-recovered-gender-trouble',
+      name: 'Gender Trouble',
+      text: 'You cannot use ANY of your unlocked Level 3 Ideologue Powers until the start of your next turn.',
+      effects: [{ op: 'restrict', kind: 'no-power', value: 0, target: 'you', until: 'next-turn' }],
+    } as HeadlineCard,
+    drive: (s) => withUnlockedLevel3(s),
+    check: (s, before, _ctx, after) => {
+      // THE FIRST SHIPPED `no-power`, so the assertion is that the rule is CONSULTED
+      // and not merely written. `usesLeft` is the engine's one consult point for this
+      // kind, and every `POWER_*` case in `reduce()` already asks it.
+      expect(
+        usesLeft(before.players.p1!, RULES, 'prospecting'),
+        'the fixture must hold the power, or this assertion is vacuous',
+      ).toBeGreaterThan(0);
+      expect(usesLeft(after.players.p1!, RULES, 'prospecting'), 'written but not consulted').toBe(0);
+      // The lifetime is the CASTER'S next turn, which is `ownerNextTurn` and not a
+      // second definition of the deadline -- see G22's ruling on why `usesLeft` does
+      // not re-derive it.
+      const r = after.players.p1!.restrictions?.find((x) => x.kind === 'no-power');
+      expect(r, 'the restriction was not written at all').toBeDefined();
+      expect(r?.sourceCardId).toBe('hl-recovered-gender-trouble');
+      expect(r?.expiresTurn).toBeGreaterThan(before.turn);
+      void s;
     },
   },
 ];

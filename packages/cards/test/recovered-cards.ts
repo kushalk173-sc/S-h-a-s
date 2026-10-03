@@ -40,6 +40,7 @@ import { setup } from '../../engine/src/setup';
 import {
   findArea,
   type AreaID,
+  type Pool,
   type GameState,
   type PendingChoice,
   type PlayerID,
@@ -394,6 +395,50 @@ export function areaInZone(s: GameState, zoneId: ZoneID, owner: PlayerID): strin
 
 export function totalOf(s: GameState, id: PlayerID): number {
   return total(s.players[id]?.resources);
+}
+
+/**
+ * G5. Raise `who`'s Capitalist tally to the Level 3 unlock, which is what
+ * `powers.ts hasPower` reads.
+ *
+ * A fixture operation rather than a rules claim, and it exists so GENDER TROUBLE's
+ * assertion is not vacuous: `usesLeft` returns 0 both for a player who holds no
+ * power and for a player whose power has been taken away, so a test that skipped
+ * this would pass whether or not the restriction were consulted.
+ *
+ * `manifesto` is a LIST of answered Ideologues and `cardsOf` is
+ * `tally(player.manifesto)[ideologue]`, so it counts CARDS rather than resources
+ * paid (KNOWN-GAPS §6: the balance checker's resource proxy is the wrong way round
+ * for exactly this ladder). So the honest way to arrange a Level 3 unlock is to
+ * answer three Capitalist cards, and a fixture writes them as the tally's source.
+ */
+export function withUnlockedLevel3(s: GameState, who: PlayerID = 'p1'): GameState {
+  const needed = RULES.level3 - s.players[who]!.manifesto.filter((x) => x === 'capitalist').length;
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      [who]: {
+        ...s.players[who]!,
+        manifesto: [...s.players[who]!.manifesto, ...Array.from({ length: Math.max(0, needed) }, () => 'capitalist' as const)],
+      },
+    },
+  };
+}
+
+/**
+ * Put `who` on a known, deliberately lopsided Mat.
+ *
+ * IF YOU LIKE PINA COLADA is the first shipped computed value, and the assertion that
+ * distinguishes "doubles your Mat" from "hands you one of each" is what happens to
+ * the pools you are NOT holding: a flat `gain res {1,1,1,1}` pays every pool, and
+ * this one pays only what is there.
+ */
+export function withResources(s: GameState, who: PlayerID, res: Pool): GameState {
+  return {
+    ...s,
+    players: { ...s.players, [who]: { ...s.players[who]!, resources: res } },
+  };
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ the fixture â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
