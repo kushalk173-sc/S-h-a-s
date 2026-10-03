@@ -181,19 +181,18 @@
       ]
     },
     {
-      "id": "hl-et2040-012",
-      "source": "original; register per REF 8.2. JUST BREATHE (REF 4.3, scribd 915391789) is recorded as NOT REPRESENTABLE in decks/SOURCES.md: moving voters out of the zone where you hold the most of them is G16, a zone computed from board state. This card is the nearest expressible reading.",
-      "provenance": "inferred",
-      "name": "Tide Warnings",
-      "text": "Evict 1 voter from the board. Then strike 1 more voter belonging to an opponent, permanently.",
+      "id": "hl-et2040-021",
+      "source": "REF 4.3 recovers DON'T KISS THE BABIES: 'All Voter Cards cost any 1 extra resource in your next turn.' G5's `surcharge` is EXECUTED and read by INFLUENCE and BUY_CONSPIRACY. Refires `inferred` TIDE WARNINGS, whose reason for existing was that JUST BREATHE was unrepresentable - G16 shipped it as hl-et2040-016. WIDER THAN PRINTED, and it is the whole difference: the printed tax is on VOTER Cards, this is on EVERY purchase, Conspiracy Cards included, because `surchargeFor` is one function read by both actions.",
+      "provenance": "adapted",
+      "name": "Don't Kiss The Babies",
+      "text": "Every purchase you make until the start of your next turn costs 1 extra Funds -- Voter Cards and Conspiracy Cards alike, where the printed card taxed Voter Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it.",
       "effects": [
         {
-          "op": "evict",
-          "n": 1
-        },
-        {
-          "op": "discard-voter",
-          "n": 1
+          "op": "restrict",
+          "kind": "surcharge",
+          "value": 1,
+          "target": "you",
+          "until": "next-turn"
         }
       ]
     },
