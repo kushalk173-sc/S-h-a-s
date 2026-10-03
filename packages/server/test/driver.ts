@@ -546,6 +546,12 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
  * which is the signature of a fix aimed at the symptom. It is recorded here because
  * the next person to read `mine + free >= majority` will have the same idea.
  *
+ * The same goes for ranking by FEWEST FREE AREAS — "a zone one placement from a majority
+ * is worth more than a zone with room", which is true and which made things worse: 3
+ * players went from a 392-action maximum to 928 and a 241-turn maximum, and the failures
+ * went from nine to ten. Deciding zones faster is not the same as being able to decide
+ * the LAST one.
+ *
  * **THE REAL CONSTRAINT, WHICH IS NOT IN THIS FUNCTION.** Once a zone satisfies
  * `max(mine) + free < majority` for every seat, no action in the driver's union can win
  * it: `PLACE_VOTERS` needs room, `INFLUENCE` needs a card, and there is no player action
