@@ -926,16 +926,30 @@ This is the handoff. `state.ts` and `reduce.ts` are not this package's to change
 | 10 | `draw-card` with `from: 'draw' \| 'discard'` and a `'choose-card'` Choice | `state.ts`, `reduce.ts` | **G17 (4 cards)** | small |
 | 11 | a `price` field: a computed cost the *seller* reads, distinct from `discount` | `cards.ts`, `reduce.ts` | G15's JUMLA / HOLO SAPIENS, and the honest half of G3 | medium |
 
-**Where the leverage is now.** Items 1–6 are done and bought 6 cards. Of what is
-left, **item 7 is the cheapest**: `'chosen-player'` on `EffectTarget` is one union
-member and one `Choice` kind, and it is the last thing standing between three more
-trigger cards (GREAT LEADER, WHY THE LONG FACE, a faithful LAB-GROWN EARWORM). It
-needs a new `Choice` kind, and **a `Choice` kind is a wire-format change the client
-owns**, so it is not one decision.
+**Where the leverage is now. Items 1–8 are DONE** (item 7 landed as `'chosen-player'`
+and bought FATALITY, WHY THE LONG FACE? and — once the corpus gate went — GENDER TROUBLE;
+item 8 landed as G-new and bought AIN'T NO CURE FOR LOVE's printed clause,
+MOVEMENT ANXIETY DISORDER, and, this pass, STAY IN YOUR LIMITS), together with item 9
+(G20). **The cheapest thing left is item 10, `draw-card` with a `'choose-card'`
+`Choice`** — and that is now blocked on something that is not a cost. A `'choose-card'`
+decision must be RENDERED, and rendering it means listing the pile. The Ideology draw
+pile is `_ideologyDraw` and `playerView` strips every `_` key, so a client that could
+list it would be holding the ordered deck; a Conspiracy discard pile is the same shape
+BY NAME (`_conspiracyDiscard`) even though its cards are individually public, because the
+rule is about the field and not about what the field happens to hold today. **An option
+list is as revealing as a value, so the option list would BE the leak**, which is why the
+kind is refused at the type level and absent from the `Choice` union. Four real cards
+(FUELLING THE NEWS, SELECTIVE ACCESS MEMORY's *"in any order"*, BLESSINGS OF PARENTS PAST,
+A CALL FROM KARACHI) are waiting on that decision rather than on the arithmetic, and the
+fix is a client-side one: a decision over a pile whose ORDER is not information, or a
+server that resolves the pick without shipping the list.
 
-**The shortest route to the next playable card** is not on this table: it is a
-`read`-vs-`target` split on a computed value, which is half of G4 and would make
-THOUGHTS AND PRAYERS faithful rather than approximate.
+**The shortest route to the next playable card** is still not on this table: it is a
+`read`-vs-`target` split on a computed value, which is half of G4. That would make
+THOUGHTS AND PRAYERS faithful rather than approximate — and `chosen-player` makes it
+*worse* in the meantime, because `n` resolves against the player the effect resolves FOR,
+so aiming the card at a chosen player would pay the chosen player for their own volatile
+voters.
 
 
 ---
