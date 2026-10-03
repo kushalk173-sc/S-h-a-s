@@ -213,21 +213,18 @@
       ]
     },
     {
-      "id": "hl-et2040-014",
-      "source": "original; register per REF 8.2. THE FOUR HORSEMEN (REF 4.3) is the recovered card whose purchase-lock clause is G5; this is the same tax without the lock, reskinned as a budget that pays for its own consultation.",
-      "provenance": "inferred",
-      "name": "The Policy Review",
-      "text": "Pay 2 Media to the Public Reserve for the review. Then get 2 discounts on purchases this turn.",
+      "id": "hl-et2040-020",
+      "source": "REF 4.3 recovers GENDER TROUBLE. G5's last consult point landed (`restrict` kind `no-power`, read in powers.ts usesLeft), so the lock is EXECUTED and the card was blocked only by a corpus gate. Retires `inferred` THE POLICY REVIEW, whose own source said it reskinned THE FOUR HORSEMEN's lockless tax - a shape hl-et2040-009 now ships recovered. WEAKER THAN PRINTED: the printed card takes ONE CHOSEN Level 3 power, this takes ALL (naming one is a decision over POWERS not players, G1). The printed 'no L3 power, discard 2 instead' fallback is DROPPED - a conditional over a whole effect list.",
+      "provenance": "adapted",
+      "name": "Gender Trouble",
+      "text": "You cannot use ANY of your unlocked Level 3 Ideologue Powers until the start of your next turn. The printed card lets you name ONE power; this takes all of them, and there is no fallback if you hold none.",
       "effects": [
         {
-          "op": "lose",
-          "res": {
-            "media": 2
-          }
-        },
-        {
-          "op": "discount",
-          "n": 2
+          "op": "restrict",
+          "kind": "no-power",
+          "value": 0,
+          "target": "you",
+          "until": "next-turn"
         }
       ]
     },
