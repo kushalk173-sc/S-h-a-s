@@ -1294,6 +1294,116 @@ describe('a theft with no victim is stated, not left as an empty list', () => {
   });
 });
 
+/**
+ * G1 and G16 -- the two name-shaped decisions, driven through the same Harness and the
+ * same engine-side gate as the other six.
+ *
+ * The property under test is NOT "a button appears". It is that **every button is a pick
+ * the engine accepts, and there is always at least one** -- the client-side half of the
+ * satisfiability argument, since `assertEngineWouldAccept` re-derives
+ * `resolveChoice`'s own two accepted sets (`turnOrder` minus the chooser, and
+ * `choosableZones`). A client that offered a seat or a constituency the engine refuses
+ * would be the exact dead-dialog failure this file was written for, one shape over.
+ *
+ * **AND THE LIST IS NOT FILTERED BY HOLDINGS.** A player with an empty pool and no pegs
+ * is still offered, because a candidate list filtered by what somebody holds is a
+ * readout of their Mat and their hand, and an option list is as revealing as a value.
+ * `p3` holds nothing and is asserted to be present.
+ */
+describe('a seat or a constituency is named, and every name is one the engine accepts', () => {
+  it("'choose-player' offers every other seat, including one holding nothing", () => {
+    const seen: ChoicePick[] = [];
+    const sc: Scenario = {
+      name: 'choose-player',
+      choice: {
+        kind: 'choose-player',
+        count: 1,
+        effects: [{ op: 'voters', n: 1, target: 'chosen-player' }],
+        source: P1,
+        reason: 'Card effect',
+      },
+      seats: [seat(P1, EMPTY), seat(P2, { funds: 1, clout: 0, media: 0, trust: 0 }), seat(P3, EMPTY)],
+      you: P1,
+    };
+    const r = render(<Harness sc={sc} onResolved={(pick) => seen.push(pick)} />);
+    const options = r.container.querySelectorAll('[data-testid=name-choice-option]');
+    const names = [...options].map((o) => o.getAttribute('data-name'));
+    // THE CHOSER IS NOT OFFERED: `resolveChoice` refuses 'you may not choose that
+    // player', so offering it would be a button the server refuses.
+    expect(names).not.toContain(P1);
+    // EVERY OTHER SEAT IS, and `p3` holds nothing at all. That asymmetry is the point.
+    expect(names).toEqual([P2, P3]);
+
+    for (const o of options) {
+      fireEvent.click(o as HTMLElement);
+      assertEngineWouldAccept(sc, seen[seen.length - 1] as ChoicePick);
+    }
+    expect(seen).toHaveLength(2);
+    r.unmount();
+  });
+
+  it("'choose-zone' offers only the constituencies holding a voter it could name", () => {
+    const sc: Scenario = {
+      name: 'choose-zone',
+      choice: {
+        kind: 'choose-zone',
+        count: 1,
+        effects: [{ op: 'discard-voter', n: 1, target: 'you', zone: 'chosen-zone' }],
+        source: P1,
+        reason: 'Card effect',
+      },
+      // Two of p1's pegs in two constituencies, and one of P3's in a third. The effect
+      // is scoped 'own' (target: 'you'), so P3's constituency cannot be named and must
+      // not be offered -- even though it is not empty.
+      seats: [
+        seat(P1, EMPTY, [{ areaId: NW1, owner: P1 }]),
+        seat(P2, EMPTY, [{ areaId: NW2, owner: P1 }]),
+        seat(P3, { funds: 1, clout: 0, media: 0, trust: 0 }, [{ areaId: N1, owner: P3 }]),
+      ],
+      you: P1,
+    };
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(pick) => seen.push(pick)} />);
+    const options = r.container.querySelectorAll('[data-testid=name-choice-option]');
+    expect(options.length, 'no constituency was offered, so the dialog is a dead end').toBeGreaterThan(0);
+    const names = [...options].map((o) => o.getAttribute('data-name'));
+    expect(names).toContain('north_west');
+    expect(names).not.toContain('north');
+
+    for (const o of options) {
+      fireEvent.click(o as HTMLElement);
+      assertEngineWouldAccept(sc, seen[seen.length - 1] as ChoicePick);
+    }
+    expect(seen).toHaveLength(options.length);
+    r.unmount();
+  });
+
+  it('and an empty candidate list is STATED rather than left as a blank dialog', () => {
+    // Unreachable in a real game -- `applyEffect` raises nothing when there is no legal
+    // zone -- and rendered anyway, because an empty list is indistinguishable from a
+    // broken one. The same treatment `StealChoice`'s no-victims note gets.
+    const r = render(
+      <Harness
+        sc={{
+          name: 'choose-zone, empty board',
+          choice: {
+            kind: 'choose-zone',
+            count: 1,
+            effects: [{ op: 'discard-voter', n: 1, target: 'you', zone: 'chosen-zone' }],
+            source: P1,
+            reason: 'Card effect',
+          },
+          seats: [seat(P1, EMPTY), seat(P2, EMPTY)],
+          you: P1,
+        }}
+        onResolved={() => undefined}
+      />,
+    );
+    expect(r.container.querySelector('[data-testid=name-choice-empty]')).not.toBeNull();
+    r.unmount();
+  });
+});
+
 describe('the gate covers the KINDS, not only the shapes that found the bug', () => {
   it('all six kinds of `Choice` are exercised above', () => {
     // A seventh kind lands on `Choice` later. Without this, the new one ships
@@ -1305,9 +1415,17 @@ describe('the gate covers the KINDS, not only the shapes that found the bug', ()
       'evict-voter',
       'discard-voter',
       'convert-voter',
+      'choose-player',
+      'choose-zone',
     ]);
     const everyKindInThisFile: readonly string[] = [...exercised];
-    expect(everyKindInThisFile).toHaveLength(6);
+    // EIGHT, not six, and the NUMBER is the assertion. `Choice` is the engine's union
+    // and this list is a hand-copy of it, so a ninth kind makes this fail and says so,
+    // rather than letting a new shape ship untested into the bug this file exists for.
+    // `derive.ts assertNever` is the other half of the same guard — that one is a
+    // COMPILE error; this one is a test. Two mechanisms, because a compile error cannot
+    // tell you the new kind is also *rendered*.
+    expect(everyKindInThisFile).toHaveLength(8);
     for (const kind of exercised) {
       expect(
         everyKindInThisFile.includes(kind),
