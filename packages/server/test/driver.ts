@@ -221,7 +221,7 @@ export function discardKeepingReserve(
 }
 
 /**
- * Non-Funds pegs a choice could legally take, most-contested first.
+ * Every area a voter decision could legally name, in board order.
  *
  * `scope` is the CHOICE'S, not the driver's, and the distinction is load-bearing —
  * this function used to ignore it and only ever offer pegs the chooser did NOT own.
@@ -233,16 +233,20 @@ export function discardKeepingReserve(
  * `wanted = 2` and a 1-area pick, and the engine answered `choose exactly 2` forever.
  * That is a hard lock reached through a driver bug, and it is the reason this
  * function takes the scope and the kind at all.
+ *
+ * The WHOLE set is returned rather than the first `want`, because the ordering below
+ * needs to see every candidate before it can choose. The order is board order — zones
+ * as `GameState.zones` lists them, areas as each zone lists them — which is fixed data
+ * and not an iteration order, so the result is deterministic (ENGINE-AUDIT R2).
  */
-function foreignAreas(
+function targetableAreas(
   s: ClientState,
   me: PlayerID,
-  want: number,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   scope: ChoiceScope | undefined,
   zoneId: ZoneID | undefined,
-): readonly string[] {
-  const out: string[] = [];
+): readonly { readonly id: string; readonly zone: ZoneID; readonly owner: PlayerID }[] {
+  const out: { id: string; zone: ZoneID; owner: PlayerID }[] = [];
   for (const z of s.zones) {
     // G16. The constituency is the CARD's, already resolved by the time the decision
     // exists, and `reduce` refuses any pick outside it ("that voter is in another
@@ -257,11 +261,153 @@ function foreignAreas(
       if (scope === 'own' && a.peg.owner !== me) continue;
       if (scope === 'others' && a.peg.owner === me) continue;
       if (kind === 'convert-voter' && a.peg.owner === me) continue;
-      out.push(a.id);
-      if (out.length === want) return out;
+      out.push({ id: a.id, zone: z.id, owner: a.peg.owner });
     }
   }
   return out;
+}
+
+/**
+ * THE PICK, ordered so that the driver never leaves a zone nobody can win.
+ *
+ * ## WHY THIS EXISTS, WITH BOTH SEEDS THAT NEEDED IT
+ *
+ * A `convert-voter` moves an opponent's peg into the chooser's hand, and an
+ * `evict-voter` takes one off the board entirely. Either can take a voter OUT of a
+ * majority holder's zone and leave it below the threshold with too few free areas for
+ * anybody to climb back — at which point that zone can never produce a `majorityHolder`
+ * again, `allMajoritiesFormed` becomes unreachable, and if the board is not full either,
+ * the table has no ending at all.
+ *
+ * Measured, on the shipped corpus, 4 seats seed 18:
+ *
+ *     t27  p3  north_west -> p3:7 p4:1 p1:3   free 0   holder p3     ← p3 WON it
+ *     t46  p1  convert-voter, pick [north_west-01, north_west-02]
+ *              north_west -> p1:5 p3:5 p4:1   free 0   holder null
+ *
+ * p1 converted two of p3's voters and reached 5 of a majority of 6. Nobody can win a
+ * full 11-area zone split 5/5/1, so `north_west` was dead for the rest of the game: the
+ * run reached 1200 actions with 8 of 9 zones decided. The pick was pure damage — p1
+ * could not have won `north_west` with two voters whatever it aimed at, so there was
+ * no version of this conversion that was not a loss for both sides.
+ *
+ * The reactive corpus found the same shape at 4 seats seed 15 (`p1:6` → `p1:4 p3:4 p2:2`,
+ * one free area, majority 6) and 5 seats seed 13/19/20 in earlier corpora.
+ *
+ * ## WHAT IT IS: A PREFERENCE AMONG LEGAL PICKS, NEVER A FILTER
+ *
+ * The engine accepts any legal set of the right size, so every pick here is legal and
+ * the count is always exactly `wanted`. What changes is the ORDER the driver offers
+ * them in, and the order is chosen so the first `want` are the least destructive:
+ * candidates whose removal leaves their zone still winnable by somebody come first, and
+ * the ones that would kill a zone come last. If EVERY candidate is lethal the driver
+ * still picks `want` of them and the game proceeds — it just cannot pretend it had a
+ * choice.
+ *
+ * ## AND THE PROJECTED TALLY IS JOINT, NOT PER-AREA
+ *
+ * Two conversions in one zone can kill it when either alone would not, so the check is
+ * run against a running projection rather than against the area in isolation: each
+ * accepted candidate is applied to the tally, and the tally is what the next candidate
+ * is judged against.
+ *
+ * ## IT IS NOT "PREFER A ZONE YOU CAN WIN", AND THAT IS A DELIBERATE OMISSION
+ *
+ * Ranking by "the chooser holds the zone afterwards" would be the obvious next
+ * refinement and it is the same mistake `targetZone`'s own note records — the obvious
+ * refinement was measured there and bought a reshuffle of the failure rather than an
+ * exit from it. The tier that matters here is the one the rules care about: a zone that
+ * can still be decided. Anything narrower would be optimising an effect's damage, which
+ * the engine deliberately does not ask a player to do (see the `choose-player` note).
+ */
+function orderedAreas(
+  s: ClientState,
+  me: PlayerID,
+  want: number,
+  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  scope: ChoiceScope | undefined,
+  zoneId: ZoneID | undefined,
+): readonly string[] {
+  const candidates = targetableAreas(s, me, kind, scope, zoneId);
+  if (want <= 0 || candidates.length === 0) return [];
+
+  // Working projection of every zone the pick can touch: per-owner counts and free
+  // areas. Seeded from the projection the seat was given, so it starts as the truth.
+  const counts = new Map<ZoneID, Map<PlayerID, number>>();
+  const free = new Map<ZoneID, number>();
+  const majority = new Map<ZoneID, number>();
+  for (const z of s.zones) {
+    const byOwner = new Map<PlayerID, number>();
+    let vacant = 0;
+    for (const a of z.areas) {
+      if (a.peg === null) vacant += 1;
+      else byOwner.set(a.peg.owner, (byOwner.get(a.peg.owner) ?? 0) + 1);
+    }
+    counts.set(z.id, byOwner);
+    free.set(z.id, vacant);
+    majority.set(z.id, z.majority);
+  }
+
+  /** Can ANY seat still reach this zone's majority, counting the free areas? */
+  const winnable = (z: ZoneID): boolean => {
+    const room = free.get(z) ?? 0;
+    const need = majority.get(z) ?? 0;
+    const byOwner = counts.get(z);
+    if (byOwner === undefined) return false;
+    for (const n of byOwner.values()) if (n + room >= need) return true;
+    return false;
+  };
+
+  const apply = (zone: ZoneID, owner: PlayerID): void => {
+    const byOwner = counts.get(zone);
+    if (byOwner === undefined) return;
+    const left = (byOwner.get(owner) ?? 1) - 1;
+    if (left <= 0) byOwner.delete(owner);
+    else byOwner.set(owner, left);
+    if (kind === 'convert-voter') byOwner.set(me, (byOwner.get(me) ?? 0) + 1);
+    else free.set(zone, (free.get(zone) ?? 0) + 1);
+  };
+
+  const undo = (zone: ZoneID, owner: PlayerID, wasWinnable: boolean): void => {
+    const byOwner = counts.get(zone);
+    if (byOwner === undefined) return;
+    if (kind === 'convert-voter') byOwner.set(me, (byOwner.get(me) ?? 1) - 1);
+    else free.set(zone, (free.get(zone) ?? 1) - 1);
+    byOwner.set(owner, (byOwner.get(owner) ?? 0) + 1);
+    void wasWinnable;
+  };
+
+  // GREEDY, ONE CANDIDATE AT A TIME — and this is the part that has to be greedy rather
+  // than a single bucketing pass. Two candidates in one zone interact: taking the first
+  // of p3's seven voters in `north_west` leaves p3 on 6 (still holding), so that one is
+  // harmless; taking the second leaves 5-and-5 with no free area, which kills the zone.
+  // A pass that classified each candidate against a tally it had already mutated would
+  // call the second one harmless-because-the-zone-was-already-dead, and ship the pair.
+  // Measured: 4 seats, seed 18, shipped corpus — that is precisely the pick that used to
+  // strand the table, so the projection is the pick and the pick is the bug.
+  const accepted: string[] = [];
+  const deferred: string[] = [];
+  for (const c of candidates) {
+    if (accepted.length === want) break;
+    const wasWinnable = winnable(c.zone);
+    apply(c.zone, c.owner);
+    // A zone that was ALREADY undecidable is not this pick's fault, so taking from it
+    // is not penalised: only a zone that goes FROM decidable TO undecidable is lethal.
+    if (wasWinnable && !winnable(c.zone)) {
+      undo(c.zone, c.owner, wasWinnable);
+      deferred.push(c.id);
+      continue;
+    }
+    accepted.push(c.id);
+  }
+  // Nothing safe left, or the board is small: take from the deferred ones so the pick is
+  // ALWAYS the length `reduce` demands. `reduce` refuses any other length outright, so a
+  // short pick is a hard lock rather than a graceful degradation.
+  for (const id of deferred) {
+    if (accepted.length >= want) break;
+    accepted.push(id);
+  }
+  return accepted;
 }
 
 /**
@@ -283,7 +429,7 @@ function areaPick(
 ): { kind: 'areas'; areaIds: string[] } {
   const usable = countableAreas(s, me, kind, scope, zoneId);
   const wanted = Math.min(count, usable);
-  return { kind: 'areas', areaIds: [...foreignAreas(s, me, wanted, kind, scope, zoneId)] };
+  return { kind: 'areas', areaIds: [...orderedAreas(s, me, wanted, kind, scope, zoneId)] };
 }
 
 /** How many pegs satisfy the same filters `reduce`'s `targetableCount` applies. */
@@ -574,17 +720,180 @@ export function targetZone(s: ClientState, me: PlayerID, need: number): string |
     // A CONTESTED zone this seat can still LOSE needs a spare area, because every other
     // seat gets a turn before this seat does and `mine + free >= majority` is a test
     // about one seat at one moment.
+    //
+    // ── THE RIVAL'S ROOM IS COUNTED AFTER THE PLACEMENT, AND THAT IS THE FIX ────────
+    // The rival term is `rival + (free - need)`, not `rival + free`. `free - need` is the
+    // number of areas that will still be empty once this group is down, which is what the
+    // rival will actually be choosing from on their next turn — counting the areas this
+    // seat is about to fill lets a rival look stronger than they can be and makes the
+    // driver refuse a zone it is going to win.
+    //
+    // Measured, reactive corpus, 3 seats seed 15, at the state the run stranded on:
+    //
+    //     north_west  maj 6   p1:3  p2:3  p3:2  free 3
+    //
+    // Under the old term: `rival(3) + free(3) = 6 >= 6`, and `mine(3) + free(3) - 1 = 5 < 6`,
+    // so EVERY seat refused — p1 (3+3-1<6), p2 (3+3-1<6) and p3 (2+3<6) — and the zone sat
+    // there undecided for 1200 actions with 8 of 9 zones decided. p1 was in fact about to
+    // win it: place a 2-voter card and p1 is on 5 of 6 with one area left, p2 and p3 are
+    // then on 4-and-3 against that one area and neither can reach 6.
+    //
+    // Under the corrected term: `rival(3) + (free 3 - need 2) = 4 < 6`, so the seat places.
+    // It is a one-term correction and not a removal: a zone where a rival genuinely can
+    // still make it after this placement is still refused, which is the property the
+    // guard exists for.
     const rival = Math.max(
       0,
       ...s.turnOrder.filter((p) => p !== me).map((p) => z.areas.filter((a) => a.peg?.owner === p).length),
     );
-    if (rival + free >= z.majority && mine + free - 1 < z.majority) continue;
+    if (rival + free - need >= z.majority && mine + free - 1 < z.majority) continue;
     if (mine > bestMine) {
       best = z.id;
       bestMine = mine;
     }
   }
   return best;
+}
+
+/**
+ * THE ZONE TO SPEND VOTERS IN WHEN NOBODY CAN WIN ANY ZONE — and the reason this
+ * function exists is a measured livelock.
+ *
+ * ## THE SHAPE OF THE BUG, WITH THE SEED THAT FOUND IT
+ *
+ * `targetZone` deliberately has no "any zone with room" fallback: relaxing its
+ * "can win it" test to "has room" was measured at 12/20 nine-majority endings at 4
+ * seats and 6/20 at 5 (see the note on `targetZone`). That is correct, and it is also
+ * what makes the fallback below necessary rather than redundant. When EVERY zone fails
+ * the winnability test, `targetZone` returns `null` for every seat forever.
+ *
+ * 4 seats, seed 15, on the reactive corpus, measured on the state at turn 83:
+ *
+ *     north_west  maj 6   p2:2  p1:4  p3:4  free 1     ← UNDECIDED
+ *     (the other eight zones all carry a majorityHolder)
+ *
+ * `max(mine) + free` is 4 + 1 = 5 against a majority of 6, for every seat, so no
+ * placement can ever decide `north_west`. `allMajoritiesFormed` is therefore
+ * unreachable. But the board is at 104 of 129 areas, so p20's board-full ending IS
+ * reachable — 25 placements short. The table had exactly one ending left and the
+ * driver would not walk towards it: `shouldSqueeze` fired, bought the cheapest card
+ * on the Mat, and then asked `targetZone` where to put the voters, which answered
+ * `null`, so the card was discarded at end of turn (p10) and the next turn bought
+ * another. 1200 actions, no state change, no ending. A livelock, and the squeeze's
+ * own docstring says its purpose is "to drive the board to p20's board-full ending"
+ * — so this is a bug against its stated intent, not a new rule.
+ *
+ * ## AND THE DEAD ZONE IS NOT THE DRIVER'S FAULT
+ *
+ * Worth recording because it is the part that looks like a driver bug and is not.
+ * `north_west` reached `p1:6` (p1 holding the majority) at turn 45 and was broken at
+ * turn 63 by a `convert-voter`: p2 converted two of p1's voters in that zone, p1 fell
+ * to 4, and with one free area left nobody can reach 6. **No placement heuristic
+ * prevents this, because no placement created it** — the zone was decided and legal,
+ * and an EFFECT undecided it. That is why the fix is here and not in `targetZone`:
+ * `targetZone` cannot prevent an effect from breaking a majority, but the driver can
+ * still refuse to sit on a board it has finished playing.
+ *
+ * ## WHAT THIS IS NOT
+ *
+ * It is not a relaxation of `targetZone`. `targetZone` still refuses every zone it
+ * cannot win, in the ordinary turn, and `shouldSqueeze` still has to be true before
+ * this is consulted — so this runs only on a board where the ordinary driver has
+ * nothing to do at all. It is also not a scoring strategy: a voter placed here wins
+ * nothing. It exists because a table that cannot finish must still be able to finish.
+ *
+ * ## THE TIE-BREAK IS "MOST FREE AREAS, THEN BOARD ORDER"
+ *
+ * Most free first, because filling the emptiest zone is what actually converges on
+ * 129 pegs, and board order for determinism — `reduce` is a pure function of state
+ * and a driver whose choice depends on `Map` iteration order would make a replayed
+ * match diverge from the original (ENGINE-AUDIT R2).
+ */
+export function fillZone(s: ClientState, need: number): string | null {
+  let best: string | null = null;
+  let bestFree = -1;
+  for (const z of s.zones) {
+    const free = z.areas.filter((a) => a.peg === null).length;
+    // p10 again: one card's voters cannot be split across zones, so a zone with fewer
+    // free areas than the card holds is unusable and must never be named.
+    if (free < need) continue;
+    if (free > bestFree) {
+      best = z.id;
+      bestFree = free;
+    }
+  }
+  return best;
+}
+
+/**
+ * Place a freshly bought group, preferring a zone this seat can WIN and falling back to
+ * simply filling the emptiest one **only when nine majorities is arithmetically dead**.
+ *
+ * One function so the two callers — `playInProcess`'s inline squeeze and the socket
+ * drivers' next ply — cannot disagree about where a squeezed card's voters go. A driver
+ * that places into a winnable zone on one path and an arbitrary one on the other is a
+ * driver whose winnability numbers depend on which path a seed happened to take, and
+ * every measurement in this file would be a measurement of that accident.
+ *
+ * The `dead` gate is NOT decoration, and ungating it is a measured regression: with the
+ * fallback unconditional, `shouldSqueeze` (which fires routinely, on any turn where no
+ * card on the Mat can be won with) began pouring squeezed cards into decided zones, the
+ * board reached 129 pegs early, and p20's board-full ending beat the standard one —
+ * 5 seats went from 20/20 nine-majority endings to 13/20, 4 seats to 18/20. Gated, the
+ * same 20 seeds at 5 seats finish at 20/20 nine majorities with no stall.
+ *
+ * Returns `null` when nothing on the board has room for the group, which is the only
+ * case in which the caller falls back to letting p10 discard it.
+ */
+export function placeSqueezed(
+  view: ClientState,
+  me: PlayerID,
+  count: number,
+): { readonly type: 'PLACE_VOTERS'; readonly groupId: string; readonly areaIds: string[] } | null {
+  const group = view.players[me]?.pending.at(-1);
+  if (group === undefined || group.count !== count) return null;
+  const dead = !nineMajoritiesReachable(view);
+  const zone = targetZone(view, me, count) ?? (dead ? fillZone(view, count) : null);
+  if (zone === null) return null;
+  const free = view.zones.find((z) => z.id === zone)?.areas.filter((a) => a.peg === null).map((a) => a.id) ?? [];
+  if (free.length < count) return null;
+  return { type: 'PLACE_VOTERS', groupId: group.id, areaIds: free.slice(0, count) };
+}
+
+/**
+ * Is NINE majorities still reachable by ANYBODY on this board?
+ *
+ * The board-level sibling of `targetZone`, and the gate that keeps `fillZone` from
+ * becoming a strategy. `targetZone` asks "can THIS seat win this zone"; this asks "can
+ * ANY seat win ANY zone", which is a different and much stronger claim — and it is the
+ * claim that decides whether p7/p20's standard ending is still on the table at all.
+ *
+ * A zone is winnable iff it has no `majorityHolder` yet AND some seat could still
+ * reach its threshold with the free areas that remain. Note `max(count) + free` and
+ * NOT `free >= majority`: a zone nobody holds is winnable the moment somebody already
+ * holds most of it, which is why this is not simply "does any zone have room".
+ *
+ * ## WHY IT IS FALSE FOR ALMOST EVERY BOARD, AND THAT IS THE POINT
+ *
+ * While even one zone is winnable this returns `true` and `fillZone` is never
+ * consulted, so the ordinary driver is untouched — which is exactly the property that
+ * keeps the "any zone with room" regression (12/20 nine-majority endings at 4 seats)
+ * from coming back through the back door. It returns `false` only on a board where the
+ * standard ending is arithmetically dead, and the only ending left is p20's
+ * board-full timer. Measured: 4 seats, seed 15, reactive corpus, turn 83 — eight zones
+ * decided, `north_west` at `p2:2 p1:4 p3:4` with one free area against a majority of 6,
+ * 104 of 129 areas filled.
+ */
+export function nineMajoritiesReachable(s: ClientState): boolean {
+  return s.zones.some((z) => {
+    if (z.majorityHolder !== null) return false;
+    const free = z.areas.filter((a) => a.peg === null).length;
+    const lead = s.turnOrder.reduce((best, p) => {
+      const mine = z.areas.filter((a) => a.peg?.owner === p).length;
+      return mine > best ? mine : best;
+    }, 0);
+    return lead + free >= z.majority;
+  });
 }
 
 /**
@@ -844,9 +1153,19 @@ export function nextAction(view: ClientState, me: PlayerID, knowledge?: SeatKnow
   // Place what is already in hand BEFORE buying more. p10 discards unplaced voters
   // at end of turn, so buying first spends money on voters that may not fit
   // anywhere.
+  //
+  // THE `dead` BRANCH, and it is the narrow one. `targetZone` alone would leave a
+  // board whose last undecided zone nobody can win with completely unplayable, and the
+  // group would be discarded at end of turn — on a board where p20's board-full ending
+  // was still 25 placements away. `dead` is `nineMajoritiesReachable(view) === false`,
+  // i.e. the standard ending is arithmetically dead, so filling is not a strategy but
+  // the only way the table reaches an ending at all. It is false for practically every
+  // board, which is what stops this from becoming the "any zone with room" fallback
+  // that cost 4 seats 8 of 20 nine-majority endings.
   const group = view.players[me]?.pending[0];
   if (group !== undefined) {
-    const zone = targetZone(view, me, group.count);
+    const dead = !nineMajoritiesReachable(view);
+    const zone = dead ? (targetZone(view, me, group.count) ?? fillZone(view, group.count)) : targetZone(view, me, group.count);
     if (zone !== null) {
       const free =
         view.zones.find((z) => z.id === zone)?.areas.filter((a) => a.peg === null).map((a) => a.id) ?? [];
@@ -857,12 +1176,19 @@ export function nextAction(view: ClientState, me: PlayerID, knowledge?: SeatKnow
   }
 
   // Buy the best voters-per-resource card that a winnable zone can still take.
+  //
+  // The `dead` case is the same narrow gate as the placement arm above, and it matters
+  // here too: a table that cannot win any zone still has to be able to BUY, because
+  // `refillMarket` only runs off a purchase, so a Mat nobody buys from never changes
+  // and the table can never fill the board either. That was the 2-seat seed-18 shape
+  // recorded on `shouldSqueeze`, one level up.
+  const dead = !nineMajoritiesReachable(view);
   const slots = view.market
     .map((slot, i) => ({ slot, i }))
     .sort((a, b) => value(b.slot) - value(a.slot));
   for (const { slot, i } of slots) {
     if (!affordable(slot.cost)) continue;
-    if (targetZone(view, me, slot.voters) === null) continue;
+    if (targetZone(view, me, slot.voters) === null && !(dead && fillZone(view, slot.voters) !== null)) continue;
     return { type: 'INFLUENCE', slot: i };
   }
 
@@ -1201,19 +1527,22 @@ export function playInProcess(
           // is what cycles the Mat. Place it if it fits anywhere first — and in the
           // squeeze "anywhere" really does mean anywhere, because the point of the
           // squeeze is to drive the board to p20's board-full ending.
+          //
+          // "Anywhere" IS `fillZone` here, and that clause used to be a lie: the
+          // squeeze asked `targetZone`, which returns `null` for every zone on a board
+          // where no seat can win anything, so the squeezed card was bought and
+          // discarded on every turn of a game that could still have been finished by
+          // p20's board-full ending. See `fillZone` for the measured shape.
           const after = playerView(r.state, p);
           const group = after.players[p]?.pending.at(-1);
-          const zone = group === undefined ? null : targetZone(after, p, group.count);
-          if (group !== undefined && zone !== null) {
-            const free = after.zones.find((z) => z.id === zone)?.areas.filter((a) => a.peg === null).map((a) => a.id) ?? [];
-            if (free.length >= group.count) {
-              const placed = reduce(r.state, p, { type: 'PLACE_VOTERS', groupId: group.id, areaIds: free.slice(0, group.count) }, ctx);
-              if (placed.ok) {
-                state = placed.state;
-                actions += 2;
-                squeezes += 1;
-                continue;
-              }
+          const place = group === undefined ? null : placeSqueezed(after, p, group.count);
+          if (place !== null) {
+            const placed = reduce(r.state, p, place, ctx);
+            if (placed.ok) {
+              state = placed.state;
+              actions += 2;
+              squeezes += 1;
+              continue;
             }
           }
           state = r.state;

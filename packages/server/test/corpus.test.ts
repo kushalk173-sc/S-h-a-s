@@ -46,7 +46,7 @@ import { playerView, RULES, setup, type Ctx, type GameState } from '@shasn/engin
 import { loadCards, loadCtx } from '../src/index.ts';
 import { cardsVersion, decksOf } from '../src/store.ts';
 import { startHarness } from './fixtures.ts';
-import { BOARD, DECK_KINDS, POOLS, REQUIRED_HEADLINE_OPS, corpusProblems, factsOf, syntheticOps } from './corpus-facts.ts';
+import { BOARD, DECK_KINDS, POOLS, REQUIRED_HEADLINE_OPS, corpusProblems, deckCliffComplaints, exhaustedIdeologyDeck, factsOf, syntheticOps } from './corpus-facts.ts';
 import { freshShippedCorpus, majoritiesOn, pegsOn, playInProcess } from './driver.ts';
 
 // ─────────────────────── the numbers that decide winnability ───────────────────────
@@ -261,19 +261,21 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     }
   });
 
-  it('a game driven on the shipped corpus REACHES AN ENDING, and outlasts its own deck', () => {
+  it('a game driven on the shipped corpus REACHES AN ENDING, and does not run out of Ideology Cards', () => {
     // The assertion the pre-fix engine could not have passed, whatever the deck
     // size. The bug ended every game on turn 52 with `finished: true` and no legal
     // move of any kind; the fix recycles the Ideology deck, so a shipped-corpus
-    // game goes PAST the deck and ends on a decided board.
+    // game ends on a decided board.
     //
-    // "PAST THE DECK" IS THE ASSERTION AND 52 WAS NEVER THE POINT. The Ideology deck
-    // is drawn one per turn, so its size IS the turn cliff — which is why the number
-    // here is `dealt.ideology` and not a literal. The old `toBeGreaterThan(52)` was
-    // true of the corpus as it happened to be and false of the corpus as it will be,
-    // so the day a card shipped it would have demanded an edit that taught the test
-    // nothing. Compare the game against the deck it was dealt instead: the claim is
-    // "the engine's recycle works", and that stays true at 53 cards or 63.
+    // "PAST THE DECK" WAS A PROXY, AND IT IS GONE. This test used to assert
+    // `turn > dealt.ideology` — the deck is drawn one per turn, so a deck of N cannot
+    // reach turn N+1, therefore passing the cliff proves the recycle. That inference is
+    // sound but it is only TESTABLE while the deck is shorter than a game, and the corpus
+    // grew: the Ideology deck is now 76 cards and a driven game ends between turn 32 and
+    // turn 84, so at 2, 3 and 4 seats no game reaches turn 77 at all. The proxy had
+    // stopped asserting anything and had started demanding a longer game. What replaced
+    // it is the property itself, exactly and corpus-size independently — see
+    // `deckCliffComplaints` in `./corpus-facts.ts` for the whole argument.
     //
     // Five seats, because that is the configuration the playtest hit and the one
     // where the staggered start (p7) was thought to be the problem.
@@ -281,9 +283,9 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     const run = playInProcess(start, ctx, { maxActions: 1200 });
     expect(run.stalled, `the driver stalled: ${run.reason}`).toBe(false);
     expect(run.state.finished, 'a shipped-corpus 5-seat game did not reach an ending').toBe(true);
-    expect(run.state.turn, `the game ended on turn ${run.state.turn}, at or before the ${dealt.ideology}-card deck cliff`).toBeGreaterThan(dealt.ideology);
     expect(majoritiesOn(run.state), 'the shipped corpus did not produce a decided board').toBe(BOARD.zones);
     expect(pegsOn(run.state)).toBeGreaterThanOrEqual(BOARD.majorityPegs);
+    expect(deckCliffComplaints(run.state)).toEqual([]);
 
     // THE VOTER DECK IS SMALLER THAN THE BOARD, so the corpus RECYCLES. This is what
     // the old "carries 36 voters" assertion was really saying, and it is checkable
@@ -298,7 +300,7 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
 
     // …and the mechanism, named: the recycle fired, so the deck never emptied.
     expect(
-      run.state.log.some((l) => l.text.includes('Ideology deck is exhausted')),
+      exhaustedIdeologyDeck(run.state),
       'the game ended because the Ideology deck ran out',
     ).toBe(false);
 
@@ -315,8 +317,10 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // `deckSizes` is the DRAW PILE, not the dealt deck — a fresh `setup` deals one
     // Ideology Card into hand and puts `RULES.marketSize` Voter Cards on the Mat, so
     // it reports one fewer in each of those two. Asserted as "no larger than the dealt
-    // deck", which is what a draw pile can be, plus the turn number, which is the real
-    // point.
+    // deck", which is what a draw pile can be. This relation is corpus-size
+    // independent, which is exactly what the turn-number proxy above was not — and it
+    // is the reason this block survived the proxy's removal: a draw pile bigger than
+    // the deck it came from is what "it recycled" looks like from outside.
     //
     // The ceiling is `dealt`, measured off `decksOf`, and there is deliberately no
     // second copy of it in this file. What is being asserted is that the draw pile
@@ -325,7 +329,6 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // number typed by hand, which is what turned four assertions red when G20 shipped
     // two cards and proved nothing about the game.
     const view = playerView(run.state, run.state.turnOrder[0] ?? 'p_1');
-    expect(view.turn, 'the projected state is not past the deck cliff').toBeGreaterThan(dealt.ideology);
     for (const [deck, reported] of Object.entries(view.deckSizes)) {
       expect(reported, `the projected ${deck} draw pile is larger than the deck that was dealt`).toBeLessThanOrEqual(
         dealt[deck as keyof typeof dealt],

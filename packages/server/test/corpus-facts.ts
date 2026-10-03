@@ -35,7 +35,7 @@
  * a list of answers.
  */
 
-import { setup, type CardIndex } from '@shasn/engine';
+import { setup, type CardIndex, type GameState } from '@shasn/engine';
 
 import { decksOf } from '../src/store.ts';
 import { bigCards } from './fixtures.ts';
@@ -193,6 +193,82 @@ export const BOARD = (() => {
   const majorityPegs = z.zones.reduce((k, zone) => k + zone.majority, 0);
   return { areas, majorityPegs, zones: z.zones.length } as const;
 })();
+
+// ─────────────────── the Ideology-deck claim, stated exactly ───────────────────
+
+/**
+ * WHY THE TURN-COUNT PROXY WAS REPLACED, AND WHAT REPLACED IT.
+ *
+ * Three files in this suite used to assert `game.turn > dealt.ideology` — "the game
+ * outlasts its own deck" — on the reasoning that the Ideology deck is drawn one card per
+ * turn, so a deck of N cards cannot reach turn N+1, and therefore passing the cliff is
+ * proof that `ANSWER` discarded its card and the deck recycled. That was the shipped bug
+ * (every game ended on turn 52 with 0 of 9 zones decided) and the proxy is a fair reading
+ * of it.
+ *
+ * **It stopped being true when the corpus grew past the length of a game.** The shipped
+ * Ideology deck is 76 cards and the driver finishes a shipped-corpus game between turn
+ * 32 and turn 84, so at 2, 3 and 4 seats NO game reaches turn 77 and the proxy is
+ * vacuously unmeetable — it had stopped asserting anything and started demanding a longer
+ * game. Nothing about the engine had broken; the instrument had.
+ *
+ * The property it was a proxy for is exact, cheap, corpus-size independent, and already
+ * visible in public data, so it is asserted directly instead:
+ *
+ *  - `advanceTurn` ends the match — `finished: true`, `phase: 'finished'` — the moment
+ *    the Ideology deck AND its discard are both empty, logging `'The Ideology deck is
+ *    exhausted.'` and scoring the board as it stands. So the exhaustion branch firing is
+ *    precisely and only "the game ended because it ran out of cards", and the log line
+ *    is public (`log` starts above the server-only block), so a client can see it too.
+ *  - A game that reached NINE majorities therefore did not exhaust: the exhaustion branch
+ *    cannot produce nine majorities, because it fires at the turn boundary with whatever
+ *    is on the board.
+ *
+ * So `deckCliffComplaints` reports the exhaustion directly, and the deeper claim — that
+ * the recycle fires when the deck IS the binding constraint — is left to
+ * `packages/engine/test/card-transfer.test.ts`, which builds the short-deck position on
+ * purpose. Three files asserting a number that depends on how long the driver chose to
+ * play was one copy too many anyway.
+ */
+
+/** True when the match ended because the Ideology deck and its discard both ran out. */
+export function exhaustedIdeologyDeck(state: GameState): boolean {
+  return state.log.some((l) => l.text.includes('Ideology deck is exhausted'));
+}
+
+/**
+ * Ideology Cards answered, counted from the PUBLIC log.
+ *
+ * `log` is public by design (the server-only block starts below it), and one Ideology
+ * Card is drawn and answered per turn, so this is also the number of cards dealt. More
+ * answers than the deck holds cards can only mean the deck recycled — which is the exact
+ * claim the turn-count proxy was making, kept in the one form that does not depend on how
+ * long the driver played.
+ */
+export function ideologyAnswers(state: GameState): number {
+  return state.log.filter((l) => l.kind === 'answer').length;
+}
+
+/**
+ * Every way a finished game can be said to have short-changed the Ideology deck, as a
+ * list of human-readable violations. Empty is the pass, for the reason `corpusProblems`
+ * gives: a list of violations is a relation between things the engine produced, so it is
+ * true of this corpus and of every future one.
+ *
+ * Deliberately ONE entry, and deliberately not the positive claim. A game that answered
+ * more Ideology Cards than the deck holds is proof the recycle fired, but whether any
+ * game is long enough to need that is a property of the DRIVER, not of the engine — and
+ * the engine's recycle is pinned where the deck really is the binding constraint, in
+ * `packages/engine/test/card-transfer.test.ts`, which builds the short-deck position on
+ * purpose. Putting the positive claim here would put it back on the hook of "how long
+ * did the driver choose to play", which is what it was removed to stop depending on.
+ */
+export function deckCliffComplaints(state: GameState): string[] {
+  if (exhaustedIdeologyDeck(state)) {
+    return ['the game ended because the Ideology deck ran out rather than on a decided board'];
+  }
+  return [];
+}
 
 /**
  * Every corpus invariant this suite holds, as a list of human-readable violations.

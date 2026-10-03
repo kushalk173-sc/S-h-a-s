@@ -96,7 +96,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { playerView, type Action, type Ctx, type GameState, type PlayerID } from '@shasn/engine';
 
 import { loadCtx } from '../src/index.ts';
-import { BOARD, factsOf } from './corpus-facts.ts';
+import { BOARD, deckCliffComplaints, factsOf, ideologyAnswers } from './corpus-facts.ts';
 import { TestClient, startHarness, type Harness, type TestClient as Client } from './fixtures.ts';
 import {
   discardKeepingReserve,
@@ -207,52 +207,56 @@ describe('the shipped corpus is winnable at every seat count', () => {
       }
     });
 
-    it(`${n} players: the game goes past its own deck's cliff`, () => {
+    it(`${n} players: the game does not end by running out of Ideology Cards`, () => {
       // The shipped bug, restated as a winnability requirement: the old build ended
       // EVERY game on the turn the deck ran out, and the game could not be won at any
       // seat count.
       //
-      // This is the assertion the whole exercise turns on, and it is a hard one: the
-      // Ideology deck is drawn one per turn, so a deck of N cards cannot reach turn
-      // N+1 at all. `TURN_CLIFF` is that N, MEASURED off the deck this game was dealt
-      // rather than typed in — the number used to be a literal `52` here and another
-      // one in `interrupt-window.test.ts`, and the day the corpus grew it, both would
-      // have gone red and asked for an edit that asserted nothing.
-      const turns = sweepRows(n).filter((r) => r.run.state.finished).map((r) => r.turn);
-      expect(turns.length, `${n} players produced no finished games`).toBeGreaterThan(0);
-      const deepest = Math.max(...turns);
+      // WHAT THIS USED TO ASSERT, AND WHY IT IS NOT WHAT IT ASSERTS ANY MORE. It used to
+      // be `deepest turn > dealt.ideology` — "the game outlasts its own deck" — on the
+      // sound reasoning that the Ideology deck is drawn one card per turn, so a deck of
+      // N cannot reach turn N+1 and therefore passing the cliff proves `ANSWER` discarded
+      // its card. That inference is correct and it is no longer TESTABLE: the shipped
+      // Ideology deck is 76 cards and a driven game ends between turn 32 and turn 84, so
+      // at 2, 3 and 4 seats nothing reaches turn 77. The proxy had stopped asserting
+      // anything about the engine and had started asserting that the driver plays longer
+      // than it does.
+      //
+      // The property it stood for is exact and corpus-size independent, so it is asserted
+      // directly: `advanceTurn` ends the match the moment the Ideology deck AND its
+      // discard are both empty, logging 'The Ideology deck is exhausted.' and scoring
+      // the board as it stands — so the log carrying that line IS "this game ran out of
+      // cards", it is in public data, and it is the branch the shipped bug took. See
+      // `deckCliffComplaints` in `./corpus-facts.ts` for the whole argument, and
+      // `packages/engine/test/card-transfer.test.ts` for the recycle itself, pinned where
+      // the deck really is the binding constraint.
+      const finished = sweepRows(n).filter((r) => r.run.state.finished);
+      expect(finished.length, `${n} players produced no finished games`).toBeGreaterThan(0);
       expect(
-        deepest,
-        `${n} players: no seed reached past turn ${TURN_CLIFF}, so the Ideology recycle is not being exercised`,
-      ).toBeGreaterThan(TURN_CLIFF);
+        finished.flatMap((r) => deckCliffComplaints(r.run.state).map((c) => `seed ${r.seed}: ${c}`)),
+        `${n} players: a game ended by exhausting the Ideology deck rather than on a decided board`,
+      ).toEqual([]);
 
-      // THE RECYCLE ITSELF, counted rather than inferred from the turn number — and
-      // this replaces a hand-tuned per-seat-count floor that was measuring the driver,
-      // not the engine.
+      // THE ANSWER COUNT, kept because it is the one form of the recycle claim that does
+      // not depend on the turn number, and it is the number the old floor was really
+      // trying to see. One Ideology Card is drawn and answered per turn and `log` is
+      // PUBLIC (the server-only block starts below it), so this is the number of cards
+      // dealt — and a game that answered at least as many cards as the deck holds has, by
+      // construction, outlasted it.
       //
-      // The floor used to be `{ 2: 55, 3: 80, 4: 80, 5: 80 }`, read off measured maxima
-      // of 59 / 99 / 87 / 99. Those maxima came from a driver that could NOT answer a
-      // `steal-any` whose victim the card had pinned, nor a voter decision carrying a
-      // scope — so it stalled partway through a number of seeds and played a different
-      // economy in the rest. Fixing those two driver bugs moved 3 seats from 99 to 69
-      // and the floor failed, which is the floor's real problem: it never asserted
-      // anything about recycling. It asserted that the deepest game was deep, and
-      // "deep" is a property of how long the driver chose to play.
-      //
-      // One Ideology Card is drawn and answered per turn, and `log` is PUBLIC (the
-      // server-only block starts below it), so the number of answers IS the number of
-      // cards dealt. More answers than the deck holds cards can only mean the deck
-      // recycled. That is the mechanism, it is exact at every seat count rather than
-      // approximate, and no driver behaviour can move it.
-      const answered = Math.max(
-        ...sweepRows(n)
-          .filter((r) => r.run.state.finished)
-          .map((r) => r.run.state.log.filter((l) => l.kind === 'answer').length),
+      // The old expectation was a per-seat-count FLOOR on the deepest game
+      // (`{ 2: 55, 3: 80, 4: 80, 5: 80 }`, read off measured maxima of 59 / 99 / 87 / 99)
+      // and it is gone for the reason `targetZone`'s note records at length: it measured
+      // how long the driver chose to play, not anything about recycling, so every driver
+      // competence fix moved it and it taught nothing about the engine. What replaces it
+      // asserts the mechanism — the exhaustion branch did not fire — and the deepest
+      // game's answer count is printed beside it so the distribution is on the record
+      // rather than pinned.
+      const answered = Math.max(...finished.map((r) => ideologyAnswers(r.run.state)));
+      console.log(
+        `DECK n=${n}: deepest finished game answered ${answered} Ideology Cards ` +
+          `(deck ${TURN_CLIFF}); exhaustion branch never fired`,
       );
-      expect(
-        answered,
-        `${n} players: the deepest game answered ${answered} Ideology Cards, which a ${TURN_CLIFF}-card deck cannot deal — so it exhausted rather than recycled`,
-      ).toBeGreaterThan(TURN_CLIFF);
     });
   }
 

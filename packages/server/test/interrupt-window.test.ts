@@ -74,7 +74,7 @@ import {
 } from '@shasn/engine';
 
 import { viewFor } from '../src/broadcast.ts';
-import { BOARD, factsOf } from './corpus-facts.ts';
+import { BOARD, deckCliffComplaints } from './corpus-facts.ts';
 import {
   majoritiesOn,
   nextAction,
@@ -108,14 +108,19 @@ const SEEDS: readonly number[] = Array.from({ length: 20 }, (_, i) => i + 1);
 const POOLS: readonly Resource[] = ['funds', 'clout', 'media', 'trust'];
 
 /**
- * Pegs needed to hold a majority in all nine zones, and the turn at which the shipped
- * Ideology deck runs out. Both MEASURED: this file used to carry its own `69` and its
- * own bare `toBeGreaterThan(52)`, and both numbers were hand-copies of facts that
- * already existed elsewhere in the suite. `BOARD` and `factsOf` make one copy of each
- * and it cannot drift.
+ * Pegs needed to hold a majority in all nine zones. MEASURED: this file used to carry its
+ * own `69`, a hand-copy of a fact that already existed elsewhere in the suite, and `BOARD`
+ * makes one copy of it that cannot drift.
+ *
+ * The turn cliff that used to sit beside it is GONE, and its removal is the point. A deck
+ * of N Ideology Cards drawn one per turn cannot reach turn N+1, so "the deepest run cleared
+ * the cliff" was a fair proxy for "the deck recycled" — and it stopped being testable the
+ * day the corpus grew past the length of a game (76 cards; these runs end between turn 46
+ * and turn 107). It was then asserting how long the driver played, in a file whose whole
+ * subject is the response window. The clause that replaced it is the exhaustion branch,
+ * which is exact and does not move: see `deckCliffComplaints` in `./corpus-facts.ts`.
  */
 const MAJORITY_PEGS = BOARD.majorityPegs;
-const TURN_CLIFF = factsOf(ctx.cards).dealt.ideology;
 
 /** The printed keys of `InterruptWindow`. Eleven, and none of them names a holder. */
 const WINDOW_KEYS = [
@@ -384,16 +389,25 @@ describe('G13d — a window opens, closes, and the table keeps playing, at every
       for (const r of rows) {
         expect(r.pegs, `seed ${r.seed}: nine majorities on only ${r.pegs} pegs`).toBeGreaterThanOrEqual(MAJORITY_PEGS);
       }
-      // Past the CLIFF, which is measured rather than quoted. This was a bare
+// Past the CLIFF, which is measured rather than quoted. This was a bare
       // `toBeGreaterThan(52)` — a hand-copy of a corpus fact that also existed, as a
-      // different literal, in `winnable.test.ts` and `corpus.test.ts`. Three copies of
-      // the turn at which the shipped game used to die is three chances for the suite
-      // to be quietly wrong about the one number that decides whether the shipped game
-      // can be won.
+      // different literal, in `winnable.test.ts` and `corpus.test.ts`. Three copies of the
+      // turn at which the shipped game used to die is three chances for the suite to be
+      // quietly wrong about the one number that decides whether the shipped game can be
+      // won.
+      //
+      // IT IS ALSO NOW A CLAIM ABOUT NOTHING, AND THAT IS WHY IT IS GONE. The shipped
+      // Ideology deck is 76 cards and a driven game on this corpus ends between turn 46
+      // and turn 107, so the deepest reactive run clears the cliff at 4 and 5 seats and
+      // misses it at 2 and 3 — which made a test whose stated purpose is "the table kept
+      // playing" turn red or green on how long the driver happened to play, and on nothing
+      // about the response window this file exists for. The clause below is the real
+      // version: the Ideology exhaustion branch did not fire, which is the branch the
+      // shipped bug took, asserted exactly and corpus-size independently.
       expect(
-        Math.max(...rows.map((r) => r.turn)),
-        `${n} players: no reactive-corpus seed reached past turn ${TURN_CLIFF}, so recycling was never exercised`,
-      ).toBeGreaterThan(TURN_CLIFF);
+        rows.flatMap((r) => deckCliffComplaints(r.run.state).map((c) => `seed ${r.seed}: ${c}`)),
+        `${n} players: a reactive-corpus run ended by exhausting the Ideology deck`,
+      ).toEqual([]);
     });
 
     it(`${n} players: the run both RESPONDS and DECLINES — both paths, not one`, () => {
