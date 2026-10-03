@@ -30,14 +30,6 @@
       "effects": [{ "op": "discard-voter", "n": 2 }]
     },
     {
-      "id": "hl-in2020-004",
-      "source": "original; register per REF 8.2 rule 5.",
-      "provenance": "inferred",
-      "name": "Ghadi Ka Aakhri Ghanta",
-      "text": "Every opponent discards 2 Trust to the Public Reserve. You then gain 1 voter.",
-      "effects": [{ "op": "lose", "res": { "trust": 2 }, "target": "each-opponent" }, { "op": "voters", "n": 1 }]
-    },
-    {
       "id": "hl-in2020-005",
       "source": "original; register per REF 8.2 rule 5.",
       "provenance": "inferred",
@@ -73,32 +65,52 @@
       ]
     },
     {
-      "id": "hl-in2020-009",
-      "source": "original; register per REF 8.2 rule 5. The AN HONEST INSTITUTION archetype (hl-et2040-007) reskinned.",
-      "provenance": "inferred",
-      "name": "Pani Ki Kammi",
-      "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 2 Trust from the Public Reserve.",
-      "effects": [{ "op": "refresh-market" }, { "op": "gain", "res": { "trust": 2 } }]
+      "id": "hl-in2020-012",
+      "source": "REF 4.1 recovers STAY IN YOUR LIMITS. G-new unblocked it, not G18: a convert-voter with no target reaches the caster (voterScope returns 'others' when chooser === source), so the conversion is PERFORMED. DROPPED, named: 'every player' (only the resolving player acts) and 'to their left' (any opponent may donate, which is WIDER). Also dropped: 'each player that doesn't break a majority gets 2 resources' — G2, no op reads board state to decide a payout. Refires the inferred GHADI KA AAKHRI GHANTA, itself a reskin of hl-et2040-004.",
+      "provenance": "adapted",
+      "name": "Stay In Your Limits",
+      "text": "Convert 2 of an opponent's voters into your own. Voters in Volatile Areas cannot be converted. The printed card has EVERY player convert 2 voters of the player to their left, and pays 2 resources to each player who breaks no majority; neither of those is performed here.",
+      "effects": [{ "op": "convert-voter", "n": 2 }]
     },
     {
-      "id": "hl-in2020-010",
-      "source": "original; register per REF 8.2 rule 5. The LONG WINTER SHORT LEDGER archetype (hl-et2040-006) reskinned.",
-      "provenance": "inferred",
-      "name": "Sarkar Ki Charcha",
-      "text": "Every opponent gains 1 resource of their choice. You then gain 2 voters, which you may place in different zones.",
+      "id": "hl-in2020-013",
+      "source": "REF 4.1 recovers COUGH IT UP. The eviction is PERFORMED exactly: 'evict' carries target and the case loops resolveTargets, so 'all your opponents' is the faithful reading, and 'evict' is the printed verb — unlike NERO'S GUESTS and JUST BREATHE, this card loses nothing to a move-for-evict approximation. DROPPED, named: the conditional bonus, 'if a player breaks a majority using this action, all other players gain 1 resource of their choice' (G2). Refires the inferred CHHOTI SI KASAM, a steal-and-payout reskin of hl-in2020-006.",
+      "provenance": "adapted",
+      "name": "Cough It Up",
+      "text": "Every opponent evicts 1 voter from the board. Evicted voters go back to their owner's Mat, where they can be influenced again. Voters in Volatile Areas cannot be evicted. Nobody is paid for breaking a majority with this card.",
+      "effects": [{ "op": "evict", "n": 1, "target": "each-opponent" }]
+    },
+    {
+      "id": "hl-in2020-014",
+      "source": "REF 4.1 recovers GROWING DISSENT, and it is the G9 + G14 card with nothing approximated: the hook fires on on-gerrymander, movedMyVoter IS 'any opponent Gerrymanders your voters', and 'for 1 round' is the round lifetime computed in state.ts. DROPPED, named: 'gained voters are placed immediately' — the engine grants the voter to your Mat and you place it, so the printed card's immediacy is not performed. Refires the inferred PANI KI KAMMI, a reskin of hl-et2040-007.",
+      "provenance": "adapted",
+      "name": "Growing Dissent",
+      "text": "Starting now and for one full round, every time an opponent Gerrymanders one of your voters, you gain 1 voter. The voter goes to your Mat, so you place it yourself rather than on the spot.",
       "effects": [
-        { "op": "gain-any", "n": 1, "target": "each-opponent" },
-        { "op": "voters", "n": 2 }
+        {
+          "op": "voters",
+          "n": 1,
+          "when": "on-gerrymander",
+          "until": "round",
+          "condition": { "movedMyVoter": true }
+        }
       ]
     },
     {
-      "id": "hl-in2020-011",
-      "source": "original; register per REF 8.2 rule 5. GUMASTA NAHI SALAAM NAHI archetype (ct-in2020-004) reskinned as a Headline; per REF 4.4 item 2 a steal is not player-targeted and this is the nearest expressible reading.",
-      "provenance": "inferred",
-      "name": "Chhoti Si Kasam",
-      "text": "Take 1 resource of your choice from a chosen opponent. Then gain 2 Media.",
-      "effects": [{ "op": "steal-any", "n": 1 }, { "op": "gain", "res": { "media": 2 } }],
-      "excludeInTwoPlayer": true
+      "id": "hl-in2020-015",
+      "source": "REF 4.1 recovers PYTHONPOST; REF 4.3 records SNOOP B-O-DOUBLE-T as the SAME card, so this one name covers both and neither is counted as a second mechanism. G5's surcharge is EXECUTED. WIDER THAN PRINTED: 'every Conspiracy Card that you buy' becomes every purchase, because surchargeFor is one function read by INFLUENCE and BUY_CONSPIRACY and no field says which kind of purchase a restriction prices. The stacking ruling is on Restriction in state.ts. Refires the inferred SARKAR KI CHARCHA.",
+      "provenance": "adapted",
+      "name": "Pythonpost",
+      "text": "For the rest of the game, every purchase you make costs 1 extra Funds — Conspiracy Cards and Voter Cards alike, where the printed card taxed Conspiracy Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it, and two of these stack with each other.",
+      "effects": [
+        {
+          "op": "restrict",
+          "kind": "surcharge",
+          "value": 1,
+          "target": "you",
+          "until": "rest-of-game"
+        }
+      ]
     }
   ]
 }
