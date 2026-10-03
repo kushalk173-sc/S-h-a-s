@@ -47,6 +47,7 @@ import {
 import {
   EXECUTED_OPS,
   EXECUTABLE_COMPUTED_SOURCES,
+  EXECUTABLE_TARGETS,
   EXECUTED_INTERRUPT_OPS,
   EXECUTED_INTERRUPT_TARGETS,
   EXECUTED_INTERRUPT_WINDOWS,
@@ -137,6 +138,43 @@ function raisedTriggers(): string[] {
 }
 
 
+/**
+ * The `case` labels of `resolveTargets`, in source order.
+ *
+ * ## WHY THIS SLICE EXISTS WHEN NOTHING LOOKS BROKEN
+ *
+ * `EXECUTABLE_TARGETS`' own doc says *"test/reducer-parity.test.ts re-derives this set
+ * from `resolveTargets`' own case labels in `reduce.ts`"*. That claim was **false** — the
+ * slice was never written — so the registry was a promise about the reducer that nothing
+ * checked, which is the one thing this file exists to prevent and whose failure mode is
+ * silent. A target value added to `cards.ts` and to the registry but **not** implemented as
+ * a `case` in `resolveTargets` would have fallen out of a `switch` with no `default`,
+ * produced a player list of `undefined`, and passed every gate in the repository.
+ *
+ * It matters more now, because `'player-after'` — a seat-relative target that would
+ * unblock A COWARD OR A JOURNALIST? and CARD GAMES — is one `case` label away and is
+ * blocked ONLY by a one-line `packages/client` change to `TARGET_TEXT`. A target value is
+ * exactly the shape whose absence is invisible from the type.
+ */
+function resolvedTargets(): readonly string[] {
+  const src = readFileSync(REDUCE_SRC, 'utf8');
+  const start = src.indexOf('function resolveTargets');
+  expect(start, 'reduce.ts still has resolveTargets').toBeGreaterThan(-1);
+  const end = src.indexOf('function grantVoters', start);
+  const body = src.slice(start, end === -1 ? undefined : end);
+  const re = /^ {4}case '([^']+)':/gm;
+  const out = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    if (m[1] !== undefined) out.add(m[1]);
+  }
+  // And the slice is not empty, so every assertion below cannot pass by asserting nothing.
+  expect(out.size, 'resolveTargets still has at least one case').toBeGreaterThan(0);
+  return [...out].sort();
+}
+
+const RESOLVED_TARGETS = resolvedTargets();
+
 // ─────────────────────────── layer 1: the op set ───────────────────────────
 
 describe('EXECUTED_OPS is exactly what reduce() has a case for', () => {
@@ -157,6 +195,39 @@ describe('EXECUTED_OPS is exactly what reduce() has a case for', () => {
     for (const op of used) {
       expect(EXECUTED_OPS[op as keyof typeof EXECUTED_OPS], op).toBeDefined();
     }
+  });
+});
+
+/**
+ * The fourth honesty seam, and the one its own registry had been CLAIMING.
+ *
+ * A target value is resolved in exactly one place — `resolveTargets`' `switch` — and a
+ * value it cannot match produces `undefined` rather than an error, so the registry is the
+ * only thing standing between a card and a player list of `undefined`. This was asserted
+ * by nothing until now.
+ */
+describe('EXECUTABLE_TARGETS is exactly the set resolveTargets has a case for', () => {
+  it('the registry and the switch agree in BOTH directions', () => {
+    expect([...EXECUTABLE_TARGETS].slice().sort()).toEqual([...RESOLVED_TARGETS].sort());
+  });
+
+  it('and the registry is not empty, so the agreement above is not vacuous', () => {
+    expect(EXECUTABLE_TARGETS.size).toBeGreaterThan(0);
+    expect(RESOLVED_TARGETS.length).toBeGreaterThan(0);
+  });
+
+  it('the SCHEMA enum is that same set, so a deck file cannot name a target the reducer has no case for', () => {
+    const defs = corpusSchema().$defs as Record<string, { readonly enum?: readonly string[] }>;
+    expect([...(defs['effectTarget']?.enum ?? [])].sort()).toEqual([...EXECUTABLE_TARGETS].sort());
+  });
+
+  it("'chosen-player' is intercepted ABOVE the switch, so it never reaches resolveTargets' cases", () => {
+    // The one value whose case in `resolveTargets` is deliberately UNREACHABLE, returning
+    // `[]`. If a future refactor moved the interception into the switch, this test would
+    // still pass — so the assertion that matters is the one below it, and both are kept
+    // because a reader who finds only one of them cannot tell which invariant is load
+    // bearing. The reachability itself is pinned in the engine's own `choices.test.ts`.
+    expect(RESOLVED_TARGETS).toContain('chosen-player');
   });
 });
 

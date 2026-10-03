@@ -1025,7 +1025,65 @@ card to become a ransomable object (G11/G20), not just a peg.
 
 ---
 
-## 3. The engine work this needs, in the order that buys the most cards
+## 2bis. THE SECRET-STATE LINE, drawn explicitly — because full information moved it
+
+**This is acceptance criterion 4 and it is a ruling, not a note.** `'choose-card'` is
+refused at the type level and absent from the `Choice` union. The reason recorded when it
+was refused was *"rendering it means listing the pile, and the piles are `_`-prefixed and
+stripped"*. That reasoning was **sound when the Ideology deck was secret** and it is
+**partly obsolete now that the whole card is public**
+(`packages/server/src/FULL-INFORMATION.md`). So here is where the line falls, per pile,
+with the test stated once so it can be applied to a pile nobody has thought of yet.
+
+### The test
+
+> **A decision may ENUMERATE a set only if the set is already PUBLIC to every client at
+> the moment the decision is raised.** An option list is as revealing as a value, so the
+> list itself is the disclosure — not the answer, the *candidates*.
+
+Two corollaries that are not obvious and both matter:
+
+1. **The test is about the SET, not about the FIELD NAME.** A pile whose every card is
+   individually public is still a leak if its **order** is not — order is the information.
+2. **The test is about EVERY viewer, including the chooser.** A hand stripped for its own
+   owner is hidden, full stop.
+
+### Applied to every pile the engine has
+
+| pile / set | field | public to every client? | may a choice enumerate it? |
+|---|---|---|---|
+| a player's **Conspiracy hand** | `PlayerState.conspiracies` (stripped by `playerView`) | **NO** — hidden from every viewer *including its owner* (`docs/ARCHITECTURE.md` §8.1.1) | **NEVER.** This is the line, and it is probably permanent. |
+| a player's **Ideology hand** | `PlayerState.ideologyCards` (stripped) | **NO** — same ruling, same reason (see the ruling on that field in `state.ts`) | **NEVER.** |
+| the **Ideology draw pile** | `GameState._ideologyDraw` (stripped) | **NO.** Its contents are un-drawn, so their *faces* are not known at run time, and its **order** is the sequence of questions the table is about to be asked. Full information made card FACES public; it did nothing for an undrawn pile. | **NEVER.** Enumerating it is the D25 failure by name. |
+| the **Ideology discard pile** | `GameState._ideologyDiscard` (stripped) | **MIXED, and that is why it is NO.** The top is the most recently ANSWERED card, which p13 makes face up — so the top is public and the rest is not, and a partial disclosure of an ordered pile is the worst of both. | **NEVER.** This is the same argument as `move-card`'s refusal of `from: 'discard'`, running the other way. |
+| the **Conspiracy discard pile** | `GameState._conspiracyDiscard` (stripped) | **YES as a set** — every card there was bought by a named player and discarded by a resolution the log names, so the contents and their order are both derivable from the action log. **BUT** the field is `_`-prefixed and stripped, so no client actually receives it, and making one client receive it is a server change this package may not make. | **NOT BY A CHOICE.** The *information* is public; the *channel* is not. This is the one place where a `choose-card` would disclose nothing and would still need a wire-format change — which is exactly why the fix is a server projection and not a card. |
+| the **headline draw pile** | `GameState._headlineDraw` (stripped) | **NO**, and unlike the Conspiracy discard it is not derivable from the log: the order is the shuffle. | **NEVER.** |
+| the **Voter Card market** | `GameState.market` | **YES**, unprefixed and on every payload — p10 keeps three face-up Voter Cards on the HQ Mat and the rulebook has no hidden phase. | **YES.** This is the one pile a `choose-card` could legitimately enumerate today, and it is the interesting case: BLESSINGS OF PARENTS PAST's *"Draw 2 Voter Cards. Keep 1 and donate the other"* is a decision over **face-up, public** cards. It is still blocked, but on the **client wire format**, not on the leak — `derive.ts` proves every `Choice` kind with `assertNever`, so a new kind is a client change and not a security change. |
+
+### What this changed, and what it did not
+
+- **It did not unblock anything by itself, and the honest reason is on the last row.**
+  The three piles a `choose-card` would want — a hand, a draw pile, a discard pile — are
+  the three the test refuses. The one pile the test *allows* is the public market, and the
+  card that wants it (BLESSINGS OF PARENTS PAST) additionally needs "draw 2, keep 1,
+  donate 1", which is a `choose-card` plus a `PlayerState`-level pending group.
+- **It DID kill a wrong line of reasoning.** *"Any pile is a leak"* would have kept a
+  blank on `draw-conspiracy`, `move-card` and `onlyIfEmpty`, all three of which read
+  hidden state and all three of which are **correct**, because they never enumerate: they
+  take the TOP of a pile deterministically and log nothing. **The rule is not "the reducer
+  must never read a hidden pile"; it is "the reducer must never put a hidden set on the
+  wire".** A deterministic read of a hidden pile discloses nothing — `AS CLEAR AS WATER`'s
+  `onlyIfEmpty` reads a hand and emits no `LogEntry` and no `GameEvent` precisely so that
+  a skipped player and an unskipped one are indistinguishable.
+- **It DID turn G17 from "the engine cannot" into "the client has not".** That is a
+  cheaper blocker and it is worth knowing which one you are looking at: for the market,
+  a new `Choice` kind is ~10 lines in `packages/client/src/app/derive.ts` and a decision
+  dialog. For the Ideology draw pile it is **never**, and a proposal that tries is asking
+  for the ordered deck.
+
+**THE LINE IN ONE SENTENCE, for a card author:** *you may choose a card the whole table
+can already see, or the top of a pile nobody can see; you may never be shown what is in a
+pile.*
 
 This is the handoff. `state.ts` and `reduce.ts` are not this package's to change.
 
@@ -1064,12 +1122,72 @@ A CALL FROM KARACHI) are waiting on that decision rather than on the arithmetic,
 fix is a client-side one: a decision over a pile whose ORDER is not information, or a
 server that resolves the pick without shipping the list.
 
+**THE REFUSAL IS STILL CORRECT, and §2bis is where the line now lives.** The paragraph
+above reasons from "the piles are `_`-prefixed and stripped", which was sound when the
+Ideology deck was secret and is now only PARTLY the reason. §2bis re-derives the test
+(*a decision may enumerate a set only if that set is already public to every client at the
+moment the decision is raised*) and applies it pile by pile. The short form of what
+changed: full information made card FACES public, and it did nothing for an undrawn
+pile's order, so the Ideology draw pile and the Ideology discard pile are still **never**,
+the Conspiracy discard pile is a **channel** problem rather than a secrecy one, and the
+Voter Card market is the one pile a `choose-card` may legitimately enumerate.
+
 **The shortest route to the next playable card** is still not on this table: it is a
 `read`-vs-`target` split on a computed value, which is half of G4. That would make
 THOUGHTS AND PRAYERS faithful rather than approximate — and `chosen-player` makes it
 *worse* in the meantime, because `n` resolves against the player the effect resolves FOR,
 so aiming the card at a chosen player would pay the chosen player for their own volatile
 voters.
+
+### 3.1 THE ONE CHANGE THAT UNBLOCKS TWO MORE CARDS FOR A SINGLE LINE SOMEONE ELSE OWNS
+
+**`'player-after'` on `EffectTarget` is one union member and one `case` in `resolveTargets`,
+and it is the whole of A COWARD OR A JOURNALIST? / CARD GAMES.** REF 4.1 reads *"Starting
+from you, each player can donate 1 of their Ideology Cards to the opponent on their left"*
+— and in a turn order that runs clockwise, *"the opponent on their left"* and *"the player
+after you"* are one index into `turnOrder`, so one value serves both recovered phrasings
+(GREAT LEADER BAD ECONOMY names the second). Every op already loops `resolveTargets`, so
+the value would be honoured everywhere for free, including the three voter ops — whose
+`voterScope` reads `target` through `resolveTargets` and gives the named player `'own'`
+without a further edit.
+
+**The reduction it unblocks**, and its named drops:
+`[{ op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'player-after' },
+  { op: 'gain-any', n: 6, target: 'player-after' }]` — one `target` for the whole effect
+list, which happens to be exactly right here because the card goes to the player on your
+left AND the 6 resources go to whoever receives it.
+
+**Why it is not done in this file: `packages/client/src/app/interrupt.ts` line 251 is a
+`Readonly<Record<EffectTarget, string>>`, which is one of the client's three totality
+proofs and therefore a compile error on a new member.** Adding the value to
+`packages/engine/src/cards.ts` turns `npm run typecheck` red in a package this one may not
+edit. **The one-line ask is:** add `'player-after': ' · the player after you',` to
+`TARGET_TEXT`. Nothing else in the client changes — `describeEffect`'s `switch` has a
+`default`, `derive.ts` does not enumerate targets, and no `Choice` kind is involved.
+
+**What it does NOT buy, stated so the trade is honest:** the real card's *"starting from
+you, each player can"* means N donations and this ships one; *"optional"* and *"you may
+pass along a card you just received"* are dropped; and the card comes off the Ideology
+**draw** pile rather than out of a hand, because a hand is a queue its holder cannot
+enumerate — which is the same refusal that keeps A COWARD OR A JOURNALIST? on G12's list
+even after the target exists.
+
+### 3.2 WHAT IS STILL BLOCKED, AND ON WHAT, AFTER THIS ITERATION
+
+| card | blocked on | owner |
+|---|---|---|
+| A COWARD OR A JOURNALIST?, CARD GAMES | the one-line `TARGET_TEXT` change above | **client** |
+| 404, BRAVE NEW WORLDS | a card-level `answerPhase` read by `reduce`'s `answer` branch — `BRAVE NEW WORLDS`'s *"will not receive any resources"* half is already shipped as `no-income`, and its first sentence is the part that moves no state | engine, large |
+| THE BIG FREEZE | a `PlayerState` cap field read by `canAfford` / `enforceCap` / `overCap` / `poolTotal` / the balance checker. **Warned, not merely sized:** lowering a cap under a player who is already over it is the exact `convert-voter` soft-lock shape, and it would have to be gated | engine, large, deadlock risk |
+| QUANTUM WRISTBAND, A CALL FROM KARACHI, NEXT BILLION DATA POINTS | **RULED OUT** — auction, vote. See §2 G13b/c. Do not rebuild | — |
+| FUELLING THE NEWS | a Headline draw pile, which does not exist: headlines are a QUEUE (`headlineQueue`), not a hand or a market | engine, large |
+| BLESSINGS OF PARENTS PAST | the ONE pile §2bis allows a `choose-card` to enumerate (the public market), so this is blocked on the **client wire format** rather than on the leak, plus "keep 1 and donate the other" | client |
+| CULT-IVATING OBEDIENCE, ON THE "HIGH" SEAS | G11: a board-resident object that outlives its resolution | engine, large |
+| HIGGS MORON | G10 (a token counter on a card) *and* G12 (an in-flight card with an owner, a seat and a deadline) | engine, large |
+| GREAT LEADER, BAD ECONOMY | `'player-after'` **and** a `move-peg` op: *"may move 1 of your non-majority voters to an adjacent zone"* needs a move to an adjacent zone, and `evict`/`discard-voter` are the wrong verb — the card HELPS the beneficiary | engine |
+| THOUGHTS AND PRAYERS | the `read`-vs-`target` split on a computed `n`. `chosen-player` makes it *worse*, not better | engine |
+| DOSTI BANI RAHE | a turn trigger on a seat OTHER than the owner: `installLiveEffects` re-applies a standing effect at the top of the **owner's** turns, and this card's whole content is somebody else's turn | engine |
+| CHAI-PAANI | **NOT A GAP AND NOT FIXABLE.** Only a re-application clause was recovered; the base effect was never recovered, and inventing a card is forbidden. See §7 | — |
 
 
 ---
