@@ -102,6 +102,8 @@ import {
   type ClientState,
   type ConspiracyCard,
   type Ctx,
+  type Effect,
+  type EffectTarget,
   type GameState,
   type InterruptWindow,
   type PendingChoice,
@@ -351,6 +353,72 @@ function stealable(
 }
 
 /**
+ * The three ops that share the `zone` field and therefore the decision — a
+ * transcription of `voterKindOf` in `reduce.ts`.
+ *
+ * The default is the engine's own, deliberately: `reduce.ts` maps anything it does
+ * not recognise to `'discard-voter'`, so a fourth op growing `zone` lands here on
+ * the same branch the engine uses rather than on a branch of its own.
+ */
+function voterKindOf(op: string): 'evict-voter' | 'discard-voter' | 'convert-voter' {
+  if (op === 'evict') return 'evict-voter';
+  if (op === 'convert-voter') return 'convert-voter';
+  return 'discard-voter';
+}
+
+/**
+ * The first constituency a `'choose-zone'` decision may name, or `null` for none.
+ *
+ * ## OFFERED == ACCEPTED, AND THAT IS THE WHOLE POINT
+ *
+ * `applyEffect` builds the candidate list with `legalZoneIds(state, source, effect)`
+ * and `resolveChoice` validates the pick against the *same call*. So this function is
+ * a transcription of that one predicate, clause for clause — the zone it returns is
+ * inside the engine's accepted set by construction rather than by luck, which is what
+ * lets a driver answer a decision it did not raise without a rollback loop.
+ *
+ * Two clauses are worth naming because they are the ones an approximation gets wrong:
+ *
+ *  - **The effect's `target` decides the scope.** `voterScope` is one expression over
+ *    `(chooser, source, kind, target)`, and the `target: 'you'` case in particular is
+ *    what makes CUT COPY AND PASTE's `discard-voter` offer the chooser's OWN pegs.
+ *    A driver that used `'others'` for every voter op would offer a zone the server
+ *    refuses. The `chooser !== source` arm of `voterScope` cannot fire here — a
+ *    `'choose-zone'` decision is raised for the card's own actor, so chooser and
+ *    source are the same seat by construction.
+ *  - **A Volatile Area is not a peg this effect can name** (p18), exactly as in
+ *    `targetableCount`, which is the other filter the pick is validated against.
+ *
+ * ## WHY THERE IS NO PREFERENCE AMONG THE LEGAL ZONES
+ *
+ * The engine offers a set, not a ranking, and `resolveChoice` accepts any member of
+ * it — so the first legal zone is a legal answer and this driver does not invent a
+ * strategy the rules do not contain. Same reasoning as `answerSide` below, and the
+ * same honesty: the driver's competence lives in not placing voters it cannot win
+ * with (`targetZone`), not in pretending to optimise an effect's damage.
+ */
+function legalZone(s: ClientState, me: PlayerID, effect: Effect | undefined): ZoneID | null {
+  if (effect === undefined) return null;
+  const named: EffectTarget | undefined = 'target' in effect ? effect.target : undefined;
+  const kind = voterKindOf(effect.op);
+  // `voterScope` with `chooser === source === me`: see the note above.
+  const scope: ChoiceScope =
+    kind === 'evict-voter' ? 'any' : kind === 'convert-voter' ? 'others' : named === 'you' ? 'own' : 'others';
+  for (const z of s.zones) {
+    const has = z.areas.some(
+      (a) =>
+        a.peg !== null &&
+        !a.volatile &&
+        !(scope === 'own' && a.peg.owner !== me) &&
+        !(scope === 'others' && a.peg.owner === me) &&
+        !(effect.op === 'convert-voter' && a.peg.owner === me),
+    );
+    if (has) return z.id;
+  }
+  return null;
+}
+
+/**
  * A legal pick for a `PendingChoice`, whatever raised it.
  *
  * Every branch is reachable against the shipped corpus. The `evict-voter`,
@@ -378,11 +446,46 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
     case 'discard-voter':
     case 'convert-voter':
       return areaPick(s, me, n, choice.choice.kind, choice.choice.scope, choice.choice.zoneId);
+    /**
+     * G1 — the card's actor named a player.
+     *
+     * **THE CANDIDATE SET IS `turnOrder` MINUS THE CHOOSER, AND IT IS NOT NARROWED BY
+     * HOLDINGS.** That is the engine's own set (`applyEffect` raises the decision
+     * exactly when `turnOrder.filter(p => p !== source)` is non-empty, and
+     * `resolveChoice` validates the pick against that same expression), so the first
+     * other seat is legal by construction and `null` is reachable only on a one-seat
+     * table, which `Lobby` refuses to create.
+     *
+     * Filtering by holdings here — "name a seat that can actually be stolen from", say
+     * — would be a leak dressed as competence, and it is the same leak the engine
+     * declines to commit twice over. A filtered option list is a readout of every
+     * opponent's mat and hand: the absence of a seat from the dialog tells the chooser
+     * that seat holds nothing. The engine offers the whole table for exactly that
+     * reason, and a driver that quietly re-narrows the list reports to the test what a
+     * real chooser is not shown. Holding nothing is therefore still an OFFER, and the
+     * driver names a seat whether or not there is anything there — a `steal-any`
+     * against an empty victim is a legal zero-width answer, not a failure.
+     */
+    case 'choose-player': {
+      const other = s.turnOrder.find((p) => p !== me);
+      return other === undefined ? null : { kind: 'player', id: other };
+    }
+    /**
+     * G16 — the card's actor named a constituency. The set is `legalZone`'s, which is
+     * `legalZoneIds` in `reduce.ts` transcribed, so the pick is in the engine's
+     * accepted set rather than in one that happens to overlap it.
+     */
+    case 'choose-zone': {
+      const zone = legalZone(s, me, choice.choice.effects[0]);
+      return zone === null ? null : { kind: 'zone', zoneId: zone };
+    }
     default:
       // Unreachable against a corpus the cards package has validated. Returning
       // `null` makes the caller throw with the kind in the message, which is the
       // right outcome: a new choice kind should FAIL LOUDLY rather than be
-      // silently answered with an empty area list.
+      // silently answered with an empty area list. That it did exactly this when
+      // G1 and G16 landed — 35 failures, one message — is the guard working, not the
+      // guard failing.
       return null;
   }
 }
