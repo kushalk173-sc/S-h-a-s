@@ -571,6 +571,14 @@ export function targetZone(s: ClientState, me: PlayerID, need: number): string |
     const mine = z.areas.filter((a) => a.peg?.owner === me).length;
     if (mine >= z.majority) continue; // lost it; nothing to gain
     if (mine + free < z.majority) continue; // cannot win it; do not spend here
+    // A CONTESTED zone this seat can still LOSE needs a spare area, because every other
+    // seat gets a turn before this seat does and `mine + free >= majority` is a test
+    // about one seat at one moment.
+    const rival = Math.max(
+      0,
+      ...s.turnOrder.filter((p) => p !== me).map((p) => z.areas.filter((a) => a.peg?.owner === p).length),
+    );
+    if (rival + free >= z.majority && mine + free - 1 < z.majority) continue;
     if (mine > bestMine) {
       best = z.id;
       bestMine = mine;
