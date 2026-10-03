@@ -1,5 +1,5 @@
 /**
- * THE TABLE'S VIEW OF THE CARD — and the two properties that make it safe.
+ * THE TABLE'S VIEW OF THE CARD — and the three properties that make it safe.
  *
  * WHAT IS UNDER TEST. Change A of the ruling (question + both labels visible to
  * the whole table) and change B (the chosen side is public after the commit) are
@@ -22,22 +22,21 @@
  *      failure wearing a different hat. The answering seat's single commit control
  *      is asserted where it lives, in `answer/blindAnswer.test.tsx`.
  *
- * WHAT IS NOT HERE, AND WHY IT IS NOT A HOLE. `order` — the seed-derived
+ * What IS NOT here, and why it is not a hole. `order` — the seed-derived
  * presentation coin flip from PLAN.md §2 amendment A′ — is deliberately not
  * published, because it is what says which face of the card a position is, and a
  * table that could line positions up against the deck's Ideologue balance would be
  * back to "guess the slot". `broadcast.ts` asserts that on the server side; the
  * client cannot assert the absence of a field it never receives, so what is asserted
- * here is that this component has no prop through which one could arrive.
+ * here is that this component has no prop through which one could arrive. The
+ * payload reader itself is asserted in `blindWire.test.ts`, which is where the
+ * boundary between a payload and a prop lives.
  */
 
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 
-import type { ClientState } from '@shasn/engine';
-
 import { TableQuestion } from './TableQuestion';
-import { openQuestionOf, type OpenQuestion } from './blindWire';
 
 // The table's panel is styled by the ANSWERER's stylesheet, because it reuses that
 // component's classes on purpose — so the symmetry assertion below is only
@@ -105,70 +104,6 @@ function snapshot(el: Element): Record<string, string> {
 function sides(container: HTMLElement): HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>('.blind-answer__side')];
 }
-
-/** A `state` carrying nothing but the one field under test. */
-function stateWith(openQuestion: unknown): ClientState {
-  return { openQuestion } as unknown as ClientState;
-}
-
-describe('the open question is readable from the payload, and only in the one safe shape', () => {
-  it('reads a well-formed {question, labels} and preserves display order positionally', () => {
-    // Positionally, and never sorted: the server already put them in the order the
-    // table is to see them, and re-ordering here would be a second random draw.
-    expect(openQuestionOf(stateWith({ question: QUESTION, labels: [FIRST, SECOND] }))).toEqual({
-      question: QUESTION,
-      labels: [FIRST, SECOND],
-    });
-    expect(openQuestionOf(stateWith({ question: QUESTION, labels: [SECOND, FIRST] }))).toEqual({
-      question: QUESTION,
-      labels: [SECOND, FIRST],
-    });
-  });
-
-  it('fails closed on every malformed payload rather than rendering half a card', () => {
-    // `undefined` (a server that does not send it), `null`, a non-object, a missing
-    // or non-string question, an empty question, a non-array `labels`, a one- or
-    // three-element `labels`, and a non-string inside it. Each must be `null`, which
-    // is the caller's "there is nothing on the table" — never a half-rendered card.
-    const bad: unknown[] = [
-      undefined,
-      null,
-      'a question, as a bare string',
-      42,
-      {},
-      { question: QUESTION },
-      { labels: [FIRST, SECOND] },
-      { question: '', labels: [FIRST, SECOND] },
-      { question: 7, labels: [FIRST, SECOND] },
-      { question: QUESTION, labels: FIRST },
-      { question: QUESTION, labels: [FIRST] },
-      { question: QUESTION, labels: [FIRST, SECOND, 'a third door'] },
-      { question: QUESTION, labels: [FIRST, 9] },
-      { question: QUESTION, labels: ['', SECOND] },
-    ];
-    for (const raw of bad) {
-      expect(openQuestionOf(stateWith(raw)), `payload ${JSON.stringify(raw)}`).toBeNull();
-    }
-  });
-
-  it('has no prop through which a payout, an Ideologue or an order could arrive', () => {
-    // The type-level half of change C being refused: `OpenQuestion` is two strings
-    // and a pair of strings. There is no slot for what a side pays.
-    const q: OpenQuestion = { question: QUESTION, labels: [FIRST, SECOND] };
-    expect(Object.keys(q).sort()).toEqual(['labels', 'question']);
-    // …and a smuggled payout is dropped by `openQuestionOf`, so a hostile or buggy
-    // server cannot get one into this component even if it sends one.
-    const smuggled = stateWith({
-      question: QUESTION,
-      labels: [FIRST, SECOND],
-      pays: { funds: 12, clout: 0, media: 0, trust: 0 },
-      ideologue: 'capitalist',
-      order: 'ab',
-      cardId: 't-ide-0054',
-    });
-    expect(openQuestionOf(smuggled)).toEqual({ question: QUESTION, labels: [FIRST, SECOND] });
-  });
-});
 
 describe('the panel shows the table one card, and it is inert', () => {
   it('renders the question, both labels in the order given, and the answerer by name', () => {
