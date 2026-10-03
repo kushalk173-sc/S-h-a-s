@@ -800,6 +800,45 @@ function purchasesBlocked(state: GameState, id: PlayerID): boolean {
 }
 
 /**
+ * G14b — voters LOST on each Voter Card this player influences right now.
+ *
+ * Summed rather than maxed, for the same reason `surchargeFor` sums: two cards that both
+ * shorten a purchase shorten it twice, which is what two cards means.
+ *
+ * `remaining > 0` is the whole of the liveness test, and it is not a second definition of
+ * the deadline — a spent entry is REMOVED by `spendVoterShortfall`, so an entry at zero
+ * cannot be in this list.
+ */
+function voterShortfall(state: GameState, id: PlayerID): number {
+  return restrictionsOf(state, id, 'voter-shortfall')
+    .filter((r) => r.remaining > 0)
+    .reduce((n, r) => n + Math.max(0, r.value), 0);
+}
+
+/**
+ * G14b, the counter: one Voter Card's worth of every shortfall this player carries.
+ *
+ * Decremented per INFLUENCE rather than per voter lost, because the printed clause counts
+ * CARDS. A 1-Voter Card under a 2-voter shortfall yields nothing and still spends one, so
+ * a player cannot extend a debuff by buying small cards.
+ *
+ * **Pure, and derived from state only.** `remaining` is a number that was written down
+ * when the card resolved, so a replay from seed + action log reproduces the counter
+ * without re-deriving it — which is R2's requirement, and the reason this is not a
+ * module-scope `let`.
+ */
+function spendVoterShortfall(state: GameState, id: PlayerID): GameState {
+  const player = state.players[id];
+  if (!player) return state;
+  const restrictions = player.restrictions ?? [];
+  if (!restrictions.some((r) => r.kind === 'voter-shortfall' && r.remaining > 0)) return state;
+  const next = restrictions
+    .map((r) => (r.kind === 'voter-shortfall' && r.remaining > 0 ? { ...r, remaining: r.remaining - 1 } : r))
+    .filter((r) => !(r.kind === 'voter-shortfall' && r.remaining <= 0));
+  return { ...state, players: { ...state.players, [id]: { ...player, restrictions: next } } };
+}
+
+/**
  * G18 — is this player earning nothing for answering an Ideology Card?
  *
  * **EXPIRY IS NOT CHECKED HERE**, for the same reason `powers.ts usesLeft` does not
@@ -2092,6 +2131,15 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
         voters += 1;
       }
 
+      // G14b. THE GRETA EFFECT: *"They will get 1 less voter on the next 2 Voter Cards
+      // that they influence."* Subtracted AFTER Going Viral, and that ordering is the
+      // ruling rather than an accident — see `'voter-shortfall'` in state.ts. FLOORED AT
+      // ZERO and it never refuses the purchase: a 1-Voter Card under a 2-voter shortfall
+      // yields nothing, and a restriction that made the influence ILLEGAL would be a
+      // table-stalling lock, because a Voter Card that has been bought cannot be unbought.
+      const shortfall = voterShortfall(state, playerId);
+      if (shortfall > 0) voters = Math.max(0, voters - shortfall);
+
       let s = state;
       [s] = takeResources(s, playerId, cost);
       s = withPlayer(s, playerId, {
@@ -2103,6 +2151,11 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       });
       // p10: voters from a single Voter Card cannot be split across zones.
       s = grantVoters(s, playerId, voters, 'Voter Card', true);
+      // G14b, the counter. One card's worth consumed per INFLUENCE, whether or not the
+      // shortfall shortened anything — the printed clause counts CARDS ("the next 2
+      // Voter Cards that they influence"), not voters. A spent entry is REMOVED rather
+      // than left at zero, the same rule `creditDonation` follows.
+      s = spendVoterShortfall(s, playerId);
       s = discardTo({ ...s, market: s.market.filter((_, i) => i !== action.slot) }, 'voter', slot.cardId);
       s = refillMarket(s, ctx);
       s = log(s, {

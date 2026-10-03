@@ -757,7 +757,53 @@ export type RestrictionKind =
    * the same deadline is how a rule lives one turn too long in one place and not
    * another.
    */
-  | 'borrowed-powers';
+  | 'borrowed-powers'
+  /**
+   * G14b — *"They will get 1 less voter on the next 2 Voter Cards that they influence."*
+   * THE GRETA EFFECT (REF 4.2.1).
+   *
+   * ## IT IS A PAYOUT MODIFIER, and that is the whole reason it is not a `per`
+   *
+   * `per: { of: 'held-of-each-resource' }` multiplies a `gain`'s `res` by something read
+   * out of the player's own state at resolution. A shortfall is the same arithmetic with
+   * the sign reversed AND with a COUNTER — it applies to the next N purchases and not to
+   * the rest of the game — and `powerUses.influenceVoters` is a count of influence
+   * already spent, not a place to keep a debuff. So it is a rule, and `INFLUENCE` asks it.
+   *
+   * ## ONE CONSULT POINT, and it is the one the printed sentence is about
+   *
+   * `INFLUENCE` subtracts it from the voters the card yields, **after** Going Viral has
+   * added its own. That ordering is the ruling: the printed clause is about what a Voter
+   * Card yields, and both effects act on the card as it resolves, so the debuff sees the
+   * card's final size. Subtracting first would let a Showstopper launder the debuff away
+   * for free by pairing it with Going Viral.
+   *
+   * ## `remaining` MEANS "HOW MANY MORE VOTER CARDS", not "how much is still owed"
+   *
+   * This is the third distinct reading of one field across six kinds, and it is worth
+   * naming because a reader who assumes KHAKI TERROR's meaning will compute the wrong
+   * deadline. `no-purchases` decrements by what was actually donated; `voter-shortfall`
+   * decrements by exactly one per Voter Card influenced, whether or not the card had any
+   * voters to shorten, because the printed clause counts CARDS. An entry that reaches 0
+   * is removed rather than left at zero, which is the same rule `creditDonation` follows
+   * so that "is this rule in force" stays one predicate.
+   *
+   * ## IT SUPPRESSES, IT NEVER REFUSES
+   *
+   * A 1-Voter Card under a 2-voter shortfall yields **zero** voters. The purchase still
+   * succeeds, the card is still paid for, the slot is still refilled and the log still
+   * says what happened. A restriction that made the purchase *illegal* would be a
+   * table-stalling lock: the card cannot be un-bought, and this codebase has been bitten
+   * three times by a decision that froze a player who could not satisfy it. Zero is the
+   * safe direction.
+   *
+   * ## Visibility: PUBLIC, on the same argument as its five siblings
+   *
+   * A player told they will get less out of the next two purchases has to be able to plan
+   * around it, and so does everyone else at the table — it is a threat. No new field, so
+   * `packages/server/test/secret-inventory.ts` owes nothing.
+   */
+  | 'voter-shortfall';
 
 /**
  * ONE RESTRICTION. The two rulings this type forces are argued on the fields that

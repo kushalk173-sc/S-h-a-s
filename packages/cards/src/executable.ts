@@ -156,6 +156,14 @@ export const EXECUTABLE_RESTRICTION_KINDS: ReadonlySet<string> = new Set([
   'surcharge',
   'no-power',
   'no-income',
+  /**
+   * G14b. `voter-shortfall` is THE GRETA EFFECT and is read by `INFLUENCE`, in one
+   * place, after Going Viral. `'borrowed-powers'` is NOT here on purpose: it is written
+   * by the `borrow-power` op rather than by `restrict`, because the two directions are
+   * opposite, so listing it would authorise a `restrict` that grants the donor the
+   * caster's powers.
+   */
+  'voter-shortfall',
 ]);
 
 // ─────────────────────────── G13: the phase-changing ops ───────────────────────────
@@ -512,9 +520,10 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
           pointer: `${pointer}/kind`,
           message:
             `restrict kind ${JSON.stringify(effect[field])} is a rule no action consults, so the ` +
-            `card would impose nothing. The four that are consulted are 'no-purchases' and ` +
-            `'surcharge' (INFLUENCE / BUY_CONSPIRACY), 'no-power' (powers.ts usesLeft) and ` +
-            `'no-income' (ANSWER). See KNOWN-GAPS.md G5 and G18.`,
+            `card would impose nothing. The five that are consulted are 'no-purchases' and ` +
+            `'surcharge' (INFLUENCE / BUY_CONSPIRACY), 'no-power' (powers.ts usesLeft), ` +
+            `'no-income' (ANSWER) and 'voter-shortfall' (INFLUENCE, after Going Viral). ` +
+            `See KNOWN-GAPS.md G5, G14b and G18.`,
         });
       }
       continue;

@@ -470,7 +470,21 @@ export type Effect = (
        * and for the clause it costs (the printed card names ONE Level 3 power, and
        * choosing which is G1).
        */
-      readonly kind: 'no-purchases' | 'surcharge' | 'no-power' | 'no-income';
+      readonly kind:
+        | 'no-purchases'
+        | 'surcharge'
+        | 'no-power'
+        | 'no-income'
+        /**
+         * G14b. THE GRETA EFFECT: *"They will get 1 less voter on the next 2 Voter Cards
+         * that they influence."* `value` is how many voters each of those cards yields
+         * less and `owed` is how many CARDS that is — one field pair for a rule with a
+         * counter, and both readings are argued on `'voter-shortfall'` in `state.ts`.
+         *
+         * Consulted by `INFLUENCE` in exactly one place, after Going Viral, and it
+         * suppresses rather than refuses.
+         */
+        | 'voter-shortfall';
       /** Extra resources per purchase, for `'surcharge'`. Zero for `'no-purchases'`. */
       readonly value: number;
       /** For `'no-purchases'`: what the player must give before buying again. */

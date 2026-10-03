@@ -121,18 +121,18 @@ the playability count; a table here that disagrees with the decks is worse than 
 |---|---:|---:|
 | Recovered X-card rows probed (REF §4.1–§4.3) | 54 | **54** |
 | …distinct after de-duplicating the campaign reskins | 51 | **51** |
-| …**PLAYED**, measured by driving each through `reduce()` | 14 | **36** |
+| …**PLAYED**, measured by driving each through `reduce()` | 14 | **37** |
 | …shipped `adapted`, dropped clause named in `source` | 7 | **30** |
 | …playable but **held back on a ruling** (LAB-GROWN EARWORM) | 0 | **1** |
-| …**not representable at all** | 43 | **18** |
+| …**not representable at all** | 43 | **17** |
 | Cards shipped in the corpus | 60 | **127** |
 | `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 41 / 86** |
 | `inferred` placeholders retired for a recovered card | 0 | **9** |
 
-The 51 distinct recovered cards are 30 shipping + 1 held back + 18 not representable, and
+The 51 distinct recovered cards are 30 shipping + 1 held back + 17 not representable, and
 `npm run playable` agrees: 54 rows probed (the three campaign reskin pairs are probed under both
-names, because a duplicate is cheaper to keep visible than to deduplicate by hand), 36 played,
-0 refused, 0 played-but-no-op, 18 inexpressible.
+names, because a duplicate is cheaper to keep visible than to deduplicate by hand), 37 played,
+0 refused, 0 played-but-no-op, 17 inexpressible.
 
 
 ### 0.2 The finding, and what changed about it
@@ -675,19 +675,48 @@ reduction rather than reading the deck — so 36 of 54 is a statement about the 
 not about `decks/`. Shipping either card is a corpus change and §6bis records what
 growing the corpus costs the server suite, which is another owner's call.
 
-### G14b — no PAYOUT modifier, and no N-target
+### G14b — no PAYOUT modifier
 
-**State: (c). Card: THE GRETA EFFECT.** *"Pick up to 2 opponents. They will get 1 less
-voter on the next 2 Voter Cards that they influence. This applies to 2 separate voter
-cards for 2 different players."* This is the shape G9's surcharges failed on: the
-printed clause changes what a purchase **yields**, and a card that reduces a payout
-needs a counter on somebody's `powerUses.influenceVoters` decrement that happens
-exactly twice and not otherwise. `'no-income'` is the precedent that one such rule is
-a `RestrictionKind` consulted in one place; what is missing is the decrement.
+**State: (a). CLOSED for the move, still (c) for the "up to 2".** Card: THE GRETA
+EFFECT. REF 4.2.1: *"Pick up to 2 opponents. They will get 1 less voter on the next 2
+Voter Cards that they influence. This applies to 2 separate voter cards for 2 different
+players."*
 
-**And the "up to 2 opponents" is the harder half.** `applyEffect` computes ONE `target`
-for a whole effect list, so a card cannot raise two `choose-player` decisions in one
-resolution — G14a ran into the same wall from the other side.
+**Why this was not a `per`.** `per: { of: 'held-of-each-resource' }` multiplies a `gain`'s
+`res` by a quantity read out of the recipient's own state — G15's work. A shortfall is
+the same arithmetic with the sign reversed **and with a counter**: it applies to the next
+N purchases and not to the rest of the game, and `powerUses.influenceVoters` is a count
+of influence already spent, not a place to keep a debuff. So it is a RULE, and
+`RestrictionKind` gains `'voter-shortfall'` — read by `INFLUENCE` in exactly one place.
+**No new `PlayerState` field**, so `secret-inventory.ts` owes nothing and
+`public-payload.test.ts`'s `{ liveEffects, restrictions }` floor is untouched.
+
+**Two rulings, and both are on `'voter-shortfall'` in `state.ts` where they belong.**
+
+1. **IT SUPPRESSES, IT NEVER REFUSES.** A 1-Voter Card under a 2-voter shortfall yields
+   **zero** voters. The purchase still succeeds, the card is still paid for, the slot is
+   still refilled. A restriction that made the influence *illegal* would be a
+   table-stalling lock — a Voter Card that has been bought cannot be unbought — and this
+   codebase has been bitten three times by a decision that froze a player who could not
+   satisfy it. Zero is the safe direction.
+2. **SUBTRACTED AFTER GOING VIRAL.** The printed clause is about what a Voter Card
+   *yields*, and both rules act on the card as it resolves. Subtracting first would let a
+   Showstopper pair the debuff with their own power and launder it away for free.
+
+**`owed` MEANS "HOW MANY CARDS" HERE, which is the third reading of one field.**
+`no-purchases` decrements by what was actually donated; `voter-shortfall` decrements by
+exactly one per INFLUENCE — *whether or not the card had any voters to shorten*,
+because the printed clause counts CARDS. A player therefore cannot extend a debuff by
+buying small cards. A spent entry is REMOVED rather than left at zero, the same rule
+`creditDonation` follows, so "is this rule in force" stays one predicate.
+
+**Card gained: THE GRETA EFFECT — `npm run playable` 36 → 37 of 54, measured by
+playing.** Two clauses are dropped and both are named on `SOURCES.md` and on the probe
+row: *"Pick up to 2 opponents"* ships as one, because `applyEffect` computes ONE `target`
+for a whole effect list and so a card cannot raise two `choose-player` decisions in one
+resolution; and the printed rider *"This applies to 2 separate voter cards for 2 different
+players"* goes with it, since one card and one player is what ships. **Not in the corpus
+yet** — see the note under G14a about what `playable` measures.
 
 ### G15 — no value computed from your own current state
 
