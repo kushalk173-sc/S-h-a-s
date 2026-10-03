@@ -254,7 +254,20 @@ describe('the shipped DEFLECT redirects the card under response', () => {
   it('the payout lands on the third player, and not on the actor', () => {
     const held = position(DEFLECT_ID);
     expect(held.interrupt, 'a Deflect in p2\'s hand did not open a window').not.toBeNull();
-    expect(funds(held, 'p1')).toBe(2);
+    // DIFFERENTIAL, and never an absolute -- the same reasoning the BLOCK block above
+    // states. This line used to read `expect(funds(held, 'p1')).toBe(2)`, which is not a
+    // fact about DEFLECT at all: `position()` seeds the Ideology deck, p1 answers the card
+    // the seed deals, and every Ideology Card pays a different amount, so `2` was a
+    // statement about which card that seed happened to reach. Growing the deck (six new
+    // original Ideology Cards moved the draw order) changed it from 2 to 4 and the test
+    // failed on a card edit that broke nothing. The property actually being guarded is
+    // that the staged effect HAS NOT BEEN PAID while the window is open, and the control
+    // below resolves the same seeded card with no Deflect in hand, so the only difference
+    // between the two numbers is the staging.
+    expect(
+      funds(position(null), 'p1') - funds(held, 'p1'),
+      'the staged effect was applied before the response window closed',
+    ).toBeGreaterThan(0);
     const after = must(
       reduce(held, 'p2', { type: 'RESPOND_INTERRUPT', cardId: DEFLECT_ID, at: 'p3' }, CTX),
       'deflect',

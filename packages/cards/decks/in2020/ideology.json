@@ -729,6 +729,120 @@
           "pays": { "media": 2, "trust": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-in2020-039",
+      "source": "original; register per REF 8.2. The land question. ig-in2020-016 asks whether land records should be digitised; nothing in the recovered pool asks what happens to the ground once they are.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a new industrial corridor be built through the fields or the city?",
+      "sides": [
+        {
+          "answer": "Yes. The city already has the buyers and the trucks.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. The fields are the only thing here that was not built.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-040",
+      "source": "original; register per REF 8.2. The inter-generational question, which the recovered pool has no instance of at all: every recovered card decides something inside one electoral term.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the next gas block be opened before the current one is empty?",
+      "sides": [
+        {
+          "answer": "Yes. The block is licensed, the wells are surveyed, the gas is sold.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. A block opened early is a field emptied two years early.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-041",
+      "source": "original; register per REF 8.2. Transparency with a price on it. The Capitalist side is the one that votes to keep a file closed, so the question does not reward the reflex of its own answer.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the procurement portal be open to anyone who asks for a file?",
+      "sides": [
+        {
+          "answer": "No. Bidder names are worth more than the files holding them.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. A portal nobody reads is a cabinet with a firewall.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-042",
+      "source": "original; register per REF 8.2. Extends the procurement family of ig-in2020-013 and ig-in2020-014 from the price of the work to the name on the envelope.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a large contractor bid using a local partner's name?",
+      "sides": [
+        {
+          "answer": "Yes. The consortium is what the tender was written for.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. The name is the whole bid, and the name was not theirs.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-043",
+      "source": "original; register per REF 8.2. Both sides here are defensible and neither is cheap, which is the register's ordinary shape: two spends competing for one season.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the border road be built before the flood relief is finished?",
+      "sides": [
+        {
+          "answer": "Yes. A road that cannot be flooded is worth two seasons.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. The relief is this year, and the road is also this year.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-044",
+      "source": "original; register per REF 8.2. Sovereignty against cost. The Capitalist side is the one that opens the tender to a foreign firm, so the greedy reading of the Ideologue and the cautious reading coincide on this card.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a foreign firm be allowed to bid for a national port?",
+      "sides": [
+        {
+          "answer": "Yes. Whoever builds it fastest also builds it cheapest.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. A port is an address, and an address can be changed.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
     }
   ]
 }
