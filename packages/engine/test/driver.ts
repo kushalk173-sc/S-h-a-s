@@ -11,7 +11,16 @@
 import type { Action, ChoicePick } from '../src/actions';
 import { canAfford } from '../src/resources';
 import { reduce, type Ctx } from '../src/reduce';
-import { RESOURCES, type Delta, type GameState, type PendingChoice, type PlayerID, type Pool, type Resource } from '../src/state';
+import {
+  RESOURCES,
+  type Delta,
+  type GameState,
+  type PendingChoice,
+  type PlayerID,
+  type Pool,
+  type Resource,
+  type ZoneID,
+} from '../src/state';
 
 const MAX_ACTIONS = 2000;
 
@@ -83,15 +92,61 @@ export function pickFor(state: GameState, c: PendingChoice): ChoicePick | null {
       return null;
     }
     case 'evict-voter': {
-      const ids = targetAreas(state, (owner) => owner !== undefined, c.choice.count);
+      const ids = targetAreas(state, c.player, c.choice.kind, c.choice.count, c.choice.zoneId, c.choice.scope);
       return ids.length > 0 ? { kind: 'areas', areaIds: ids } : null;
     }
     case 'discard-voter':
     case 'convert-voter': {
-      const ids = targetAreas(state, (owner) => owner !== c.player, c.choice.count);
+      const ids = targetAreas(state, c.player, c.choice.kind, c.choice.count, c.choice.zoneId, c.choice.scope);
       return ids.length > 0 ? { kind: 'areas', areaIds: ids } : null;
     }
+    /**
+     * G1. `turnOrder` minus the chooser is the candidate set `resolveChoice` accepts,
+     * so the first other seat is always legal. Returns null only if the game has one
+     * seat, which `Lobby` refuses to create.
+     */
+    case 'choose-player': {
+      const id = state.turnOrder.find((x) => x !== c.player);
+      return id === undefined ? null : { kind: 'player', id };
+    }
+    /**
+     * G16. The first zone holding a peg the decision could name, mirroring
+     * `legalZoneIds`. It reads only public board state.
+     */
+    case 'choose-zone': {
+      const effect = c.choice.effects[0];
+      const zone = effect === undefined ? undefined : zonesWithLegalPeg(state, c.player, effect.op, 'target' in effect ? effect.target : undefined);
+      return zone === undefined ? null : { kind: 'zone', zoneId: zone };
+    }
   }
+}
+
+/** G16 — the first zone `legalZoneIds` would offer, so the driver always has a pick. */
+function zonesWithLegalPeg(
+  state: GameState,
+  source: PlayerID,
+  op: string,
+  named: string | undefined,
+): ZoneID | undefined {
+  const scope = voterScopeOf(op, named);
+  for (const z of state.zones) {
+    const has = z.areas.some((a) => {
+      if (a.peg === null || a.volatile) return false;
+      if (scope === 'own' && a.peg.owner !== source) return false;
+      if (scope === 'others' && a.peg.owner === source) return false;
+      if (op === 'convert-voter' && a.peg.owner === source) return false;
+      return true;
+    });
+    if (has) return z.id;
+  }
+  return undefined;
+}
+
+/** The `voterScope` rule, mirrored so the driver's pick is the engine's own set. */
+function voterScopeOf(op: string, named: string | undefined): 'any' | 'own' | 'others' {
+  if (op === 'evict') return 'any';
+  if (op === 'convert-voter') return 'others';
+  return named === 'you' ? 'own' : 'others';
 }
 
 function sum(d: Delta): number {
@@ -100,14 +155,25 @@ function sum(d: Delta): number {
 
 function targetAreas(
   state: GameState,
-  ok: (owner: PlayerID | undefined) => boolean,
+  chooser: PlayerID,
+  kind: string,
   want: number,
+  zoneId?: ZoneID,
+  scope?: 'any' | 'own' | 'others',
 ): string[] {
+  // G16 + G-new: `zoneId` is the resolved constituency and `scope` is the card's —
+  // both are the CARD's, not the pick's, and both are enforced again by
+  // `resolveChoice`. Mirroring them here is what keeps the driver's pick legal in a
+  // game that actually uses them; the old predicate-based version was an
+  // approximation that only happened to be right for scope `'any'` and `'others'`.
   const out: string[] = [];
   for (const z of state.zones) {
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (!a.peg || a.volatile) continue;
-      if (!ok(a.peg.owner)) continue;
+      if (scope === 'own' && a.peg.owner !== chooser) continue;
+      if (scope === 'others' && a.peg.owner === chooser) continue;
+      if (kind === 'convert-voter' && a.peg.owner === chooser) continue;
       out.push(a.id);
       if (out.length === want) return out;
     }

@@ -38,7 +38,7 @@ import { RULES, type CardIndex, type Effect, type Interrupt } from '../src/engin
 import { reduce } from '../../engine/src/reduce';
 import { setup } from '../../engine/src/setup';
 import type { Action } from '../../engine/src/actions';
-import type { AreaID, ChoiceScope, GameState, PlayerID } from '../../engine/src/state';
+import type { AreaID, ChoiceScope, GameState, PlayerID, ZoneID } from '../../engine/src/state';
 
 /** Sum of a signed pool. `state.ts` owns it; mirrored here rather than imported as a value. */
 const deltaTotal = (d: { funds?: number; clout?: number; media?: number; trust?: number }): number =>
@@ -617,15 +617,63 @@ function settleChoices(s: GameState): { readonly state: GameState } | { readonly
         choiceId: pending.id,
         pick: { kind: 'steal', from: victim, res },
       }, PROBE_CTX);
-    } else {
+    } else if (
+      c.kind === 'evict-voter' ||
+      c.kind === 'discard-voter' ||
+      c.kind === 'convert-voter'
+    ) {
       // evict / discard-voter / convert-voter: pick the areas the engine itself
       // says are legal, discovered by asking for one too many and reading the count.
-      const legal = legalAreas(state, pending.player, c.kind, c.scope, c.count);
+      // `zoneId` is G16's narrowing and is the CARD's, so the pick mirrors it.
+      const legal = legalAreas(state, pending.player, c.kind, c.scope, c.count, c.zoneId);
       if (legal.length === 0) return { error: `no legal target for ${c.kind}` };
       result = reduce(state, pending.player, {
         type: 'RESOLVE_CHOICE',
         choiceId: pending.id,
         pick: { kind: 'areas', areaIds: legal },
+      }, PROBE_CTX);
+    } else if (c.kind === 'choose-player') {
+      // G1. `turnOrder` minus the chooser is the engine's candidate set, so the first
+      // other seat is always accepted — which is the satisfiability invariant, read
+      // off the same expression `applyEffect` offered the decision from.
+      const id = state.turnOrder.find((x) => x !== pending.player);
+      if (id === undefined) return { error: 'a choose-player decision with no candidate seat' };
+      result = reduce(state, pending.player, {
+        type: 'RESOLVE_CHOICE',
+        choiceId: pending.id,
+        pick: { kind: 'player', id },
+      }, PROBE_CTX);
+    } else {
+      // G16. The first zone `legalZoneIds` would offer, mirrored here so the probe
+      // measures the card rather than a bad pick.
+      const effect = c.effects[0];
+      if (effect === undefined || !('zone' in effect)) {
+        return { error: 'a choose-zone decision naming no zone' };
+      }
+      const named = 'target' in effect ? effect.target : undefined;
+      const op = effect.op === 'evict' || effect.op === 'convert-voter' ? effect.op : 'discard-voter';
+      const scope: ChoiceScope =
+        op === 'evict' ? 'any' : op === 'convert-voter' ? 'others' : named === 'you' ? 'own' : 'others';
+      let zoneId: ZoneID | undefined;
+      for (const z of state.zones) {
+        const has = z.areas.some(
+          (a) =>
+            a.peg !== null &&
+            !a.volatile &&
+            !(scope === 'own' && a.peg.owner !== c.source) &&
+            !(scope === 'others' && a.peg.owner === c.source) &&
+            !(op === 'convert-voter' && a.peg.owner === c.source),
+        );
+        if (has) {
+          zoneId = z.id;
+          break;
+        }
+      }
+      if (zoneId === undefined) return { error: 'a choose-zone decision with no legal constituency' };
+      result = reduce(state, pending.player, {
+        type: 'RESOLVE_CHOICE',
+        choiceId: pending.id,
+        pick: { kind: 'zone', zoneId },
       }, PROBE_CTX);
     }
 
@@ -638,9 +686,17 @@ function settleChoices(s: GameState): { readonly state: GameState } | { readonly
 }
 
 /** The areas `resolveChoice` will accept, mirroring its guards exactly. */
-function legalAreas(s: GameState, playerId: PlayerID, kind: string, scope: ChoiceScope, n: number): AreaID[] {
+function legalAreas(
+  state: GameState,
+  playerId: PlayerID,
+  kind: string,
+  scope: ChoiceScope,
+  n: number,
+  zoneId?: ZoneID,
+): AreaID[] {
   const out: AreaID[] = [];
-  for (const z of s.zones) {
+  for (const z of state.zones) {
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (out.length >= n) return out;
       if (a.peg === undefined || a.peg === null) continue;

@@ -23,6 +23,7 @@ import type {
   EffectTiming,
   EffectTrigger,
   Interrupt,
+  ZoneSelector,
 } from './cards';
 import { hasPower, passiveBonus, usesLeft } from './powers';
 import { applyDiscounts, canAfford, deltaError, overCap, subtract } from './resources';
@@ -32,6 +33,7 @@ import {
   IDEOLOGUE_RESOURCE,
   NO_POWER_USES,
   RESOURCES,
+  ZONE_IDS,
   deltaTotal,
   emptyAreas,
   findArea,
@@ -59,6 +61,8 @@ import {
   type Pool,
   type Resource,
   type Restriction,
+  type ZoneID,
+  type ZoneScope,
   type RestrictionKind,
   type Zone,
 } from './state';
@@ -289,7 +293,18 @@ function setArea(state: GameState, area: Area, ctx: Ctx): BoardEdit {
 
 // ─────────────────────────── effects ───────────────────────────
 
-function resolveTargets(state: GameState, source: PlayerID, target: EffectTarget): PlayerID[] {
+function resolveTargets(
+  state: GameState,
+  source: PlayerID,
+  target: EffectTarget,
+  forced: PlayerID | null = null,
+): PlayerID[] {
+  // G1. A `'choose-player'` effect has ALREADY been resolved — `resolveChoice` named
+  // the player — so the decision is over and the effect re-runs against them. This
+  // one line is why no op needs to know that `'chosen-player'` exists: every
+  // `resolveTargets` call in `applyEffect` is correct for a forced player without
+  // knowing why it is being forced.
+  if (forced !== null) return [forced];
   switch (target) {
     case 'you':
       return [source];
@@ -303,6 +318,12 @@ function resolveTargets(state: GameState, source: PlayerID, target: EffectTarget
       const top = Object.entries(s).filter(([, v]) => v === best && v > 0);
       return top.length === 1 && top[0] ? [top[0][0]] : [];
     }
+    case 'chosen-player':
+      // Unreachable: `applyEffect` intercepts `'chosen-player'` above its switch and
+      // never reaches an op's case with it. It is here so the switch is TOTAL, which
+      // is what makes a future `EffectTarget` member a compile error at every site
+      // rather than a `undefined` player list at runtime.
+      return [];
   }
 }
 
@@ -506,19 +527,55 @@ function raiseVoterDecision(
    * lets `voterScope` tell them apart.
    */
   named: EffectTarget | undefined,
+  /**
+   * G16 — the RAW `zone` field, plus the constituency a `'choose-zone'` decision
+   * already resolved to. `resolveZone` prefers the resolved value, so the three
+   * selectors and the two entry points (raise fresh, resolve a decision) are one
+   * path and not two.
+   */
+  zone: ZoneSelector | undefined,
+  forcedZone: ZoneID | null,
   ctx: Ctx,
 ): GameState {
   let s = state;
   const target = named ?? 'you';
+  const resolvedZone = resolveZone(s, source, zone, forcedZone);
   for (const p of resolveTargets(s, source, target)) {
     const scope = voterScope(p, source, kind, named);
     s = pushChoice(
       s,
-      { kind, count: resolveCount(s, p, n, ctx), scope, reason: 'Card effect' },
+      {
+        kind,
+        count: resolveCount(s, p, n, ctx),
+        scope,
+        // G16. Both halves are published: `zone` says WHICH rule narrowed the decision
+        // so the dialog can explain it, and `zoneId` is the narrowing itself. The id is
+        // public — it is a fixed constituency on a board every client already has in
+        // full — and it is the only piece that is NOT re-derivable from the card, since
+        // for `'chosen-zone'` it is the player's own answer.
+        ...(zone === undefined ? {} : { zone: zoneOfSelector(zone, forcedZone) }),
+        ...(resolvedZone === null ? {} : { zoneId: resolvedZone }),
+        reason: 'Card effect',
+      },
       p,
     );
   }
   return s;
+}
+
+/**
+ * G16 — the `ZoneScope` a resolved zone is published under.
+ *
+ * `'chosen-zone'` becomes a concrete `ZoneID` on the decision rather than staying a
+ * selector, which is the whole reason the two kinds are different types: a client
+ * cannot act on a selector, so it never receives one. A zone resolved from
+ * `'this-zone'` or `'your-strongest'` keeps its selector name so the UI can say
+ * WHICH zone rule produced it ("the constituency whose placement drew this Headline")
+ * rather than naming a bare id it cannot explain.
+ */
+function zoneOfSelector(zone: ZoneSelector | undefined, forcedZone: ZoneID | null): ZoneScope {
+  if (forcedZone !== null) return 'chosen-zone';
+  return zone === 'this-zone' || zone === 'your-strongest' ? zone : 'any';
 }
 
 /**
@@ -743,6 +800,21 @@ function purchasesBlocked(state: GameState, id: PlayerID): boolean {
 }
 
 /**
+ * G18 — is this player earning nothing for answering an Ideology Card?
+ *
+ * **EXPIRY IS NOT CHECKED HERE**, for the same reason `powers.ts usesLeft` does not
+ * check it: `restrictionsOf` reads a `PlayerState` and `expiresTurn` is an absolute
+ * TURN number, so re-deriving the deadline here would be a second definition of the
+ * same clock — the failure mode where a rule lives one turn too long in one place and
+ * not another. `expireRestrictions` in `advanceTurn` removes what has run out, on the
+ * same clock that resets `powerUses`. `restrictions.test.ts` pins that a `no-income`
+ * imposed for `'next-turn'` is in force for exactly that turn and no other.
+ */
+function incomeBlocked(state: GameState, id: PlayerID): boolean {
+  return restrictionsOf(state, id, 'no-income').length > 0;
+}
+
+/**
  * THE KHAKI TERROR RULING, and it is the one that decides whether this card is a
  * card or a soft-lock.
  *
@@ -805,6 +877,120 @@ function expireRestrictions(state: GameState): GameState {
 }
 
 
+/**
+ * G16 — resolve a `ZoneSelector` against the board, or `null` when it names nothing.
+ *
+ * ## THE THREE, AND WHY NONE OF THEM NEEDS A NEW `GameState` FIELD
+ *
+ *  - `'this-zone'` — the zone of the Volatile Area whose placement drew the Headline
+ *    being resolved. `GameState.headlineQueue[0].areaId` already says so, so this is
+ *    a READ of state that was written down rather than a value threaded down from
+ *    `ACK_HEADLINE`. That is what keeps `reduce()` a pure function of
+ *    `(state, action, ctx)`: a replay derives it without re-running the trigger.
+ *    REF 4.1 is explicit that "this zone" means exactly this — *"'this zone' = the
+ *    volatile zone that triggered it."*
+ *  - `'your-strongest'` — the zone `actor` holds the most pegs in. Ties are broken by
+ *    `ZONE_IDS` order, which makes it a pure function of the board rather than a
+ *    "pick any of the tied ones" decision; the dropped tie-break is named on
+ *    `ZoneSelector`'s refusal list rather than approximated.
+ *  - `'chosen-zone'` — never resolved here. It is raised as a decision by
+ *    `applyEffect` and arrives back as `forced`, so the value that reaches this
+ *    function is already a `ZoneID`.
+ *
+ * **`null` MEANS "NO ZONE", AND IT FALLS BACK TO EVERY ZONE** — which is the
+ * satisfiability decision, and it is the safe direction for the reason the rest of
+ * this file argues it everywhere else: a selector that cannot be resolved must not
+ * narrow the target set to nothing, because an empty target set is a decision with no
+ * legal pick and this codebase has been bitten by that bug three times. A card that
+ * says "in this zone" and finds no zone acts on the whole board, which is a card that
+ * over-delivers; the alternative is a card that freezes a player, which is a dead
+ * table.
+ */
+function resolveZone(
+  state: GameState,
+  actor: PlayerID,
+  zone: ZoneSelector | undefined,
+  forcedZone: ZoneID | null,
+): ZoneID | null {
+  if (forcedZone !== null) return forcedZone;
+  if (zone === undefined || zone === 'chosen-zone') return null;
+  if (zone === 'this-zone') {
+    const areaId = state.headlineQueue[0]?.areaId;
+    if (areaId === undefined || areaId === '') return null;
+    return findArea(state, areaId)?.zone ?? null;
+  }
+  // 'your-strongest'
+  let best: ZoneID | null = null;
+  let bestN = 0;
+  for (const id of ZONE_IDS) {
+    const z = findZone(state, id);
+    if (!z) continue;
+    const n = pegsOf(z, actor);
+    // `>` not `>=`, and ZONE_IDS is a fixed order, so the first zone to reach the
+    // maximum wins — deterministic, and a replay reaches the same one.
+    if (n > bestN) {
+      best = id;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
+/**
+ * G16 — the zones a `'choose-zone'` decision may offer: those holding at least one
+ * peg this effect could actually name.
+ *
+ * ## WHY THE SET IS FILTERED BY WHAT THE EFFECT COULD NAME
+ *
+ * `resolveChoice` accepts a pick whose zone contains at least one legal peg, so a
+ * zone that could not be picked must not be offered — otherwise the dialog would
+ * carry a button the server refuses, which is the one outcome worse than not
+ * offering the choice at all ("the player believes they have finished"). That is the
+ * same reasoning `derive.ts:requiredPicks` implements on the client, and it is why
+ * the count of legal zones is a function of the pegs rather than a constant nine.
+ *
+ * **It reads only PUBLIC state.** The board is nine fixed areas with every peg face
+ * up; there is no hidden-pile read anywhere in this function, and that is the whole
+ * reason a zone decision is safe to put on the wire at all.
+ *
+ * `scope` comes from `voterScope`, so it is the same rule the decision itself will
+ * use — one expression, offered and validated.
+ */
+function legalZoneIds(
+  state: GameState,
+  source: PlayerID,
+  effect: Effect,
+): readonly ZoneID[] {
+  const named = 'target' in effect ? effect.target : undefined;
+  const scope = voterScope(source, source, voterKindOf(effect.op), named);
+  const out: ZoneID[] = [];
+  for (const id of ZONE_IDS) {
+    const z = findZone(state, id);
+    if (!z) continue;
+    const has = z.areas.some(
+      (a) =>
+        a.peg !== null &&
+        !a.volatile &&
+        !(scope === 'own' && a.peg.owner !== source) &&
+        !(scope === 'others' && a.peg.owner === source) &&
+        !(effect.op === 'convert-voter' && a.peg.owner === source),
+    );
+    if (has) out.push(id);
+  }
+  return out;
+}
+
+/** The three ops that share `raiseVoterDecision` and the `zone` field. */
+function voterKindOf(op: Effect['op']): 'evict-voter' | 'discard-voter' | 'convert-voter' {
+  // `applyEffect` only ever reaches `legalZoneIds` with one of the three, because
+  // `'zone' in effect` is the guard at every call site. The default is the loudest
+  // available one rather than a silent `'own'`: a fourth op gaining `zone` without
+  // gaining a case here fails its own test rather than quietly narrowing wrong.
+  if (op === 'evict') return 'evict-voter';
+  if (op === 'convert-voter') return 'convert-voter';
+  return 'discard-voter';
+}
+
 function applyEffect(
   state: GameState,
   source: PlayerID,
@@ -812,19 +998,79 @@ function applyEffect(
   ctx: Ctx,
   fire: FireContext | undefined = NO_FIRE,
   cardId: CardID | null = null,
+  /**
+   * G1/G16 — the player or the constituency a `choose-player` / `choose-zone`
+   * decision has already resolved to, or `null` when this is an ordinary resolution.
+   *
+   * **WHY THE DECISION IS RAISED HERE AND CARRIED, rather than inside an op's
+   * `case`.** `'chosen-player'` and `'chosen-zone'` are `EffectTarget`s and
+   * `ZoneSelector`s, i.e. *fields*, and a field is read by whoever needs it. Raising
+   * the decision up here means one interception covers every op that can carry the
+   * field, so `gain`, `voters`, `steal-any`, `restrict`, `discount` and the three
+   * voter ops all get it without a single one of them growing a branch. When
+   * `resolveChoice` re-runs the effect it passes the named player back in as
+   * `forced`, which `resolveTargets` turns into `[forced]`.
+   *
+   * The effect list carried on the decision is the card's OWN effect, unchanged.
+   * Termination does not need a counter: the re-run passes `forced` / `forcedZone`
+   * back in, which short-circuits the two interceptions above, so the same decision
+   * can never be raised twice. `TRIGGER_MAX_WAVES` does not cover this — it bounds
+   * one FIRING EVENT, and this is a decision a player answers.
+   */
+  forced: PlayerID | null = null,
+  forcedZone: ZoneID | null = null,
 ): GameState {
   let s = state;
   const target = 'target' in effect ? (effect.target ?? 'you') : 'you';
 
+  // G1. Raise rather than guess. `turnOrder.filter(p => p !== source)` IS the
+  // candidate set `resolveChoice` validates against, so an empty candidate set raises
+  // NOTHING and a non-empty one always has a legal answer. See `Choice`'s
+  // `'choose-player'` note for the satisfiability proof and the visibility argument.
+  if (target === 'chosen-player' && forced === null) {
+    const candidates = s.turnOrder.filter((p) => p !== source);
+    if (candidates.length === 0) return s;
+    return pushChoice(
+      s,
+      {
+        kind: 'choose-player',
+        count: 1,
+        effects: [effect],
+        source,
+        reason: 'Card effect',
+      },
+      source,
+    );
+  }
+
+  // G16. Same argument, same shape: the candidate set is the zones a decision over
+  // this effect's own `target` could actually name, and a zone with nothing in it
+  // cannot be a pick `resolveChoice` would accept, so it is not offered.
+  if ('zone' in effect && effect.zone === 'chosen-zone' && forcedZone === null) {
+    const candidates = legalZoneIds(s, source, effect);
+    if (candidates.length === 0) return s;
+    return pushChoice(
+      s,
+      {
+        kind: 'choose-zone',
+        count: 1,
+        effects: [effect],
+        source,
+        reason: 'Card effect',
+      },
+      source,
+    );
+  }
+
   switch (effect.op) {
     case 'gain': {
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         s = enforceCap(addResources(s, p, resolveDelta(s, p, effect.res, effect.per, ctx)), p, ctx.rules);
       }
       return s;
     }
     case 'lose': {
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         // The `taken` Delta is what the engine ACTUALLY removed, which is the whole
         // of the KHAKI TERROR ruling — see `creditDonation`.
         const [after, taken] = takeResources(
@@ -837,13 +1083,13 @@ function applyEffect(
       return s;
     }
     case 'gain-any': {
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         s = pushChoice(s, { kind: 'gain-any', count: resolveCount(s, p, effect.n, ctx), reason: 'Card effect' }, p);
       }
       return s;
     }
     case 'lose-any': {
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         const held = poolTotal(s.players[p]?.resources ?? { funds: 0, clout: 0, media: 0, trust: 0 });
         const n = Math.min(resolveCount(s, p, effect.n, ctx), held);
         if (n > 0) s = pushChoice(s, { kind: 'lose-any', count: n, reason: 'Card effect' }, p);
@@ -856,7 +1102,19 @@ function applyEffect(
       // decision per resolved player and the victim is already fixed, which is what
       // makes "take N from EVERY opponent" writable at all. `resolveChoice` then
       // requires the pick to name exactly that player.
-      const named = target !== 'you' ? resolveTargets(s, source, target) : [];
+      const named = target !== 'you' ? resolveTargets(s, source, target, forced) : [];
+      if (forced !== null) {
+        // G1: a `'chosen-player'` theft is "take N from the player you named", which
+        // is the ONE case where the thief and the victim are different by
+        // construction rather than by a guard. `from = forced` and `resolveChoice`
+        // then refuses any other victim, so the named player cannot be redirected.
+        if (forced === source) return s;
+        return pushChoice(
+          s,
+          { kind: 'steal-any', count: resolveCount(s, source, effect.n, ctx), from: forced, reason: 'Card effect' },
+          source,
+        );
+      }
       if (named.length === 0) {
         return pushChoice(s, { kind: 'steal-any', count: resolveCount(s, source, effect.n, ctx), from: null, reason: 'Card effect' }, source);
       }
@@ -889,19 +1147,19 @@ function applyEffect(
       return s;
     }
     case 'voters': {
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         s = grantVoters(s, p, resolveCount(s, p, effect.n, ctx), 'Card effect', false);
       }
       return s;
     }
     case 'evict':
-      return raiseVoterDecision(s, source, 'evict-voter', effect.n, effect.target, ctx);
+      return raiseVoterDecision(s, source, 'evict-voter', effect.n, effect.target, effect.zone, forcedZone, ctx);
     case 'discard-voter':
       // G-new: the RAW field, not the defaulted one, so `discard-voter` with an
       // explicit `target: 'you'` can reach the caster's OWN pegs. See `voterScope`.
-      return raiseVoterDecision(s, source, 'discard-voter', effect.n, effect.target, ctx);
+      return raiseVoterDecision(s, source, 'discard-voter', effect.n, effect.target, effect.zone, forcedZone, ctx);
     case 'convert-voter':
-      return raiseVoterDecision(s, source, 'convert-voter', effect.n, effect.target, ctx);
+      return raiseVoterDecision(s, source, 'convert-voter', effect.n, effect.target, effect.zone, forcedZone, ctx);
     case 'gerrymander': {
       // G8, closed on the REDUCER (KNOWN-GAPS.md G8). The bonus used to be credited
       // to `source` alone, which is why "starting with you, EVERY player can
@@ -914,7 +1172,7 @@ function applyEffect(
       // NO_POWER_USES at the start of each player's own turn — so a bonus handed to
       // every player lasts exactly the turn the card resolved on for whoever has
       // not played yet, which is what the card says ("immediately").
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         const player = s.players[p];
         if (!player) continue;
         // Negative "used" counts read as bonus moves in the allowance check.
@@ -934,7 +1192,7 @@ function applyEffect(
       // decision over the pile's contents, and a new `Choice` kind is a wire-format
       // change the client owns. The top of the pile is the honest subset.
       const fromDiscard = effect.from === 'discard';
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         // G17's `onlyIfEmpty`, which is what makes AS CLEAR AS WATER expressible: a
         // resolved player who is already holding a Conspiracy Card is skipped and
         // takes nothing. The check is on the RECIPIENT, because a Conspiracy Card is
@@ -969,7 +1227,7 @@ function applyEffect(
     case 'restrict': {
       // G5. Writes a rule, not a resource. `target` says who carries it, so `'you'`
       // is KHAKI TERROR on its caster and a surcharge lands on whoever the card names.
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         s = pushRestriction(s, p, source, {
           kind: effect.kind,
           value: effect.value,
@@ -988,7 +1246,7 @@ function applyEffect(
       // sibling, the allowance check), so a discount is a subtraction from a negative
       // count. `target` writes another player's counter, which is the only write of
       // somebody else's `powerUses` in the effect vocabulary.
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         const player = s.players[p];
         if (!player) continue;
         s = withPlayer(s, p, {
@@ -1045,7 +1303,7 @@ function applyEffect(
         return { ...s, _ideologyDraw: s._ideologyDraw.slice(take) };
       }
 
-      for (const p of resolveTargets(s, source, target)) {
+      for (const p of resolveTargets(s, source, target, forced)) {
         const player = s.players[p];
         if (!player) continue;
         for (let i = 0; i < n; i += 1) {
@@ -1709,11 +1967,26 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       // deck recycle. This one line is the difference between a game that ends on
       // a rule and a game that ends on turn 52. Rationale in `advanceTurn`.
       s = discardTo(s, 'ideology', cardId);
-      // p13: receive the answer's resources…
-      s = addResources(s, playerId, side.pays);
-      // …p28: …plus the passive bonus, counting the card just added.
-      const after = s.players[playerId];
-      if (after) s = addResources(s, playerId, passiveBonus(after, rules));
+      // G18. BRAVE NEW WORLDS: *"Players will not receive any resources (active &
+      // passive) for doing so."* Both halves are suppressed at ONE point, which is why
+      // it is one edit and not two — p13's payout and p28's passive bonus are credited
+      // together here, so a second consult point could drift from this one and give a
+      // player the bonus while withholding the answer's resources.
+      //
+      // **SUPPRESSED, NEVER REFUSED.** The answer still succeeds, still joins
+      // `manifesto` / `manifestoCards` and still recycles the card. A restriction that
+      // made the answer *illegal* would be a lock with no escape — the card cannot be
+      // un-drawn — and zero is the safe direction: the deck keeps falling by exactly
+      // one per turn either way.
+      if (incomeBlocked(s, playerId)) {
+        s = log(s, { player: playerId, text: 'No resources for this answer.', kind: 'system' });
+      } else {
+        // p13: receive the answer's resources…
+        s = addResources(s, playerId, side.pays);
+        // …p28: …plus the passive bonus, counting the card just added.
+        const after = s.players[playerId];
+        if (after) s = addResources(s, playerId, passiveBonus(after, rules));
+      }
       s = enforceCap(s, playerId, rules);
 
       s = { ...s, phase: 'actions', _pendingCard: null };
@@ -2495,7 +2768,7 @@ function resolveChoice(
     case 'discard-voter':
     case 'convert-voter': {
       if (pick.kind !== 'areas') return fail('choose areas');
-      const wanted = Math.min(c.count, targetableCount(state, playerId, c.kind, c.scope));
+      const wanted = Math.min(c.count, targetableCount(state, playerId, c.kind, c.scope, c.zoneId));
       if (pick.areaIds.length !== wanted) return fail(`choose exactly ${wanted}`);
       if (new Set(pick.areaIds).size !== pick.areaIds.length) return fail('duplicate area');
 
@@ -2505,6 +2778,10 @@ function resolveChoice(
         const area = findArea(s, id);
         if (!area?.peg) return fail('there is no voter there');
         if (area.volatile) return fail('voters in a Volatile Area cannot be affected');
+        // G16. The zone is the CARD's, checked the same way the scope is: it says
+        // which voters the ask reaches, and it is resolved before the decision
+        // existed, so a pick cannot redirect it into another constituency.
+        if (c.zoneId !== undefined && area.zone !== c.zoneId) return fail('that voter is in another zone');
         // The scope is the card's, not the pick's: a card that named this player as
         // its victim asks them about their OWN voters, and a card that did not
         // leaves them unable to reach their own. See `ChoiceScope`.
@@ -2526,6 +2803,68 @@ function resolveChoice(
       }
       return { ok: true, state: drop(s), events };
     }
+
+    /**
+     * G1 — the card's actor named a player, and the effect runs against them.
+     *
+     * ## WHY THE VALIDATION IS `turnOrder.filter(p => p !== source)` AND NOTHING ELSE
+     *
+     * It is the SAME expression `applyEffect` built the candidate set from, which is
+     * the whole satisfiability argument: the options offered and the picks accepted
+     * are one list, so there is no state in which this decision has no legal answer.
+     * A two-seat game has exactly one candidate. An unknown id is refused rather than
+     * ignored, so a stale client cannot aim a card at a seat that has left.
+     *
+     * **`source` is the CHOOSER and is checked first.** A pick answered by anybody else
+     * is refused outright, which is the G21 self-target guard in its most direct
+     * form: a `choose-player` decided by the named player could aim a card's effect at
+     * them without the card's actor ever consenting, and since the actor is the only
+     * player with standing to name somebody, that is a redirect nobody authorised.
+     *
+     * **`applyEffect` is called directly, not `applyEffects`**, for the reason
+     * `fireTriggers` does it: the carried effect came off a card that is already
+     * resolved, so re-installing its `when` / `until` would re-arm it a second time.
+     * One pass, no cascade, and `TRIGGER_MAX_WAVES` is not what bounds it — the
+     * decision can only be answered once because `drop` removes it in the same breath.
+     */
+    case 'choose-player': {
+      if (pick.kind !== 'player') return fail('choose a player');
+      if (playerId !== c.source) return fail('that decision is not yours');
+      const chosen = state.turnOrder.filter((p) => p !== c.source);
+      if (!chosen.includes(pick.id)) return fail('you may not choose that player');
+      let s = drop(state);
+      for (const effect of c.effects) s = applyEffect(s, c.source, effect, ctx, NO_FIRE, null, pick.id, null);
+      return { ok: true, state: s, events: [] };
+    }
+
+    /**
+     * G16 — the card's actor named a constituency, and the effect runs inside it.
+     *
+     * **THE VALIDATION IS `legalZoneIds`, WHICH IS WHAT THE CANDIDATE SET WAS.** Same
+     * one-expression argument as `'choose-player'`, and it is why a zone with nothing
+     * legal in it was never offered: offering it would give a button the server
+     * refuses, which is the outcome the engine has spent this whole file refusing to
+     * produce.
+     *
+     * **THE RE-RUN CAN RAISE A NEW DECISION, AND THAT IS CORRECT.** A card that names
+     * a zone AND an opponent raises a `'choose-player'` for the opponent inside the
+     * chosen zone, and a card with two such effects raises two in turn — each one
+     * dropped before the next is applied, so the cascade is bounded by the card's own
+     * effect list length rather than by anything in the state. Termination is a
+     * property of the CARD here, exactly as it is for any effect list, and no cycle is
+     * reachable because an effect cannot name itself.
+     */
+    case 'choose-zone': {
+      if (pick.kind !== 'zone') return fail('choose a zone');
+      if (playerId !== c.source) return fail('that decision is not yours');
+      const effect = c.effects[0];
+      if (!effect || !('zone' in effect)) return fail('that decision names no zone');
+      const legal = legalZoneIds(state, c.source, effect);
+      if (!legal.includes(pick.zoneId)) return fail('you may not choose that constituency');
+      let s = drop(state);
+      for (const e of c.effects) s = applyEffect(s, c.source, e, ctx, NO_FIRE, null, null, pick.zoneId);
+      return { ok: true, state: s, events: [] };
+    }
   }
 }
 
@@ -2537,9 +2876,20 @@ function resolveChoice(
  * default `'others'` is byte-for-byte the rule this function had before scopes
  * existed, which is what keeps the client's own copy of it in agreement.
  */
-function targetableCount(state: GameState, playerId: PlayerID, kind: string, scope: ChoiceScope): number {
+function targetableCount(
+  state: GameState,
+  playerId: PlayerID,
+  kind: string,
+  scope: ChoiceScope,
+  zoneId?: ZoneID,
+): number {
+  // G16. `zoneId` is the RESOLVED constituency, or absent for the whole board — and
+  // it is absent for the whole board whenever the selector resolved to nothing, which
+  // is the safe direction `resolveZone` argues: a selector that cannot be resolved
+  // must not narrow the target set to nothing.
   let n = 0;
   for (const z of state.zones) {
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (!a.peg || a.volatile) continue;
       if (scope === 'own' && a.peg.owner !== playerId) continue;

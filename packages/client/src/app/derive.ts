@@ -42,6 +42,7 @@ import type {
   ChoiceScope,
   ClientState,
   Delta,
+  Effect,
   MarketSlot,
   PendingChoice,
   PendingVoters,
@@ -368,7 +369,24 @@ export function marketView(state: ClientState, player: PlayerID): readonly Marke
 
 // ─────────────────────────── choices ───────────────────────────
 
-/** The six decision shapes, with the sentence a player needs to act on each. */
+/**
+ * The eight decision shapes, with the sentence a player needs to act on each.
+ *
+ * ## THIS SWITCH IS PROVABLY TOTAL, and the `never` below is the proof
+ *
+ * TypeScript infers the return type of this function as `string`, so a missing case
+ * would ordinarily be invisible — the function would just fall off the end and return
+ * `undefined`, and a player would see a blank where the sentence should be. That is
+ * the exact failure this file was previously broken by: a new `Choice` kind in
+ * `packages/engine/src/state.ts` made `derive.ts` compile with `undefined` leaking
+ * into the dialog, and the only report was a blank screen.
+ *
+ * `assertNever(choice)` is what converts it into a COMPILE ERROR. `choice` is
+ * narrowed to `never` after every `case`, so adding a tenth `Choice` kind makes this
+ * line fail to type-check — at the point of the addition, in the client, which is the
+ * whole reason this file and the engine's `Choice` union are one handshake rather than
+ * two changes.
+ */
 export function choiceHeadline(choice: Choice): string {
   // `resource(s)` is built once so all three resource headlines pluralise the
   // same way the voter ones already did: a cap discard of 1 read "Discard 1
@@ -389,7 +407,24 @@ export function choiceHeadline(choice: Choice): string {
       return `Discard ${choice.count} opponent ${voter(choice.count)}`;
     case 'convert-voter':
       return `Convert ${choice.count} opponent ${voter(choice.count)} to yours`;
+    case 'choose-player':
+      return 'Choose a player';
+    case 'choose-zone':
+      return 'Choose a constituency';
   }
+}
+
+/**
+ * Compile-time exhaustiveness, and the same trick in `requiredPicks` and
+ * `ChoiceResolver.tsx`.
+ *
+ * It takes `never` and returns `never`, so after every `case` of a `switch` over the
+ * full union the subject is `never` and a new member is a type error rather than a
+ * silent fallthrough. One helper, three call sites, and it is the only mechanism that
+ * makes "the next new kind must be rendered here" enforceable by the compiler.
+ */
+export function assertNever(x: never): never {
+  throw new Error(`unhandled Choice kind: ${JSON.stringify(x)}`);
 }
 
 /** Why the decision exists, in the card's own words where it gave any. */
@@ -427,6 +462,16 @@ export function choiceReason(choice: Choice): string {
  *                   accepts as an empty pick. Never unsatisfiable; sometimes free.
  *   the three       `min(count, targetable)`, and 0 targets is resolvable because
  *   voter kinds     the engine accepts an EMPTY `areaIds` list for a zero ask.
+ *   `choose-player` `1`, uncapped, and never 0. The candidate set is
+ *                   `turnOrder` minus the chooser, which `resolveChoice` validates
+ *                   against with the SAME expression `applyEffect` offered it from —
+ *                   so the options and the accepted answers are one list and a
+ *                   two-seat game has exactly one, which is always legal.
+ *   `choose-zone`   `1`, uncapped, and never 0. The offered set is `legalZoneIds`
+ *                   and the accepted set is `legalZoneIds`, again one expression, so
+ *                   `applyEffect` raising nothing for an empty set is what makes this
+ *                   safe: a zone with no legal peg in it is never offered, because
+ *                   offering it would be a button the server refuses.
  */
 export function requiredPicks(
   choice: Choice,
@@ -446,7 +491,15 @@ export function requiredPicks(
     case 'evict-voter':
     case 'discard-voter':
     case 'convert-voter':
-      return Math.min(choice.count, targetableCount(state, player, choice.kind, choice.scope));
+      return Math.min(choice.count, targetableCount(state, player, choice.kind, choice.scope, choice.zoneId));
+    case 'choose-player':
+    case 'choose-zone':
+      return choice.count;
+    default:
+      // The totality guarantee, at the second of the three switch sites. Without this
+      // line a ninth kind returns `undefined`, which `MyChoice.required` types as a
+      // number — so the dialog would demand `NaN` picks and be unconfirmable forever.
+      return assertNever(choice);
   }
 }
 
@@ -480,9 +533,11 @@ export function targetableCount(
   player: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   scope: ChoiceScope,
+  zoneId?: ZoneID,
 ): number {
   let n = 0;
   for (const z of state.zones) {
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (a.peg === null || a.volatile) continue;
       if (scope === 'own' && a.peg.owner !== player) continue;
@@ -500,9 +555,11 @@ export function targetableAreas(
   player: PlayerID,
   kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
   scope: ChoiceScope,
+  zoneId?: ZoneID,
 ): ReadonlySet<string> {
   const out = new Set<string>();
   for (const z of state.zones) {
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (a.peg === null || a.volatile) continue;
       if (scope === 'own' && a.peg.owner !== player) continue;
@@ -512,6 +569,58 @@ export function targetableAreas(
     }
   }
   return out;
+}
+
+/**
+ * G1 — the seats a `'choose-player'` decision may name: every seat but the chooser's.
+ *
+ * **MIRRORS `reduce.ts:applyEffect`'s candidate set EXACTLY, and that mirroring is
+ * the point.** The engine builds its candidate list from this same expression and
+ * `resolveChoice` validates against it, so this list can never offer a button the
+ * server refuses. It also deliberately includes players holding no resources and no
+ * cards — a candidate list filtered by what somebody holds would be a readout of their
+ * Mat and their hand, and an option list is as revealing as a value.
+ */
+export function choosablePlayers(state: ClientState, chooser: PlayerID): readonly PlayerID[] {
+  return state.turnOrder.filter((id) => id !== chooser);
+}
+
+/**
+ * G16 — the constituencies a `'choose-zone'` decision may name.
+ *
+ * **MIRRORS `reduce.ts:legalZoneIds`**: the zones holding at least one peg this
+ * effect's own scope could name. Filtering here rather than offering all nine is the
+ * same rule `requiredPicks` follows for voters — the offered list and the accepted
+ * list must be one list, or the dialog carries a button that is refused.
+ *
+ * **It reads only public board state.** Nine fixed areas, every peg face up.
+ */
+export function choosableZones(
+  state: ClientState,
+  choice: Extract<Choice, { readonly kind: 'choose-zone' }>,
+): readonly { readonly id: ZoneID; readonly name: string }[] {
+  const effect = choice.effects[0];
+  const op = effect === undefined ? 'discard-voter' : voterOpOf(effect);
+  const named = effect !== undefined && 'target' in effect ? effect.target : undefined;
+  const scope: ChoiceScope =
+    op === 'evict' ? 'any' : op === 'convert-voter' ? 'others' : named === 'you' ? 'own' : 'others';
+  const out: { readonly id: ZoneID; readonly name: string }[] = [];
+  for (const z of state.zones) {
+    const has = z.areas.some((a) => {
+      if (a.peg === null || a.volatile) return false;
+      if (scope === 'own' && a.peg.owner !== choice.source) return false;
+      if (scope === 'others' && a.peg.owner === choice.source) return false;
+      if (op === 'convert-voter' && a.peg.owner === choice.source) return false;
+      return true;
+    });
+    if (has) out.push({ id: z.id, name: z.name });
+  }
+  return out;
+}
+
+/** The zone-scoped op a carried effect is, for `choosableZones`' scope rule. */
+function voterOpOf(effect: Effect): 'evict' | 'discard-voter' | 'convert-voter' {
+  return effect.op === 'evict' || effect.op === 'convert-voter' ? effect.op : 'discard-voter';
 }
 
 /** The decisions owed to THIS player. `net/store.ts:myChoices` filters; this shapes. */

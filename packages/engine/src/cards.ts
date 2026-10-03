@@ -41,13 +41,80 @@ export type VoterCard = {
 
 // ─────────────────────────── effects ───────────────────────────
 
-/** Who an effect lands on. Defaults to the card's player. */
+/**
+ * Who an effect lands on. Defaults to the card's player.
+ *
+ * `'chosen-player'` is G1 and is the FIRST member here that is not a fixed set of
+ * seats: it is a DECISION, and it is resolved one function above `applyEffect`'s
+ * switch. `reduce()` reads it by raising a `'choose-player'` `Choice` for the card's
+ * own actor, carrying the effect list the engine re-runs once the player is named —
+ * so a card naming it gets a real `RESOLVE_CHOICE`, not a silent no-op.
+ *
+ * **WHY THE CARD'S ACTOR IS THE ONE WHO ANSWERS.** Every real card that uses it
+ * names its own player as the chooser in the printed text — *"Pick an opponent"*,
+ * *"Choose a player"*, *"Pick up to 2 opponents"*. Nobody else has standing to
+ * choose, and letting the effect's `target` set decide it would mean a
+ * `target: 'everyone'` card picks the victim.
+ *
+ * **THE CANDIDATE SET IS EVERY SEAT BUT THE ACTOR'S, and it is fixed, not
+ * filtered.** A `steal-any` with no `target` lets the thief pick a victim with
+ * nothing to hold against, which is the same rule (`steal-any`'s resolver refuses a
+ * self-pick), so a candidate who holds nothing is a legal *answer* — the effect
+ * simply resolves to nothing for them, exactly as `min(count, 0)` already makes a
+ * theft from an empty pool resolve to nothing. Filtering candidates by whether they
+ * hold something would make the option list a function of hidden state, which is the
+ * leak this design is refusing (see `PlayerState.ideologyCards`).
+ */
 export type EffectTarget =
   | 'you'
   | 'each-opponent'
   | 'everyone'
   /** The player currently holding the most majority voters. Ties → nobody. */
-  | 'leader';
+  | 'leader'
+  /** G1 — the card's actor names one player, from every seat but their own. */
+  | 'chosen-player';
+
+/**
+ * G16 — WHICH constituency a voter-targeting op may reach.
+ *
+ * Three values, and each one is a recovered card's own wording:
+ *
+ *  - `'this-zone'` — the Volatile Area whose placement drew the Headline being
+ *    resolved. Read out of `GameState.headlineQueue[0]` rather than threaded down
+ *    from `ACK_HEADLINE`, which is what keeps `reduce()` a pure function of
+ *    `(state, action, ctx)`: the zone is already in the state that was written
+ *    down, so a replay derives it without re-running anything. REF 4.1 says so
+ *    outright about NERO'S GUESTS: *"'this zone' = the volatile zone that triggered
+ *    it."*
+ *  - `'your-strongest'` — the zone the actor holds the most pegs in, ties broken by
+ *    `ZONE_IDS` order so it is a pure function of the board. JUST BREATHE's
+ *    *"Select the zone where you have the most number of voters"*.
+ *  - `'chosen-zone'` — the actor names one of the nine constituencies. That is a
+ *    DECISION, so it raises a `'choose-zone'` `Choice` like `'chosen-player'` does,
+ *    and it is raised only when a zone is legal — see `resolveChoice`.
+ *
+ * ## WHY A FIELD AND NOT A NEW OP
+ *
+ * NERO'S GUESTS moves voters, CUT COPY AND PASTE converts them and JUST BREATHE
+ * evicts them: three different verbs, one shared narrowing. A `zone` on the three
+ * voter ops expresses all three, and every op that does not read the field simply
+ * has none — which is what `packages/cards/src/executable.ts` checks, from the
+ * reducer's own source text, per op.
+ *
+ * ## WHAT IT CANNOT BE, and the two refusals
+ *
+ *  - **No `'adjacent'` selector.** JUST BREATHE's second clause moves the voters
+ *    into an ADJACENT zone, and no recovered card that needs one can be shipped
+ *    without a destination decision on top of a source decision. It is dropped and
+ *    named rather than approximated.
+ *  - **No `'zone-you-lead'`.** It would be satisfiable in ZERO zones for a player
+ *    holding no majority, which is the unsatisfiable-choice bug class this codebase
+ *    has been bitten by three times. A selector that can resolve to nothing must
+ *    either raise nothing at all (which `'chosen-zone'` does, and `'this-zone'` and
+ *    `'your-strongest'` do too by falling back to every zone) or clamp. Since no
+ *    recovered card in this corpus needs it, it is not in the union.
+ */
+export type ZoneSelector = 'this-zone' | 'your-strongest' | 'chosen-zone';
 
 /**
  * FIELDS THAT ARE PART OF THE CARD CONTRACT BUT NOT YET INTERPRETED.
@@ -285,18 +352,35 @@ export type Effect = (
    *
    * `target` names who is asked to make the eviction. A player named by the card
    * chooses among their OWN voters; the caster chooses from the whole board.
+   *
+   * `zone` narrows WHICH constituency those pegs may be in — G16, see `ZoneSelector`.
    */
-  | { readonly op: 'evict'; readonly n: Count; readonly target?: EffectTarget }
+  | { readonly op: 'evict'; readonly n: Count; readonly target?: EffectTarget; readonly zone?: ZoneSelector }
   /**
    * p34 Discard: off the board permanently. `target` as for `evict`.
    *
    * With no target the caster picks from every peg on the board that is not their
    * own — the reading three shipped cards state in their text. See
    * `ChoiceScope` for why "your own voters" needs the target rather than a flag.
+   *
+   * `zone` is G16's narrowing; see `ZoneSelector`.
    */
-  | { readonly op: 'discard-voter'; readonly n: Count; readonly target?: EffectTarget }
-  /** p34 Convert: replace an opponent's voter in the same area with your own. `target` as for `evict`. */
-  | { readonly op: 'convert-voter'; readonly n: Count; readonly target?: EffectTarget }
+  | {
+      readonly op: 'discard-voter';
+      readonly n: Count;
+      readonly target?: EffectTarget;
+      readonly zone?: ZoneSelector;
+    }
+  /**
+   * p34 Convert: replace an opponent's voter in the same area with your own. `target`
+   * as for `evict`; `zone` is G16's narrowing, see `ZoneSelector`.
+   */
+  | {
+      readonly op: 'convert-voter';
+      readonly n: Count;
+      readonly target?: EffectTarget;
+      readonly zone?: ZoneSelector;
+    }
   /**
    * Extra gerrymander moves this turn, above the normal per-zone allowance.
    *
@@ -386,7 +470,7 @@ export type Effect = (
        * and for the clause it costs (the printed card names ONE Level 3 power, and
        * choosing which is G1).
        */
-      readonly kind: 'no-purchases' | 'surcharge' | 'no-power';
+      readonly kind: 'no-purchases' | 'surcharge' | 'no-power' | 'no-income';
       /** Extra resources per purchase, for `'surcharge'`. Zero for `'no-purchases'`. */
       readonly value: number;
       /** For `'no-purchases'`: what the player must give before buying again. */

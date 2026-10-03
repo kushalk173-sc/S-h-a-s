@@ -240,11 +240,20 @@ export function stagedCardLabel(
 
 // ─────────────────────────── the staged effects ───────────────────────────
 
+/**
+ * `Readonly<Record<EffectTarget, string>>` IS one of the three totality proofs, and
+ * it is the strongest of the three because the language enforces it: a new
+ * `EffectTarget` member is a compile error at this literal with no `never` and no
+ * discipline required. `chosen-player` is here because it is a real target a player
+ * must be able to predict — a card that will hit somebody the caster names is a
+ * threat everybody at the table has to be able to read off the window.
+ */
 const TARGET_TEXT: Readonly<Record<EffectTarget, string>> = {
   you: '',
   'each-opponent': ' · each opponent',
   everyone: ' · everyone',
   leader: ' · whoever holds the most majorities',
+  'chosen-player': ' · a player you name',
 };
 
 const COMPUTED_TEXT: Readonly<Record<ComputedSource, string>> = {

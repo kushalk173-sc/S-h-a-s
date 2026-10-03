@@ -918,6 +918,16 @@ export function GameScreen({ store }: GameScreenProps) {
             clearPowerTarget();
             clearToughLove();
           }}
+          onResolvePlayer={(choiceId, playerId) => {
+            dispatch(actions.resolveChoice(choiceId, { kind: 'player', id: playerId }));
+            clearPowerTarget();
+          }}
+          onResolveZone={(choiceId, zoneId) => {
+            dispatch(
+              actions.resolveChoice(choiceId, { kind: 'zone', zoneId: zoneId as ZoneID }),
+            );
+            clearPowerTarget();
+          }}
           draft={app.picker?.pick ?? {}}
           onDraft={(next) => {
             const p = app.picker;

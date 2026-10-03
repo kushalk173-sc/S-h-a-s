@@ -82,7 +82,19 @@ export type Action =
 export type ChoicePick =
   | { readonly kind: 'resources'; readonly res: Delta }
   | { readonly kind: 'steal'; readonly from: PlayerID; readonly res: Delta }
-  | { readonly kind: 'areas'; readonly areaIds: readonly AreaID[] };
+  | { readonly kind: 'areas'; readonly areaIds: readonly AreaID[] }
+  /**
+   * G1 — answer a `'choose-player'` decision by naming a seat.
+   *
+   * A single `id`, not a list, because `'choose-player'.count` is 1 for every
+   * recovered card and POLO RETREAT's 2 is not being shipped. One pick per decision
+   * also means one `RESOLVE_CHOICE` per named player, so a card wanting several
+   * players raises several decisions — which keeps `resolveChoice`'s job single-seat
+   * and keeps the failure mode of a bad pick local to one player.
+   */
+  | { readonly kind: 'player'; readonly id: PlayerID }
+  /** G16 — answer a `'choose-zone'` decision by naming one of the nine constituencies. */
+  | { readonly kind: 'zone'; readonly zoneId: ZoneID };
 
 export type GameEvent =
   | { readonly type: 'answered'; readonly player: PlayerID; readonly cardId: CardID; readonly side: 0 | 1 }

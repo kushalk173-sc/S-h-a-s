@@ -43,6 +43,7 @@ import {
   type GameState,
   type PendingChoice,
   type PlayerID,
+  type ZoneID,
 } from '../../engine/src/state';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ the entry type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -136,11 +137,52 @@ export function pickFor(state: GameState, c: PendingChoice): Action {
     case 'evict-voter':
     case 'discard-voter':
     case 'convert-voter': {
-      const ids = targetAreas(state, me, c.choice.kind, c.choice.scope, c.choice.count);
+      const ids = targetAreas(state, me, c.choice.kind, c.choice.scope, c.choice.count, c.choice.zoneId);
       if (ids.length < c.choice.count) throw new Error(`only ${ids.length} legal targets for ${c.choice.kind}`);
       return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'areas', areaIds: ids.slice(0, c.choice.count) } };
     }
+    /**
+     * G1. `turnOrder` minus the chooser IS the engine's candidate set, so the first
+     * other seat is always accepted. Throws rather than returning a bad pick: a card
+     * whose decision cannot be answered must fail the test loudly, not be reported as
+     * having played.
+     */
+    case 'choose-player': {
+      const id = state.turnOrder.find((x) => x !== c.player);
+      if (id === undefined) throw new Error('a choose-player decision with no candidate seat');
+      return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'player', id } };
+    }
+    /** G16. The first zone `legalZoneIds` would offer — public board state only. */
+    case 'choose-zone': {
+      const effect = c.choice.effects[0];
+      const named = effect !== undefined && 'target' in effect ? effect.target : undefined;
+      const op = effect?.op === 'evict' || effect?.op === 'convert-voter' ? effect.op : 'discard-voter';
+      const zone = firstLegalZone(state, c.choice.source, op, named);
+      if (zone === undefined) throw new Error('a choose-zone decision with no legal constituency');
+      return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'zone', zoneId: zone } };
+    }
   }
+}
+
+/** G16 — mirrors `reduce.ts:legalZoneIds`, so the pick is one the engine accepts. */
+function firstLegalZone(
+  state: GameState,
+  source: PlayerID,
+  op: string,
+  named: string | undefined,
+): ZoneID | undefined {
+  const scope = op === 'evict' ? 'any' : op === 'convert-voter' ? 'others' : named === 'you' ? 'own' : 'others';
+  for (const z of state.zones) {
+    const has = z.areas.some((a) => {
+      if (a.peg === null || a.volatile) return false;
+      if (scope === 'own' && a.peg.owner !== source) return false;
+      if (scope === 'others' && a.peg.owner === source) return false;
+      if (op === 'convert-voter' && a.peg.owner === source) return false;
+      return true;
+    });
+    if (has) return z.id;
+  }
+  return undefined;
 }
 
 function total(p: { funds: number; clout: number; media: number; trust: number } | undefined): number {
@@ -162,9 +204,13 @@ export function targetAreas(
   kind: string,
   scope: 'any' | 'others' | 'own',
   want: number,
+  zoneId?: ZoneID,
 ): AreaID[] {
   const out: AreaID[] = [];
   for (const z of state.zones) {
+    // G16: the card's resolved constituency narrows the pegs, and the scope is the
+    // card's rather than the pick's — the same two rules `resolveChoice` re-checks.
+    if (zoneId !== undefined && z.id !== zoneId) continue;
     for (const a of z.areas) {
       if (a.peg === null || a.volatile) continue;
       if (scope === 'own' && a.peg.owner !== chooser) continue;

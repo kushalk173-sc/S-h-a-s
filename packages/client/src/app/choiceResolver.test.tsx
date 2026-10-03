@@ -90,10 +90,16 @@ import type {
   PlayerState,
   Pool,
   Zone,
+  ZoneID,
 } from '@shasn/engine';
 
 import { ChoiceResolver, type ChoiceResolverProps } from './ChoiceResolver.tsx';
-import { requiredPicks, targetableAreas, targetableCount } from './derive.ts';
+import {
+  choosableZones,
+  requiredPicks,
+  targetableAreas,
+  targetableCount,
+} from './derive.ts';
 
 // ─────────────────────────── the board, by hand ───────────────────────────
 
@@ -328,7 +334,7 @@ function Harness({
   const owed = state.choices.find((c) => c.player === sc.you)?.choice ?? null;
   const legal: ReadonlySet<string> =
     owed !== null && areaShapedKind(owed)
-      ? targetableAreas(state, sc.you, owed.kind, owed.scope)
+      ? targetableAreas(state, sc.you, owed.kind, owed.scope, owed.zoneId)
       : new Set<string>();
 
   const props: ChoiceResolverProps = {
@@ -340,6 +346,11 @@ function Harness({
     onResolveResources: (_id, pick) => onResolved({ kind: 'resources', res: pick }),
     onResolveSteal: (_id, from, pick) => onResolved({ kind: 'steal', from, res: pick }),
     onResolveAreas: (_id, areaIds) => onResolved({ kind: 'areas', areaIds }),
+    // G1/G16. Routed through the SAME `onResolved` seam as the other three, so a
+    // regression in either new resolver fails the same engine-side assertions the
+    // area and theft picks are held to below rather than a weaker local check.
+    onResolvePlayer: (_id, playerId) => onResolved({ kind: 'player', id: playerId }),
+    onResolveZone: (_id, zoneId) => onResolved({ kind: 'zone', zoneId: zoneId as ZoneID }),
     draft,
     onDraft: setDraft,
   };
@@ -514,6 +525,41 @@ function assertResolvable(sc: Scenario): ChoicePick {
 function assertEngineWouldAccept(sc: Scenario, pick: ChoicePick): void {
   const state = buildState(sc);
   const required = requiredPicks(sc.choice, state, sc.you);
+
+  /**
+   * G1/G16. `resolveChoice`'s two new rules, transcribed with the engine's own
+   * refusal strings so a failure names which rule was broken:
+   *  - `'choose-player'`: "you may not choose that player" — the accepted set is
+   *    `turnOrder` minus the card's `source`.
+   *  - `'choose-zone'`: "you may not choose that constituency" — the accepted set is
+   *    the zones holding a peg this effect could name.
+   *
+   * Both are the SAME expressions `applyEffect` offered the choices from, which is
+   * what makes them satisfiable, so asserting membership here is asserting the
+   * satisfiability invariant from the client side.
+   */
+  if (pick.kind === 'player') {
+    expect(sc.choice.kind, `${sc.name}: a player pick for a non-player choice`).toBe('choose-player');
+    if (sc.choice.kind !== 'choose-player') return;
+    expect(pick.id === sc.choice.source, `${sc.name}: "you may not choose that player" — the chooser`).toBe(
+      false,
+    );
+    expect(
+      state.turnOrder.includes(pick.id),
+      `${sc.name}: "you may not choose that player" — unknown seat`,
+    ).toBe(true);
+    return;
+  }
+  if (pick.kind === 'zone') {
+    expect(sc.choice.kind, `${sc.name}: a zone pick for a non-zone choice`).toBe('choose-zone');
+    if (sc.choice.kind !== 'choose-zone') return;
+    const offered = choosableZones(state, sc.choice).map((z) => z.id);
+    expect(
+      offered.includes(pick.zoneId),
+      `${sc.name}: "you may not choose that constituency" — ${pick.zoneId} not in ${offered.join('/')}`,
+    ).toBe(true);
+    return;
+  }
 
   if (pick.kind === 'resources') {
     expect(total(pick.res), `${sc.name}: "choose exactly ${required}"`).toBe(required);

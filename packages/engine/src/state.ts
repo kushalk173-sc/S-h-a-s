@@ -333,6 +333,21 @@ export type PlayerState = {
 export type ChoiceScope = 'any' | 'others' | 'own';
 
 /**
+ * G16 — the constituency a voter decision is confined to, once it has been RESOLVED.
+ *
+ * `'any'` is an ABSENT `zone` on the op, spelled out here so `PendingChoice.choice`
+ * is a value the client's switch can be total over. The other three are the
+ * `ZoneSelector` values, already resolved: `'chosen-zone'` has become one concrete
+ * `ZoneID` by the time a decision exists, which is the whole point of resolving it
+ * in `resolveChoice` rather than carrying the selector to the UI.
+ *
+ * `ZoneID` itself is a fourth possible value and is deliberately NOT in this union:
+ * a `zone` on a decision is always a selector, and a `ZoneID` reaching the UI is
+ * `resolveChoice` refusing the pick — a client cannot act on one.
+ */
+export type ZoneScope = 'any' | 'this-zone' | 'your-strongest' | 'chosen-zone';
+
+/**
  * A decision the engine is waiting on. Conspiracies and Headlines are data, and
  * some of their effects need a target the engine cannot pick for the player.
  */
@@ -353,9 +368,96 @@ export type Choice =
       readonly from: PlayerID | null;
       readonly reason: string;
     }
-  | { readonly kind: 'evict-voter'; readonly count: number; readonly scope: ChoiceScope; readonly reason: string }
-  | { readonly kind: 'discard-voter'; readonly count: number; readonly scope: ChoiceScope; readonly reason: string }
-  | { readonly kind: 'convert-voter'; readonly count: number; readonly scope: ChoiceScope; readonly reason: string };
+  | { readonly kind: 'evict-voter'; readonly count: number; readonly scope: ChoiceScope; readonly zone?: ZoneScope; readonly zoneId?: ZoneID; readonly reason: string }
+  | { readonly kind: 'discard-voter'; readonly count: number; readonly scope: ChoiceScope; readonly zone?: ZoneScope; readonly zoneId?: ZoneID; readonly reason: string }
+  | { readonly kind: 'convert-voter'; readonly count: number; readonly scope: ChoiceScope; readonly zone?: ZoneScope; readonly zoneId?: ZoneID; readonly reason: string }
+  /**
+   * G1 — THE CARD'S ACTOR NAMES A PLAYER. `EffectTarget = 'chosen-player'`.
+   *
+   * ## WHY IT IS ONE `Choice` KIND AND NOT A FIELD ON THE OTHER SIX
+   *
+   * Every existing kind answers *"which of these things?"* — which resources, whose
+   * pool, which slots. This one answers *"which player?"*, and a player is not a
+   * resource and not a slot: `steal-any`'s pick already carries a player because a
+   * THEFT is self-contained (the pick names the victim and the denomination, and the
+   * resolver can finish the job), but no other op carries enough on its pick to apply
+   * itself. So this kind carries the effect list it is gating, and `resolveChoice`
+   * re-runs `applyEffect` once per named player with that player forced.
+   *
+   * ## SATISFIABILITY, which is the property that matters
+   *
+   * `applyEffect` raises this ONLY when `turnOrder` has at least one seat other
+   * than the actor's — the candidate set is literally `turnOrder.filter(p => p !==
+   * source)`, and the resolver accepts any member of exactly that set. The offered
+   * options and the acceptable answers are therefore the same list, computed by the
+   * same expression, so **no state can raise this with no legal pick.** A two-seat
+   * game has exactly one candidate and it is always legal. Asserted exhaustively at
+   * 2/3/4/5 seats in `test/choices.test.ts`.
+   *
+   * ## VISIBILITY: PUBLIC, and the argument is the leak argument
+   *
+   * **The choice itself is public: it names no hidden thing.** Its candidate set is
+   * `turnOrder`, which every client already has in full, and a player who holds no
+   * resources and no cards is *still* a candidate — deliberately, because filtering
+   * the list by what somebody holds would make the option list a readout of their mat
+   * and their hand. An option list is as revealing as a value; see
+   * `PlayerState.ideologyCards` for the same principle applied to a hand.
+   *
+   * `effects` is on the wire and that is sound for the reason `LiveEffect.sourceCardId`
+   * is: a `Choice` is only ever raised by a card that is being resolved right now
+   * (`PLAY_CONSPIRACY` / `ACK_HEADLINE`), both of which put the card face up on the
+   * discard pile in the same breath, so the effects cannot name a card anybody is
+   * still holding secretly. **No `_`-prefixed field is added**, so
+   * `packages/server/test/secret-inventory.ts` owes nothing.
+   *
+   * ## `source` is ON THE CHOICE, and it has to be
+   *
+   * The resolver re-runs the effect with the ORIGINAL actor as `source`, because
+   * `source` is what every relative read is measured from — `steal-any` takes its
+   * victim from `fire.actor`, and `'you'` means "the card's player". Dropping it
+   * would silently re-attribute the card to whoever it landed on, which is the
+   * DEFLECT bug in a different place. It is public for the same reason `LiveEffect.owner`
+   * is: the actor of a card already on the table is on the log.
+   */
+  | {
+      readonly kind: 'choose-player';
+      /** How many players to name. `1` for every recovered card; 2 is POLO RETREAT. */
+      readonly count: number;
+      /** The effect list to run once per named player. Never empty. */
+      readonly effects: readonly Effect[];
+      /** The card's actor. See the note above. */
+      readonly source: PlayerID;
+      readonly reason: string;
+    }
+  /**
+   * G16 — THE CARD'S ACTOR NAMES A CONSTITUENCY. `ZoneSelector = 'chosen-zone'`.
+   *
+   * ## SATISFIABILITY
+   *
+   * The candidate set is the nine `ZONE_IDS`, or the subset of them that contain at
+   * least one peg the decision could name when the same effect also carries a
+   * `target`. **`applyEffect` raises this only when that set is non-empty**, for the
+   * same reason `choose-player` does: the offered list and the acceptable list are
+   * one expression, so the choice cannot be unsatisfiable. A selector resolving to
+   * zero zones raises NOTHING rather than raising a decision nobody can answer — and
+   * raising nothing is honest here, because "select one of your majorities" cannot
+   * be performed by a player who holds none.
+   *
+   * ## VISIBILITY: PUBLIC, and it leaks nothing at all
+   *
+   * The board is fully public — nine fixed areas, every peg face up. There is no
+   * version of this choice that could enumerate a hidden hand, because a zone is not
+   * a card. This is the reason the two G16 selectors that need no decision
+   * (`'this-zone'`, `'your-strongest'`) are plain functions of public state too.
+   */
+  | {
+      readonly kind: 'choose-zone';
+      readonly count: number;
+      /** The effect list to run once per chosen zone. Never empty. */
+      readonly effects: readonly Effect[];
+      readonly source: PlayerID;
+      readonly reason: string;
+    };
 
 /** Whose decision it is. Headlines can penalise a player who is not the active one. */
 export type PendingChoice = {
@@ -556,7 +658,40 @@ export type RestrictionKind =
    * knowing they cannot use their powers next turn. No new field, so
    * `packages/server/test/secret-inventory.ts` owes nothing.
    */
-  | 'no-power';
+  | 'no-power'
+  /**
+   * G18 — *"Players will not receive any resources (active & passive) for doing so."*
+   * BRAVE NEW WORLDS, REF 4.3.
+   *
+   * ## WHY THIS IS THE G18 CLAUSE THAT MOVES STATE, and why the rest is not
+   *
+   * BRAVE NEW WORLDS reads *"Every player answers an Ideology Card immediately, in
+   * order of turn. Players will not receive any resources (active & passive) for
+   * doing so."* The first sentence is the G18 MECHANIC — control over WHEN the draw
+   * and answer phase runs — and it has no effect on any pool, mat or board. The
+   * second is the only clause with a state consequence in it, and it is this kind.
+   *
+   * `ANSWER` consults it in exactly one place, where p13's "receive the answer's
+   * resources" and p28's passive bonus are credited together, so **one edit covers
+   * both halves of the printed "active & passive"** rather than two that could
+   * drift. A power added later cannot bypass it: every resource credit in the engine
+   * that is tied to answering goes through these two lines.
+   *
+   * ## IT SUPPRESSES, IT NEVER REFUSES
+   *
+   * `ANSWER` still succeeds and the card still joins `manifesto` / `manifestoCards`
+   * and still joins the Ideology discard pile. A restriction that made the answer
+   * *illegal* would be a table-stalling lock with no escape — the card cannot be
+   * un-drawn — and this codebase has been bitten three times by a decision that
+   * froze a player who could not satisfy it. Zero is the safe direction: the player
+   * answers, the card recycles, the deck keeps falling by one per turn.
+   *
+   * **Visibility: PUBLIC, for the same reason as its three siblings.** Every real
+   * card imposing it announces it, and a player who has been told they earn nothing
+   * for answering must be able to see that they have been told. No new field, so
+   * `packages/server/test/secret-inventory.ts` owes nothing.
+   */
+  | 'no-income';
 
 /**
  * ONE RESTRICTION. The two rulings this type forces are argued on the fields that

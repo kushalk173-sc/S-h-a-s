@@ -32,7 +32,7 @@ import { useMemo, useState } from 'react';
 
 import type { ClientState, PlayerID } from '@shasn/engine';
 
-import { myChoices, targetableAreas, type MyChoice } from './derive.ts';
+import { choosablePlayers, choosableZones, myChoices, targetableAreas, type MyChoice } from './derive.ts';
 import { ResourcePicker } from './ResourcePicker.tsx';
 
 export type ChoiceResolverProps = {
@@ -49,6 +49,10 @@ export type ChoiceResolverProps = {
     pick: Readonly<Record<string, number>>,
   ) => void;
   readonly onResolveAreas: (choiceId: string, areaIds: readonly string[]) => void;
+  /** G1 — answer a `'choose-player'`: the seat the card's actor named. */
+  readonly onResolvePlayer: (choiceId: string, playerId: string) => void;
+  /** G16 — answer a `'choose-zone'`: the constituency the card's actor named. */
+  readonly onResolveZone: (choiceId: string, zoneId: string) => void;
   /** The draft the resource picker is holding, when it is for this choice. */
   readonly draft: Readonly<Record<string, number>>;
   readonly onDraft: (next: Readonly<Record<string, number>>) => void;
@@ -73,6 +77,10 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
   const { pending, required, headline, reason } = first;
   const me = state.players[you];
   if (me === undefined) return null;
+  /* One binding, narrowed once. `pending.choice.kind === …` inline in the JSX does not
+     narrow the OBJECT the following call receives, so the two new branches read the
+     discriminant through this local instead. */
+  const owed0 = pending.choice;
 
   return (
     <div className="scrim" data-testid="choice-resolver">
@@ -99,7 +107,28 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
             onRemovePick={props.onRemovePick}
             onResolve={props.onResolveAreas}
           />
-        ) : pending.choice.kind === 'steal-any' ? (
+        ) : owed0.kind === 'choose-player' ? (
+          <NameChoice
+            state={state}
+            choice={first}
+            ids={choosablePlayers(state, pending.player).map((id) => ({
+              id,
+              label: state.players[id]?.name ?? id,
+            }))}
+            onResolve={props.onResolvePlayer}
+            noun="player"
+            empty="This game has no other player, so there is nobody to choose."
+          />
+        ) : owed0.kind === 'choose-zone' ? (
+          <NameChoice
+            state={state}
+            choice={first}
+            ids={choosableZones(state, owed0).map((z) => ({ id: z.id, label: z.name }))}
+            onResolve={props.onResolveZone}
+            noun="constituency"
+            empty="No constituency holds a voter this card could reach, so there is nothing to choose."
+          />
+        ) : owed0.kind === 'steal-any' ? (
           <StealChoice
             state={state}
             you={you}
@@ -397,6 +426,74 @@ function StealChoice({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * `'choose-player'` and `'choose-zone'` — ONE component, because they are ONE decision
+ * with two vocabularies, and a player who has learned "pick one of these" should not
+ * have to learn it twice.
+ *
+ * ## WHY THIS IS A LIST AND NOT THE BOARD
+ *
+ * A seat is a button and a constituency is nine buttons; neither is a spatial choice
+ * over 129 slots, which is what `AreaChoice` is for. The board would be a worse
+ * interface for the same action — the rule this file has followed since the area
+ * shapes were split out.
+ *
+ * ## THE LIST IS THE ENGINE'S LIST, and that is the correctness argument
+ *
+ * `choosablePlayers` / `choosableZones` mirror `applyEffect`'s candidate set and
+ * `resolveChoice`'s accepted set, which are the same expression. So every button here
+ * is accepted by the server and there is always at least one. **A choice with an empty
+ * candidate set never reaches this component** — `applyEffect` raises nothing — so the
+ * empty branch below is a stated rule edge rather than a stall, the same treatment
+ * `StealChoice`'s no-victims note gets.
+ *
+ * ## IT SHOWS NO HIDDEN INFORMATION, and that is a design constraint not a coincidence
+ *
+ * The player list is `turnOrder` minus you: every seat, including players holding no
+ * resources and no cards. Filtering by what somebody holds would turn this dialog into
+ * a readout of their Mat and their hand, which is the same leak the engine refuses for
+ * `ideologyCards` — an option list is as revealing as a value. The zone list is pegs
+ * on a public board.
+ */
+function NameChoice({
+  state: _state,
+  choice,
+  ids,
+  onResolve,
+  noun,
+  empty,
+}: {
+  state: ClientState;
+  choice: MyChoice;
+  ids: readonly { readonly id: string; readonly label: string }[];
+  onResolve: (choiceId: string, id: string) => void;
+  noun: string;
+  empty: string;
+}) {
+  return (
+    <div className="col" data-testid="name-choice">
+      <p className="panel__note">Choose a {noun}.</p>
+      {ids.length === 0 ? (
+        <p className="panel__note panel__note--quiet" data-testid="name-choice-empty">
+          {empty}
+        </p>
+      ) : null}
+      {ids.map((x) => (
+        <button
+          key={x.id}
+          type="button"
+          className="btn"
+          onClick={() => onResolve(choice.pending.id, x.id)}
+          data-testid="name-choice-option"
+          data-name={x.id}
+        >
+          {x.label}
+        </button>
+      ))}
     </div>
   );
 }
