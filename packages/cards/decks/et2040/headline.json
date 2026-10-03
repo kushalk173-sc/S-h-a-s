@@ -278,6 +278,36 @@
           "zone": "this-zone"
         }
       ]
+    },
+    {
+      "id": "hl-et2040-018",
+      "source": "REF 4.3 recovers Fatality: 'Influence an open Voter Card for free and donate the voters to any opponent.' G1 LANDED: `target: chosen-player` raises a decision for the card's OWN actor, and a player holding nothing is STILL offered -- filtering the list by holdings would make it a readout of their Mat. DROPPED, named: 'for free' is a PURCHASE the engine cannot grant (G15's `price`); 'the voters' ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; 'right away' needs an 'immediately' placement. What ships is the DONATE.",
+      "provenance": "adapted",
+      "name": "Fatality",
+      "text": "Choose an opponent. They receive 1 voter, which they place on the board on their own turn.",
+      "effects": [
+        {
+          "op": "voters",
+          "n": 1,
+          "target": "chosen-player"
+        }
+      ]
+    },
+    {
+      "id": "hl-et2040-019",
+      "source": "REF 4.3 recovers Why The Long Face?: 'Pick an opponent. They will get 1 voter (not card) for every Voter Card you influence in their next turn.' G1 LANDED for the NAMED OPPONENT, and G14 + G22 were already landed, so this card is now WHOLE: the hook fires on `on-voter-influenced`, the lifetime is the caster's next turn, and the 'NOT card' parenthetical holds because `voters` grants a group rather than drawing. ONE CLAUSE DROPPED AND IT IS STRONGER: `condition: { byOwner: true }` is left off, so the hook fires on ANY influence, not only yours.",
+      "provenance": "adapted",
+      "name": "Why The Long Face?",
+      "text": "Choose an opponent. Every time a Voter Card is influenced from here until the start of your next turn, they receive 1 voter.",
+      "effects": [
+        {
+          "op": "voters",
+          "n": 1,
+          "target": "chosen-player",
+          "when": "on-voter-influenced",
+          "until": "next-turn"
+        }
+      ]
     }
   ]
 }

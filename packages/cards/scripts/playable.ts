@@ -143,7 +143,7 @@ const PROBES: readonly Probe[] = [
   { name: 'Brave New Worlds', ref: '4.3', kind: 'headline', reduction: null, gap: 'G18', note: 'every player answers, suppressing income' },
   { name: 'Card Games', ref: '4.3', kind: 'headline', reduction: null, gap: 'G12/G20', note: 'same card as A COWARD OR A JOURNALIST?' },
   { name: "Don't Kiss The Babies", ref: '4.3', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'the purchase surcharge, as a restriction rather than a cost modifier' },
-  { name: 'Fatality', ref: '4.3', kind: 'headline', reduction: null, gap: 'G1', note: 'donate voters to a NAMED opponent, placed now' },
+  { name: 'Fatality', ref: '4.3', kind: 'headline', reduction: [{ op: 'voters', n: 1, target: 'chosen-player' }], gap: 'G15', note: 'SHIPS as hl-et2040-018: the DONATE to ANY OPPONENT is now performed, because target chosen-player raises the decision for the card own actor. DROPPED, each named: influence an open Voter Card FOR FREE is a purchase the engine cannot grant (G15 price); the voters ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; right away needs an immediately placement' },
   { name: 'Fuelling The News', ref: '4.3', kind: 'headline', reduction: null, gap: 'G17/G20', note: 'draw 3 headlines, keep 1, give 2' },
   { name: 'Gender Trouble', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G22', note: 'a power is unavailable next turn' },
   { name: 'Good Gig Well Played', ref: '4.3', kind: 'headline', reduction: [{ op: 'draw-conspiracy', n: 1 }], gap: 'G17/G20', note: 'keep-one branch; the discard fallback is dropped' },
@@ -156,7 +156,7 @@ const PROBES: readonly Probe[] = [
   { name: 'Snoop B-O-Double-T', ref: '4.3', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'the same card as PYTHONPOST, per REF 4.3; not double-counted as two mechanisms' },
   { name: 'The Big Freeze', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G9/G15/G22', note: 'four gaps at once' },
   { name: 'The Four Horsemen', ref: '4.3', kind: 'headline', reduction: [{ op: 'lose-any', n: 2 }], gap: 'G5', note: 'the purchase lock is dropped' },
-  { name: 'Why The Long Face?', ref: '4.3', kind: 'headline', reduction: null, gap: 'G14/G22', note: 'trigger with a duration' },
+  { name: 'Why The Long Face?', ref: '4.3', kind: 'headline', reduction: [{ op: 'voters', n: 1, target: 'chosen-player', when: 'on-voter-influenced', until: 'next-turn' }], gap: 'G14', note: 'SHIPS as hl-et2040-019 and is now WHOLE: G1 names the opponent, G14 fires the hook, G22 is the lifetime, and the printed 1 voter NOT card parenthetical is honoured because voters grants a group rather than drawing. ONE CLAUSE IS DROPPED AND IT MAKES THE CARD STRONGER, which is why it is named rather than approximated: condition byOwner is left OFF, so the hook fires on ANY influence including an opponents, where the printed card says every Voter Card YOU influence' },
 ];
 
 // ─────────────────────────── the harness ───────────────────────────

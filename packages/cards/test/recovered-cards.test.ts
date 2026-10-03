@@ -252,6 +252,67 @@ effects: [{ op: 'discard-voter', n: 2, target: 'you', zone: 'chosen-zone' }],
       expect(raised.choice.effects[0]).toMatchObject({ op: 'discard-voter', zone: 'chosen-zone' });
     },
   },
+  // ── G1: `target: 'chosen-player'`, and the two cards that were stuck behind it. ──
+  {
+    name: 'Fatality',
+    ref: 'REF 4.3 (2040 Deck - Headline Cards)',
+    kind: 'headline',
+    verbatim:
+      'Influence an open Voter Card for free and donate the voters to any opponent. They must place these voters right away.',
+    drops: [
+      "'influence an open Voter Card for free': a PURCHASE the engine cannot grant. It needs a cost-waiver on INFLUENCE, which is G15's `price` field -- a computed cost the SELLER reads.",
+      "'the voters' ships as 1, because the recovered text names no number and an invented one would be a claim the corpus does not support -- and a count above what the board holds is clamped by `resolveChoice` anyway (G4).",
+      "'they must place these voters right away': a granted group is placed by its owner, and the turn machine has no 'immediately' placement -- a forced placement of somebody else's pending group is a G4-style per-unit iteration with a deadline (G22).",
+    ],
+    card: {
+      id: 'hl-recovered-fatality',
+      name: 'Fatality',
+      text: 'Choose an opponent. They receive 1 voter.',
+      effects: [{ op: 'voters', n: 1, target: 'chosen-player' }],
+    } as HeadlineCard,
+    check: (s) => {
+      // THE CLAUSE THAT IS PERFORMED is the DONATE to a NAMED opponent, so the
+      // assertion is that a decision exists, that it is the card's own ACTOR who owes
+      // it, and that it carries the card's own effect. A `voters` grant aimed at
+      // 'each-opponent' would have needed no decision and would not be this card.
+      const raised = s.choices.find((x) => x.player === 'p1');
+      expect(raised?.choice.kind).toBe('choose-player');
+      if (raised?.choice.kind !== 'choose-player') return;
+      expect(raised.choice.source).toBe('p1');
+      expect(raised.choice.effects[0]).toMatchObject({ op: 'voters', target: 'chosen-player' });
+    },
+  },
+  {
+    name: 'Why The Long Face?',
+    ref: 'REF 4.3 (2040 Deck - Headline Cards)',
+    kind: 'headline',
+    verbatim:
+      'Pick an opponent. They will get 1 voter (not card) for every Voter Card you influence in their next turn.',
+    drops: [
+      "\`condition: { byOwner: true }\` is left OFF, so the hook fires on ANY influence including an opponent's, where the printed card says every Voter Card YOU influence. This makes the card STRONGER than the real one, and it is named here rather than approximated (G14).",
+    ],
+    card: {
+      id: 'hl-recovered-long-face',
+      name: 'Why The Long Face?',
+      text: 'Choose an opponent. Every time a Voter Card is influenced before the start of your next turn, they receive 1 voter.',
+      effects: [
+        { op: 'voters', n: 1, target: 'chosen-player', when: 'on-voter-influenced', until: 'next-turn' },
+      ],
+    } as HeadlineCard,
+    check: (s) => {
+      // A lasting clause does nothing to a pool or a mat on the turn it resolves, so
+      // the thing asserted is the INSTALL: a live effect in force, carrying the card.
+      // That is the same shape the fingerprint in playable.ts learned to look for.
+      const live = s.liveEffects.find((le) => le.sourceCardId === 'hl-recovered-long-face');
+      expect(live, 'the hook was not installed').toBeDefined();
+      if (live === undefined) return;
+      expect(live.trigger).toBe('on-voter-influenced');
+      expect(live.owner).toBe('p1');
+      // AND the decision is NOT raised yet: a pending choice frozen into a LiveEffect
+      // would outlive the turn it was raised on, which is a freeze by another name.
+      expect(s.choices).toEqual([]);
+    },
+  },
 ];
 
 // ─────────────────────────── the measurement ───────────────────────────
