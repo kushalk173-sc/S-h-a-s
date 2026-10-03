@@ -513,6 +513,19 @@
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
           }
+        },
+        {
+          "$comment": "G14a. `borrow-power` is DEEP THOUGHTS (\"Select an opponent and use all their Level 3 Ideologue Powers this turn\") and the shape POLO RETREAT needs across a turn boundary. It is an op rather than a `restrict` kind because the two directions are opposite: `restrict` writes its entry on the player the card NAMES and records the caster as `sourcePlayer`, while a borrow must be written on the CASTER and record the player being borrowed FROM as `sourcePlayer`. In a `restrict` the entry would land on the donor, which is a card that grants the donor the caster's powers.\n\n`target` has exactly one value and is REQUIRED. The choice is raised by the same interception above applyEffect's switch that every other decision uses — reduce() pushes a 'choose-player' PendingChoice for the card's own actor and re-runs the effect with the named player as `forced` — so a single legal value keeps it a compile error rather than a runtime no-op, and a donor who holds nothing is a legal ANSWER that resolves to nothing, which is the honest reading and is what makes the decision never unsatisfiable.\n\n`until` is the lifetime and is read by the op's case exactly as `restrict` reads its own, because a borrow has no trigger and nothing to stand up on. Level 3 only is a RULING rather than a narrowing: all four Level 3 powers are consulted through powers.ts `usesLeft`, and the Level 5 ones are not all there (Election Fever is passive and is read by `gerrymanderAllowance`), so a Level 5 borrow would be a power available in one code path and not another. See `'borrowed-powers'` in packages/engine/src/state.ts.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "target"],
+          "properties": {
+            "op": { "const": "borrow-power" },
+            "target": { "const": "chosen-player" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
+          }
         }
       ]
     },

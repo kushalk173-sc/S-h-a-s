@@ -570,6 +570,40 @@ export type Effect = (
        */
       readonly target?: EffectTarget;
     }
+  /**
+   * G14a — USE AN OPPONENT'S LEVEL 3 IDEOLOGUE POWERS.
+   *
+   * DEEP THOUGHTS (REF 4.2.1): *"Select an opponent and use all their Level 3 Ideologue
+   * Powers this turn. You cannot use the same Ideologue Power twice."* POLO RETREAT is
+   * the same borrow across a turn boundary and between two players.
+   *
+   * ## WHY IT IS AN OP AND NOT A `restrict` WITH A KIND
+   *
+   * Because the two directions are opposite. Every `restrict` writes its entry on the
+   * player the card NAMES and records the caster as `sourcePlayer`; a borrow has to be
+   * written on the CASTER and record the player being borrowed FROM as `sourcePlayer`,
+   * because `powers.ts usesLeft` is handed the borrower and has to be told whose
+   * manifesto to count. Putting it in `restrict` would have written the entry on the
+   * donor, which is a card that grants the donor the caster's powers.
+   *
+   * `target: 'chosen-player'` is REQUIRED and it is the ONLY legal value, so it is a
+   * compile error rather than a runtime no-op: the choice is raised by the same
+   * interception above `applyEffect`'s switch that every other decision uses, and
+   * `resolveChoice` re-runs the effect with the named player as `forced`. A donor
+   * who holds nothing is a legal ANSWER — `borrowedFrom` then contributes a manifest
+   * with no Level 3 power and the borrow resolves to nothing, which is the honest
+   * reading — so the decision is never unsatisfiable.
+   *
+   * `until` is the lifetime, on `EffectScope` like every other effect, and it is read
+   * HERE rather than by `installLiveEffects` for the reason `restrict` reads it there:
+   * a borrow has no trigger and nothing to stand up on, so there is nothing to
+   * install. `'this-turn'` is DEEP THOUGHTS and `'next-turn'` is POLO RETREAT.
+   *
+   * **Level 3 only, and that is a ruling rather than a narrowing.** See
+   * `'borrowed-powers'` in `state.ts`: all four Level 3 powers are consulted through
+   * one function, and the Level 5 ones are not all there.
+   */
+  | { readonly op: 'borrow-power'; readonly target: 'chosen-player' }
 ) &
   EffectScope;
 

@@ -13,7 +13,9 @@ import {
   IDEOLOGUE_RESOURCE,
   tally,
   type Delta,
+  type GameState,
   type Ideologue,
+  type PlayerID,
   type PlayerState,
 } from './state';
 
@@ -107,10 +109,51 @@ export function cardsOf(player: PlayerState, ideologue: Ideologue): number {
   return tally(player.manifesto)[ideologue];
 }
 
-export function hasPower(player: PlayerState, rules: Rules, id: PowerID): boolean {
+export function hasPower(player: PlayerState, rules: Rules, id: PowerID, borrowedFrom?: readonly PlayerState[]): boolean {
   const spec = powerSpec(id);
   const need = spec.level === 3 ? rules.level3 : rules.level5;
-  return cardsOf(player, spec.ideologue) >= need;
+  if (cardsOf(player, spec.ideologue) >= need) return true;
+  // G14a. A BORROWED power is a LEVEL 3 power, and the level check is the ruling
+  // rather than a detail: `RestrictionKind`'s `'borrowed-powers'` note is the long
+  // version, and the short version is that every Level 3 power is consulted through
+  // `usesLeft` (this file) while Election Fever is passive and is read by
+  // `gerrymanderAllowance` in `reduce.ts`. Borrowing a Level 5 power would therefore be
+  // a power that is available when its action checks `usesLeft` and unavailable when
+  // it does not. Both real cards ask for Level 3, so nothing is narrowed.
+  if (spec.level !== 3) return false;
+  return (borrowedFrom ?? []).some((donor) => cardsOf(donor, spec.ideologue) >= need);
+}
+
+/**
+ * G14a — the players whose manifests this player may currently count.
+ *
+ * Read out of `restrictions` rather than stored, for the reason `hasPower` is derived
+ * from the manifesto and never cached (p22, and the note at the top of this file): a
+ * borrow that outlived its donor's manifesto would be an Elite keeping a power their
+ * requirement no longer supports.
+ *
+ * **`expiresTurn` IS NOT CHECKED HERE**, for exactly the reason `usesLeft` does not
+ * check it for `no-power`: `expiresTurn` is an absolute turn number and
+ * `expireRestrictions` in `advanceTurn` is the single place that removes what has run
+ * out, on the same clock that resets `powerUses`. Re-deriving the deadline here would
+ * be a second definition of the same expiry.
+ *
+ * Reads only public state — a `PlayerState.manifesto` is face-up under a player's own
+ * mat (p13) and is on every client's payload — so it adds no `_` field and owes
+ * `packages/server/test/secret-inventory.ts` nothing.
+ */
+export function borrowedFrom(state: GameState, player: PlayerID): readonly PlayerState[] {
+  const out: PlayerState[] = [];
+  const seen = new Set<PlayerID>();
+  for (const r of state.players[player]?.restrictions ?? []) {
+    if (r.kind !== 'borrowed-powers') continue;
+    if (seen.has(r.sourcePlayer)) continue;
+    const donor = state.players[r.sourcePlayer];
+    if (donor === undefined) continue;
+    seen.add(r.sourcePlayer);
+    out.push(donor);
+  }
+  return out;
 }
 
 export function unlockedPowers(player: PlayerState, rules: Rules): PowerID[] {
@@ -154,7 +197,12 @@ export function archetype(player: PlayerState): Ideologue | null {
 }
 
 /** Remaining uses of a power this turn, or 0 if it is not unlocked. */
-export function usesLeft(player: PlayerState, rules: Rules, id: PowerID): number {
+export function usesLeft(
+  player: PlayerState,
+  rules: Rules,
+  id: PowerID,
+  borrowedFrom?: readonly PlayerState[],
+): number {
   // G5's `no-power`, and THE consult point for it. Every `POWER_*` case in `reduce()`
   // already asks this function whether the power is available, so returning 0 here is
   // what makes the restriction total across the whole vocabulary — one edit rather
@@ -170,7 +218,7 @@ export function usesLeft(player: PlayerState, rules: Rules, id: PowerID): number
   // same expiry — which is how a restriction lives one turn too long in one place and
   // not another. See `RestrictionKind` in state.ts.
   if ((player.restrictions ?? []).some((r) => r.kind === 'no-power')) return 0;
-  if (!hasPower(player, rules, id)) return 0;
+  if (!hasPower(player, rules, id, borrowedFrom)) return 0;
   const u = player.powerUses;
   switch (id) {
     case 'prospecting':

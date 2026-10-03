@@ -25,7 +25,7 @@ import type {
   Interrupt,
   ZoneSelector,
 } from './cards';
-import { hasPower, passiveBonus, usesLeft } from './powers';
+import { borrowedFrom, hasPower, passiveBonus, usesLeft } from './powers';
 import { applyDiscounts, canAfford, deltaError, overCap, subtract } from './resources';
 import { shuffle } from './rng';
 import type { Rules } from './rules';
@@ -1321,6 +1321,41 @@ function applyEffect(
       }
       return s;
     }
+    case 'borrow-power': {
+      // G14a. DEEP THOUGHTS: *"Select an opponent and use all their Level 3 Ideologue
+      // Powers this turn."*
+      //
+      // THE TYPE MAKES THIS ONE BRANCH AND NOT A CHOICE OF READINGS: `target` is a
+      // required `'chosen-player'`, so the only way to arrive here is with `forced`
+      // naming the donor the card's own actor picked. The guard is therefore about a
+      // hand-built state rather than a card — but it is a branch rather than a comment
+      // because a comment does not fail a test.
+      if (target !== 'chosen-player') return s;
+      const donor = forced;
+      if (donor === null || donor === source) return s;
+      // SILENT, and for a different reason than `move-card`. A borrow is PUBLIC: the
+      // entry lands on the public `restrictions` list, every client already receives
+      // that list whole, and `public-payload.test.ts` pins the field set to exactly
+      // `{ liveEffects, restrictions }`. `fireTriggers` already logs a lasting effect
+      // taking hold, and a log line here would be a second statement of a fact every
+      // client can read for itself.
+      //
+      // THE WRITER IS THE CASTER and the `sourcePlayer` IS THE DONOR, which is the one
+      // inverting field on `Restriction` — see `'borrowed-powers'` in state.ts. Reversed,
+      // this is a card that lets the donor use the caster's own powers.
+      return pushRestriction(s, source, donor, {
+        kind: 'borrowed-powers',
+        value: 0,
+        remaining: 0,
+        // The same absolute-turn arithmetic `restrict` uses, so `'this-turn'` means
+        // "live through the turn the card resolved on" without a special case and a
+        // replay reproduces it from the state. `durationExpiry` is the single
+        // definition; `expireRestrictions` in `advanceTurn` is the only thing that
+        // retires it.
+        expiresTurn: durationExpiry(s, source, effect.until ?? 'this-turn'),
+        sourceCardId: cardId ?? 'unknown',
+      });
+    }
   }
 }
 
@@ -1339,6 +1374,14 @@ function applyEffect(
  * it in that case — there is no event for it to narrow. The corpus validator refuses
  * the combination outright rather than letting it reach here, so the engine's
  * behaviour is belt and braces rather than the primary defence.
+ *
+ * **G14a adds a second op to the carve-out, and it is the same reason rather than a
+ * new one.** `borrow-power` writes a RULE now and `until` is that rule's deadline, so
+ * treating it as a hook's lifetime would install a live effect that does not happen now
+ * and re-arms on every event — which is a card that reads as *"in your next turn"* and
+ * acts on somebody else's turn boundary instead. The rule for the carve-out is a
+ * property of the op, not a list of ops: **an op that writes a `Restriction` is never
+ * scoped**, and there are exactly two of those.
  */
 function isScoped(effect: Effect): boolean {
   // `restrict` is the one op that carries `until` WITHOUT being scoped, and that is
@@ -1352,6 +1395,10 @@ function isScoped(effect: Effect): boolean {
   // collision the honesty registry exists to catch, so the case is named here and
   // asserted in restrictions.test.ts.
   if (effect.op === 'restrict') return false;
+  // G14a. `borrow-power` writes a `Restriction` too — see `'borrowed-powers'` in
+  // state.ts for why it is one list rather than two — so it means the same thing by
+  // `until` and gets the same answer. Asserted in borrowed-powers.test.ts.
+  if (effect.op === 'borrow-power') return false;
   return effect.when !== undefined || effect.until !== undefined || effect.condition !== undefined;
 }
 
@@ -1891,6 +1938,14 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
   const self = state.players[playerId];
   if (!self) return fail(`unknown player ${playerId}`);
 
+  // G14a. The manifests this player may currently count for a BORROWED Level 3 power.
+  // Computed once, here, because `state` is never reassigned inside the switch below —
+  // every case returns a new state rather than mutating this binding — so this cannot
+  // go stale between reading it and a `usesLeft` call in any of the nine `POWER_*`
+  // cases. `state.players[playerId]!.manifesto` is public (p13: an answered card is face
+  // up under its owner's mat), so this reads nothing hidden and adds no `_` field.
+  const donors = borrowedFrom(state, playerId);
+
   // G13: an open response window freezes the whole table except the two moves the
   // window exists for, plus `RESOLVE_CHOICE` so a player frozen by p12 can always
   // thaw. Placed FIRST, above the per-player freeze, because the window is the more
@@ -2014,7 +2069,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       if (!slot) return fail('no Voter Card in that slot');
 
       const discounts = action.discounts ?? [];
-      if (discounts.length > usesLeft(self, rules, 'helping-hands')) {
+      if (discounts.length > usesLeft(self, rules, 'helping-hands', donors)) {
         return fail('not enough Helping Hands discounts left');
       }
       const discounted = applyDiscounts(slot.cost, discounts);
@@ -2033,7 +2088,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
       let voters = slot.voters;
       if (action.viral) {
-        if (usesLeft(self, rules, 'going-viral') <= 0) return fail('Going Viral is spent for this turn');
+        if (usesLeft(self, rules, 'going-viral', donors) <= 0) return fail('Going Viral is spent for this turn');
         voters += 1;
       }
 
@@ -2314,7 +2369,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       if (!card) return fail('unknown conspiracy card');
 
       const discounts = action.discounts ?? [];
-      if (discounts.length > usesLeft(self, rules, 'helping-hands')) {
+      if (discounts.length > usesLeft(self, rules, 'helping-hands', donors)) {
         return fail('not enough Helping Hands discounts left');
       }
       // p19: "any combination of resources" totalling the printed cost. The surcharge
@@ -2386,7 +2441,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'POWER_PROSPECT': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
-      if (usesLeft(self, rules, 'prospecting') <= 0) return fail('Prospecting is not available');
+      if (usesLeft(self, rules, 'prospecting', donors) <= 0) return fail('Prospecting is not available');
       if (action.take.length === 0 || action.take.length > rules.prospectingTake) {
         return fail(`take up to ${rules.prospectingTake} resources`);
       }
@@ -2407,7 +2462,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'POWER_LAND_GRAB': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
-      if (usesLeft(self, rules, 'land-grab') <= 0) return fail('Land Grab is spent for this turn');
+      if (usesLeft(self, rules, 'land-grab', donors) <= 0) return fail('Land Grab is spent for this turn');
       const area = findArea(state, action.areaId);
       if (!area?.peg) return fail('there is no voter there');
       if (area.volatile) return fail('voters in a Volatile Area cannot be evicted');
@@ -2438,7 +2493,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'POWER_DONATIONS': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
-      if (usesLeft(self, rules, 'donations') <= 0) return fail('Donations is spent for this turn');
+      if (usesLeft(self, rules, 'donations', donors) <= 0) return fail('Donations is spent for this turn');
       const victim = state.players[action.from];
       if (!victim) return fail('unknown player');
       if (victim.id === playerId) return fail('snatch from someone else');
@@ -2457,7 +2512,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'POWER_PAYBACK': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
-      if (usesLeft(self, rules, 'payback') <= 0) return fail('Payback is spent for this turn');
+      if (usesLeft(self, rules, 'payback', donors) <= 0) return fail('Payback is spent for this turn');
       const area = findArea(state, action.areaId);
       if (!area?.peg) return fail('there is no voter there');
       if (area.peg.owner === playerId) return fail("Payback targets an opponent's voter");
@@ -2480,7 +2535,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
 
     case 'POWER_TOUGH_LOVE': {
       if (state.phase !== 'actions') return fail('answer your Ideology Card first');
-      if (usesLeft(self, rules, 'tough-love') <= 0) return fail('Tough Love is spent for this turn');
+      if (usesLeft(self, rules, 'tough-love', donors) <= 0) return fail('Tough Love is spent for this turn');
       if (action.areaIds.length !== rules.toughLoveConverts) {
         return fail(`Tough Love converts exactly ${rules.toughLoveConverts} voters`);
       }
@@ -2495,7 +2550,7 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       if (new Set(resolved.map((a) => a.zone)).size !== 1) return fail('both voters must be in the same zone');
 
       const discounts = action.discounts ?? [];
-      if (discounts.length > usesLeft(self, rules, 'helping-hands')) {
+      if (discounts.length > usesLeft(self, rules, 'helping-hands', donors)) {
         return fail('not enough Helping Hands discounts left');
       }
       // p32: 2 Trust + any 2 resources. Helping Hands may discount it.

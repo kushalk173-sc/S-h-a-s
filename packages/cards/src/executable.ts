@@ -84,6 +84,15 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
    * card whose answer p13 has already made public under somebody's mat.
    */
   'move-card': ['from', 'to', 'n', 'target'],
+  /**
+   * G14a. `target` and nothing else, and both are the honest minimum: `target` is the
+   * single legal value (`'chosen-player'`), so the case reads it as a guard rather than
+   * as a set of victims; `until` is a scope field and is read in this case exactly as
+   * `restrict`'s is, which is why it does not appear here — `SCOPE_FIELDS_READ_BY_INSTALL`
+   * is about the INSTALLER and `unexecutedEffectProblems` checks `until` against
+   * `EXECUTABLE_DURATIONS` before it ever looks at this table.
+   */
+  'borrow-power': ['target'],
 };
 
 

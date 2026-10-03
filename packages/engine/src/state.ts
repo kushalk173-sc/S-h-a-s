@@ -700,7 +700,64 @@ export type RestrictionKind =
    * for answering must be able to see that they have been told. No new field, so
    * `packages/server/test/secret-inventory.ts` owes nothing.
    */
-  | 'no-income';
+  | 'no-income'
+  /**
+   * G14a — *"Select an opponent and use all their Level 3 Ideologue Powers this
+   * turn."* DEEP THOUGHTS (REF 4.2.1); *"they can use each other's unlocked Level 3
+   * Ideologue Powers in addition to their own in their next turns"* is POLO RETREAT.
+   *
+   * ## THE ONE KIND HERE THAT IS A GRANT AND NOT A PROHIBITION, and why it is here
+   *
+   * The four kinds above all say what a player may no longer *do*. This one says what
+   * a player may *additionally* do, and it is on the same list deliberately rather
+   * than in a new `PlayerState` field, for three reasons in order of weight:
+   *
+   *  1. **Visibility.** It is public, and for exactly the reason the other four are:
+   *    the card imposing it is played face up and its whole content is public under
+   *    FULL INFORMATION. A player who can borrow Land Grab tomorrow and cannot
+   *    tomorrow+1 has to be able to plan against that, and so does everyone else at
+   *    the table — it is a threat, and a hidden threat is a card that lies.
+   *  2. **No `_` field, no server change.** `restrictions` is already on
+   *    `packages/server/test/secret-inventory.ts` as a deliberate NON-SECRET and
+   *    `packages/server/test/public-payload.test.ts` pins the public field set to
+   *    exactly `{ liveEffects, restrictions }`. A new public field would have gone
+   *    red in a package this one may not edit; a new KIND on a list that is already
+   *    declared public does not.
+   *  3. **It is not a counter.** `powerUses` is where *uses spent* live; a borrow is a
+   *    permission and has no counter of its own, so it is not that list's business
+   *    either.
+   *
+   * ## `sourcePlayer` IS THE DONOR, which is the one inverting field on this list
+   *
+   * On the other four kinds `sourcePlayer` is "who imposed this", which is the caster.
+   * Here the entry is written on the **caster** and `sourcePlayer` is the player they
+   * are borrowing FROM, because `usesLeft` has to read somebody *else's* manifesto and
+   * the only player id it is handed is the donor's. Getting this backwards would make
+   * DEEP THOUGHTS let you use your own powers, which is a card that does nothing.
+   *
+   * ## WHY IT GRANTS LEVEL 3 AND ONLY LEVEL 3
+   *
+   * Both real cards say **Level 3**, and the restriction is total over Level 3 for a
+   * reason that is mechanical rather than a convenience: **every Level 3 power is
+   * consulted through `usesLeft` in `powers.ts`** — Prospecting, Donations, Going
+   * Viral and Helping Hands, all four — and that is the single function this kind is
+   * read in. The Level 5 powers are not all read there (Election Fever is passive and
+   * is read by `gerrymanderAllowance` in `reduce.ts`), so a Level 5 borrow would be a
+   * power that is sometimes available and sometimes not, decided by which function
+   * happened to ask. Restricting the borrow to Level 3 makes the guarantee checkable
+   * by one `describe.each` over `POWERS`, and it is not a narrowing of either card.
+   *
+   * ## EXPIRY, on the same clock as everything else
+   *
+   * `until` is the lifetime, read by the `borrow-power` case exactly as `restrict`
+   * reads it, and `expiresTurn` is absolute so a replay from seed + action log
+   * reproduces it without re-deriving anything. `expireRestrictions` in `advanceTurn`
+   * removes it on the same clock that resets `powerUses`, and `usesLeft` deliberately
+   * does NOT re-check it for the reason `no-power` documents: a second definition of
+   * the same deadline is how a rule lives one turn too long in one place and not
+   * another.
+   */
+  | 'borrowed-powers';
 
 /**
  * ONE RESTRICTION. The two rulings this type forces are argued on the fields that

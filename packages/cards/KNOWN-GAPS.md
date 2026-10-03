@@ -121,18 +121,18 @@ the playability count; a table here that disagrees with the decks is worse than 
 |---|---:|---:|
 | Recovered X-card rows probed (REF §4.1–§4.3) | 54 | **54** |
 | …distinct after de-duplicating the campaign reskins | 51 | **51** |
-| …**PLAYED**, measured by driving each through `reduce()` | 14 | **34** |
+| …**PLAYED**, measured by driving each through `reduce()` | 14 | **36** |
 | …shipped `adapted`, dropped clause named in `source` | 7 | **30** |
 | …playable but **held back on a ruling** (LAB-GROWN EARWORM) | 0 | **1** |
-| …**not representable at all** | 43 | **20** |
+| …**not representable at all** | 43 | **18** |
 | Cards shipped in the corpus | 60 | **127** |
 | `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 41 / 86** |
 | `inferred` placeholders retired for a recovered card | 0 | **9** |
 
-The 51 distinct recovered cards are 30 shipping + 1 held back + 20 not representable, and
+The 51 distinct recovered cards are 30 shipping + 1 held back + 18 not representable, and
 `npm run playable` agrees: 54 rows probed (the three campaign reskin pairs are probed under both
-names, because a duplicate is cheaper to keep visible than to deduplicate by hand), 34 played,
-0 refused, 0 played-but-no-op, 20 inexpressible.
+names, because a duplicate is cheaper to keep visible than to deduplicate by hand), 36 played,
+0 refused, 0 played-but-no-op, 18 inexpressible.
 
 
 ### 0.2 The finding, and what changed about it
@@ -600,6 +600,95 @@ GREAT LEADER BAD ECONOMY and WHY THE LONG FACE? both need *"pick an opponent"* o
 modifier, the same shape as G9's surcharges. QUANTUM WRISTBAND is an auction, G13.
 
 
+### G14a — no BORROWED Ideologue Power
+
+**State: (a). CLOSED — a new op, a new `RestrictionKind`, and one parameter.**
+
+DEEP THOUGHTS (REF 4.2.1): *"Select an opponent and use all their Level 3 Ideologue
+Powers this turn. You cannot use the same Ideologue Power twice."* POLO RETREAT
+(REF 4.1) is the same borrow across a turn boundary. **Both were labelled G20 in the
+row-9 table and that label was wrong** — `move-card` moves cards, not powers, and
+KNOWN-GAPS §4 said so while the handoff table did not.
+
+**What landed is three small pieces, and the second one is the load-bearing.**
+
+1. **`{ op: 'borrow-power'; target: 'chosen-player' }`**, with `target` REQUIRED and
+   single-valued so it is a compile error rather than a runtime no-op. It rides the
+   same interception above `applyEffect`'s switch that every other decision uses, so
+   it raises no new `Choice` kind and costs `packages/client/**` nothing — which is
+   why it could be built at all in a package that may not edit the client's
+   `Readonly<Record<EffectTarget, string>>`.
+2. **`RestrictionKind` gains `'borrowed-powers'`, and the entry is written on the
+   CASTER with `sourcePlayer` naming the DONOR.** That is the one inverting field on
+   `Restriction`, and the reason is mechanical: `powers.ts usesLeft` is handed the
+   borrower and has to be told whose manifesto to count. Written the other way round
+   it is a card that grants the donor the caster's powers.
+3. **`hasPower` / `usesLeft` take an optional donor list**, read once per `reduce()` by
+   the new `borrowedFrom(state, player)` and threaded into all nine `usesLeft` call
+   sites.
+
+**Why it rides on `restrictions` rather than a new field, which is the coordination
+decision.** `restrictions` is already a declared non-secret in
+`packages/server/test/secret-inventory.ts` and
+`packages/server/test/public-payload.test.ts` pins the public field set to exactly
+`{ liveEffects, restrictions }`. A new public field would have gone red in a package
+this one may not edit; a new KIND on a list already declared public does not. **No
+`_` field was added and `secret-inventory.ts` owes nothing.**
+
+**`isScoped` needed a second carve-out, and the rule is a property rather than a list.**
+`until` means "this is a hook's lifetime" for every op except the ones that write a
+`Restriction`, where it means "this is the deadline of the rule being written now".
+`restrict` was already carved out; `borrow-power` is the second such op, and without
+the carve-out POLO RETREAT's `until: 'next-turn'` would have installed a live effect
+that acts on a turn boundary instead of writing a rule.
+
+**TOTALITY, and it is the reason Level 5 is refused.** All four Level 3 powers
+(Prospecting, Donations, Going Viral, Helping Hands) are consulted through
+`usesLeft`, and that is the one function this kind is read in. The Level 5 powers are
+not all there — Election Fever is passive and is read by `gerrymanderAllowance` in
+`reduce.ts` — so a Level 5 borrow would be a power available in one code path and not
+another. `borrowed-powers.test.ts` proves the grant over all four L3 powers, proves
+Land Grab / Payback / Tough Love stay at 0, and pins the covered Ideologue set to all
+four so a fifth L3 power is a test failure rather than a silent gap. **Both real cards
+ask for Level 3, so nothing is narrowed.**
+
+**Satisfiability: the decision is the existing one.** Candidate set is
+`turnOrder` minus the actor, which is the SAME expression `resolveChoice` validates
+against, so there is no state in which it has no legal answer — asserted at 2, 3, 4 and
+5 seats. A donor holding nothing is a legal ANSWER that resolves to nothing, which is
+what keeps the decision satisfiable rather than merely non-empty.
+
+**Deadlock: a borrow only ever ADDS an available power**, so it cannot remove a legal
+move from anybody. A played game at 2, 3, 4 and 5 seats with the card in the deck
+asserts at every step that some action succeeds.
+
+**Cards gained: 2, and they are measured by PLAYING them — `npm run playable` 34 → 36
+of 54.** DEEP THOUGHTS drops one clause (*"you cannot use the same Ideologue Power
+twice"* — no per-power counter on a borrowed power). POLO RETREAT drops four and the
+first one moves **who benefits**: it is *"you may use a named opponent's powers"* rather
+than a mutual exchange. Both are named on their `SOURCES.md` rows and on the probe
+rows.
+
+**NOT IN THE CORPUS YET, and that is stated rather than implied.** `playable` measures
+by playing each reduction through the real reducer, and the probe writes its own
+reduction rather than reading the deck — so 36 of 54 is a statement about the ENGINE,
+not about `decks/`. Shipping either card is a corpus change and §6bis records what
+growing the corpus costs the server suite, which is another owner's call.
+
+### G14b — no PAYOUT modifier, and no N-target
+
+**State: (c). Card: THE GRETA EFFECT.** *"Pick up to 2 opponents. They will get 1 less
+voter on the next 2 Voter Cards that they influence. This applies to 2 separate voter
+cards for 2 different players."* This is the shape G9's surcharges failed on: the
+printed clause changes what a purchase **yields**, and a card that reduces a payout
+needs a counter on somebody's `powerUses.influenceVoters` decrement that happens
+exactly twice and not otherwise. `'no-income'` is the precedent that one such rule is
+a `RestrictionKind` consulted in one place; what is missing is the decrement.
+
+**And the "up to 2 opponents" is the harder half.** `applyEffect` computes ONE `target`
+for a whole effect list, so a card cannot raise two `choose-player` decisions in one
+resolution — G14a ran into the same wall from the other side.
+
 ### G15 — no value computed from your own current state
 
 **State: (a) for `n` and `per`, still (b) for PRICES.** `n` is now
@@ -800,8 +889,10 @@ queue (an owner, a seat, a deadline) — so the type refusal and the missing que
 same blocker seen twice. BLESSINGS OF PARENTS PAST is G17 (choose 2) plus a Voter Card
 donation plus a defined two-player order. A CALL FROM KARACHI, AS CLEAR AS WATER and
 FUELLING THE NEWS are all G17 deck search or G18 on top of a card move. CULT-IVATING
-OBEDIENCE, POLO RETREAT and DEEP THOUGHTS name G20 in the table but are G-new, G11 and
-borrow-a-power respectively, and no `move-card` reaches any of them. **Re-entrancy is
+OBEDIENCE names G20 in that table but is G-new/G11 and no `move-card` reaches it. POLO
+RETREAT and DEEP THOUGHTS also named G20 there and that label was **wrong** — they are
+G14a, borrow-a-power rather than borrow-a-card, and no `move-card` reaches either; both
+now PLAY (§2 G14a). **Re-entrancy is
 bounded**, and the `to: 'destroy'` branch ships with no card yet: it is the operation the
 destruction-leak tests pin, and inventing a card for it would be a card the corpus does
 not contain.

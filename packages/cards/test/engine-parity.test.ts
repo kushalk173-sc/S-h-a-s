@@ -90,6 +90,13 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
           expect(effect.from).toBe('draw');
           expect(['hand', 'destroy']).toContain(effect.to);
           break;
+        case 'borrow-power':
+          // G14a. `target` is a single required value rather than a set, so it is
+          // checked as the value it is: a borrow with no opponent named is a card that
+          // borrows from itself, which resolves to nothing and reads as though it did
+          // something.
+          expect(effect.target).toBe('chosen-player');
+          break;
         default: {
           const never: never = effect;
           throw new Error(`unhandled Effect variant: ${JSON.stringify(never)}`);

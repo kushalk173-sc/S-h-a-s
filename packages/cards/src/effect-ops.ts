@@ -26,6 +26,7 @@ export const EFFECT_OPS = [
   'restrict',
   'discount',
   'move-card',
+  'borrow-power',
 ] as const satisfies readonly Effect['op'][];
 
 /**
