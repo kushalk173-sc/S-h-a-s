@@ -6,8 +6,17 @@
  *
  * CONVENTION: any field prefixed with `_` is SERVER-ONLY and must be stripped
  * before the state is sent to a client. See `playerView.ts`. This is not a style
- * choice — the blind-answer mechanic dies if card payouts reach the client, so the
- * underscore is load-bearing and enforced by test.
+ * choice and the underscore is load-bearing and enforced by test — but the
+ * reason CHANGED with full information, and the old reason would be a lie here.
+ *
+ * It used to read "the blind-answer mechanic dies if card payouts reach the client". It does
+ * not: the payout is published to every seat now, by decision, in the server's
+ * `PublicQuestion`. What the convention now protects is the four draw piles and the four
+ * discard piles, `_seed` — which is the input to the seed-derived answer ORDER, the last
+ * channel by which a display position could carry the deck's Ideologue balance — `_idSeq`,
+ * and the pending card's ID. The full record of the change, with the measurements behind it,
+ * is `packages/server/src/FULL-INFORMATION.md`, and the rulings are on `GameState._pendingCard`
+ * and on `playerView`'s own header.
  */
 
 import type { Effect, EffectCondition, EffectDuration, EffectTiming, EffectTrigger } from './cards';
@@ -223,7 +232,7 @@ export type PlayerState = {
    *
    * ## 3. Why it is never put STRAIGHT to the receiver: the anti-collision rule
    *
-   * The blind answer is a single nullable field, `GameState._pendingCard`. A hand is
+   * The answer window is a single nullable field, `GameState._pendingCard`. A hand is
    * a queue. **The queue is drained at the turn boundary, one card per turn, IN PLACE
    * OF that turn's draw** — see `advanceTurn` in `reduce.ts`. The two therefore
    * cannot collide: `_pendingCard` is written exactly once per turn, by the boundary,
@@ -252,7 +261,7 @@ export type PlayerState = {
    * can therefore only move a card between the hidden side and a pile — it can never
    * write `manifestoCards`, and it can never write `_pendingCard`. Both prohibitions
    * are assertions in `card-transfer.test.ts`, because both are the exact two ways
-   * this mechanic could destroy the blind answer.
+   * this mechanic could destroy the answer window.
    *
    * ## WHY IT IS OPTIONAL — the same wart, and the same reason as `restrictions`
    *
@@ -895,7 +904,29 @@ export type GameState = {
   readonly log: readonly LogEntry[];
 
   // ─────────── SERVER ONLY — stripped by playerView ───────────
-  /** The card put to the active player. They answer without seeing it. */
+  /**
+   * The card put to the active player. SERVER ONLY, and it stays that way after full
+   * information.
+   *
+   * The card's CONTENT — question, both answers, both Ideologues, both payouts — is
+   * published to every seat by the server's `PublicQuestion`. This field, the id, is
+   * not, and the two rulings are different on purpose:
+   *
+   *  - The content was always reachable. The Ideology corpus is public JSON; a card's
+   *    payout is one lookup away whatever this field says. What the old withholding
+   *    protected was *which* card was on the table, and under full information the card
+   *    is read aloud at a physical table anyway (`AUTHENTIC-SHASN-REFERENCE` §7.2 step 1).
+   *  - The id is what `packages/server/scripts/check-secrets.mjs` watches. That name-based
+   *    grep is the only mechanism in the repository keeping a server-only field off the
+   *    wire, and it works by this field being `_`-prefixed. Moving the value onto an
+   *    unprefixed field would remove its coverage of the one value a future change might
+   *    most want to re-hide.
+   *
+   * The full argument, and the measurements behind it, are in
+   * `packages/server/src/FULL-INFORMATION.md` §2. The engine itself is unchanged by full
+   * information: it has no projection of its own beyond `playerView`, and it does not know
+   * what the server chooses to publish.
+   */
   readonly _pendingCard: CardID | null;
   readonly _ideologyDraw: readonly CardID[];
   readonly _ideologyDiscard: readonly CardID[];

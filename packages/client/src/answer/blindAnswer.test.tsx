@@ -1,14 +1,19 @@
 /**
- * The blind answer's symmetry test.
+ * The answer card's symmetry test. The filename keeps its `blind` because the class names
+ * do, and because the AVERAGE mechanic — which side of the card a display position is — is
+ * still what this file guards.
  *
  * §8.8: "Test the symmetry, don't assume it: a unit test asserting
  * `getComputedStyle` equality on every property in the §1.2 contract table, for
  * both sides, in both orderings, is a release gate. It is the cheapest possible
  * guard on the game's central mechanic."
  *
- * §1.2: "The blind answer is the product; everything else is table furniture…
- * A design that is 5% better at everything else and leaks one bit is a failed
- * design."
+ * §1.1 quoted "the blind answer is the product; everything else is table furniture", and §1.2
+ * quoted "a design that is 5% better at everything else and leaks one bit is a failed design".
+ * **The payout half of that sentence no longer applies** — full information publishes the
+ * whole card — so the "one bit" that must not leak is now the `order` draw and nothing else,
+ * and the measurement that says so is in `packages/server/src/FULL-INFORMATION.md` §6: position 0
+ * holds the Capitalists' answer in 34 of the shipped 76 cards.
  *
  * So this file has three jobs, and all three are gates rather than smoke tests:
  *
@@ -16,13 +21,18 @@
  *      contract table, on both sides, in BOTH orderings, and in the chosen
  *      state. Plus a guard that the CSS actually reached the document, because
  *      without `css: true` in vitest.config.ts this whole file would pass
- *      vacuously.
+ *      vacuously. **And this is the gate with new teeth:** the fixture's two sides carry
+ *      DIFFERENT Ideologues and DIFFERENT payouts, so anything that tinted a face by either
+ *      would fail here — which, with the Ideologue printed on the card, is exactly the
+ *      position leak.
  *   2. THE ORDER IS SEED-DERIVED AND ACTUALLY VARIES. If the draw collapsed to
- *      a constant, the positional bias would come straight back.
- *   3. NO PAYOUT CAN REACH THE DOM. The type-level half of this lives in
- *      `blindAnswer.types.ts` and is gated by `npm run typecheck`; this is the
- *      runtime half, and it works by smuggled a payout past the types with a
- *      cast and asserting nothing appears in the output.
+ *      a constant, the positional bias would come straight back — and per §6 of the record
+ *      that bias is large enough to be worth a game.
+ *   3. THE WHOLE CARD IS ON SCREEN, AND THE `order` DRAW IS NOT. The type-level half of the
+ *      surviving guarantee lives in `blindAnswer.types.ts` and is gated by
+ *      `npm run typecheck`; this is the runtime half, and it works by smuggling an `order`
+ *      past the types with a cast and asserting the DOM is byte-identical to a clean
+ *      render's.
  */
 
 import { describe, expect, it, vi } from 'vitest';

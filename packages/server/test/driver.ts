@@ -1064,7 +1064,7 @@ export function reactiveAnswer(
  *
  * So the gate is right and the driver is wrong. Choosing the side by its payout was
  * never something a player can do: the two labels are all they get, and the payout
- * is what the blind is hiding. "Always answer the left label" is what a player with
+ * is what the server ORDER is hiding. "Always answer the left label" is what a player with
  * no private information does, so the winnability claim below is now a claim about
  * the game as a client experiences it rather than one that peeks.
  *

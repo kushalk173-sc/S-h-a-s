@@ -4,7 +4,7 @@
  * THE REQUIREMENT: a player closes the tab for two hours, comes back, and the
  * board is exactly as they left it, in the correct phase, with their own view. Not
  * a fresh page, not a reset seat, and — critically — if they return *mid-answer*,
- * the same blind prompt with the same two labels in the same order, and still no
+ * the same answer prompt with the same two sides in the same order, and still no card id
  * payout.
  *
  * HOW IT WORKS:
@@ -63,7 +63,7 @@ export type ResumeOk = {
   readonly session: SessionRecord;
   readonly room: Room | null;
   readonly lobby: LobbyRecord | null;
-  /** True when the player is owed a blind prompt the moment they reconnect. */
+  /** True when the player is owed the answer prompt the moment they reconnect. */
   readonly owesPrompt: boolean;
 };
 

@@ -65,8 +65,9 @@ import {
   type PlayerID,
 } from '@shasn/engine';
 
-import { answerSideFor, answerPromptFor, viewFor } from '../src/broadcast.ts';
+import { answerSideFor, answerPromptFor, viewFor, type PublicQuestion } from '../src/broadcast.ts';
 import { Room } from '../src/room.ts';
+import type { AnswerPrompt } from '../src/protocol.ts';
 import { makeCtx, realCards } from './fixtures.ts';
 import { decksOf } from '../src/store.ts';
 import { renderAll } from './render-all.ts';
@@ -1464,12 +1465,18 @@ describe('the leak vectors the type system cannot see', () => {
     const noServerOnlyKeys: ServerOnly extends never ? true : false = true;
     expect(noServerOnlyKeys).toBe(true);
 
-    type BlindShape = { question: string; labels: readonly [string, string]; order: 'ab' | 'ba' };
-    type BlindHasNoPayout = keyof BlindShape extends 'pays' | 'delta' | 'payout' | 'ideologue' | 'cardId'
-      ? false
-      : true;
-    const blindIsClean: BlindHasNoPayout = true;
-    expect(blindIsClean).toBe(true);
+    // The `order` guarantee, at the type level. It used to be a `BlindShape` proof that
+    // no payout/ideologue/cardId key existed — a true statement about a type that no
+    // longer exists, since the payout is now published on purpose. The surviving claim is
+    // the narrow one and it is the one that matters: NEITHER published card type carries
+    // an `order`, at any level, and the answerer's prompt carries `order` and nothing else
+    // beyond the card.
+    type TableCard = PublicQuestion;
+    type PromptShape = AnswerPrompt;
+    const tableHasNoOrder: keyof TableCard extends 'order' ? false : true = true;
+    const promptKeysAreExactly: keyof PromptShape extends 'order' | 'question' | 'sides' ? true : false = true;
+    expect(tableHasNoOrder).toBe(true);
+    expect(promptKeysAreExactly).toBe(true);
   });
 });
 

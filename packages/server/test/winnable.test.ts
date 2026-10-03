@@ -68,7 +68,7 @@
  * reading the pending card off the authoritative state. That is reading a server-only
  * field, the server's secrets gate forbids it, and — the part that matters — it is
  * not something a player can do. The two labels are all a client gets; the payout is
- * what the blind is hiding.
+ * nothing but the seed-derived ORDER is.
  *
  * So the driver always answers the left label now, and the result is BETTER, not
  * worse: 3 seats went from 19/20 to 20/20. The seed that used to strand — 3 seats,
