@@ -861,6 +861,41 @@
   margin: 0 0 var(--sp-1);
 }
 
+/* ── The card on the table ───────────────────────────────────────────────────
+   The read-only view every non-answering seat gets, in the flow above the board.
+   Deliberately almost no styling of its own: the scenario, the panel and both
+   sides reuse `blind-answer__*` verbatim so the whole table is looking at ONE
+   card rather than at a lookalike of the card the answerer is holding.
+
+   The ONE thing that has to be narrowed is the pointer cursor. On the answerer's
+   screen a side is clickable and says so; here it is inert text, and a pointer
+   cursor on inert text is §9.10's prohibited control by another route — it looks
+   pressable and does nothing. It is a DESCENDANT selector so it outranks the single
+   class in `blindAnswer.css` regardless of stylesheet order, and it lives here
+   rather than there because `blindAnswer.test.tsx` fails the build on any selector
+   in that file which qualifies a side. */
+
+.table-question {
+  margin: var(--sp-3) var(--sp-3) 0;
+  max-width: 46rem;
+}
+
+.table-question .blind-answer__scenario {
+  /* The scenario keeps its own type ramp, but it sits in a panel with a heading
+     above it rather than alone in a viewport, so the answer window's very large
+     top padding would read as a gap rather than as calm. */
+  margin: var(--sp-3) 0 var(--sp-5);
+  text-align: left;
+}
+
+.table-question .blind-answer__side {
+  cursor: default;
+}
+
+.table-question .blind-answer__choose {
+  text-align: left;
+}
+
 /* ── The answer's one frame ──────────────────────────────────────────────────
    §9.3 and §7.3: the payout is ONE readable moment. A single 300ms frame that
    fades in fully formed. NO count-up, NO card flip, NO reel, NO delay, and NO

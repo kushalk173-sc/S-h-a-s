@@ -47,6 +47,8 @@ import { AnswerReveal, AnswerScreen } from './AnswerScreen.tsx';
 import { ChoiceResolver } from './ChoiceResolver.tsx';
 import { ConspiracyPicker, type PlayableConspiracy } from './ConspiracyPicker.tsx';
 import { ResponseWindow, type ResponsiveCard } from './ResponseWindow.tsx';
+import { openQuestionOf } from './blindWire.ts';
+import { TableQuestion } from './TableQuestion.tsx';
 import { windowLiveMessage } from './interrupt.ts';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
@@ -190,6 +192,36 @@ export function GameScreen({ store }: GameScreenProps) {
   */
   const openWindow = state === null ? null : state.interrupt;
   const windowOpen = openWindow !== null;
+
+  /*
+    THE CARD ON THE TABLE — for every seat that is not answering it.
+
+    A and B of the ruling, at the client. The question and both labels are the
+    table's to see while the card is out, because in the physical game the player
+    to your right READS BOTH SIDES ALOUD (`AUTHENTIC-SHASN-REFERENCE.md` §7.2
+    step 1, p764) and the redraw and interception windows are table business
+    (step 2, p768; §7.4 step 3, p815). So this is a panel in the flow above the
+    board rather than a takeover: during the answer window the rest of the table is
+    still allowed to act — p19 lets anybody play a Conspiracy immediately before an
+    opponent answers — and a scrim here would take that away from the seats this
+    exists to inform.
+
+    `!isMyTurn` is what keeps it off the answerer's screen, and it is also what
+    keeps the commit control singular: the answering seat gets `AnswerScreen`,
+    which owns the ONE control that sends. This panel has none, not even a disabled
+    one (§9.10 — a control that cannot act and looks like it can). A spectator
+    satisfies `!isMyTurn` too, which is right: the question is public, and the
+    spectator treatment (§5.11) is the absence of CONTROLS, not the absence of
+    information.
+
+    COMPUTED, NEVER STORED — `openQuestionOf` reads the server's own field and
+    returns `null` for anything malformed, so there is no local flag to fall out of
+    step with the table. A redraw swaps the card, and therefore the question and
+    both labels, on the very next projection.
+  */
+  const openQuestion = state === null ? null : openQuestionOf(state);
+  const tableQuestion = openQuestion !== null && !isMyTurn ? openQuestion : null;
+  const answererName = state === null ? '' : (state.players[state.activePlayer]?.name ?? '');
 
   const myResponsive = useMemo(
     () => (state === null ? undefined : responsiveConspiracies(state, you)),
@@ -625,6 +657,20 @@ export function GameScreen({ store }: GameScreenProps) {
         deflectTarget={deflectTarget}
         onDeflectTarget={setDeflectTarget}
       />
+
+      {/*
+        THE CARD ON THE TABLE, in the flow above the board so every seat that is not
+        answering sees it — the same placement as the response window above, and for
+        the same reason: this is table information, not an interruption of the seats
+        that receive it. Deliberately NOT suppressed by `windowOpen`, unlike the two
+        overlays further down: a BLOCK or a DEFLECT does not put a different card on
+        the table, it puts a question to somebody else about the card already there,
+        so a responder who can see what they are intervening in is being told the
+        thing the physical game tells them by reading it aloud.
+      */}
+      {tableQuestion !== null ? (
+        <TableQuestion question={tableQuestion} answererName={answererName} />
+      ) : null}
 
       <div className="shell__body">
 {/*
@@ -1564,12 +1610,19 @@ function describeForScreenReader(
   if (openWindow !== null) return windowLiveMessage(state, openWindow);
   if (hasPrompt && isMyTurn) return 'An Ideology Card has been put to you. Answer it.';
   if (state.phase === 'headlines') return 'A Headline is resolving.';
+  const who = state.players[state.activePlayer]?.name ?? 'Someone';
+  // The answer window, for every OTHER seat. The question is on the table and is
+  // rendered above the board, so a screen-reader user is told where to find it
+  // rather than only that somebody is busy — the same reason the response window
+  // reads `state.interrupt` instead of saying nothing.
+  if (state.phase === 'answer' && !isMyTurn) {
+    return `${who} is answering. The question is on the table above the board.`;
+  }
   if (isMyTurn) {
     const me = you === null ? null : state.players[you];
     const pending = me?.pending.length ?? 0;
     return `Your turn. ${pending} group${pending === 1 ? '' : 's'} of voters waiting.`;
   }
-  const who = state.players[state.activePlayer]?.name ?? 'Someone';
   return `${who} is thinking.`;
 }
 

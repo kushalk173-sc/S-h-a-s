@@ -43,6 +43,8 @@
  * information — and the test below asserts the two facts that make it true.
  */
 
+import type { ClientState } from '@shasn/engine';
+
 import type { BlindPrompt } from '../net/index.ts';
 import { presentationOrder } from '../answer/BlindAnswer.tsx';
 
@@ -102,4 +104,59 @@ export function promptToProps(prompt: BlindPrompt): WirePrompt {
  */
 export function committedSideToDisplayIndex(side: 'A' | 'B'): 0 | 1 {
   return side === 'A' ? 0 : 1;
+}
+
+/**
+ * THE CARD ON THE TABLE, as the server published it for EVERY viewer.
+ *
+ * A server-side projection, not a field of `ClientState`: `openQuestionFor` takes
+ * `(state, cards)` and no player, because at a physical table the question is read
+ * aloud and belongs to the table (AUTHENTIC-SHASN-REFERENCE §7.2 step 1). It
+ * arrives as an ordinary property of `state` for the same reason
+ * `playableConspiracies` does — see `GameScreen.tsx` — and it is read here through
+ * the same fail-closed narrow cast.
+ *
+ * THE TYPE IS THE SECURITY CONTROL, exactly as `BlindPrompt` is, and it is the
+ * reason the table can be told the question without being told the payout:
+ * `PublicQuestion` is `{question, labels}` and admits no `Delta`, no `Ideologue`, no
+ * `CardID`, no `order` and no number. There is no prop on the table's panel through
+ * which a payout could arrive even if a caller smuggled one past the cast, which is
+ * asserted at the DOM level in `tableQuestion.test.tsx`.
+ *
+ * NO `order` EITHER, and that is load-bearing rather than an omission: `order` says
+ * which face of the card a position is, so publishing it would let the table line
+ * positions up against the deck's Ideologue balance — the exact leak PLAN.md §2
+ * amendment A′ exists to prevent. The labels arrive ALREADY IN DISPLAY ORDER, so
+ * the table and the answerer are looking at one card rather than two orderings.
+ */
+export type OpenQuestion = {
+  readonly question: string;
+  readonly labels: readonly [string, string];
+};
+
+/**
+ * The open question, or `null`.
+ *
+ * FAIL-CLOSED, and the shape is validated rather than merely checked for
+ * existence: a payload is attacker-adjacent input, so `undefined`, `null`, a
+ * non-object, a non-string question and a one-element `labels` all produce `null`.
+ * The caller's honest "there is nothing on the table" is the only thing it can
+ * render — it can never render half a card, and it can never be talked into
+ * rendering a payout because there is no shape here that holds one.
+ *
+ * It is deliberately NOT keyed on the viewer's identity. Every seat, including a
+ * spectator, gets the same strings; the one thing that differs between seats is
+ * whether `blind` — and with it the commit control — was sent at all.
+ */
+export function openQuestionOf(state: ClientState): OpenQuestion | null {
+  const raw = (state as { openQuestion?: unknown }).openQuestion;
+  if (typeof raw !== 'object' || raw === null) return null;
+  const q = raw as Record<string, unknown>;
+  if (typeof q['question'] !== 'string' || q['question'].length === 0) return null;
+  const labels = q['labels'];
+  if (!Array.isArray(labels) || labels.length !== 2) return null;
+  const [first, second] = labels as unknown[];
+  if (typeof first !== 'string' || typeof second !== 'string') return null;
+  if (first.length === 0 || second.length === 0) return null;
+  return { question: q['question'], labels: [first, second] };
 }
