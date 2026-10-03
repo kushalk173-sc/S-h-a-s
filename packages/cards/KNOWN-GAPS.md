@@ -1158,6 +1158,109 @@ unchanged.
 
 ---
 
+---
+
+## 6bis. Growing the Ideology deck turns `packages/server` red, and the cause is measured
+
+**This is not a gap in the card schema. It is the cost of the assigned work, recorded here
+because this is where the repo keeps costs, and it is the server owner's call to accept or
+to rule on it. `packages/server/**` is not this package's to edit.**
+
+### What was shipped
+
+24 original India Ideology Cards, `ig-in2020-033` … `ig-in2020-056`, all `inferred`. The
+India deck went 32 → **56**; the shipped Ideology pool went 52 → **76**. Every card's
+`source` cites REF §8.2 and REF §2.4's own instruction to write in the recovered register
+when the three named sources in §2.4 are unreachable.
+
+### What went red, in `packages/server`, and nothing in `packages/cards`
+
+| suite | assertion | count |
+|---|---|---:|
+| `test/corpus.test.ts` | `turn > dealt.ideology` (`:284`) | 1 |
+| `test/winnable.test.ts` | `deepest turn > TURN_CLIFF` (`:227`) | 3 (2, 3 and 4 seats) |
+| `test/winnable.test.ts` | *the ending is nine majorities* / *a seed stalled* (`:189`, `:200`) | 2 |
+| `test/interrupt-window.test.ts` | `deepest turn > TURN_CLIFF` (`:396`) | 3 (2, 3 and 5 seats) |
+| `test/interrupt-window.test.ts` | a seed reached no ending, 8 of 9 majorities, 1200-action budget | 2 |
+
+Eleven assertions, in two families, and **the two families have different causes.**
+
+### Family 1 — seven assertions that are a pure function of the deck's size
+
+`TURN_CLIFF = factsOf(ctx.cards).dealt.ideology`, i.e. **the whole shipped Ideology pool**,
+76. The claim is "a real-corpus game outlasts its own deck", i.e. that the Ideology recycle
+is exercised. Measured, 20 seeds per seat count, real corpus, real reducer:
+
+| seats | deepest game | `TURN_CLIFF` |
+|---:|---:|---:|
+| 2 | 59 | 76 |
+| 3 | 62 | 76 |
+| 4 | 73 | 76 |
+| 5 | 77 | 76 |
+
+**No seat count reaches 76, so the recycle is never exercised on the real corpus at this
+pool size.** That is not a claim about the engine — it is arithmetic: a deck of N cards
+cannot be exhausted before turn N, and a decided 2-5 player game ends around turn 59-77.
+
+**The author of that assertion wrote this day down in advance**, at
+`packages/server/test/winnable.test.ts:216-219`, and it is quoted because it settles who
+owns the decision:
+
+> "Ideology deck is drawn one per turn, so a deck of N cards cannot reach turn N+1 at all.
+> `TURN_CLIFF` is that N, MEASURED off the deck this game was dealt rather than typed in -
+> the number used to be a literal `52` here and another one in `interrupt-window.test.ts`,
+> **and the day the corpus grew it, both would have gone red and asked for an edit that
+> asserted nothing.**"
+
+So the two choices are the server owner's, and this package will not take either:
+
+1. **drop the `> TURN_CLIFF` proxy** and keep the claim on the generated-size corpus the
+   file already builds (`winnable.test.ts:8`), which is where a recycle claim can be made
+   at all once the shipped deck is larger than a game; or
+2. **rule that the Ideology pool stays under the shortest decided game**, which caps the
+   pool at ~58 and therefore caps the India deck at ~38 - barely above the 32 this
+   iteration started from, i.e. it withdraws the work.
+
+**There is no cards-side compromise between those.** The pool is shared (India 56 + Earth
+2040 20 = 76), so growing *either* deck moves `TURN_CLIFF`. Cutting cards to satisfy a
+turn-number comparison, or editing the comparison from this package, are the two things §2
+of this file refuses: a guard that punishes progress, and an edit made in a package that
+does not own the test.
+
+### Family 2 — four marginal driver stalls, and the class PRE-DATES this iteration
+
+All four are the same shape: **8 of 9 majorities**, turn ~333, `budget: 1200 actions`. That
+is an uninformed driver running out of budget one zone short, not a soft-lock — and it is
+**the failure the brief reported as already open on the pre-change deck**. Measured on the
+32-card deck, `packages/server` was already 1 red on exactly this assertion: 5 seats, seed
+20, turn 342, 8 majorities, `reasons budget: 1200 actions`. The 76-card deck widens it from
+one seat count to three.
+
+**Why a bigger Ideology deck makes this WORSE, which is the mechanism worth having.** Games
+got *shorter* (medians 2p 49→45, 3p 57→48, 4p 59→55, 5p 66→61) and the marginal seeds got
+*longer*. Both follow from one engine rule: `powers.ts hasPower` unlocks on
+`cardsOf(player, ideologue) >= rules.level3` - a count of Ideology **CARDS** answered, not
+of resources paid (recorded in §6 of this file). A player answering 24 more cards meets the
+3-card and 5-card thresholds sooner and more often, an unlocked power pays out **every turn
+for the rest of the game**, and the economy accelerates. Faster economy ⇒ earlier decided
+board ⇒ less slack for the driver on the seeds that were already marginal.
+
+### What was NOT done, and why
+
+- **No checker was weakened.** `src/balance.ts` is untouched; `npm run balance` is 0 errors
+  and the same single pre-existing `X_EFFECT_MAGNITUDE` NOT-MEASURED warning.
+- **No shipped card was retired** to make a server assertion pass. §2 G5 records that this
+  trade was tried once, by retiring an `inferred` placeholder, and it regressed the server
+  suite for a corpus reason rather than a design one. Nothing was deleted here.
+- **The pre-existing `ig-in2020-006` unequal payout was left alone**, and is named in
+  `test/ideology-variety.test.ts` rather than fixed, for the same reason.
+- **The 20 inexpressible recovered cards were not touched.** Every one is blocked on a
+  mechanism in `reduce()` / `state.ts` - G1, G5, G11, G12, G13, G15, G17, G18, G20 - and
+  none of this iteration moved any of them. `npm run playable` is unchanged at **34 of 54**,
+  which is the measurement that says so.
+
+---
+
 ## 7. What is NOT a gap
 
 Recorded so the next iteration does not waste time on them.

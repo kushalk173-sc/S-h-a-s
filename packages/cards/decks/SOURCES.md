@@ -69,8 +69,9 @@ unchanged:
 - **0** ship as `verbatim`.
 
 **What genuinely improved in this pass** is the Ideology deck, which is the deck players
-actually see: 20 → 52 Ideology Cards, and the number carrying recovered question text went
-8 → 10.
+actually see: 20 → 52 → **76** Ideology Cards, and the number carrying recovered question
+text went 8 → 10 and has not moved since, because REF §2.4 is right that the recovered pool
+is exhausted: everything past `ig-in2020-032` is authored.
 
 ---
 
@@ -88,9 +89,9 @@ actually see: 20 → 52 Ideology Cards, and the number carrying recovered questi
 
 ---
 
-## 3. Per-card index, all 127 shipped cards
+## 3. Per-card index, all 151 shipped cards
 
-### `in2020` / ideology — 32 cards
+### `in2020` / ideology — 56 cards
 
 | # | card id | question | provenance | source |
 |---|---|---|---|---|
@@ -126,6 +127,30 @@ actually see: 20 → 52 Ideology Cards, and the number carrying recovered questi
 | 30 | `ig-in2020-030` | Should the memorial be built where the crowd was standing? | `inferred` | original; REF §8.2 |
 | 31 | `ig-in2020-031` | Should we stop aerial bombing developed countries? | `adapted` | REF §8.1 item 9 — stem legible but the verb is **occluded**; REF §8.1 says do not treat as verbatim. Verb supplied. Both answers authored |
 | 32 | `ig-in2020-032` | Should Kashmiri farmers be given the right to fly drones? | `adapted` | REF §8.1 item 10 — stem legible only to *"FLY"*; REF §8.1 says do not treat as verbatim. Object of "fly" (drones) supplied. Both answers authored |
+| 33 | `ig-in2020-033` | Should the panchayat's water allocation favour the fields that have always had water? | `inferred` | original; REF §8.2 — the recovered pool has no small-scale question |
+| 34 | `ig-in2020-034` | Should farm loan waivers be paid to the banks or to the farmers? | `inferred` | original; REF §8.2 — creditor vs debtor, a trade the recovered pool has no instance of |
+| 35 | `ig-in2020-035` | Should India pay more than its agreed share of the climate fund? | `inferred` | original; REF §8.2 |
+| 36 | `ig-in2020-036` | Should a working spouse's earnings count in the family's means test? | `inferred` | original; REF §8.2 — measured inside the household |
+| 37 | `ig-in2020-037` | Should the ruling party campaign on the day the budget is presented? | `inferred` | original; REF §8.2 |
+| 38 | `ig-in2020-038` | Should the district's advertising contract go to the highest bidder? | `inferred` | original; REF §8.2 |
+| 39 | `ig-in2020-039` | Should a new industrial corridor be built through the fields or the city? | `inferred` | original; REF §8.2 |
+| 40 | `ig-in2020-040` | Should the next gas block be opened before the current one is empty? | `inferred` | original; REF §8.2 — the inter-generational question, absent from the recovered pool |
+| 41 | `ig-in2020-041` | Should the procurement portal be open to anyone who asks for a file? | `inferred` | original; REF §8.2 — the Capitalist side votes to keep a file closed |
+| 42 | `ig-in2020-042` | Should a large contractor bid using a local partner's name? | `inferred` | original; REF §8.2 |
+| 43 | `ig-in2020-043` | Should the border road be built before the flood relief is finished? | `inferred` | original; REF §8.2 |
+| 44 | `ig-in2020-044` | Should a foreign firm be allowed to bid for a national port? | `inferred` | original; REF §8.2 |
+| 45 | `ig-in2020-045` | Should the district hospital publish its death rate every quarter? | `inferred` | original; REF §8.2 |
+| 46 | `ig-in2020-046` | Should free travel serve everyone or only those who cannot pay? | `inferred` | original; REF §8.2 — eligibility, not existence |
+| 47 | `ig-in2020-047` | Should the state's message be issued in the states' own languages? | `inferred` | original; REF §8.2 |
+| 48 | `ig-in2020-048` | Should every transfer to a panchayat be published within a month? | `inferred` | original; REF §8.2 |
+| 49 | `ig-in2020-049` | Should the pension fund be lent to a new manufacturing scheme? | `inferred` | original; REF §8.2 |
+| 50 | `ig-in2020-050` | Should the state border be redrawn where the people live? | `inferred` | original; REF §8.2 — Idealist x Supremo seam, per REF §2.3 |
+| 51 | `ig-in2020-051` | Should loss-making public transport be kept running or written off? | `inferred` | original; REF §8.2 |
+| 52 | `ig-in2020-052` | Should the courts be told to clear all pending cases this year? | `inferred` | original; REF §8.2 — the recovered pool has no institutional question |
+| 53 | `ig-in2020-053` | Should the television debate come from one studio or two? | `inferred` | original; REF §8.2 |
+| 54 | `ig-in2020-054` | Should the ruling party's internal vote be shown to the public? | `inferred` | original; REF §8.2 |
+| 55 | `ig-in2020-055` | Should the minister's own district get the new hospital? | `inferred` | original; REF §8.2 — the Showstopper side argues for the minister's own district |
+| 56 | `ig-in2020-056` | Should the border open to pilgrims without a visa for one month? | `inferred` | original; REF §8.2 |
 
 ### `et2040` / ideology — 20 cards
 
@@ -392,6 +417,7 @@ listed; see §6.
 | §8.1 questions 1–8 | ship as `ig-in2020-001` … `ig-in2020-008`, all `adapted`. Stems recovered; **no complete card was ever recovered** — REF §2.4 and REF §10 item 1 both record zero ordinary question cards in full |
 | §8.1 item 9, aerial bombing | ships as `ig-in2020-031`, `adapted`. Stem legible, **verb occluded**; REF §8.1 says do not treat as verbatim |
 | §8.1 item 10, Kashmiri farmers | ships as `ig-in2020-032`, `adapted`. Stem legible only to "FLY"; **object occluded**; REF §8.1 says do not treat as verbatim |
+| **Everything past `ig-in2020-032`** | **44 authored cards, `inferred`, and this is the honest shape of the whole file.** REF §2.4 names the three sources that would have closed this gap (a Tabletop Simulator mod, photo reviews, or buying the deck) and records that YouTube, Reddit and BoardGameGeek were all unreachable in that session. None of them was reachable from here either, so §2.4's own instruction governs: *"Do not fabricate card text. If none of the above lands, write original cards in the recovered register and cite §8."* Every one of them cites §8.2 on its `source` field, and none is tagged anything but `inferred` |
 | Any printed Ideology payout | not recovered. REF §10 item 2: payouts are icon discs, not numerals, and were never published in a crawlable text source |
 
 ---
@@ -505,14 +531,14 @@ quote numbers from an earlier pass, it quotes today's.
 
 | | before | after (measured) |
 |---|---:|---:|
-| Total cards shipped | 64 | **127** |
-| Ideology Cards | 20 | **52** |
+| Total cards shipped | 64 | **151** |
+| Ideology Cards | 20 | **76** — India 56, Earth 2040 20 |
 | Voter Cards | 12 | 18 |
 | Conspiracy Cards | 14 | **27** |
 | Headline Cards | 18 | **30** |
 | `verbatim` | 0 | **0** — see §1, and BLOCK/DEFLECT are why |
 | `adapted` (carries recovered material) | 19 | **41** — 30 X-cards and 11 Ideology stems |
-| `inferred` | 45 | **86** |
+| `inferred` | 45 | **110** — 86 of them Ideology Cards, and **all 24 authored since `ig-in2020-032`** |
 | Cards carrying recovered text | 19 | **41** |
 | Distinct recovered cards with a recovered effect | 52 *(wrong; see §4)* | **51** — 54 rows less 3 campaign-reskin pairs |
 | …shipping `adapted` | — | **30** |
@@ -523,6 +549,15 @@ quote numbers from an earlier pass, it quotes today's.
 
 **The one number that matters for playability:** REF §2.3 records 8–12 Ideology Cards in a
 player's hand after a 5-player game. The India deck went from 12 cards — so players saw the
-entire deck and then some — to **32**, and the Earth 2040 deck from 8 — meaning the deck was
-exhausted before the third player finished their turn — to **20**. Both decks now exercise
-all six Ideologue pairings at exactly 25% each, which the balance checker confirms.
+entire deck and then some — to 32 and then to **56**, and the Earth 2040 deck from 8 — meaning the deck was
+**The second number, and it is the one the balance checker exists for.** Both decks now
+exercise all six Ideologue pairings, and the India deck sits within 2 points of an even
+25% per Ideologue. More load-bearing than either: **all 24 cards authored since
+`ig-in2020-032` pay both sides the same total**, so `resourcePreferredSide` in
+`src/balance.ts` returns `null` for every one of them — which is that function's own word
+for *"the question has to decide this"*. The deck's `resource-blind` verdict stays
+`undecidable`, i.e. the payout structure does not tell you which side to take. That matters
+more now than it did: another agent is making the payout visible to the whole table, so a
+dominated card stops being a design smell and becomes a broken card. The single pre-existing
+unequal card, `ig-in2020-006`, is named rather than fixed — see `test/ideology-variety.test.ts`
+for why swapping a shipped card for a tidier one is not this package's trade to make alone.
