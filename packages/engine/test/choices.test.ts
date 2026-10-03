@@ -44,6 +44,7 @@ import {
   type PendingChoice,
   type PlayerID,
   type Pool,
+  type ZoneID,
 } from '../src/state';
 import { CARDS, IDEOLOGY_DECK, VOTER_DECK, CONSPIRACY_DECK, HEADLINE_DECK, fresh, makeCtx } from './helpers';
 
@@ -337,6 +338,8 @@ const ALL_KINDS = [
   'evict-voter',
   'discard-voter',
   'convert-voter',
+  'choose-player',
+  'choose-zone',
 ] as const;
 type Kind = (typeof ALL_KINDS)[number];
 
@@ -354,6 +357,17 @@ const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
   'evict-voter': probeCard('probe-evict-voter', [{ op: 'evict', n: 2, target: 'you' }]),
   'discard-voter': probeCard('probe-discard-voter', [{ op: 'discard-voter', n: 2, target: 'you' }]),
   'convert-voter': probeCard('probe-convert-voter', [{ op: 'convert-voter', n: 2, target: 'you' }]),
+  /**
+   * G1. The candidate set is `turnOrder` minus the actor, so this raises a decision in
+   * every game with at least two seats and in NO game with one — and the exhaustive
+   * loop below proves the second half too, because it asserts every kind was raised at
+   * least once and separately that nothing was raised without a legal pick.
+   */
+  'choose-player': probeCard('probe-choose-player', [{ op: 'voters', n: 1, target: 'chosen-player' }]),
+  /** G16. `zone` narrows the pegs; `target: 'each-opponent'` makes the scope `'own'`. */
+  'choose-zone': probeCard('probe-choose-zone', [
+    { op: 'discard-voter', n: 1, target: 'each-opponent', zone: 'chosen-zone' },
+  ]),
 };
 
 function probeCard(id: string, effects: ConspiracyCard['effects']): ConspiracyCard {
@@ -450,6 +464,24 @@ function candidatePicks(s: GameState, pending: PendingChoice): ReturnType<typeof
     }
     return out;
   }
+  /**
+   * G1/G16 candidates, and they are deliberately OVER-GENEROUS: every seat including
+   * the chooser, plus a seat that does not exist, and every constituency plus a
+   * fabricated id. The engine is supposed to refuse the chooser and the unknown ids —
+   * and finding nothing else is how a genuinely stranded decision shows up. So a
+   * green result means the search really did find an accepted pick, not that the
+   * candidate list was small.
+   */
+  if (c.kind === 'choose-player') {
+    const seats = [...s.turnOrder, me, 'nobody-here'];
+    for (const id of seats) out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'player', id } }, probeCtx));
+    return out;
+  }
+  if (c.kind === 'choose-zone') {
+    const zones = [...s.zones.map((z) => z.id), 'nowhere' as ZoneID];
+    for (const zoneId of zones) out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'zone', zoneId } }, probeCtx));
+    return out;
+  }
   const areaIds = s.zones.flatMap((z) => z.areas.filter((a) => a.peg !== null).map((a) => a.id));
   const subsets: string[][] = [[]];
   const areaReach = Math.min(Math.max(2, c.count), areaIds.length);
@@ -510,7 +542,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                 // The card's printed `n` is what sets `count`, so vary it through the
                 // card rather than through the choice — a state built by hand is not
                 // a state the engine can raise.
-                const card = probeCard(`probe-${kind}-${count}`, [{ op: opFor(kind), n: count, target: 'each-opponent' }]);
+                const card = probeCard(`probe-${kind}-${count}`, [probeEffect(kind, count)]);
                 const indexed = indexCards({
                   ideology: Object.values(CARDS.ideology),
                   voter: Object.values(CARDS.voter),
@@ -523,7 +555,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                 // `each-opponent` raises the decision for the OPPONENTS, and their
                 // scope is what varies above. `you` raises it for the chooser. Both
                 // are real raise paths, so both are probed.
-                for (const castAt of ['you', 'each-opponent'] as const) {
+                for (const castAt of ['you', 'each-opponent', 'chosen-player'] as const) {
                   const out = playAndRead(inHand, card.id, castAt, ctxN);
                   if (out === null) continue; // this raise path did not apply here
                   for (const pending of out.choices) {
@@ -604,9 +636,112 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     }
   });
 
+  /**
+   * The probe effect for one kind, with the count the card asks for.
+   *
+   * The six pre-existing kinds are one op with a retargetable `target`. The two new
+   * ones are FIELD values on an ordinary op — `'chosen-player'` is an `EffectTarget`
+   * and `'chosen-zone'` is a `ZoneSelector` — so they are built as such here, and
+   * `playAndRead` must not retarget them (see its guard).
+   */
+  function probeEffect(kind: Kind, count: number): ConspiracyCard['effects'][number] {
+    if (kind === 'choose-player') return { op: 'voters', n: count, target: 'chosen-player' };
+    if (kind === 'choose-zone') {
+      return { op: 'discard-voter', n: count, target: 'each-opponent', zone: 'chosen-zone' };
+    }
+    return { op: opFor(kind), n: count, target: 'each-opponent' };
+  }
+
+  /**
+   * G1/G16 — THE SEAT-COUNT AXIS, at 2/3/4/5, which the loop above cannot reach because
+   * its position is fixed at three.
+   *
+   * This is the axis the two new kinds live or die on, and the two-seat case is the
+   * one that matters: it is the smallest legal table, so `'choose-player'`'s candidate
+   * set is exactly one seat there. If that seat were filtered by anything — holdings,
+   * pegs, whether the effect would do anything to them — a two-seat game would raise a
+   * decision with no legal answer, which is the dead-`gain-any` dialog and the
+   * Ideology-deck bug, in a new place.
+   *
+   * **AND THE EMPTY-BOARD CASE, which is the real `choose-zone` hazard.** With no pegs
+   * anywhere, `legalZoneIds` is empty, and the honest behaviour is to raise NOTHING
+   * rather than raise a decision nobody can answer. Asserted both ways: nothing is
+   * raised, and the reducer is not stuck afterwards.
+   */
+  it('the two new kinds are satisfiable at 2/3/4/5 seats, and raise nothing on an empty board', () => {
+    const stranded: string[] = [];
+    let raisedPlayer = 0;
+    let raisedZone = 0;
+    let emptyBoardPlayer = 0;
+    let emptyBoardZone = 0;
+
+    for (const seats of [2, 3, 4, 5] as const) {
+      const ids = Array.from({ length: seats }, (_, i) => `p${i + 1}`);
+      const playerCard = PROBE_EFFECTS['choose-player'];
+      const zoneCard = PROBE_EFFECTS['choose-zone'];
+
+      for (const [label, card] of [['choose-player', playerCard], ['choose-zone', zoneCard]] as const) {
+        for (const pegLayout of ['none', 'mixed'] as const) {
+          const base = pegged(
+            {
+              ...fresh(1, ids, { startResources: ids.map(() => ({})) }),
+              phase: 'actions',
+              activePlayer: 'p1',
+              _pendingCard: null,
+              choices: [],
+            } as GameState,
+            'p1',
+            pegLayout === 'mixed' ? 1 : 0,
+            pegLayout === 'mixed' ? seats - 1 : 0,
+            0,
+          );
+          const inHand = withHand(base, 'p1', [card.id]);
+          const out = reduce(inHand, 'p1', { type: 'PLAY_CONSPIRACY', cardId: card.id }, probeCtx);
+          expect(out.ok, `${label} at ${seats} seats / ${pegLayout}: ${out.ok ? '' : out.error}`).toBe(true);
+          if (!out.ok) continue;
+
+          const pending = out.state.choices.find((c) => c.player === 'p1');
+          if (label === 'choose-player') {
+            if (pending === undefined) {
+              // Only legal in a one-seat game, which `Lobby` refuses to create.
+              emptyBoardPlayer += 1;
+              continue;
+            }
+            raisedPlayer += 1;
+            const ok = candidatePicks(out.state, pending).some((r) => r.ok);
+            if (!ok) stranded.push(`${label} at ${seats} seats / ${pegLayout}: ${JSON.stringify(pending.choice)}`);
+          } else if (pending === undefined) {
+            emptyBoardZone += 1;
+          } else {
+            raisedZone += 1;
+            const ok = candidatePicks(out.state, pending).some((r) => r.ok);
+            if (!ok) stranded.push(`${label} at ${seats} seats / ${pegLayout}: ${JSON.stringify(pending.choice)}`);
+          }
+
+          // The refused picks are pinned as refusals, so "one candidate accepted" cannot
+          // be "every candidate accepted" and this cannot quietly become a redirect.
+          if (pending !== undefined) {
+            const self = out.state.choices.find((c) => c.id === pending.id);
+            if (self !== undefined && label === 'choose-player') {
+              expect(
+                reduce(out.state, 'p1', { type: 'RESOLVE_CHOICE', choiceId: self.id, pick: { kind: 'player', id: 'p1' } }, probeCtx).ok,
+                `${label}: naming the actor must be refused — nobody may aim a card at themselves`,
+              ).toBe(false);
+            }
+          }
+        }
+      }
+    }
+
+    expect(raisedPlayer, 'choose-player was never raised, so nothing was proved').toBeGreaterThanOrEqual(4);
+    expect(raisedZone, 'choose-zone was never raised, so nothing was proved').toBeGreaterThanOrEqual(4);
+    expect(emptyBoardZone, 'choose-zone should raise nothing on an empty board, and did not').toBe(4);
+    expect(stranded, `${stranded.length} raised decisions had NO legal pick:\n${stranded.join('\n')}`).toEqual([]);
+  });
+
   /** Which reducer `op` raises `kind`. `evict` is the op; `evict-voter` is the choice. */
   function opFor(kind: Kind): 'gain-any' | 'lose-any' | 'steal-any' | 'evict' | 'discard-voter' | 'convert-voter' {
-    return kind === 'evict-voter' ? 'evict' : kind;
+    return kind === 'evict-voter' ? 'evict' : (kind as 'gain-any');
   }
 
   /**
@@ -616,14 +751,22 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
   function playAndRead(
     s: GameState,
     cardId: string,
-    castAt: 'you' | 'each-opponent',
+    castAt: 'you' | 'each-opponent' | 'chosen-player',
     ctxN: Ctx,
   ): { state: GameState; choices: PendingChoice[] } | null {
     const card = ctxN.cards.conspiracy[cardId];
     if (!card) return null;
+    // A `'chosen-player'` effect is NOT retargeted: the whole point of the value is
+    // that the card's ACTOR names the player, so overwriting it with `'you'` or
+    // `'each-opponent'` would remove the decision this probe exists to raise. Its own
+    // axis is `castAt === 'chosen-player'`, which is a no-op retarget.
     const retargeted: ConspiracyCard = {
       ...card,
-      effects: card.effects.map((e) => ('target' in e ? { ...e, target: castAt } : e)) as ConspiracyCard['effects'],
+      effects: card.effects.map((e) =>
+        'target' in e && e.target !== 'chosen-player' && castAt !== 'chosen-player'
+          ? { ...e, target: castAt as 'you' | 'each-opponent' }
+          : e,
+      ) as ConspiracyCard['effects'],
     };
     const idx = indexCards({
       ideology: Object.values(CARDS.ideology),

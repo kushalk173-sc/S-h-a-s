@@ -2626,8 +2626,21 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
       const entry = state.headlineQueue[0];
       const source = entry?.by ?? playerId;
 
-      let s: GameState = { ...state, headlineQueue: state.headlineQueue.slice(1) };
+      // G16 — THE SLICE IS DELIBERATELY AFTER `resolveCard`, and that ordering is load-
+      // bearing rather than cosmetic. `'this-zone'` resolves by reading
+      // `headlineQueue[0].areaId`, because the zone a Headline came from is the Volatile
+      // Area whose placement drew it and that is already written down. Slicing first
+      // made the head the NEXT Headline's placement, so NERO'S GUESTS silently fell
+      // back to the whole board -- a card that reads as though it is zone-scoped and is
+      // not. `packages/cards/test/recovered-cards.test.ts` caught it the moment a
+      // fixture arranged a real placement, which is exactly what a fixture is for.
+      //
+      // Nothing else depends on the order: the effects, the discard and the log all read
+      // or write fields this slice does not touch, and the interrupt window `resolveCard`
+      // may open is carried on by the spread below.
+      let s: GameState = state;
       s = resolveCard(s, source, card, 'headline', ctx);
+      s = { ...s, headlineQueue: s.headlineQueue.slice(1) };
       s = discardTo(s, 'headline', cardId);
       s = log(s, { player: source, text: `HEADLINE — ${card.name}`, kind: 'card' });
 

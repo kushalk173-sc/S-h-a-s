@@ -277,7 +277,7 @@ excluded.
 |---|---|---|
 | A Grave Inheritance | **ships** `adapted` as `ct-et2040-001` | G2 |
 | Block | **ships** `adapted` as `ct-et2040-014` | the reactive half only. G13 landed. Still dropped: the *"[OR] Discard an open Conspiracy Card or Headline Card"* branch (no op discards an open card), *"block a card stealing this card"* (G20 moves Ideology Cards only) and *"cleanse an already-active card"* (no op removes a `LiveEffect`, G9/G22). §1 tabulates all eight recovered clauses |
-| Cut, Copy, and Paste | not representable | G16 zone-scoped, G22 spans two turns. (The convert-own clause is no longer blocked on G-new.) |
+| Cut, Copy, and Paste | **ships** `adapted` as `ct-et2040-016` | G16 landed. Ships the FIRST TURN only: *"select 1 of your majorities. Discard all your voters in that zone"* becomes *"select one constituency, discard 2 of your voters from it"*. The `choose-zone` decision is raised **only** when a constituency holds a voter the effect could name, so nobody is frozen by one. Still dropped, each named: the second turn entirely (*"if any empty area is left at the start of your next turn"* is a standing effect conditioned on board state — G22); **"1 of your MAJORITIES"**, which is the one clause this card is *wider* on; and *"all"* as a count. KNOWN-GAPS G16 |
 | Deep Thoughts | not representable | no op borrows an opponent's Ideologue powers. **Not a G20 card** despite the row-9 table: move-card moves cards, not powers |
 | Deflect | **ships** `adapted` as `ct-et2040-015` | the reactive half only. G13 landed. Still dropped: *"only that partial effect is deflected"* — `applyEffect` computes one target per effect list, so the whole resolution is redirected (G20). And widened: `target: 'any-card'` rather than `card-affecting-you`, which resolves through an approximation (G1) |
 | Eradicating Germs | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
@@ -286,7 +286,7 @@ excluded.
 | Lab-Grown Earworm | not representable | G14 trigger on *another* player's purchase; plus self-limiting copies |
 | Power Trip | not representable | G14 trigger |
 | Quantum Wristband | not representable | G14 + G13 (auction of 3 headlines, self-immunity, IOU bids) |
-| Selective Access Memory | **now partially playable** — see §4.7 | the remaining clause, *"in any order"*, needs a decision over the pile's contents, which is a new `Choice` kind and therefore a wire-format change the client owns (G17 half-closed by `draw-conspiracy.from: 'discard'`) |
+| Selective Access Memory | **now partially playable** — see §4.7 | the remaining clause, *"in any order"*, needs a decision over a pile's contents, and a `'choose-card'` kind was considered and **refused at the type level** this round: rendering it would have to list the pile, the piles are `_`-prefixed and stripped by `playerView`, so the choice's CONTENTS would be the leak. G17 stays open for exactly that reason |
 | Singularity | **ships** `adapted` as `ct-et2040-003` (branch 1 of 2) | G6 |
 | The Greta Effect | not representable | G14 persistent debuff, N-target |
 | The Psychohistorian | **ships** `adapted` as `ct-et2040-004` (branch 1 of 2) | G7/G19 |
@@ -325,7 +325,7 @@ excluded.
 | PYTHONPOST | not representable | G9 rest-of-game purchase surcharge + G5 |
 | SUBMERGED | ships as `hl-et2040-001` | same card as NEW FACE WHO DIS (REF §4.3); **not double-counted** |
 | COUGH IT UP | **now partially playable** — see §4.7 | `evict` carries `target` since commit `9d1326c`, so *"All your opponents evict 1 voter"* plays. The conditional bonus — *"if a player breaks a majority using this action, all other players gain 1 resource of their choice"* — is still G2: no op reads board state to decide a payout |
-| NERO'S GUESTS | not representable | G16 — zone-scoped, all-or-nothing, *"this zone"* context |
+| NERO'S GUESTS | **ships** `adapted` as `hl-et2040-017` | G16 landed. `zone: this-zone` is read off `GameState.headlineQueue[0].areaId` - the Volatile Area whose placement drew the Headline - which is exactly REF 4.1's own gloss (*"this zone" = the volatile zone that triggered it*) and needs **no new state field**, so `reduce()` stays pure and a replay derives it. Still dropped, named: *"move"* ships as EVICT (strictly weaker for everyone affected), the adjacent-zone destination, and the all-or-nothing pairing of the two clauses |
 | ON THE "HIGH" SEAS | not representable | G11 hostage — a persistent board-resident object holding 4 pegs |
 | A COWARD OR A JOURNALIST? | not representable | **G20 has landed and this is STILL blocked**, which is the interesting entry here. It needs `from: 'pending'` — donating the card you have been PUT — and that is refused AT THE TYPE LEVEL, because it would tell a mid-answer player the card exists, offer a look at it by proxy, and empty `_pendingCard` into a soft-lock where `ANSWER` and `END_TURN` are both illegal. It needs G12's in-flight queue (an owner, a seat, a deadline) besides. See KNOWN-GAPS.md G20 |
 | BLESSINGS OF PARENTS PAST | not representable | G17 (choose 2 of 2 Voter Cards) + a Voter Card donation, which is not an Ideology Card hand at all + a defined two-player resolution order. **Not G20-blocked** now |
@@ -345,7 +345,7 @@ excluded.
 | Gender Trouble | not representable | G5 + G22 |
 | Good Gig Well Played | **ships** `adapted` as `hl-et2040-011` (keep-one branch) | G17, G20 |
 | Higgs Moron | not representable | G10 (tokens on a card) + G12 (timed pass) |
-| Just Breathe | not representable | G16 — the zone is computed from board state |
+| Just Breathe | **ships** `adapted` as `hl-et2040-016` | G16 landed. `zone: your-strongest` is a pure function of the board, so *"the zone where you have the most voters"* is now **performed** rather than approximated. Still dropped, named: *"into an adjacent zone"* (a destination is a second decision on top of a source one), the tie-break (broken deterministically by `ZONE_IDS` order instead of offered as a decision), and *"move"* as EVICT (strictly weaker) |
 | Married With Bits | **ships** `adapted` as `hl-et2040-010` | G1 |
 | Movement Anxiety Disorder | **ships** `adapted` as `hl-et2040-015` (replacing the `inferred` SILICON RAIN) | G10 (the counter), G13 (multi-turn block). Both of its recorded gaps, G9 and G22, were already CLOSED when the playability probe wrote the row down |
 | New Face Who Dis | **ships** `adapted` as `hl-et2040-001` | G5, G8 |

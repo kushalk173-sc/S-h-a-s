@@ -4,39 +4,70 @@
   "cards": [
     {
       "id": "ct-et2040-001",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union — see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union â€” see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does.",
       "provenance": "adapted",
       "name": "A Grave Inheritance",
       "text": "Take 2 resources of your choice from a chosen opponent. Then evict 2 voters from the board.",
       "cost": 5,
-      "effects": [{ "op": "steal-any", "n": 2 }, { "op": "evict", "n": 2 }]
+      "effects": [
+        {
+          "op": "steal-any",
+          "n": 2
+        },
+        {
+          "op": "evict",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-002",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' — a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' â€” a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource.",
       "provenance": "adapted",
       "name": "Eradicating Germs",
       "text": "Every face-up Voter Card is discarded and replaced with a fresh one. You then gain 1 resource of your choice.",
       "cost": 4,
-      "effects": [{ "op": "refresh-market" }, { "op": "gain-any", "n": 1 }]
+      "effects": [
+        {
+          "op": "refresh-market"
+        },
+        {
+          "op": "gain-any",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "ct-et2040-003",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist — see KNOWN-GAPS.md G6.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist â€” see KNOWN-GAPS.md G6.",
       "provenance": "adapted",
       "name": "Singularity",
       "text": "Gain 2 voters. They are not from a Voter Card, so you may place them in different zones.",
       "cost": 5,
-      "effects": [{ "op": "voters", "n": 2 }]
+      "effects": [
+        {
+          "op": "voters",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-004",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag — see KNOWN-GAPS.md G7.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag â€” see KNOWN-GAPS.md G7.",
       "provenance": "adapted",
       "name": "The Psychohistorian",
       "text": "Gain 1 voter and 2 resources of your choice. The voter is not from a Voter Card.",
       "cost": 4,
-      "effects": [{ "op": "voters", "n": 1 }, { "op": "gain-any", "n": 2 }]
+      "effects": [
+        {
+          "op": "voters",
+          "n": 1
+        },
+        {
+          "op": "gain-any",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-005",
@@ -45,7 +76,19 @@
       "name": "Confidential Annex",
       "text": "Gain 2 Funds and 1 Trust from the Public Reserve. Then get 2 discounts on purchases this turn.",
       "cost": 4,
-      "effects": [{ "op": "gain", "res": { "funds": 2, "trust": 1 } }, { "op": "discount", "n": 2 }]
+      "effects": [
+        {
+          "op": "gain",
+          "res": {
+            "funds": 2,
+            "trust": 1
+          }
+        },
+        {
+          "op": "discount",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-006",
@@ -54,7 +97,16 @@
       "name": "Quiet Redrafting",
       "text": "Take 1 resource of your choice from a chosen opponent. Then gain 1 voter.",
       "cost": 4,
-      "effects": [{ "op": "steal-any", "n": 1 }, { "op": "voters", "n": 1 }]
+      "effects": [
+        {
+          "op": "steal-any",
+          "n": 1
+        },
+        {
+          "op": "voters",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "ct-et2040-007",
@@ -63,7 +115,16 @@
       "name": "The Wet Season Argument",
       "text": "Evict 2 voters from the board. Then gain 1 resource of your choice.",
       "cost": 5,
-      "effects": [{ "op": "evict", "n": 2 }, { "op": "gain-any", "n": 1 }]
+      "effects": [
+        {
+          "op": "evict",
+          "n": 2
+        },
+        {
+          "op": "gain-any",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "ct-et2040-008",
@@ -72,7 +133,15 @@
       "name": "Filed Under Normal",
       "text": "Get 1 discount on a purchase this turn. Then discard every face-up Voter Card and deal three fresh ones.",
       "cost": 4,
-      "effects": [{ "op": "discount", "n": 1 }, { "op": "refresh-market" }],
+      "effects": [
+        {
+          "op": "discount",
+          "n": 1
+        },
+        {
+          "op": "refresh-market"
+        }
+      ],
       "excludeInTwoPlayer": true
     },
     {
@@ -82,7 +151,16 @@
       "name": "Dry Dock",
       "text": "Gain 2 resources of your choice from the Public Reserve. Then gain 1 voter.",
       "cost": 4,
-      "effects": [{ "op": "gain-any", "n": 2 }, { "op": "voters", "n": 1 }]
+      "effects": [
+        {
+          "op": "gain-any",
+          "n": 2
+        },
+        {
+          "op": "voters",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "ct-et2040-010",
@@ -91,7 +169,16 @@
       "name": "The Long Commute",
       "text": "Evict 2 voters from the board. Then gain 2 resources of your choice from the Public Reserve.",
       "cost": 5,
-      "effects": [{ "op": "evict", "n": 2 }, { "op": "gain-any", "n": 2 }]
+      "effects": [
+        {
+          "op": "evict",
+          "n": 2
+        },
+        {
+          "op": "gain-any",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-011",
@@ -100,7 +187,18 @@
       "name": "Load Shedding, Properly Explained",
       "text": "Pay 2 Funds to the Public Reserve to keep the district dark for one night, then take 2 resources of your choice from it.",
       "cost": 4,
-      "effects": [{ "op": "lose", "res": { "funds": 2 } }, { "op": "gain-any", "n": 2 }]
+      "effects": [
+        {
+          "op": "lose",
+          "res": {
+            "funds": 2
+          }
+        },
+        {
+          "op": "gain-any",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-012",
@@ -109,7 +207,16 @@
       "name": "Server Space",
       "text": "Draw the top Conspiracy Card and keep it. You also get 2 discounts on purchases this turn.",
       "cost": 4,
-      "effects": [{ "op": "draw-conspiracy", "n": 1 }, { "op": "discount", "n": 2 }]
+      "effects": [
+        {
+          "op": "draw-conspiracy",
+          "n": 1
+        },
+        {
+          "op": "discount",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "ct-et2040-013",
@@ -118,7 +225,15 @@
       "name": "Holo Sapiens",
       "text": "This is an extra Ideology Card. You will be put it at the start of your next turn, face down, and you will not be told which one.",
       "cost": 5,
-      "effects": [{ "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "you" }]
+      "effects": [
+        {
+          "op": "move-card",
+          "from": "draw",
+          "to": "hand",
+          "n": 1,
+          "target": "you"
+        }
+      ]
     },
     {
       "id": "ct-et2040-014",
@@ -127,8 +242,19 @@
       "name": "Block",
       "text": "Play this IMMEDIATELY out of turn when an opponent plays a Conspiracy Card, or a Headline resolves, to negate that card's effect entirely. It cannot be reversed or deflected, and a card not aimed at you may also be blocked. Otherwise: gain 1 Clout.",
       "cost": 5,
-      "effects": [{ "op": "gain", "res": { "clout": 1 } }],
-      "interrupt": { "op": "block", "window": "always", "target": "any-card" }
+      "effects": [
+        {
+          "op": "gain",
+          "res": {
+            "clout": 1
+          }
+        }
+      ],
+      "interrupt": {
+        "op": "block",
+        "window": "always",
+        "target": "any-card"
+      }
     },
     {
       "id": "ct-et2040-015",
@@ -137,8 +263,35 @@
       "name": "Deflect",
       "text": "Play this IMMEDIATELY out of turn when an opponent plays a card, to redirect that card's whole effect onto a third player of your choosing - whoever it was aimed at. It cannot be blocked. Otherwise: gain 1 Trust.",
       "cost": 5,
-      "effects": [{ "op": "gain", "res": { "trust": 1 } }],
-      "interrupt": { "op": "deflect", "window": "always", "target": "any-card" }
+      "effects": [
+        {
+          "op": "gain",
+          "res": {
+            "trust": 1
+          }
+        }
+      ],
+      "interrupt": {
+        "op": "deflect",
+        "window": "always",
+        "target": "any-card"
+      }
+    },
+    {
+      "id": "ct-et2040-016",
+      "source": "REF 4.2.1 recovers Cut, Copy, and Paste: 'select 1 of your majorities. Discard all your voters in that zone. If any empty area is left at the start of your next turn, convert all its voters into yours'. G16 landed for the SELECTOR: `zone: chosen-zone` raises a decision, and only when a constituency holds a voter the effect could name, so nobody is frozen by one. DROPPED, named: the second turn (G22); '1 of your MAJORITIES' (the selector offers any constituency holding a voter of yours, the one clause this card is WIDER on); 'all your voters' as a count. G16.",
+      "provenance": "adapted",
+      "name": "Cut, Copy, and Paste",
+      "text": "Select one constituency. Discard 2 of your voters from it -- they leave the board permanently, and voters in Volatile Areas cannot be discarded.",
+      "cost": 5,
+      "effects": [
+        {
+          "op": "discard-voter",
+          "n": 2,
+          "target": "you",
+          "zone": "chosen-zone"
+        }
+      ]
     }
   ]
 }

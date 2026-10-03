@@ -8,7 +8,12 @@
       "provenance": "adapted",
       "name": "New Face Who Dis",
       "text": "You may Gerrymander 1 of your majority or non-majority voters this turn, under the normal Gerrymandering rules. It does not have to happen now.",
-      "effects": [{ "op": "gerrymander", "n": 1 }]
+      "effects": [
+        {
+          "op": "gerrymander",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "hl-et2040-002",
@@ -16,7 +21,17 @@
       "provenance": "adapted",
       "name": "Red Blooded",
       "text": "You strike 2 of your opponents' voters from the board, permanently — voters in Volatile Areas cannot be struck, and your own voters are out of your reach. Each opponent then gains 2 resources of their choice from the Public Reserve.",
-      "effects": [{ "op": "discard-voter", "n": 2 }, { "op": "gain-any", "n": 2, "target": "each-opponent" }]
+      "effects": [
+        {
+          "op": "discard-voter",
+          "n": 2
+        },
+        {
+          "op": "gain-any",
+          "n": 2,
+          "target": "each-opponent"
+        }
+      ]
     },
     {
       "id": "hl-et2040-003",
@@ -24,7 +39,13 @@
       "provenance": "adapted",
       "name": "Ain't No Cure For Love",
       "text": "You strike 2 of your OWN voters from the board, permanently. Voters in Volatile Areas cannot be struck.",
-      "effects": [{ "op": "discard-voter", "n": 2, "target": "you" }]
+      "effects": [
+        {
+          "op": "discard-voter",
+          "n": 2,
+          "target": "you"
+        }
+      ]
     },
     {
       "id": "hl-et2040-004",
@@ -33,8 +54,17 @@
       "name": "Quietly, The Ceiling Moved",
       "text": "Every opponent discards 2 Funds to the Public Reserve. You then gain 1 voter.",
       "effects": [
-        { "op": "lose", "res": { "funds": 2 }, "target": "each-opponent" },
-        { "op": "voters", "n": 1 }
+        {
+          "op": "lose",
+          "res": {
+            "funds": 2
+          },
+          "target": "each-opponent"
+        },
+        {
+          "op": "voters",
+          "n": 1
+        }
       ]
     },
     {
@@ -44,8 +74,15 @@
       "name": "The Second Reading",
       "text": "Every opponent gains 1 resource of their choice. You then get 2 discounts on purchases this turn.",
       "effects": [
-        { "op": "gain-any", "n": 1, "target": "each-opponent" },
-        { "op": "discount", "n": 2 }
+        {
+          "op": "gain-any",
+          "n": 1,
+          "target": "each-opponent"
+        },
+        {
+          "op": "discount",
+          "n": 2
+        }
       ]
     },
     {
@@ -55,8 +92,15 @@
       "name": "Long Winter, Short Ledger",
       "text": "Evict 2 voters from the board. Every opponent then gains 1 resource of their choice.",
       "effects": [
-        { "op": "evict", "n": 2 },
-        { "op": "gain-any", "n": 1, "target": "each-opponent" }
+        {
+          "op": "evict",
+          "n": 2
+        },
+        {
+          "op": "gain-any",
+          "n": 1,
+          "target": "each-opponent"
+        }
       ]
     },
     {
@@ -65,7 +109,15 @@
       "provenance": "inferred",
       "name": "An Honest Institution",
       "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 1 resource of your choice.",
-      "effects": [{ "op": "refresh-market" }, { "op": "gain-any", "n": 1 }]
+      "effects": [
+        {
+          "op": "refresh-market"
+        },
+        {
+          "op": "gain-any",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "hl-et2040-008",
@@ -74,8 +126,17 @@
       "name": "Filed Under: Weather",
       "text": "Every opponent discards 1 resource of their choice to the Public Reserve. You gain 2 Media.",
       "effects": [
-        { "op": "lose-any", "n": 1, "target": "each-opponent" },
-        { "op": "gain", "res": { "media": 2 } }
+        {
+          "op": "lose-any",
+          "n": 1,
+          "target": "each-opponent"
+        },
+        {
+          "op": "gain",
+          "res": {
+            "media": 2
+          }
+        }
       ],
       "excludeInTwoPlayer": true
     },
@@ -85,7 +146,12 @@
       "provenance": "adapted",
       "name": "The Four Horsemen",
       "text": "Discard 2 resources of your choice to the Public Reserve. Any two of the same kind, or one of each.",
-      "effects": [{ "op": "lose-any", "n": 2 }]
+      "effects": [
+        {
+          "op": "lose-any",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "hl-et2040-010",
@@ -93,7 +159,13 @@
       "provenance": "adapted",
       "name": "Married With Bits",
       "text": "Every opponent gains 1 voter, which they may place in any zone on their own turn.",
-      "effects": [{ "op": "voters", "n": 1, "target": "each-opponent" }]
+      "effects": [
+        {
+          "op": "voters",
+          "n": 1,
+          "target": "each-opponent"
+        }
+      ]
     },
     {
       "id": "hl-et2040-011",
@@ -101,7 +173,12 @@
       "provenance": "adapted",
       "name": "Good Gig Well Played",
       "text": "Draw the top Conspiracy Card and keep it. It is yours to play whenever you choose.",
-      "effects": [{ "op": "draw-conspiracy", "n": 1 }]
+      "effects": [
+        {
+          "op": "draw-conspiracy",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "hl-et2040-012",
@@ -109,15 +186,31 @@
       "provenance": "inferred",
       "name": "Tide Warnings",
       "text": "Evict 1 voter from the board. Then strike 1 more voter belonging to an opponent, permanently.",
-      "effects": [{ "op": "evict", "n": 1 }, { "op": "discard-voter", "n": 1 }]
+      "effects": [
+        {
+          "op": "evict",
+          "n": 1
+        },
+        {
+          "op": "discard-voter",
+          "n": 1
+        }
+      ]
     },
     {
       "id": "hl-et2040-013",
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of As Clear As Water in full. This slot was `inferred` (THREE DAY WEEKEND, a reskin of hl-et2040-005, which stays); SOURCES.md 4 replaces an inferred placeholder BY the recovered card once the engine can perform it. DROPPED, both for the same reason: a REVEAL has no state consequence here, so reduce() has nothing to perform. SHIPPED: 'if any player does not have a Conspiracy Card, they receive 1 from the draw pile' is `onlyIfEmpty`, read off the RECIPIENT's hand - a fact hidden from every owner too, so it logs nothing.",
       "provenance": "adapted",
       "name": "As Clear As Water",
-      "text": "Every player who is holding no Conspiracy Card receives 1 from the draw pile, in turn order. A player already holding one takes nothing \u2014 and that includes you, unless the card you just played was your last.",
-      "effects": [{ "op": "draw-conspiracy", "n": 1, "target": "everyone", "onlyIfEmpty": true }]
+      "text": "Every player who is holding no Conspiracy Card receives 1 from the draw pile, in turn order. A player already holding one takes nothing — and that includes you, unless the card you just played was your last.",
+      "effects": [
+        {
+          "op": "draw-conspiracy",
+          "n": 1,
+          "target": "everyone",
+          "onlyIfEmpty": true
+        }
+      ]
     },
     {
       "id": "hl-et2040-014",
@@ -125,7 +218,18 @@
       "provenance": "inferred",
       "name": "The Policy Review",
       "text": "Pay 2 Media to the Public Reserve for the review. Then get 2 discounts on purchases this turn.",
-      "effects": [{ "op": "lose", "res": { "media": 2 } }, { "op": "discount", "n": 2 }]
+      "effects": [
+        {
+          "op": "lose",
+          "res": {
+            "media": 2
+          }
+        },
+        {
+          "op": "discount",
+          "n": 2
+        }
+      ]
     },
     {
       "id": "hl-et2040-015",
@@ -140,7 +244,38 @@
           "target": "you",
           "when": "on-gerrymander",
           "until": "next-turn",
-          "condition": { "movedMyVoter": true }
+          "condition": {
+            "movedMyVoter": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "hl-et2040-016",
+      "source": "REF 4.3 recovers Just Breathe in full. G16 landed for the SELECTOR: `zone: your-strongest` is a pure function of the board, so 'the zone where you have the most voters' is now performed rather than approximated. DROPPED, named: 'into an adjacent zone' (a destination is a second decision on top of a source one); 'in case of a tie, pick any of the tied zones' (resolveZone breaks the tie by ZONE_IDS order, deterministically); and 'move' ships as EVICT, which is STRICTLY WEAKER for everyone affected, because an evicted voter returns to its owner's Mat and can be influenced again. KNOWN-GAPS G16.",
+      "provenance": "adapted",
+      "name": "Just Breathe",
+      "text": "Select the constituency where you have the most voters. Evict 2 voters from it -- they go back to their owners' Mats, where they can be influenced again. Voters in Volatile Areas cannot be evicted.",
+      "effects": [
+        {
+          "op": "evict",
+          "n": 2,
+          "zone": "your-strongest"
+        }
+      ]
+    },
+    {
+      "id": "hl-et2040-017",
+      "source": "REF 4.1 recovers Nero's Guests: 'Move any 3 voters in this zone. OR Move any 3 voters out of this zone.' with the author's own gloss '\"this zone\" = the volatile zone that triggered it'. G16 landed for BOTH halves: `zone: this-zone` is read off GameState.headlineQueue[0].areaId, which is exactly that gloss and needs NO new state field, so reduce() stays pure. DROPPED, named: 'move' ships as EVICT (strictly weaker); and the adjacent-zone destination plus the all-or-nothing pairing. KNOWN-GAPS.md G16.",
+      "provenance": "adapted",
+      "name": "Nero's Guests",
+      "text": "Every opponent must evict 3 of their own voters from the Volatile Area whose placement drew this Headline. Evicted voters go back to their Mats, where they can be influenced again. Volatile-Area voters are permanent and cannot be evicted.",
+      "effects": [
+        {
+          "op": "evict",
+          "n": 3,
+          "target": "each-opponent",
+          "zone": "this-zone"
         }
       ]
     }

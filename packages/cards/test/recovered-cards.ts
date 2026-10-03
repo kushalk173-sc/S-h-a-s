@@ -66,6 +66,16 @@ export type RecoveredCard = {
    */
   readonly drive?: (s: GameState, ctx: Ctx) => GameState;
   /**
+   * G16. The Volatile Areas whose placements drew this Headline, in queue order, so
+   * `zone: 'this-zone'` has something to resolve.
+   *
+   * A function rather than a list of ids, because the area a Headline-drawing placement
+   * landed in is a fixture's own doing and naming it here would duplicate the layout
+   * `drive` already arranged. Omit it and the queue carries empty `areaId`s, which is the
+   * honest default: a fixture that has not arranged a placement has not arranged a zone.
+   */
+  readonly queueAreas?: (s: GameState) => readonly AreaID[];
+  /**
    * Assert the promised state change.
    *
    * `raised` is the state the moment the card resolved, decisions still open; `after`
@@ -137,9 +147,18 @@ export function pickFor(state: GameState, c: PendingChoice): Action {
     case 'evict-voter':
     case 'discard-voter':
     case 'convert-voter': {
-      const ids = targetAreas(state, me, c.choice.kind, c.choice.scope, c.choice.count, c.choice.zoneId);
-      if (ids.length < c.choice.count) throw new Error(`only ${ids.length} legal targets for ${c.choice.kind}`);
-      return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'areas', areaIds: ids.slice(0, c.choice.count) } };
+      const want = Math.min(
+        c.choice.count,
+        targetAreas(state, me, c.choice.kind, c.choice.scope, 99, c.choice.zoneId).length,
+      );
+      // THE CLAMP, and it is the engine's own: `resolveChoice` asks for
+      // `min(count, targetableCount(...))` and accepts an EMPTY `areaIds` for a zero
+      // ask. Throwing when the board holds fewer pegs than the card names is what
+      // would have made G16 look like a failure — NERO'S GUESTS asks for 3 evictions
+      // and a fresh board offers 1, which is a resolved decision, not a stranded one.
+      const ids = targetAreas(state, me, c.choice.kind, c.choice.scope, want, c.choice.zoneId);
+      if (ids.length < want) throw new Error(`only ${ids.length} legal targets for ${c.choice.kind}`);
+      return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'areas', areaIds: ids.slice(0, want) } };
     }
     /**
      * G1. `turnOrder` minus the chooser IS the engine's candidate set, so the first
@@ -266,12 +285,26 @@ export function resolveHeadline(
   card: HeadlineCard,
   ctx: Ctx,
   queueDepth = 1,
+  /**
+   * G16. The area each queued Volatile placement was made in, which is what
+   * `zone: 'this-zone'` reads (`GameState.headlineQueue[0].areaId`).
+   *
+   * An EMPTY `areaId` is the honest default and what every other card here gets: a
+   * Headline drawn by a placement is queued with the placement's area, but a fixture
+   * that has not arranged one has not arranged a zone, and an unresolvable selector
+   * must fall back to the whole board rather than narrow to nothing. A card that wants
+   * `'this-zone'` measured passes its own area here.
+   */
+  queueAreas: readonly AreaID[] = [],
 ): GameState {
   const active: GameState = {
     ...s,
     phase: 'headlines',
     activeHeadline: card.id,
-    headlineQueue: Array.from({ length: queueDepth }, () => ({ areaId: '', by: who })),
+    headlineQueue: Array.from({ length: queueDepth }, (_, i) => ({
+      areaId: queueAreas[i] ?? '',
+      by: who,
+    })),
   };
   return must(reduce(active, who, { type: 'ACK_HEADLINE' }, ctx));
 }
@@ -312,6 +345,51 @@ export function withPegsFor(s: GameState, owners: readonly PlayerID[]): GameStat
 
 export function pegsOf(s: GameState, owner: PlayerID): number {
   return s.zones.flatMap((z) => z.areas).filter((a) => a.peg?.owner === owner).length;
+}
+
+/**
+ * One peg per `[owner, zone]` pair, on the first legal empty area of that constituency.
+ *
+ * G16 needs a board where the CONSTITUENCY matters, which `withPegsFor` cannot express:
+ * it walks the free areas in board order and so scatters pegs across zones without the
+ * test saying which. Several entries may name the same zone, which is what separates
+ * `'your-strongest'` from a tie.
+ *
+ * `volatile: true` puts the peg on that zone's Volatile area instead, which is how
+ * NERO'S GUESTS gets a Headline that was drawn by a real placement.
+ */
+export function withPegsInZones(
+  s: GameState,
+  specs: readonly (readonly [PlayerID, ZoneID] | readonly [PlayerID, ZoneID, 'volatile'])[],
+): GameState {
+  let state = s;
+  for (const [owner, zoneId, volatile] of specs) {
+    const zone = state.zones.find((z) => z.id === zoneId);
+    const area = zone?.areas.find((a) =>
+      a.peg === null && (volatile === 'volatile' ? a.volatile : !a.volatile),
+    );
+    if (area === undefined) throw new Error(`no free area in ${zoneId} for ${owner}`);
+    state = withPeg(state, area.id, owner);
+  }
+  return state;
+}
+
+/** The Volatile area of `zoneId` carrying a peg, which is where a placement landed. */
+export function volatileAreaIn(s: GameState, zoneId: ZoneID): AreaID | null {
+  const z = s.zones.find((x) => x.id === zoneId);
+  return z?.areas.find((a) => a.volatile && a.peg !== null)?.id ?? null;
+}
+
+/** The zone of the area `areaId` sits in, or null. */
+export function zoneOfArea(s: GameState, areaId: string): ZoneID | null {
+  for (const z of s.zones) if (z.areas.some((a) => a.id === areaId)) return z.id;
+  return null;
+}
+
+/** The area in `zoneId` whose peg belongs to `owner`, or null. */
+export function areaInZone(s: GameState, zoneId: ZoneID, owner: PlayerID): string | null {
+  const zone = s.zones.find((z) => z.id === zoneId);
+  return zone?.areas.find((a) => a.peg?.owner === owner && !a.volatile)?.id ?? null;
 }
 
 export function totalOf(s: GameState, id: PlayerID): number {

@@ -228,9 +228,14 @@
       }
     },
 
-    "effectTarget": {
-      "enum": ["you", "each-opponent", "everyone", "leader"],
-      "$comment": "EffectTarget in cards.ts. 'leader' = the player holding the most majority voters; ties give nobody. REF 4.4 item 2 records that this four-value enum does not fit several real cards (ON THE \"HIGH\" SEAS attaches to the card, A CALL FROM KARACHI auctions, NEXT BILLION DATA POINTS votes) — see packages/cards/KNOWN-GAPS.md."
+"effectTarget": {
+      "enum": ["you", "each-opponent", "everyone", "leader", "chosen-player"],
+      "$comment": "EffectTarget in cards.ts. 'leader' = the player holding the most majority voters; ties give nobody. 'chosen-player' is G1 and is EXECUTED: reduce.ts applyEffect intercepts it above its switch and raises a 'choose-player' PendingChoice for the card's OWN actor, carrying the effect list to re-run once the player is named. The candidate set is `turnOrder` minus the actor -- which is what makes it PUBLIC by construction, since it cannot enumerate a hidden hand, and why a player holding nothing is still offered. EXECUTABLE_TARGETS in packages/cards/src/executable.ts is the registry and refuses any value not in this list, so a card naming an EffectTarget the reducer cannot honour cannot ship. REF 4.4 item 2 records that this five-value enum still does not fit several real cards (ON THE \"HIGH\" SEAS attaches to the card, A CALL FROM KARACHI auctions, NEXT BILLION DATA POINTS votes) — see packages/cards/KNOWN-GAPS.md."
+    },
+
+    "zoneSelector": {
+      "enum": ["this-zone", "your-strongest", "chosen-zone"],
+      "$comment": "G16. ZoneSelector in cards.ts, read by `zone` on evict / discard-voter / convert-voter. All three are EXECUTED by reduce.ts resolveZone, and none of them needs a new GameState field: 'this-zone' is read off headlineQueue[0].areaId -- the Volatile Area whose placement drew the Headline being resolved, which is exactly REF 4.1's '\"this zone\" = the volatile zone that triggered it' -- and 'your-strongest' is a pure function of the board with ties broken by ZONE_IDS order so a replay derives it without re-running anything. 'chosen-zone' is a DECISION and raises a 'choose-zone' PendingChoice, but ONLY when at least one legal zone exists; a selector that resolves to nothing narrows to nothing and raises nothing, because an empty target set is a decision with no legal pick. See KNOWN-GAPS.md G16."
     },
 
     "effectDuration": {
@@ -390,6 +395,7 @@
             "op": { "const": "evict" },
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
+            "zone": { "$ref": "#/$defs/zoneSelector" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
@@ -403,6 +409,7 @@
             "op": { "const": "discard-voter" },
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
+            "zone": { "$ref": "#/$defs/zoneSelector" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
@@ -416,6 +423,7 @@
             "op": { "const": "convert-voter" },
             "n": { "$ref": "#/$defs/countOrComputed" },
             "target": { "$ref": "#/$defs/effectTarget" },
+            "zone": { "$ref": "#/$defs/zoneSelector" },
             "when": { "$ref": "#/$defs/effectTrigger" },
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
@@ -470,7 +478,7 @@
           "required": ["op", "kind", "value"],
           "properties": {
             "op": { "const": "restrict" },
-            "kind": { "enum": ["no-purchases", "surcharge", "no-power"] },
+            "kind": { "enum": ["no-purchases", "surcharge", "no-power", "no-income"] },
             "value": { "type": "integer", "minimum": 0, "maximum": 9 },
             "owed": { "type": "integer", "minimum": 1, "maximum": 9 },
             "target": { "$ref": "#/$defs/effectTarget" },

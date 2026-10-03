@@ -621,15 +621,49 @@ owner. THE BIG FREEZE is a cap change or a per-turn donation, and a cap change i
 `PlayerState` field, not an effect.
 
 
-### G16 — no zone-scoped operation
+### G16 - no zone-scoped operation - **LANDED, and three cards with it**
 
-**State: (c).** Cards: JUST BREATHE, NERO'S GUESTS, CUT COPY AND PASTE. Three
-needs: a zone selector computed from board state, a zone passed in by the trigger as
-context, and board mutation scoped to one zone.
+**State: (a) for the SELECTOR. The selector is done; the `fill-zone` op is not, and
+one clause got WIDER rather than narrower.** Cards: JUST BREATHE, NERO'S GUESTS and CUT
+COPY AND PASTE **all ship** - **27 -> 30 of 54, measured by playing.** Zero refused,
+zero no-op.
 
-**Ask:** a `zone?: ZoneID | 'this-zone' | 'your-strongest'` on the affected ops, a
-`GameState` field carrying the zone that triggered the current resolution, and a
-`fill-zone` op.
+`ZoneSelector` in `packages/engine/src/cards.ts` is three values, and each is a
+recovered card's own wording:
+
+| value | reads | card |
+|---|---|---|
+| `'this-zone'` | `GameState.headlineQueue[0].areaId` | NERO'S GUESTS |
+| `'your-strongest'` | the board, ties by `ZONE_IDS` order | JUST BREATHE |
+| `'chosen-zone'` | raises a `'choose-zone'` `Choice` | CUT COPY AND PASTE |
+
+**NO NEW `GameState` FIELD, and that is the load-bearing decision.** `'this-zone'`
+could have been a context argument threaded down from `ACK_HEADLINE`, and it is a read
+of state that was already written down instead: a Headline is queued with the Volatile
+Area whose placement drew it, and REF 4.1 says outright that *"this zone"* means exactly
+that. So a replay from seed + action log derives it without re-running anything, which
+is R2's requirement on every other mechanism here. `'your-strongest'` is a pure
+function for the same reason.
+
+**AND THE FIXTURE CAUGHT A REAL ORDERING BUG.** `ACK_HEADLINE` used to slice the queue
+head off *before* calling `resolveCard`, so `headlineQueue[0]` during a resolution was
+the **next** Headline's placement. `'this-zone'` therefore resolved to nothing and
+silently fell back to the whole board - a card that reads as zone-scoped and is not.
+`playable.ts` could never have caught this, because it queues headlines with an empty
+`areaId`; `packages/cards/test/recovered-cards.test.ts` caught it the moment a fixture
+arranged a real placement. The slice now happens **after** `resolveCard`, and the probe
+row says out loud that its own NERO'S GUESTS measurement is of the fallback.
+
+**`fill-zone` is still (c)**, and CUT COPY AND PASTE's second turn needs it: *"convert
+all its voters into yours, and fill all remaining areas with your voters"* is a
+board-mutation op scoped to one zone, plus a condition over board state at a turn
+boundary (G22). Also still (c): a `'zone-you-lead'` selector, refused rather than
+omitted - it would be satisfiable in **zero** zones for a player holding no majority,
+which is the unsatisfiable-choice bug class, so a card using it would freeze somebody.
+
+**THE ONE PLACE THIS GOT WIDER, named rather than approximated:** CUT COPY AND PASTE
+says *"1 of your MAJORITIES"*, and `'chosen-zone'` offers any constituency holding a
+voter of yours. The deck card's `text` and `source` both say so.
 
 ### G17 — no deck search, and no rewind from the discard pile
 
@@ -675,13 +709,23 @@ the draw pile into a hand that is *empty*, so no queue grows on its own and
 `TRIGGER_MAX_WAVES` is not what stops it. Asserted by resolving the card twice against
 a three-card pile.
 
-**What is STILL (c), and it is the reason this is not a full G17:** a decision over a
-pile's CONTENTS. SELECTIVE ACCESS MEMORY's *"pick ANY Conspiracy Card from the discard
-pile, in any order"* needs a `'choose-card'` `Choice` kind, and a new `Choice` kind
-breaks `packages/client/src/app/derive.ts` at two `switch`es — verified, `tsc` reports
-`TS2366` at `derive.ts:372` and `derive.ts:435`. `packages/client` is not this
-package's to edit, so `pick` remains unbuilt and the top of the pile is still the
-honest subset. A CALL FROM KARACHI, FUELLING THE NEWS and BLESSINGS OF PARENTS PAST
+**What is STILL (c), and the reason has CHANGED: it is no longer the client.**
+SELECTIVE ACCESS MEMORY's *"pick ANY Conspiracy Card from the discard pile, in any
+order"* needs a `'choose-card'` `Choice` kind, and the client handshake that used to
+block it is now PAID: `derive.ts` handles every `Choice` kind and proves it with
+`assertNever`, so the wire-format cost of a new kind is gone.
+
+**What blocks it now is the LEAK, and that is a refusal rather than a cost.** A
+`'choose-card'` decision has to be RENDERED, and rendering it means listing the cards
+in the pile. The Ideology draw pile is `GameState._ideologyDraw` and `playerView`
+strips every `_` key, so a client that could list the pile would be a client holding
+the ordered deck - the D25 failure `docs/ARCHITECTURE.md` 8.1.1 names. A Conspiracy
+discard pile is the same shape BY NAME (`_conspiracyDiscard`) even though its cards are
+individually public, because the rule is about the field, not about what the field
+happens to contain today. **An option list is as revealing as a value**, so the option
+list would BE the leak. `'choose-card'` is therefore refused at the type level and
+absent from the `Choice` union, which `test/g16-zone.test.ts` asserts. The top of the
+pile remains the honest subset. A CALL FROM KARACHI, FUELLING THE NEWS and BLESSINGS OF PARENTS PAST
 each need the choice on top of G20 card movement, and none of them moves.
 
 ### G18 — no control over the draw-and-answer phase

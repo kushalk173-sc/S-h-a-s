@@ -62,9 +62,16 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   'lose-any': ['n', 'target'],
   'steal-any': ['n', 'target'],
   voters: ['n', 'target'],
-  evict: ['n', 'target'],
-  'discard-voter': ['n', 'target'],
-  'convert-voter': ['n', 'target'],
+  /**
+   * G16. `zone` is listed because each case passes it to `raiseVoterDecision`, which
+   * reads it and hands `resolveZone` the narrowing. The `reducer-parity` slice finds
+   * the read because `effect.zone` is spelled inside the case body — so if the case
+   * ever stops passing it, this registry fails the parity test rather than letting a
+   * zone-scoped card resolve against the whole board.
+   */
+  evict: ['n', 'target', 'zone'],
+  'discard-voter': ['n', 'target', 'zone'],
+  'convert-voter': ['n', 'target', 'zone'],
   gerrymander: ['n', 'target'],
   'draw-conspiracy': ['n', 'target', 'from', 'onlyIfEmpty'],
   'refresh-market': [],
@@ -81,6 +88,66 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
 
 
 export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(EXECUTED_OPS));
+
+/**
+ * `EffectTarget` values `reduce()` actually honours. G1.
+ *
+ * **WHY THIS IS A SEPARATE REGISTRY AND NOT JUST THE SCHEMA'S ENUM.** The JSON Schema
+ * enum and the reducer's switch are two different claims, and only the second one is a
+ * promise: `applyEffect` computes `const target = 'target' in effect ? …` and consults
+ * it in the cases that take it, so a value it cannot distinguish would be a card that
+ * reads as though it hits somebody and hits nobody. That is exactly the failure this
+ * file exists to stop, and `'chosen-player'` is the value that makes the question real
+ * — it is intercepted ABOVE the switch, so a registry that forgot it would let a card
+ * naming it ship as a silent no-op.
+ *
+ * `test/reducer-parity.test.ts` re-derives this set from `resolveTargets`'s own case
+ * labels in `reduce.ts`, so the registry cannot claim a target the switch dropped.
+ */
+export const EXECUTABLE_TARGETS: ReadonlySet<string> = new Set([
+  'you',
+  'each-opponent',
+  'everyone',
+  'leader',
+  'chosen-player',
+]);
+
+/**
+ * `ZoneSelector` values `reduce.ts resolveZone` actually resolves. G16.
+ *
+ * Same reasoning as `EXECUTABLE_TARGETS`, and the same asymmetry that makes it worth
+ * naming: `'chosen-zone'` is intercepted above the switch and `'this-zone'` /
+ * `'your-strongest'` are read inside `resolveZone`, so a fourth selector in `cards.ts`
+ * would compile and resolve to `null` — i.e. to "the whole board", which is a card
+ * that quietly over-delivers. This registry refuses it by value.
+ */
+export const EXECUTABLE_ZONE_SELECTORS: ReadonlySet<string> = new Set([
+  'this-zone',
+  'your-strongest',
+  'chosen-zone',
+]);
+
+export const TARGET_FIX =
+  'EffectTarget values reduce() honours are listed in EXECUTABLE_TARGETS. ' +
+  "'chosen-player' is executed: applyEffect intercepts it above its switch and raises a " +
+  "'choose-player' PendingChoice for the card's own actor, carrying the effect list to re-run " +
+  "once the player is named. A value that is not in the registry would resolve against the " +
+  "card's own player and read as though it hit somebody else. See KNOWN-GAPS.md G1.";
+
+export const ZONE_FIX =
+  'ZoneSelector values reduce() resolves are listed in EXECUTABLE_ZONE_SELECTORS. ' +
+  "'this-zone' is read off GameState.headlineQueue[0].areaId and 'your-strongest' off the " +
+  "board, both pure functions of state; 'chosen-zone' raises a 'choose-zone' PendingChoice, but " +
+  "only when a legal zone exists. A selector the reducer cannot resolve narrows to nothing and " +
+  "acts on the WHOLE board, which is a card that quietly over-delivers. See KNOWN-GAPS.md G16.";
+
+/** `RestrictionKind` values `reduce()` consults, so a `restrict` cannot name an inert rule. */
+export const EXECUTABLE_RESTRICTION_KINDS: ReadonlySet<string> = new Set([
+  'no-purchases',
+  'surcharge',
+  'no-power',
+  'no-income',
+]);
 
 // ─────────────────────────── G13: the phase-changing ops ───────────────────────────
 
@@ -396,6 +463,53 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
     }
 
     if (reads.includes(field)) continue;
+
+    /**
+     * VALUE checks on the three vocabulary fields, and the reason they are checks on
+     * values rather than on presence. `reads` already says `applyEffect`'s case opens
+     * the door; these say it opens it onto a thing it can act on. A `target` the
+     * resolver cannot distinguish, a `zone` it cannot resolve (which narrows to
+     * nothing and so acts on the whole board), and a `restrict` kind nobody consults
+     * are all cards that read as though they do something and do not.
+     */
+    if (field === 'target') {
+      if (typeof effect[field] !== 'string' || !EXECUTABLE_TARGETS.has(effect[field])) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/target`,
+          message:
+            `target ${JSON.stringify(effect[field])} is not an EffectTarget reduce() honours, so ` +
+            `the op would resolve against the card's own player. ${TARGET_FIX}`,
+        });
+      }
+      continue;
+    }
+    if (field === 'zone') {
+      if (typeof effect[field] !== 'string' || !EXECUTABLE_ZONE_SELECTORS.has(effect[field])) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/zone`,
+          message:
+            `zone ${JSON.stringify(effect[field])} is not a ZoneSelector reduce() resolves, so the ` +
+            `narrowing would fall back to the whole board. ${ZONE_FIX}`,
+        });
+      }
+      continue;
+    }
+    if (field === 'kind' && op === 'restrict') {
+      if (typeof effect[field] !== 'string' || !EXECUTABLE_RESTRICTION_KINDS.has(effect[field])) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/kind`,
+          message:
+            `restrict kind ${JSON.stringify(effect[field])} is a rule no action consults, so the ` +
+            `card would impose nothing. The four that are consulted are 'no-purchases' and ` +
+            `'surcharge' (INFLUENCE / BUY_CONSPIRACY), 'no-power' (powers.ts usesLeft) and ` +
+            `'no-income' (ANSWER). See KNOWN-GAPS.md G5 and G18.`,
+        });
+      }
+      continue;
+    }
 
     const key = `${op}.${field}`;
     if (FIELD_EXECUTABLE_WHEN[key]?.(effect[field]) === true) continue;

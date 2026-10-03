@@ -18,12 +18,15 @@ import type { GameState } from '../../engine/src/state';
 
 import {
   FIXTURE_CONSPIRACIES,
+  areaInZone,
   drainChoices,
   fixture,
   pegsOf,
   playConspiracy,
   resolveHeadline,
   withPegsFor,
+  volatileAreaIn,
+  withPegsInZones,
   type RecoveredCard,
 } from './recovered-cards.js';
 
@@ -154,7 +157,99 @@ export const RECOVERED: readonly RecoveredCard[] = [
       expect(s.players.p2!.conspiracies.length).toBe(1);
       expect(s.players.p3!.conspiracies.length).toBe(1);
       expect(s.players.p1!.conspiracies).not.toEqual(s.players.p2!.conspiracies);
+void before;
+    },
+  },
+  // ── G16: `zone`, and the 'choose-zone' Choice kind it needed. ──
+  {
+    name: 'Just Breathe',
+    ref: 'REF 4.3 (2040 Deck - Headline Cards)',
+    kind: 'headline',
+    verbatim:
+      'Select the zone where you have the most number of voters. Move 2 voters from that zone into an adjacent zone. In case of a tie, pick any of the tied zones.',
+    drops: [
+      "'into an adjacent zone': a DESTINATION is a second decision on top of a source decision, and no recovered card ships on a half-built relocation (G16).",
+"'move' ships as EVICT rather than a relocation, which is strictly WEAKER for everyone affected: an evicted voter returns to its owner's Mat and can be influenced again (G16).",
+      "'in case of a tie, pick any of the tied zones': resolveZone breaks a tie by ZONE_IDS order instead, which is a deterministic rule rather than a decision -- so this drop is a SMALLER decision, not a different one (G16).",
+    ],
+    card: {
+      id: 'hl-recovered-just-breathe',
+      name: 'Just Breathe',
+      text: 'Select the constituency where you have the most voters. Evict 2 voters from it.',
+      effects: [{ op: 'evict', n: 2, zone: 'your-strongest' }],
+    } as HeadlineCard,
+    drive: (s) => withPegsInZones(s, [['p1', 'north'], ['p1', 'north'], ['p2', 'south']]),
+    check: (s, before) => {
+// THE CLAUSE THAT IS PERFORMED: two of p1's own pegs in `north` and one of p2's
+      // in `south`, so "the zone where you have the most voters" is `north` because of
+      // the COUNT. ZONE_IDS puts north_west before north, so an implementation that
+      // ignored the count could still land on north here -- the layout is chosen so the
+      // count is the only thing that can decide it.
+      expect(pegsOf(before, 'p1')).toBe(2);
+      expect(pegsOf(before, 'p2')).toBe(1);
+      const raised = s.choices.find((x) => x.player === 'p1');
+      expect(raised?.choice).toMatchObject({ kind: 'evict-voter', zone: 'your-strongest', zoneId: 'north' });
+      void areaInZone;
+    },
+  },
+  {
+    name: "Nero's Guests",
+    ref: 'REF 4.1 (2024 Headline and Conspiracy Cards Explained)',
+    kind: 'headline',
+    verbatim: 'Move any 3 voters in this zone. OR Move any 3 voters out of this zone.',
+    drops: [
+"'move' ships as EVICT rather than a relocation, which is strictly WEAKER for everyone affected: an evicted voter returns to its owner's Mat and can be influenced again (G16).",
+      "the adjacent-zone destination, and the all-or-nothing pairing of the two clauses, which is a system rather than an effect (G16).",
+    ],
+    card: {
+      id: 'hl-recovered-neros-guests',
+      name: "Nero's Guests",
+      text: 'Every opponent evicts 3 of their own voters from the Volatile Area whose placement drew this Headline.',
+      effects: [{ op: 'evict', n: 3, target: 'each-opponent', zone: 'this-zone' }],
+    } as HeadlineCard,
+    drive: (s) => withPegsInZones(s, [['p2', 'central', 'volatile'], ['p2', 'central']]),
+    queueAreas: (s) => {
+      const a = volatileAreaIn(s, 'central');
+      if (a === null) throw new Error('the fixture put no peg on a Volatile Area in central');
+      return [a];
+    },
+    check: (s, before) => {
+      // Confined to the constituency the placement was made in, which is what the
+      // author's gloss says "this zone" means, and scoped 'own' so each victim chooses
+      // among their own voters rather than the caster choosing for them.
+      const asked = s.choices.filter((x) => x.player === 'p2');
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.choice).toMatchObject({ kind: 'evict-voter', scope: 'own', zoneId: 'central' });
       void before;
+    },
+  },
+  {
+    name: 'Cut, Copy, and Paste',
+    ref: 'REF 4.2.1 (2040 Deck - Conspiracy Cards)',
+    kind: 'conspiracy',
+    verbatim:
+      'At the end of your turn, select 1 of your majorities. Discard all your voters in that zone. If any empty area is left in this zone at the start of your next turn, convert all its voters into yours, and fill all remaining areas with your voters.',
+    drops: [
+      "the second turn entirely: 'if any empty area is left at the start of your next turn' is a standing effect conditioned on board state, and the engine has no condition over the board (G22).",
+      "'1 of your MAJORITIES': the selector offers any constituency holding a voter of yours, which is WIDER than the printed restriction -- the one clause this card over-delivers on, and it is named rather than approximated. A majority-restricted selector would be satisfiable in ZERO zones for a player holding none, which is the unsatisfiable-choice class, so it is refused rather than added (G16).",
+      "'all your voters in that zone' ships as 2, because a discard needs a count and the corpus recovered no number for 'all' -- and the engine clamps the ask to what the constituency holds, so 'all' is what a player with 4 voters there would get anyway (G4).",
+    ],
+    card: {
+      id: 'ct-recovered-cut-copy-paste',
+      name: 'Cut, Copy, and Paste',
+      text: 'Select one constituency. Discard 2 of your voters from it.',
+effects: [{ op: 'discard-voter', n: 2, target: 'you', zone: 'chosen-zone' }],
+      cost: 5,
+    } as ConspiracyCard,
+    drive: (s) => withPegsInZones(s, [['p1', 'east'], ['p1', 'west']]),
+    check: (s) => {
+      // The card's OWN ACTOR is asked, and it is a ZONE decision -- a player-selector
+      // here would be a card that reads as though it names a person.
+      const raised = s.choices.find((x) => x.player === 'p1');
+      expect(raised?.choice.kind).toBe('choose-zone');
+      if (raised?.choice.kind !== 'choose-zone') return;
+      expect(raised.choice.source).toBe('p1');
+      expect(raised.choice.effects[0]).toMatchObject({ op: 'discard-voter', zone: 'chosen-zone' });
     },
   },
 ];
@@ -170,7 +265,7 @@ function play(entry: RecoveredCard): { raised: GameState; after: GameState; befo
   const raised =
     entry.kind === 'conspiracy'
       ? playConspiracy(before, 'p1', entry.card as ConspiracyCard, ctx)
-      : resolveHeadline(before, 'p1', entry.card as HeadlineCard, ctx, 2);
+      : resolveHeadline(before, 'p1', entry.card as HeadlineCard, ctx, 2, entry.queueAreas?.(before) ?? []);
   return { raised, after: drainChoices(raised, ctx), before, ctx };
 }
 
