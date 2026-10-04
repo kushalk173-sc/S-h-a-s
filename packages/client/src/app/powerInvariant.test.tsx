@@ -532,6 +532,42 @@ describe('every board-resolved power is COMPLETABLE, on the real board', () => {
 });
 
 describe('the mechanism, pinned where jsdom cannot measure it', () => {
+  it('every branch of the slot dispatcher either ACTS or NAMES ITS REASON', () => {
+    // §9.10, and the shape of the tester's original hypothesis about Land Grab. They
+    // pointed at a bare `return` in `onSlotActivate` and were right about the LINE
+    // NUMBER being unstable and wrong about it being the cause — but the defect was
+    // real: a board click that reaches the dispatcher and leaves without changing
+    // anything and without saying why is indistinguishable, from outside, from a
+    // broken board.
+    //
+    // It matters as an invariant rather than as two fixes, because the live branch
+    // BEHIND that dead one was Land Grab: a guard that drops clicks silently is where
+    // the next defect goes to hide. So the rule is checked over the whole function —
+    // no `return;` in `onSlotActivate` may be preceded by nothing but a condition.
+    const screen = gameScreenSource;
+    const at = screen.indexOf('const onSlotActivate = useCallback(');
+    expect(at, 'onSlotActivate is gone from GameScreen').toBeGreaterThan(-1);
+    const body = screen.slice(at, screen.indexOf('[state, you, app, me, isMyTurn, windowOpen],', at));
+    // Every bare `return;` in the dispatcher, with the line above it.
+    const lines = body.split(/\r?\n/);
+    const silent: string[] = [];
+    lines.forEach((line, i) => {
+      if (!/^\s*return;\s*$/.test(line)) return;
+      const before = lines
+        .slice(Math.max(0, i - 6), i + 1)
+        .join('\n');
+      if (!before.includes('setRefusal(')) silent.push(`line ${i}: ${line.trim()}`);
+    });
+    expect(
+      silent,
+      'a branch of onSlotActivate returns without naming a reason — §9.10, and the shape ' +
+        'that hid Land Grab behind a placement guard',
+    ).toEqual([]);
+    // …and the two guards that are reachable in principle both speak, by name.
+    expect(screen).toContain("setRefusal('that group is no longer waiting to be placed");
+    expect(screen).toContain("setRefusal('that power is no longer armed");
+  });
+
   it('.scrim--area lets a click fall through to the board, and .scrim does not', () => {
     // jsdom has no layout, so `document.elementFromPoint` at the centre of a legal
     // slot — the assertion that caught this in the live DOM for `ChoiceResolver` —

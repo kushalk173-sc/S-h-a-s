@@ -501,7 +501,25 @@ export function GameScreen({ store }: GameScreenProps) {
       // 3. Placing a pending group.
       if (app.placingGroupId !== null && me !== null && isMyTurn) {
         const group = me.pending.find((g) => g.id === app.placingGroupId);
-        if (group === undefined) return;
+        /*
+         * Â§9.10. THIS USED TO BE A BARE `return`, and it was the right suspicion from
+         * the tester who reported that Land Grab's CONFIRM "never enables" and
+         * pointed at this line: a board click that reaches the dispatcher and leaves
+         * without changing anything and without saying why is indistinguishable, from
+         * the outside, from a board that is broken. It is unreachable today â€” the id
+         * comes from `me.pending`, so it is in `me.pending`, and
+         * `clearTurnInteraction` clears it on every `viewId` â€” which is exactly why
+         * it is dangerous rather than harmless: a dead branch in front of a live one
+         * is where the NEXT defect goes to hide, and the live one behind it turned
+         * out to be Land Grab.
+         *
+         * So it speaks. The sentence is what is actually true if it ever fires, and
+         * it is actionable: the group is not on the mat any more, so pick another.
+         */
+        if (group === undefined) {
+          setRefusal('that group is no longer waiting to be placed â€” pick another one');
+          return;
+        }
         if (app.pickedAreaIds.includes(areaId)) {
           setRefusal('already chosen for this group');
           return;
@@ -530,7 +548,13 @@ export function GameScreen({ store }: GameScreenProps) {
       //    already blocking on, while a power can always be cancelled.
       if (powerTargetsArea(app.powerTarget) && isMyTurn) {
         const flow = app.powerTarget;
-        if (flow === null) return;
+        // Same rule as the guard above, for the same reason. `powerTargetsArea` already
+        // excludes `null`, so this is a narrowing rather than a live branch â€” but a
+        // narrowing that silently drops a click is still a narrowing that can hide one.
+        if (flow === null) {
+          setRefusal('that power is no longer armed â€” press it again');
+          return;
+        }
         if (app.pickedAreaIds.includes(areaId)) {
           removePick();
           return;
@@ -704,9 +728,9 @@ export function GameScreen({ store }: GameScreenProps) {
      The powers tray, the market and GERRYMANDER were all disabled by the same
      boolean and all said nothing, so a player watching `Land Grab 3 of 3 left` sit
      there refusing every press had no way to tell "not my turn" from "a card is
-     being answered" from "the connection dropped" — a moment, this instant, and a
+     being answered" from "the connection dropped" ï¿½ a moment, this instant, and a
      reconnect respectively. That is what item 3's "unlocked, had uses left, and
-     were untappable" turned out to be, and §9.2's rule is that the reason is
+     were untappable" turned out to be, and ï¿½9.2's rule is that the reason is
      adjacent to the control.
 
      Ordered so the most transient cause wins: a window open right now is a better
@@ -715,9 +739,9 @@ export function GameScreen({ store }: GameScreenProps) {
      already computed above, so none of it can go stale.
   */
   const inertReason = !isMyTurn
-    ? `Waiting for ${state.players[state.activePlayer]?.name ?? 'the table'} — your powers and the HQ Mat come alive on your turn.`
+    ? `Waiting for ${state.players[state.activePlayer]?.name ?? 'the table'} ï¿½ your powers and the HQ Mat come alive on your turn.`
     : windowOpen
-      ? 'A card is being answered — answer it or decline first.'
+      ? 'A card is being answered ï¿½ answer it or decline first.'
       : app.link !== 'live'
         ? 'Not connected to the table yet.'
         : null;
