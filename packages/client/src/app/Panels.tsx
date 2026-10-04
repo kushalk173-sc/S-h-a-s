@@ -169,11 +169,31 @@ export function ReconnectScreen({
 export function Scoreboard({
   state,
   you,
+  winners,
   onViewBoard,
   onNewMatch,
 }: {
   state: ClientState;
   you: PlayerID | null;
+  /**
+   * WHO WON, from the server's `match:over`. `null` means the server has not said.
+   *
+   * THE SCORES BELOW ARE DERIVED and this list is not, and the asymmetry is the
+   * point. A score is `majorityCount` per seat: a pure function of the board every
+   * viewer already holds, so deriving it is free and cannot be stale. A WINNER is a
+   * judgement with three branches -- one winner, a genuine tie, and the scoreless
+   * board on which `winners()` deliberately names nobody -- and this component used
+   * to decide it by asking "whose score is highest", which on a scoreless board
+   * printed "P1 WINS WITH 0". That is the same bug `board.ts:winners` documents
+   * having had and fixed server-side, re-introduced in the sentence that tells a
+   * player they won.
+   *
+   * So the ranking is computed here and the verdict is not. `null` is a real state:
+   * a client that reconnects after the game ended gets the final board and never the
+   * `match:over` frame. It then shows the ranked table and claims nothing, which is
+   * the honest answer and the only one available without inventing an authority.
+   */
+  winners: readonly PlayerID[] | null;
   onViewBoard: () => void;
   onNewMatch: () => void;
 }) {
@@ -182,20 +202,52 @@ export function Scoreboard({
   const max = Math.max(top, 1);
   const boardWasFull = boardFull(state);
   const allFormed = allMajoritiesFormed(state);
-  const tied = rows.filter((r) => r.score === top).length > 1;
+
+  /** The score of a seat the server named, for the headline sentence. */
+  const scoreOf = (id: PlayerID): number =>
+    rows.find((r) => r.player === id)?.score ?? 0;
+  const nameOf = (id: PlayerID): string =>
+    rows.find((r) => r.player === id)?.name ?? '—';
+
+  /**
+   * THE HEADLINE. Three branches because the engine has three, and no branch is
+   * inferred from the scores: `winners` is either empty (nobody), one seat, or two
+   * or more tied at the top.
+   */
+  const verdict = ((): string => {
+    if (winners === null) return 'RESULT';
+    if (winners.length === 0) return 'NOBODY WON';
+    if (winners.length === 1) {
+      const id = winners[0] as PlayerID;
+      return `${nameOf(id)} WINS WITH ${scoreOf(id)}`;
+    }
+    // A tie is a genuine draw and is reported as one. p20's "privilege" tie-breaker
+    // is recorded as explicitly non-binding and out of scope for a digital
+    // implementation, so no tie-break is applied and none is implied.
+    return `${winners.map(nameOf).join(' & ')} TIE AT ${scoreOf(winners[0] as PlayerID)}`;
+  })();
 
   return (
     <div className="lobby">
       <div className="sheet sheet--wide" data-testid="scoreboard">
         <p className="eyebrow">RESULT</p>
-        <h1 className="sheet__title">
-          {tied
-            ? `${rows
-                .filter((r) => r.score === top)
-                .map((r) => r.name)
-                .join(' & ')} TIE AT ${top}`
-            : `${rows[0]?.name ?? '—'} WINS WITH ${top}`}
+        <h1 className="sheet__title" data-testid="score-verdict">
+          {verdict}
         </h1>
+
+        {winners !== null && winners.length === 0 ? (
+          <p className="sheet__body">
+            Nobody held a majority voter when the game ended, so there is no winner to name. The
+            board below is the result as it stood — which is the same standing the engine records,
+            and p20 asks for no substitute.
+          </p>
+        ) : winners === null ? (
+          <p className="sheet__body">
+            The game is over and the final board is below. This client was not on the wire when the
+            result was announced, so it is not going to guess who won from the scores — the server
+            sends that, and a guess is how a table gets told two different things.
+          </p>
+        ) : null}
 
         {boardWasFull ? (
           <p className="sheet__body">

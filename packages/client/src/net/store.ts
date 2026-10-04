@@ -69,6 +69,36 @@ export type ClientStore = {
   readonly answer: AnswerPrompt | null;
   readonly error: PendingError | null;
   readonly you: { readonly role: 'player' | 'spectator'; readonly playerId: PlayerID | null };
+  /**
+   * WHO WON, from the server's `match:over`. `null` until it arrives.
+   *
+   * WHY THIS IS NOT DERIVED, and the previous version of this client is the reason
+   * the question needed asking. `Scoreboard` used to compute the winner itself --
+   * sort the seats by score, take the top, and if two tie print a tie -- which is a
+   * SECOND AUTHORITY on who won, and it disagreed with the engine on the one branch
+   * `board.ts:winners` goes to some trouble to get right.
+   *
+   * `winners()` returns `[]` when nobody holds a majority voter, and the reason is
+   * written on the function: the old floor at 0 made `best === 0` match every seat,
+   * so `game-over` named the whole table as winners. A client that asks "whose score
+   * is highest" has exactly that bug waiting -- on an empty board it prints "P1 WINS
+   * WITH 0", naming a winner the engine says does not exist. That board is
+   * reachable: the deck-exhaustion ending fires with no majority formed, and p20's
+   * board-full ending can distribute 129 voters so that nobody holds a majority in
+   * any of the nine zones.
+   *
+   * So the wire carries the answer and the arithmetic stays derived. The server sends
+   * it LAST, after the finished board it describes, and derives it from the engine's
+   * own `game-over` event rather than from a second `winners()` call, so the list that
+   * goes out is the list the engine computed when it ended the game.
+   *
+   * `null` is a real state, not a gap: a client that reconnects after the game ends
+   * gets `match:sync` and the final board but never the `match:over` frame. The
+   * scoreboard renders its ranked rows in that case and makes NO winner claim, which
+   * is the honest answer -- better than guessing, and better than the alternative,
+   * which was guessing.
+   */
+  readonly winners: readonly PlayerID[] | null;
 };
 
 const INITIAL: ClientStore = {
@@ -84,6 +114,7 @@ const INITIAL: ClientStore = {
   answer: null,
   error: null,
   you: { role: 'spectator', playerId: null },
+  winners: null,
 };
 
 let store: ClientStore = INITIAL;
@@ -200,7 +231,7 @@ export function applyServerMessage(msg: ServerMessage): void {
       // The credential is gone. Everything derived from it is meaningless now, and
       // leaving a stale ClientState on screen would be a state the player believes
       // but is not.
-      set({ session: null, matchId: null, state: null, answer: null, phase: 'offline', viewId: 0 });
+      set({ session: null, matchId: null, state: null, answer: null, phase: 'offline', viewId: 0, winners: null });
       return;
     case 'lobby:list':
       set({ lobbies: msg.lobbies });
@@ -215,7 +246,13 @@ export function applyServerMessage(msg: ServerMessage): void {
       applyEvents(msg.viewId, msg.events);
       return;
     case 'match:log':
+      return;
     case 'match:over':
+      // The authority on who won, taken from the engine's own `game-over` event.
+      // Nothing is computed here: `Scoreboard` renders this list rather than ranking
+      // the seats again, because ranking them again is how this client came to name a
+      // winner on a board where the engine names none. See the field's docstring.
+      set({ winners: msg.winners });
       return;
     case 'error':
       errSeq += 1;

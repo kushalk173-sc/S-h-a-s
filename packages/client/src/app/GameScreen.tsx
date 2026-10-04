@@ -597,6 +597,7 @@ export function GameScreen({ store }: GameScreenProps) {
       <Scoreboard
         state={state}
         you={you}
+        winners={store.winners}
         onViewBoard={() => undefined}
         onNewMatch={() => {
           clearTurnInteraction();
