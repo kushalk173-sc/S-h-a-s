@@ -3,13 +3,24 @@
  *
  * WHY A FIXTURE RATHER THAN A SHIPPED-DECK CHANGE
  *
- * The two cards are real and the engine executes them, but no card in
- * `packages/cards/decks/**` declares an `interrupt` - so `canBeAnswered` is false
- * for every play, `resolveCard` never takes its staging branch, and a game on the
- * shipped deck can never open a window. That is a deliberate shipping decision in
- * the cards package and this file does not argue with it; what this file does is
- * give the server suite a corpus where the window is REACHABLE, so the driver can
- * be tested against it.
+ * **CORRECTION, measured 2026-10-03. The sentence below is now FALSE, and it matters.**
+ * When this file was written, no card in `packages/cards/decks/**` declared an
+ * `interrupt`, so a shipped-deck game could never open a window. Two shipped Conspiracy
+ * Cards now do: `ct-et2040-014` (BLOCK THE MOTION) and `ct-et2040-015` (DEFLECT THE
+ * BLAME), both in `decks/et2040/conspiracy.json`. A window IS therefore reachable from
+ * the shipped deck — rarely, and only through the chain
+ * `./corpus-response-window.test.ts` traces and measures: a conspiracy-granting HEADLINE
+ * (`hl-et2040-011` GOOD GIG WELL PLAYED, or `hl-et2040-013` AS CLEAR AS WATER) has to put
+ * a reactive card into a hand, and then a DIFFERENT seat has to resolve a card. Measured
+ * at one run in twenty seeds, the same seed at every seat count.
+ *
+ * So the fixture is still the right tool — it makes the window REACHABLE ON EVERY SEED
+ * and at every seat count, which the shipped deck does not — but it is no longer the
+ * only way to reach one, and a reader who took the old sentence at face value would
+ * conclude that two real shipped cards are inert. They are not; they are just very hard
+ * to draw in the right order. The shipped-corpus proof is
+ * `./corpus-response-window.test.ts`; this file remains the reachability harness for
+ * every window SHAPE.
  *
  * THE CARDS THEMSELVES, and the two fields that are not decoration
  *
