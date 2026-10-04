@@ -447,6 +447,12 @@ const ONE_PER_OP: Readonly<Record<string, Effect>> = {
   'convert-voter': { op: 'convert-voter', n: 2 },
   gerrymander: { op: 'gerrymander', n: 1 },
   'draw-conspiracy': { op: 'draw-conspiracy', n: 1 },
+  // A reveal takes the top of a draw pile FACE UP, which is what makes it
+  // publishable at all (§2bis, argued on `GameState.revealedCards`). The
+  // representative is the one with an explicit `target`, so the sentence's
+  // `TARGET_TEXT` tail is covered by this row rather than only by the branch
+  // that has no target.
+  reveal: { op: 'reveal', kind: 'conspiracy', n: 1, target: 'each-opponent' },
   'refresh-market': { op: 'refresh-market' },
   restrict: { op: 'restrict', kind: 'surcharge', value: 2 },
   discount: { op: 'discount', n: 1 },
@@ -461,14 +467,15 @@ const ONE_PER_OP: Readonly<Record<string, Effect>> = {
 
 describe('every op in the engine Effect union has its own sentence', () => {
   it('the op list was actually derived — non-vacuity', () => {
-    // Eighteen, asserted rather than assumed: a slice that silently matched nothing
+    // Nineteen, asserted rather than assumed: a slice that silently matched nothing
     // would make every other assertion in this block pass for the wrong reason,
     // which is the exact failure mode this file exists to prevent.
-    expect(ENGINE_OPS.size).toBe(18);
+    expect(ENGINE_OPS.size).toBe(19);
     // And the slice really is the `Effect` union rather than the whole file:
-    // `block` is an `Interrupt` op outside it, `move-peg` is the eighteenth.
+    // `block` is an `Interrupt` op outside it, and `reveal` is the nineteenth.
     expect(ENGINE_OPS.has('set-cap')).toBe(true);
     expect(ENGINE_OPS.has('move-peg')).toBe(true);
+    expect(ENGINE_OPS.has('reveal')).toBe(true);
     expect(ENGINE_OPS.has('block')).toBe(false);
   });
 

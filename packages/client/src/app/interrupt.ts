@@ -280,6 +280,20 @@ const COMPUTED_TEXT: Readonly<Record<ComputedSource, string>> = {
   'revealed-card': 'one per card you have revealed face up',
 };
 
+/**
+ * Which draw pile a `reveal` takes off, in the words a table uses.
+ *
+ * Exhaustive by type off the engine's `Effect['kind']`, and singular because it
+ * qualifies a noun the sentence supplies the number for: `Turn 1 Conspiracy Card
+ * face up`, not `Turn 1 Conspiracy Cards`.
+ */
+const PILE_TEXT: Readonly<Record<'ideology' | 'voter' | 'conspiracy' | 'headline', string>> = {
+  ideology: 'Ideology Card',
+  voter: 'Voter Card',
+  conspiracy: 'Conspiracy Card',
+  headline: 'Headline Card',
+};
+
 const DURATION_TEXT: Readonly<Record<EffectDuration, string>> = {
   'this-turn': 'this turn',
   round: 'for this round',
@@ -423,6 +437,15 @@ export function describeEffect(e: Effect): string {
       }${target}`;
     case 'refresh-market':
       return 'Discard every face-up Voter Card and deal three fresh ones';
+    case 'reveal':
+      /*
+        A REVEAL turns the top of a draw pile FACE UP, which is the whole of what
+        makes it publishable (see `GameState.revealedCards` in the engine): the
+        table sees the card, not the pile. So the sentence says the deck and says
+        "face up", and it never says the pile is being shown — the one wording
+        `staleWording.test.tsx` and §2bis would both object to.
+      */
+      return `Turn ${countText(e.n)} ${PILE_TEXT[e.kind]} face up${target}`;
     case 'restrict':
       return restrictText(e.kind, e.value, e.owed, target);
     case 'discount':
