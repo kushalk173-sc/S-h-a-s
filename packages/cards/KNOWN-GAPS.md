@@ -1759,16 +1759,35 @@ A gap list that says "these fourteen are blocked" is a to-do list; a gap list th
 "these fourteen will never be built, and here is what replaces each of them" is a
 decision. This section is the decision, taken per card, and it is the handoff.
 
-**Measured, not remembered.** 54 rows probed, **40 PLAYED, 0 refused, 0 no-op, 14
-inexpressible**. The brief's list names thirteen of the fourteen and omits **DOSTI BANI
-RAHE**, which is inexpressible and is ruled on here too, so all fourteen appear.
+**Measured, not remembered.** 54 rows probed. **Before this iteration: 40 PLAYED, 0
+refused, 0 no-op, 14 inexpressible. After: 42 PLAYED, 0 refused, 0 no-op, 12
+inexpressible.** `IN THE CORPUS` rose **31 → 33** and `SHIPPED AS AUTHORED` **23 → 25**.
+The brief's list names thirteen of the fourteen and omits **DOSTI BANI RAHE**, which is
+inexpressible and is ruled on here too, so all fourteen appear.
+
+**THE TWO THAT MOVED, and each moved for a different reason.** GREAT LEADER, BAD ECONOMY
+is a **BUILD** and its mechanism was `move-peg` plus one new `Choice` kind. BRAVE NEW
+WORLDS is a **PART-BUILD** and needed **no engine change at all** — `no-income` already
+existed and `ANSWER` already consulted it — which is the honest answer to the brief's
+question about whether G18 was really "large". The *other* half of it is not large; it is
+a rules question (§8.2a).
+
+**AND A CORPUS CHANGE LANDED, which is its own kind of work.** Nine original substitute
+cards replaced the ruled-out names (§8.3, §8.4), so the deck has no permanent hole where a
+recovered card can never be played. That is 211 → 220 cards, and it found a bug in the
+shipped checker rather than the other way round: `semantic-agreement`'s "a lasting clause
+installed NO live effect" assertion was false about every lasting `restrict` in the corpus,
+because `reduce.ts isScoped` carves `restrict` / `borrow-power` / `set-cap` out for exactly
+the reason `until` means something else on them. The carve-out is now **derived from
+`isScoped`'s own source** rather than typed, so a fourth op carving itself out there fails
+this file instead of quietly making it assert a falsehood.
 
 ### 8.0 The table, and it is the deliverable
 
 | # | card | first gap | ruling | replaces it in the corpus? |
 |---|---|---|---|---|
-| 1 | **GREAT LEADER, BAD ECONOMY** | G1/G14 | **BUILD** — landed this iteration | ships as a recovered card; no substitute needed |
-| 2 | **BRAVE NEW WORLDS** | G18 | **PART-BUILD** — the `no-income` half ships; the sweep half is the named decision in §8.2 | ships as a recovered card, `adapted` |
+| 1 | **GREAT LEADER, BAD ECONOMY** | G1/G14 | **BUILD** — landed this iteration as `hl-et2040-022` | ships as a recovered card; no substitute needed |
+| 2 | **BRAVE NEW WORLDS** | G18 | **PART-BUILD** — landed as `hl-et2040-023` on the `no-income` half, with NO engine change; the sweep half is the named decision in §8.2 | ships as a recovered card, `adapted` |
 | 3 | **THOUGHTS AND PRAYERS** | G4 | **BUILD**, and it is the `read`-vs-`target` split this file has called "the shortest route to the next playable card" since §3 | ships as a recovered card |
 | 4 | **404** | G18 | **BLOCKED ON A NAMED DECISION** — §8.2, question (a) | substitute filed |
 | 5 | **A CALL FROM KARACHI** | G13/G17/G20 | **RULE OUT** — the auction; §8.3 | substitute filed |
@@ -1785,7 +1804,8 @@ RAHE**, which is inexpressible and is ruled on here too, so all fourteen appear.
 **Eight are ruled out, two are blocked on a decision that is not the engine owner's,
 three are built and one was never a gap.** The eight ruled out are not silently absent:
 each is **replaced in the corpus by an original card that does the same job** (§8.4), so
-the deck has no permanent hole where a recovered name cannot be played.
+the deck has no permanent hole where a recovered name cannot be played. **Nine
+substitutes shipped** — the ninth for CHAI-PAANI, which §7 rules was never a gap at all.
 
 ### 8.1 THE TWO THAT WERE BUILT, and what each one cost
 
@@ -1979,10 +1999,10 @@ this table is the index and it is the thing that stops the next reader re-derivi
 | **A CALL FROM KARACHI** | `auction` (p12/p34) | a `PlayerState.debts` field that persists, expires, reaches the payload and is consulted by `INFLUENCE` and `BUY_CONSPIRACY`; **a rules ruling** on a bidder at their cap committing resources they do not hold; negative-resource support in `canAfford` / `enforceCap` / `overCap` / `poolTotal` and in the balance checker's proxy; four new `Action`s and a second window protocol. And its first sentence needs a `reveal` set, which is U2 in `docs/GAP-RULINGS-2026-10.md` and therefore a **server + client** change, not an engine one. | `hl-in2020-030` **CALL FROM THE EDITOR'S DESK** |
 | **QUANTUM WRISTBAND** | `auction` **and** a Headline draw pile | everything above, plus: headlines are a **`headlineQueue`, not a pile**. There is no `_headlineDraw` to search, no top-of-pile to take deterministically, and §2bis lists `_headlineDraw` as **NEVER** for a choice. So even the *first* branch — *"select a card to be resolved"* — cannot be a `choose-card`, and the printed *"OR"* means the card has no honest reduced form at all. | `ct-et2040-020` **FEED THE TICKER** |
 | **NEXT BILLION DATA POINTS** | `vote` | a ballot, a no-self-vote rule, and a **re-vote-on-tie loop that is a genuine termination hazard** (§4's "two opponents who always tie is a table that never finishes"). And the payoff — *"the next Conspiracy Card in the draw pile is up for grabs"* handed to a chosen player — is G20 card movement plus a G17 deal, so **the ballot alone buys nothing**. | `hl-in2020-031` **THE PEOPLE'S VOTE** |
-| **HIGGS MORON** | `pass-card` **and** G10's token counter | a counter that outlives its resolution (`GameState.counters` keyed `cardId:ownerId`, an `add-tokens` op, and a `when: 'tokens-reach'` trigger), **plus** something to pass the card ON TO. `pass-card` has **no referent**: G12's in-flight queue and G20's `move-card` are both missing, and reassigning Ideology Cards breaks the blind-answer invariant `playerView.ts` tests for. | `hl-et2040-022` **HOT POTATO** |
-| **ON THE "HIGH" SEAS** | G11, `hostage` | a `Hostage` type on `GameState` with a place/ransom op pair. `PendingVoters` is the **wrong container** — it is discarded at the end of *that player's* turn, so a ransom that recurs every turn cannot live there. It needs a board-resident object with its own lifetime, its own reset, and a way to be re-ransomed after the first ransom, which is three new pieces of persisted state. | `hl-et2040-023` **DEAD WEIGHT** |
+| **HIGGS MORON** | `pass-card` **and** G10's token counter | a counter that outlives its resolution (`GameState.counters` keyed `cardId:ownerId`, an `add-tokens` op, and a `when: 'tokens-reach'` trigger), **plus** something to pass the card ON TO. `pass-card` has **no referent**: G12's in-flight queue and G20's `move-card` are both missing, and reassigning Ideology Cards breaks the blind-answer invariant `playerView.ts` tests for. | `hl-et2040-024` **HOT POTATO** |
+| **ON THE "HIGH" SEAS** | G11, `hostage` | a `Hostage` type on `GameState` with a place/ransom op pair. `PendingVoters` is the **wrong container** — it is discarded at the end of *that player's* turn, so a ransom that recurs every turn cannot live there. It needs a board-resident object with its own lifetime, its own reset, and a way to be re-ransomed after the first ransom, which is three new pieces of persisted state. | `hl-et2040-025` **DEAD WEIGHT** |
 | **CULT-IVATING OBEDIENCE** | G11's cousin, and the gap label is wrong | REF 4.2.2: *"protects one of the majorities of the owner, but it also allows any other player to convert 3 of their voters as a cost to take the card for themselves."* The **card itself** is the object that is captured — a board-resident, transferable thing with a value — so it is G11, not G-new and **not** G20 (no `move-card` reaches it; §2 G20 already corrected this label once). What makes it cheap to rule out is the same thing: the protected majority must SURVIVE the capture, so it is a persistent per-zone protection plus a transfer, and the engine has no persisted per-zone flag. | `ct-in2020-012` **THE QUIET ROOM** |
-| **FUELLING THE NEWS** | G17 on a pile that does not exist | *"Draw 3 Headline Cards from the top of the deck. Keep one and give 1 to each of 2 opponents."* Headlines are dealt from a **queue** (`GameState.headlineQueue`) into the `headlines` phase, one per voter placed in a Volatile Area. There is no Headline **hand** to hold three of and no Headline **draw pile** to search, so "draw 3" has no referent and *"choose the order in which to resolve these Headlines"* needs a resolution-order queue as well. Two missing containers, not one. | `hl-et2040-024` **THE FRONT PAGE** |
+| **FUELLING THE NEWS** | G17 on a pile that does not exist | *"Draw 3 Headline Cards from the top of the deck. Keep one and give 1 to each of 2 opponents."* Headlines are dealt from a **queue** (`GameState.headlineQueue`) into the `headlines` phase, one per voter placed in a Volatile Area. There is no Headline **hand** to hold three of and no Headline **draw pile** to search, so "draw 3" has no referent and *"choose the order in which to resolve these Headlines"* needs a resolution-order queue as well. Two missing containers, not one. | `hl-et2040-026` **THE FRONT PAGE** |
 | **DOSTI BANI RAHE** | G22's target half | *"in THEIR next turn they may use your rights"* (gerrymandering rights, POWER PROBING). A live effect is re-applied at the top of the **owner's** turns (`installLiveEffects` / `fireTriggers` both require `fire.actor === le.owner` for `on-turn-start`), so a grant that must land on **somebody else's** turn has no event to hook: `on-turn-start` is the owner's by construction, and there is no "another seat's turn began" trigger. A new trigger is a new member on `EffectTrigger`, a new case in `fireTriggers`, a new condition key, and a re-derivation of the trigger registry in `reducer-parity.test.ts`. | `hl-in2020-032` **OPEN MIC** |
 
 **A ninth substitute, for CHAI-PAANI**, which §7 rules is not a gap at all: only a
@@ -2018,10 +2038,11 @@ was rewritten, not waived.**
 | NEXT BILLION DATA POINTS | a table-wide **contention** card — nobody gets what they want | a steal from the leader, which is contention with a known owner |
 | HIGGS MORON | a card the table has to **pass around**, so it taxes movement | a surcharge the whole table pays while the card is in an opponent's hand |
 | ON THE "HIGH" SEAS | **removing your own voters from the board** and getting them back later | discard your own 2 — the permanent half of the same removal |
-| CULT-IVATING OBEDIENCE | **protect something, and let somebody buy it** | protect a majority from eviction for a round |
-| FUELLING THE NEWS | a card that **hands Headlines out** | a headline effect that hits every player |
+| CULT-IVATING OBEDIENCE | **protect something, and let somebody buy it** | lock every opponent's Ideologue Powers for a round — protection the table can feel. The *"somebody may buy it"* half is dropped and named on the card's `source` |
+| FUELLING THE NEWS | a card that **hands Headlines out** | a headline effect that hits every player at once, which is what handing out headlines feels like |
 | DOSTI BANI RAHE | a card that gives **someone else** a benefit | a live effect that pays every player but you |
-| CHAI-PAANI | one protection at a time, the newest replacing the oldest | the same, as a re-application of `no-power` |
+| CHAI-PAANI | one protection at a time, the newest replacing the oldest | the same, as a `no-income` rule with a deadline rather than as persistent state |
+| NEXT BILLION DATA POINTS | a table-wide **contention** card — nobody gets what they want | take 2 from whoever leads, which is contention with a known owner |
 
 ### 8.5 WHAT THIS ITERATION DID NOT DO, and why
 
