@@ -80,6 +80,15 @@ const MINIMAL_EFFECT: Readonly<Record<string, Effect>> = {
   'draw-conspiracy': { op: 'draw-conspiracy', n: 1 },
   'refresh-market': { op: 'refresh-market' },
   restrict: { op: 'restrict', kind: 'no-power', value: 0, until: 'next-turn' },
+  /**
+   * G1 — the one op whose pick names a DESTINATION. `n: 1` and no `target`, which is the
+   * smallest thing `applyEffect` will act on: the ask is read from `n` and `count` is
+   * always 1 because the pick carries a single `(voter, area)` pair. The shipped card
+   * (GREAT LEADER, BAD ECONOMY) adds `target: 'player-after'` and a `when`/`until`
+   * lifetime, none of which belongs in a MINIMAL example — this table answers "can the
+   * invariant checker reason about an op", not "what does the real card say".
+   */
+  'move-peg': { op: 'move-peg', n: 1 },
 };
 
 /**
