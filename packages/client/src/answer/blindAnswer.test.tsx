@@ -983,14 +983,12 @@ describe('the three lines of a side have three DIFFERENT types', () => {
     expect(faction['font-size']).toBe('13px');
     expect(faction['font-weight']).toBe('600');
     expect(faction['line-height']).toBe('16px');
+    const px = (t: Record<string, string>, k: string): number =>
+      Number.parseFloat((t[k] ?? '').replace('px', ''));
     // The three levels are strictly ordered, so the eye can rank them at a glance:
     // the answer is the largest, the payout next, the attribution a caption.
-    expect(Number(faction['font-size'].replace('px', ''))).toBeLessThan(
-      Number(payout['font-size'].replace('px', '')),
-    );
-    expect(Number(payout['font-size'].replace('px', ''))).toBeLessThan(
-      Number(label['font-size'].replace('px', '')),
-    );
+    expect(px(faction, 'font-size')).toBeLessThan(px(payout, 'font-size'));
+    expect(px(payout, 'font-size')).toBeLessThan(px(label, 'font-size'));
     // Tracked and uppercased, which is what makes a fragment read as a name rather
     // than as prose continuing the sentence above it.
     expect(faction['text-transform']).toBe('uppercase');
