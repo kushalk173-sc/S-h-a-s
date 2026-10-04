@@ -21,11 +21,13 @@
  * THE OTHER HALF OF THIS FILE IS `PUBLIC_BY_DESIGN` below, and it exists because the
  * `_` prefix cannot record a decision. A field that is unprefixed is public BY
  * DEFAULT, which means "nobody thought about it" and "somebody decided it" look
- * identical in the type — and the only field where that ambiguity is expensive rather
- * than harmless is one a client is supposed to ENFORCE. `restrictions` is that field:
- * if it stops reaching the client, the server keeps refusing illegal purchases and no
- * player can see why. An omission nobody can distinguish from a ruling is the failure
- * mode; see the comment on the entry.
+ * identical in the type — and the only fields where that ambiguity is expensive rather
+ * than harmless are the ones a client is supposed to ENFORCE or PLAN AROUND:
+ * `restrictions` (the reason a purchase is refused), `capOverride` (the ceiling p12 is
+ * checked against) and `liveEffects` (what the table has hanging over it). A field that
+ * quietly stops being projected is not a cosmetic regression. The game keeps enforcing
+ * a rule no client can display, and the failure is a refusal with no visible cause,
+ * which reads as a bug in the server and is not one.
  */
 
 export const SECRET_FIELDS = [
@@ -231,6 +233,43 @@ export const PUBLIC_BY_DESIGN = {
    * `public-payload.test.ts` is the thing that would fail.
    */
   restrictions: 'players[].restrictions',
+
+  /**
+   * G15 — `PlayerState.capOverride`. THE THIRD ENTRY, and the one added because the
+   * inventory's own failure mode had come true.
+   *
+   * **THE PREMISE THAT PROMPTED IT WAS REFUTABLE, AND HALF OF IT WAS FALSE.** A client
+   * reported that it is told a player is over cap by a dialog whose ceiling it cannot
+   * see, and asked for the ceiling to be published. It is already published: the field
+   * is unprefixed and is not in `PRIVATE_PLAYER_KEYS`, so it goes through
+   * `playerView`'s `players` clone untouched and reaches every viewer — owner, opponent
+   * and spectator alike. Nothing about the wire needed to change. What was missing is
+   * the RECORD, and this is the entry.
+   *
+   * Why it belongs here rather than being left as an unconsidered field:
+   *
+   *  - **It is the same class as `restrictions`, by the engine's own argument.** p12's
+   *    cap is printed on the player's mat, and a ceiling somebody else must predict
+   *    before they act is a different game — `state.ts` says so on the field itself
+   *    ("PUBLIC, and why it owes the server nothing"). THE BIG FREEZE lowers it and
+   *    `expireCapOverrides` lifts it back at the turn boundary; a player who cannot see
+   *    the current number is being asked to comply with a rule that is not on their mat.
+   *  - **The failure this file exists for is an omission nobody can distinguish from a
+   *    ruling.** The field is public, load-bearing the moment a `set-cap` card ships,
+   *    and recorded nowhere. The next reader — or the next agent — sees an unprefixed
+   *    optional field with no entry and has to re-derive the visibility argument from
+   *    `state.ts`, which is exactly the re-derivation this list is supposed to prevent.
+   *
+   * **AND ITS OPTIONALITY IS PART OF THE CONTRACT, which is the part a client has to
+   * survive.** `capOverride` is `undefined` — not `{to: printed, expiresTurn: null}` —
+   * when nothing is holding it down, because a required field would break the
+   * hand-built `PlayerState` literals in packages the engine may not edit. So "absent"
+   * is a real, meaningful wire state that means the printed cap, and
+   * `JSON.stringify` turns it into a MISSING KEY rather than an `undefined`. That is
+   * asserted in `public-payload.test.ts`, which is the only place a wire claim about an
+   * optional key can be made honestly.
+   */
+  capOverride: 'players[].capOverride',
 
   /**
    * G9 / G22 — `GameState.liveEffects`. Public for the same structural reason, and

@@ -437,10 +437,11 @@ describe('the fixture actually produces both fields, over a real socket', () => 
 
   it('the inventory entry names the fields this file is about, and only those', () => {
     // The inventory is a CLAIM, and a claim nothing reads rots. This is the tie
-    // between the two files: if a third public-but-load-bearing field is added to the
-    // engine, adding it here brings this file's sweep along with it rather than
-    // leaving the assertion behind.
-    expect(Object.keys(PUBLIC_BY_DESIGN).sort()).toEqual(['liveEffects', 'restrictions']);
+    // between the two files: if a public-but-load-bearing field is added to the engine
+    // and not recorded, adding it here brings this file's sweep along with it rather
+    // than leaving the assertion behind — and, more importantly, the ENTRY is the
+    // record, so an omission is visible in the diff rather than discovered later.
+    expect(Object.keys(PUBLIC_BY_DESIGN).sort()).toEqual(['capOverride', 'liveEffects', 'restrictions']);
     // A path and a reason, not a bare name: a bare list cannot be read by the next
     // person as a decision.
     for (const [field, path] of Object.entries(PUBLIC_BY_DESIGN)) {
@@ -506,6 +507,80 @@ describe('a public field is not "public" until it is proven to be on the wire', 
       }
     }
     expect(named, 'no restriction was named — the assertion above was vacuous').toBeGreaterThan(0);
+  });
+
+  it('capOverride is on every seat`s payload for every viewer, and is ABSENT when nothing holds it down', () => {
+    // G15, and the third entry in the inventory. Two claims, and the second is the one
+    // a client actually has to survive.
+    //
+    // A client reported it was told a player was over cap by a dialog whose ceiling it
+    // could not see, and asked for the ceiling to be published. **It is already
+    // published** — `capOverride` is unprefixed and not in `PRIVATE_PLAYER_KEYS`, so it
+    // rides `playerView`'s `players` clone untouched — and this is the assertion that
+    // says so over the wire rather than in a comment.
+    //
+    // `capOverride` is OPTIONAL, and that is the whole contract: absent means "the
+    // printed cap", not "no opinion". So the interesting failure is a projection that
+    // either drops the key when the engine wrote one, or INVENTS one when the engine did
+    // not — and `JSON.stringify` turns `undefined` into a missing key rather than a
+    // null, which is the shape the browser actually receives.
+    const cards = realCards();
+    const states: GameState[] = [
+      setup({ players: ['p_1', 'p_2'], names: { p_1: 'Ada', p_2: 'Bo' }, cards, seed: 909, ...decksOf(cards) }),
+    ];
+    const reachedState = reached;
+    if (reachedState !== null) states.push(reachedState);
+
+    let present = 0;
+    let absent = 0;
+    for (const s of states) {
+      for (const viewer of allViewers(s)) {
+        const wire = JSON.parse(JSON.stringify(viewFor(s, cards, viewer))) as {
+          players: Record<string, { capOverride?: unknown } | undefined>;
+        };
+        for (const pid of s.turnOrder) {
+          const authoritative = s.players[pid]?.capOverride;
+          const got = wire.players[pid]?.capOverride;
+          if (authoritative === undefined) {
+            expect(
+              Object.prototype.hasOwnProperty.call(wire.players[pid] ?? {}, 'capOverride'),
+              `viewer ${String(viewer)} seat ${pid}: an override was INVENTED where the engine wrote none`,
+            ).toBe(false);
+            absent += 1;
+          } else {
+            expect(got, `viewer ${String(viewer)} seat ${pid}: the cap override did not reach the client`).toEqual(
+              authoritative,
+            );
+            expect(Object.keys(got as Record<string, unknown>).sort(), 'a capOverride arrived narrowed').toEqual([
+              'expiresTurn',
+              'to',
+            ]);
+            present += 1;
+          }
+        }
+      }
+    }
+    expect(present + absent, 'nothing was inspected — the shape assertion was vacuous').toBeGreaterThan(0);
+
+    // AND, so the client-side report is answered with a fact rather than a reassurance:
+    // no card in the SHIPPED corpus installs one. The ceiling it cannot see is a
+    // ceiling no card can currently lower, so the dialog it is drawing is the printed
+    // p12 cap and the engine's `rules.resourceCap` is the number it should be showing.
+    // Derived rather than counted, because a bare count of shipped cards is exactly the
+    // literal `corpus-drift.test.ts` exists to refuse.
+    const installers: string[] = [];
+    for (const card of [
+      ...Object.values(cards.ideology),
+      ...Object.values(cards.voter),
+      ...Object.values(cards.conspiracy),
+      ...Object.values(cards.headline),
+    ]) {
+      if ('effects' in card && card.effects.some((e) => e.op === 'set-cap')) installers.push(card.id);
+    }
+    expect(
+      installers,
+      `a shipped card now installs a cap override (${installers.join(', ')}) — the claim above is stale and the wire assertion above is the one that matters`,
+    ).toEqual([]);
   });
 
   it('liveEffects is on the payload for every viewer, and is the whole list', () => {
