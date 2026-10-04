@@ -161,6 +161,24 @@ export const IDEOLOGUE_RESOURCE: Readonly<Record<IdeologueName, Resource>> = {
   idealist: 'trust',
 };
 
+/**
+ * The Ideologue NAMES, for a place that is counting CARDS rather than paying a
+ * bonus. `state.ts:IDEOLOGUES` has the same four, in the same order; this is the
+ * spelling a player reads.
+ *
+ * It exists because `IDEOLOGUE_RESOURCE` above is the wrong label for the wrong
+ * half of a manifesto cell: the Ideologue pays a resource, so `+1 funds` is right on
+ * the bonus line — but the COUNT is of that Ideologue's Ideology Cards, so the
+ * noun beside it is "Capitalist", and printing "funds" there is what made a tester
+ * read a card count as a resource holding. See `YourMat.tsx:ManifestoStrip`.
+ */
+export const IDEOLOGUE_NAME: Readonly<Record<IdeologueName, string>> = {
+  capitalist: 'Capitalist',
+  supremo: 'Supremo',
+  showstopper: 'Showstopper',
+  idealist: 'Idealist',
+};
+
 /** The seat index into `--seat-1..5`, 1-based, from the turn order. */
 export function seatOf(turnOrder: readonly PlayerID[], id: PlayerID): 1 | 2 | 3 | 4 | 5 {
   const i = turnOrder.indexOf(id);

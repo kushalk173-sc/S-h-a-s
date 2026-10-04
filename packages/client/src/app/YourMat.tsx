@@ -33,6 +33,7 @@ import type { ClientState, PlayerID, Pool } from '@shasn/engine';
 import {
   RESOURCE_ORDER,
   UI_RULES,
+  IDEOLOGUE_NAME,
   effectiveCap,
   manifestoCells,
   marketLockout,
@@ -177,7 +178,42 @@ export function ResourceStrip({
   );
 }
 
-/** Four Ideologue cells, with the unlock chips and the passive-bonus forecast. */
+/**
+ * THE MANIFESTO STRIP, AND WHAT THE BIG NUMBER IS.
+ *
+ * ## CONFIRMED, AND THE TESTER'S READING WAS WRONG IN OUR FAVOUR
+ *
+ * Reported: "`MANIFESTO` shows 54 under a pool of 12, and nobody could work out what
+ * it is. A tester concluded the big number is the resource holding, not manifesto
+ * progress."
+ *
+ * `derive.ts:manifestoCells` reads `player.manifesto.filter((i) => i === ideologue)
+ * .length` — the number of **Ideology Cards of that Ideologue in your hand**. It is
+ * NOT a resource holding, and it cannot be: `54` against a cap of 12 is a card count,
+ * and the resource strip four lines above prints the holdings in a different font at
+ * a different size with a different name. Both numbers were on screen and both were
+ * correct.
+ *
+ * ## BUT A CORRECT NUMBER WITH NO NOUN IS A LIE BY OMISSION, AND THIS ONE WAS
+ *
+ * The cell rendered `23` · `funds` · `L5`. Put under the heading `MANIFESTO`, on a mat
+ * whose resource strip also prints a funds number, that reads as **"23 funds"** — and
+ * a tester with the DOM in front of them read it that way. They were given no way to
+ * tell, because the noun after the numeral was a RESOURCE (correct for the bonus,
+ * which pays `+1 Funds`, and wrong for the count, which counts Capitalist cards).
+ *
+ * So the two nouns are separated and both are spoken:
+ *
+ *   - the count is labelled `cards`, and the cell is named after the **Ideologue**,
+ *     because Capitalist is what the 23 are;
+ *   - the RESOURCE moves to the bonus line, where it is the thing being paid, and it
+ *     is stated as what it is: `+1 funds per 3 cards` — the actual p28 rule, which
+ *     until now was a bare `+1 in 2` counting down to an unnamed threshold.
+ *
+ * The second half is the part that earns the first: a player aiming at L3 needs to
+ * know that three Capitalist cards is the price and that each one pays a Fund, and
+ * `23 funds L5` told them neither.
+ */
 export function ManifestoStrip({ state, you }: { state: ClientState; you: PlayerID }) {
   const p = state.players[you];
   if (p === undefined) return null;
@@ -185,16 +221,40 @@ export function ManifestoStrip({ state, you }: { state: ClientState; you: Player
   return (
     <div className="mani">
       {cells.map((c) => (
-        <div key={c.ideologue} className="mani__cell" data-level={c.level ?? 'none'}>
-          <span className="mani__count">{c.count}</span>
-          <span className="mani__name">{c.resource}</span>
+        <div
+          key={c.ideologue}
+          className="mani__cell"
+          data-level={c.level ?? 'none'}
+          /* The whole cell, in one accessible name. §8.5 parity: a screen-reader
+             user must not have to reassemble "23", "cards", "Capitalist", "L5" from
+             four separate nodes to learn what the number means. */
+          aria-label={`${c.count} ${IDEOLOGUE_NAME[c.ideologue]} Ideology Cards. ${
+            c.level === null
+              ? `${c.toNext} more unlocks a power and pays ${c.bonusPerTurn} extra ${c.resource} per turn.`
+              : `Level ${c.level} reached. Pays ${c.bonusPerTurn} extra ${c.resource} per turn.`
+          }`}
+          data-testid={`manifesto-${c.ideologue}`}
+        >
+          <span className="mani__count">
+            {c.count}
+            {/* THE NOUN, VISIBLE. `cards` is 11px of text on a cell whose numeral is
+                24px, so it costs no vertical space and it is the whole difference
+                between "23 funds" and "23 cards". */}
+            <span className="mani__noun"> cards</span>
+          </span>
+          {/* THE IDEOLOGUE, not the resource: the 23 ARE Capitalist cards. */}
+          <span className="mani__name">{IDEOLOGUE_NAME[c.ideologue]}</span>
           {c.level !== null ? (
             <span className={`chip chip--${c.level === 'L3' ? 'l3' : 'l5'}`}>{c.level}</span>
-          ) : (
-            // The forecast. §5.4 calls this "the main strategic read on the
-            // mat": it is what a player looks at to decide what to answer.
-            <span className="mani__name">+1 in {c.cardsToBonus}</span>
-          )}
+          ) : null}
+          {/* §5.4 calls this "the main strategic read on the mat": it is what a
+              player looks at to decide what to answer, so it is the p28 rule in
+              words rather than a countdown to an unnamed threshold. */}
+          <span className="mani__name">
+            {c.level === null
+              ? `${c.toNext} more · +1 ${c.resource} per ${UI_RULES.passiveBonusPer}`
+              : `+${c.bonusPerTurn} ${c.resource} per turn`}
+          </span>
         </div>
       ))}
     </div>

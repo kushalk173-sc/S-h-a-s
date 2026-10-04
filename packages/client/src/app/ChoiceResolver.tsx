@@ -555,11 +555,48 @@ function PegDestChoice({
       </p>
 
       {unreachable ? (
+        /*
+         * AND IT IS NOT TRUE THAT THE BOARD CARRIES ON WITHOUT AN ANSWER.
+
+         * This used to say, in a `role="status"` the player reads while the table is
+         * stopped: "the card has nothing to do, and the board will carry on without
+         * an answer." **Both halves were false.** The card did not resolve itself:
+         * `reduce.ts` keeps the decision in `state.choices` until something removes
+         * it, and `blockedBy` refuses every other action for the answering player
+         * while it is there. So the table does not carry on — it waits, on a player
+         * who cannot act — and a sentence that promises otherwise is the most
+         * expensive kind of wrong copy there is: it tells a locked table that it is
+         * not locked.
+
+         * What IS true, and all this asserts now:
+         *
+         *   1. the OFFER has gone stale. `pegMoveOffered` was true when the card was
+         *      played, because `applyEffect` raises nothing otherwise. It is being
+         *      re-read here against the LIVE board (`pegMoveOptions` → the engine's
+         *      `movablePegIds` and `pegDestinations`), and it has come back empty:
+         *      a majority formed, or somebody filled the only hole.
+         *   2. no pick is legal, so this frame renders NO confirm rather than a
+         *      disabled one. `resolveChoice` would refuse every pair — the offer
+         *      test is `movablePegIds(...).some(id => pegDestinations(...).length
+         *      > 0)`, and both halves are empty.
+         *   3. the decision is STILL OWED, and the player is not the cause of that.
+         *             That is the sentence that replaces the false promise, and it is
+         *             a `role="status"` precisely because it is the only thing on the
+         *             frame that changes: if the board comes back — a hole opens, a
+         *             majority breaks — the dialog recovers on the next broadcast and
+         *             the highlight returns with it, because nothing here is state.
+         *
+         * The underlying gap is the engine's: a decision that can be raised and then
+         * become unanswerable, with nothing to retire it. `reduce.ts` is not this
+         * file's to change, so it is reported rather than patched, and the client
+         * half of the contract is kept: no control that cannot act, and no sentence
+         * the player can act on being untrue.
+         */
         <p className="panel__note" data-testid="peg-dest-nothing">
-          Nothing on the board can be moved by this card: no voter that could move has an
-          empty area in a neighbouring constituency. There is no pick to make, so there is
-          no button here — the card has nothing to do, and the board will carry on without
-          an answer.
+          The move this card asked for can no longer be made: no voter that could move has an
+          empty area in a neighbouring constituency any more. There is no pick to make, so there
+          is no button here. The decision is still owed — the table waits until the board offers a
+          move again, and it will come back on its own as soon as one does.
         </p>
       ) : (
         <div className="row">

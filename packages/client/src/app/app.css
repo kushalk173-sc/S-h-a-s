@@ -485,6 +485,18 @@
   text-transform: uppercase;
 }
 
+/* The count's NOUN. Eleven pixels beside a twenty-four pixel numeral, so it costs no
+   vertical space, and it is the entire difference between "23 funds" — which a
+   tester read off this mat as a resource holding — and "23 cards", which is what it
+   is. Lower-case deliberately: it is a unit, not a label, and upper-casing it would
+   give it the weight of the noun it is disambiguating FROM. */
+.mani__noun {
+  font: var(--type-resource-cap);
+  font-weight: 400;
+  color: var(--ink-500);
+  letter-spacing: 0;
+}
+
 .chip {
   display: inline-block;
   font: var(--type-resource-cap);
