@@ -60,7 +60,7 @@ let seats: { client: TestClient; playerId: string }[] = [];
 let driverActions = 0;
 
 beforeAll(async () => {
-  h = await startHarness({ dispatchRate: 4000 });
+  h = await startHarness({ dispatchRate: 4000, messageRate: 4000 });
 
   ada = await TestClient.connect(h.url);
   ada.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });

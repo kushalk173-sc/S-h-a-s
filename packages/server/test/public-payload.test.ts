@@ -244,7 +244,7 @@ let pricedFromPayload: { player: PlayerID; printedRefused: boolean; surchargedOk
 const engineCtx = makeCtx(CARDS);
 
 beforeAll(async () => {
-  h = await startHarness({ cards: CARDS, dispatchRate: 4000 });
+  h = await startHarness({ cards: CARDS, dispatchRate: 4000, messageRate: 4000 });
 
   ada = await TestClient.connect(h.url);
   ada.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });

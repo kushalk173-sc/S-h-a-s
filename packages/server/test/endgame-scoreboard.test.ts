@@ -441,7 +441,7 @@ describe('the ending survives the wire, with a spectator watching', () => {
     seats: readonly { client: Client; playerId: string }[];
     spectator: Client;
   }> {
-    const harness = await startHarness({ dispatchRate: 4000 });
+    const harness = await startHarness({ dispatchRate: 4000, messageRate: 4000 });
     open.push(harness);
 
     const host = await TestClient.connect(harness.url);

@@ -244,7 +244,7 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // `cards` is on the shipped corpus and this assertion says so out loud. A
     // future "the real corpus is too slow to drive" change has to change THIS line,
     // visibly, instead of quietly reintroducing a 4.6x deck.
-    const h = await startHarness({ dispatchRate: 4000 });
+    const h = await startHarness({ dispatchRate: 4000, messageRate: 4000 });
     try {
       expect(Object.keys(h.ctx.cards.ideology)).toHaveLength(dealt.ideology);
       expect(Object.keys(h.ctx.cards.voter)).toHaveLength(dealt.voter);

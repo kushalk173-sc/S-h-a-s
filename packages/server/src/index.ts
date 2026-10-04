@@ -69,6 +69,18 @@ export type ServerConfig = {
   readonly now?: () => number;
   /** Dispatch budget per connection, in dispatches per second. */
   readonly dispatchRate?: number;
+  /**
+   * Budget for every OTHER message, in messages per second. Separate from
+   * `dispatchRate` because the two bound different costs and a game needs far more of
+   * one than the other — see `DEFAULT_MESSAGE_RATE`.
+   */
+  readonly messageRate?: number;
+  /** Hard ceiling on concurrent sockets, process-wide. */
+  readonly maxConnections?: number;
+  /** Hard ceiling on concurrent sockets from ONE remote address. */
+  readonly maxConnectionsPerIp?: number;
+  /** Hard ceiling on sockets attached to one match. */
+  readonly maxWatchersPerMatch?: number;
   readonly snapshotEvery?: number;
   /** How long a disconnected seat is held. */
   readonly graceMs?: number;
@@ -80,6 +92,62 @@ export type ServerConfig = {
 
 export const DEFAULT_DISPATCH_RATE = 4;
 export const DEFAULT_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * ── THE THREE CEILINGS, AND WHY THESE NUMBERS ────────────────────────────────────────
+ *
+ * The amplifier this bounds is real and it needs no credential at all:
+ *
+ *     lobby:list → lobby:spectate (the reply carries a running match's id)
+ *            → match:spectate → attached, with a full ~60 KB state
+ *            → every committed action then runs one full projection PER WATCHER,
+ *              synchronously, inside the action handler that a real player is
+ *              waiting on.
+ *
+ * The numbers are chosen for THE GAME THIS SERVER IS FOR — a table of friends — and
+ * that is a real constraint, not a rationalisation:
+ *
+ *  - **64 sockets (`DEFAULT_MAX_CONNECTIONS`).** Six tables of five, or one table
+ *    with a large family watching. A process that is serving several tables has no
+ *    reason to be above this; one that is being used as a broadcast platform does, and
+ *    the right answer to that is a second server, not a bigger number here.
+ *  - **12 per remote address (`DEFAULT_MAX_CONNECTIONS_PER_IP`).** This is the number
+ *    that is easy to get wrong. Shasn is played by people who live in the same house,
+ *    so five seats and their spectators routinely arrive from ONE address behind one
+ *    router — a cap of 1 or 2 would refuse a legitimate table. Twelve is four seats
+ *    beyond a full table, which is the honest reading of "a table of friends plus the
+ *    people who want to watch it". Anything lower trades a real game for a slightly
+ *    better ratio.
+ *  - **32 watchers on one match (`DEFAULT_MAX_WATCHERS_PER_MATCH`).** Above this the
+ *    fan-out, not the players, is the cost: every committed action would be paying for
+ *    thirty-two projections before the answering player's own click is acknowledged.
+ *
+ * WHAT IS DELIBERATELY *NOT* HERE, and it is worth naming because the temptation is to
+ * add it: a token on the spectator path, an invite code, a captcha, a rate limit keyed
+ * on seat count. The game is played by people who have been sent a link, and every one
+ * of those makes "click the link your friend sent you" worse. The threat is a bored
+ * person with a script, and bored people are stopped by ceilings.
+ */
+export const DEFAULT_MAX_CONNECTIONS = 64;
+export const DEFAULT_MAX_CONNECTIONS_PER_IP = 12;
+export const DEFAULT_MAX_WATCHERS_PER_MATCH = 32;
+
+/**
+ * THE NON-ACTION BUDGET.
+ *
+ * `dispatchRate` (4/s) was only ever spent by `match:action`, so every other message
+ * was free — and the free ones are the ones that cost the server: `match:sync` and
+ * `match:spectate` each build and serialise a whole `ClientState`, `lobby:create`
+ * allocates a lobby and a session record, and `session:resume` misses the in-memory
+ * index and scans the store.
+ *
+ * 20/s is roughly what the client itself uses: a table of five produces on the order of
+ * two actions a minute, and the client sends a `match:sync` per reconnect and a `ping`
+ * per keepalive tick. So this ceiling is about an order of magnitude above honest use,
+ * which is the only margin worth having — a limit that honest play can brush against is
+ * a limit that will one day refuse a game in hour three.
+ */
+export const DEFAULT_MESSAGE_RATE = 20;
 
 /**
  * THE MESSAGES THAT EXCHANGE A CREDENTIAL â€” the complete list of the ways a
@@ -105,6 +173,17 @@ type Conn = {
   /** Token bucket. Dispatches are the only state-mutating message. */
   tokens: number;
   lastRefill: number;
+  /** The other token bucket: every message that is not a dispatch. */
+  msgTokens: number;
+  lastMsgRefill: number;
+  /**
+   * Exactly-once teardown. Both `close` and `error` call `#onClose`, and a socket that
+   * errors usually closes as well, so without this the per-IP counter below is
+   * decremented twice and a table of friends gets refused after enough flaky networks.
+   */
+  released: boolean;
+  /** The address this socket's per-IP budget is charged to. */
+  readonly remote: string;
 };
 
 export class ShasnServer {
@@ -117,6 +196,10 @@ export class ShasnServer {
     host: string;
     now: () => number;
     dispatchRate: number;
+    messageRate: number;
+    maxConnections: number;
+    maxConnectionsPerIp: number;
+    maxWatchersPerMatch: number;
     snapshotEvery: number;
     graceMs: number;
     clientDir: string | null;
@@ -125,6 +208,8 @@ export class ShasnServer {
   readonly #http: Server;
   readonly #wss: WebSocketServer;
   readonly #conns = new Map<WebSocket, Conn>();
+  /** Remote address → live sockets from it. The per-IP ceiling is the size of this. */
+  readonly #perIp = new Map<string, number>();
   /** matchId â†’ the sockets currently watching it. */
   readonly #watchers = new Map<string, Set<Conn>>();
   /** matchId â†’ unsubscribe, so a finished room stops broadcasting. */
@@ -142,6 +227,10 @@ export class ShasnServer {
       host: cfg.host,
       now,
       dispatchRate: cfg.dispatchRate ?? DEFAULT_DISPATCH_RATE,
+      messageRate: cfg.messageRate ?? DEFAULT_MESSAGE_RATE,
+      maxConnections: cfg.maxConnections ?? DEFAULT_MAX_CONNECTIONS,
+      maxConnectionsPerIp: cfg.maxConnectionsPerIp ?? DEFAULT_MAX_CONNECTIONS_PER_IP,
+      maxWatchersPerMatch: cfg.maxWatchersPerMatch ?? DEFAULT_MAX_WATCHERS_PER_MATCH,
       snapshotEvery: cfg.snapshotEvery ?? 10,
       graceMs: cfg.graceMs ?? DEFAULT_GRACE_MS,
       clientDir: cfg.clientDir ?? null,
@@ -213,6 +302,7 @@ async listen(): Promise<{ port: number; host: string }> {
       }
     }
     this.#conns.clear();
+    this.#perIp.clear();
     await new Promise<void>((resolve) => {
       this.#wss.close(() => resolve());
     });
@@ -273,15 +363,45 @@ async listen(): Promise<{ port: number; host: string }> {
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ WebSocket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  /**
+   * THE CONNECTION CEILINGS, enforced BEFORE the upgrade.
+   *
+   * `WebSocketServer` is constructed `noServer: true` precisely so this method owns the
+   * decision, and `ws`'s own `maxConnections` is deliberately not used: it would apply
+   * the global number but not the per-IP one, it would count on a different schedule,
+   * and - the reason that decided it - it cannot answer with a status a client can be
+   * told about. Refusing here means the amplifier never becomes a socket at all, which
+   * is one fewer thing to bound later: there is no `#conns` entry, no session, no
+   * watcher set and no projection for a connection that was never admitted.
+   *
+   * A refused upgrade gets a 503 and a closed socket rather than an accepted-then-closed
+   * one, so "the server is full" is distinguishable from "the server hung up on you".
+   */
   #onUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const url = new URL(req.url ?? '/', 'http://localhost');
     if (url.pathname !== '/ws') {
       socket.destroy();
       return;
     }
+    const remote = remoteAddressOf(req);
+    if (!this.#admits(remote)) {
+      try {
+        socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+      } catch {
+        /* the peer is already gone */
+      }
+      socket.destroy();
+      return;
+    }
+    this.#perIp.set(remote, (this.#perIp.get(remote) ?? 0) + 1);
     this.#wss.handleUpgrade(req, socket, head, (ws) => {
-      this.onConnection(ws);
+      this.onConnection(ws, remote);
     });
+  }
+
+  #admits(remote: string): boolean {
+    if (this.#conns.size >= this.#cfg.maxConnections) return false;
+    return (this.#perIp.get(remote) ?? 0) < this.#cfg.maxConnectionsPerIp;
   }
 
   /**
@@ -291,10 +411,24 @@ async listen(): Promise<{ port: number; host: string }> {
    * on connect would mean every TCP probe that completed a handshake got a
    * credential, and the resume token is the only thing in the system that can
    * write to a match.
+   *
+   * `remote` is charged to the per-IP budget by `#onUpgrade` and given back by
+   * `#onClose`. It is a parameter rather than read off the socket so the accounting has
+   * exactly one owner, and a test that calls `onConnection` directly is explicit about
+   * what it is skipping.
    */
-  onConnection(socket: WebSocket): void {
+  onConnection(socket: WebSocket, remote = 'direct'): void {
     const now = this.#cfg.now();
-    const conn: Conn = { socket, session: null, tokens: this.#cfg.dispatchRate, lastRefill: now };
+    const conn: Conn = {
+      socket,
+      session: null,
+      tokens: this.#cfg.dispatchRate,
+      lastRefill: now,
+      msgTokens: this.#cfg.messageRate,
+      lastMsgRefill: now,
+      released: false,
+      remote,
+    };
     this.#conns.set(socket, conn);
     socket.on('message', (data: unknown) => {
       void this.#onFrame(conn, data);
@@ -308,8 +442,16 @@ async listen(): Promise<{ port: number; host: string }> {
   }
 
   #onClose(conn: Conn): void {
+    // Exactly once. `close` and `error` both land here and a socket that errors
+    // normally closes as well, so this guard is what keeps the per-IP count - and
+    // `setConnected(false)` - from being applied twice for one socket.
+    if (conn.released) return;
+    conn.released = true;
     this.#conns.delete(conn.socket);
     for (const set of this.#watchers.values()) set.delete(conn);
+    const held = this.#perIp.get(conn.remote);
+    if (held === undefined || held <= 1) this.#perIp.delete(conn.remote);
+    else this.#perIp.set(conn.remote, held - 1);
     const s = conn.session;
     if (s === null) return;
     const now = this.#cfg.now();
@@ -321,6 +463,22 @@ async listen(): Promise<{ port: number; host: string }> {
   }
 
   async #onFrame(conn: Conn, data: unknown): Promise<void> {
+    // THE GENERAL BUDGET, and it is here rather than in `#dispatch` because the point
+    // is that `#dispatch` was the ONLY place a bucket was spent, and the messages that
+    // cost the most are not dispatches. `match:spectate` and `match:sync` each build
+    // and serialise a whole `ClientState`; `lobby:create` allocates a lobby and a
+    // session record; `session:resume` misses the in-memory index and scans the store.
+    // A spectator paying the dispatch rate is nearly free, which is why charging it
+    // there was never going to bound the fan-out.
+    //
+    // `ping` is charged too, deliberately: it is the cheapest message the server has
+    // (one small write, no projection) and the client's keepalive tick is minutes
+    // apart, so a ceiling an order of magnitude above honest use costs it nothing and
+    // closes the one free loop an attacker would otherwise keep open.
+    if (!this.#spendMessage(conn)) {
+      this.#fail(conn, 'RATE_LIMITED', 'slow down');
+      return;
+    }
     const raw = toRaw(data);
     if (raw === null) {
       this.#fail(conn, 'BAD_MESSAGE', 'unsupported frame');
@@ -597,7 +755,11 @@ async listen(): Promise<{ port: number; host: string }> {
       room.setConnected(rec.playerId, true, now);
       void room.persistSeats().catch(() => undefined);
       this.#adoptSession(conn, rec);
-      this.#attach(conn, matchId);
+      // A SEAT is never refused a seat back. The watcher budget is a fan-out ceiling,
+      // and a returning player is one projection, not an amplification: they hold a
+      // token, they are already in the room's fan-out in the sense that matters, and
+      // refusing them would hand a 4-hour game to a spectator count.
+      if (!this.#attach(conn, matchId)) this.#watchers.get(matchId)?.add(conn);
       this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
       this.#sendMatchState(conn, room, rec);
       return;
@@ -686,7 +848,17 @@ async listen(): Promise<{ port: number; host: string }> {
     rec.matchId = matchId;
     rec.playerId = newPlayerId();
     this.#adoptSession(conn, rec);
-    this.#attach(conn, matchId);
+    if (!this.#attach(conn, matchId)) {
+      // THE FAN-OUT CEILING, and the one refusal in this file that is about load
+      // rather than authority: this connection is not a seat in this room, it has
+      // proved nothing, and the room already has as many screens watching it as this
+      // server will project for. It keeps its (read-only, seatless) session - there is
+      // no reason to make a spectator leave - and is told the room is full of watchers,
+      // which is the truth and is not a statement about the match.
+      this.#fail(conn, 'RATE_LIMITED', 'too many people are watching this match');
+      this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
+      return;
+    }
     this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
     this.#sendMatchState(conn, room, rec);
   }
@@ -763,6 +935,27 @@ async listen(): Promise<{ port: number; host: string }> {
     return true;
   }
 
+  /**
+   * The second bucket: everything that is not a dispatch.
+   *
+   * Kept separate from `#spend` rather than merged into one, because the two ceilings
+   * are set by different facts. `dispatchRate` is a game rule in disguise - a player
+   * acting twice in the same instant is a bug, not a user - while `messageRate` is an
+   * abuse ceiling and is set an order of magnitude above what the client sends. One
+   * number for both would either let a spectator fan out or refuse a table.
+   */
+  #spendMessage(conn: Conn): boolean {
+    const now = this.#cfg.now();
+    const elapsed = now - conn.lastMsgRefill;
+    if (elapsed > 0) {
+      conn.msgTokens = Math.min(this.#cfg.messageRate, conn.msgTokens + (elapsed / 1000) * this.#cfg.messageRate);
+      conn.lastMsgRefill = now;
+    }
+    if (conn.msgTokens < 1) return false;
+    conn.msgTokens -= 1;
+    return true;
+  }
+
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ the fan-out â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   #watchRoom(room: Room): void {
@@ -790,19 +983,45 @@ async listen(): Promise<{ port: number; host: string }> {
     );
   }
 
-  #attach(conn: Conn, matchId: string | null): void {
+  /**
+   * Attach this socket to a match's watcher set. Returns false when the match's watcher
+   * budget is already spent, which is the ceiling on the fan-out itself.
+   *
+   * WHY THIS IS A CEILING AND NOT A QUEUE. The cost being bounded is the K projections
+   * every committed action performs inside the action handler a real player is waiting
+   * on - `Room.dispatch` is documented as synchronous end to end, and the answering
+   * player's acknowledgement queues behind all K. So the question is not "what does the
+   * server do with spectator number 33" but "how much of one player's click belongs to
+   * other people's screens", and the honest answer for a game played by a table of
+   * friends is 32. Beyond that the answer is a second process or a different transport,
+   * and refusing is honest about which one this is.
+   *
+   * WHY IT IS NOT "OFF THE SYNCHRONOUS PATH", which is the other thing this could have
+   * been and the more tempting one: deferring the projection to a later tick would let
+   * an action be answered before the watchers have been written, and a client that
+   * acts on what it has is then acting on a stale board. `winnable.test.ts` documents a
+   * real intermittent failure produced by exactly that class of race, in the harness.
+   * Ordering here is a correctness property, and the cap is how the cost is bounded
+   * without touching it.
+   */
+  #attach(conn: Conn, matchId: string | null): boolean {
     // Detach from the previous room first, or a client that resumes into a
     // different match keeps receiving two boards.
     for (const [id, set] of this.#watchers) {
       if (set.delete(conn) && set.size === 0) this.#watchers.delete(id);
     }
-    if (matchId === null) return;
+    if (matchId === null) return true;
     const room = this.hub.rooms.get(matchId);
-    if (room === undefined) return;
-    this.#watchRoom(room);
-    const set = this.#watchers.get(matchId) ?? new Set<Conn>();
+    if (room === undefined) return false;
+    const set = this.#watchers.get(matchId);
+    if (set === undefined) {
+      this.#watchRoom(room);
+      this.#watchers.set(matchId, new Set<Conn>([conn]));
+      return true;
+    }
+    if (set.size >= this.#cfg.maxWatchersPerMatch) return false;
     set.add(conn);
-    this.#watchers.set(matchId, set);
+    return true;
   }
 
   #connFor(playerId: PlayerID): Conn | undefined {
@@ -992,6 +1211,21 @@ async listen(): Promise<{ port: number; host: string }> {
 type LobbyRecordView = NonNullable<ReturnType<LobbyHub['getLobby']>>;
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+/**
+ * The address the per-IP ceiling counts against.
+ *
+ * `::ffff:127.0.0.1` and `127.0.0.1` are the same host, and a Node server that binds
+ * IPv6 answers IPv4 peers in the mapped form — so without the unwrap a table of
+ * friends behind one router would be counted as several addresses and the per-IP
+ * ceiling would stop meaning anything. `x-forwarded-for` is deliberately NOT read: this
+ * server has no proxy in front of it, and trusting a header on a direct connection
+ * would let a caller pick its own bucket.
+ */
+function remoteAddressOf(req: IncomingMessage): string {
+  const raw = req.socket.remoteAddress ?? 'unknown';
+  return raw.startsWith('::ffff:') ? raw.slice('::ffff:'.length) : raw;
+}
 
 function toRaw(data: unknown): string | null {
   if (typeof data === 'string') return data;

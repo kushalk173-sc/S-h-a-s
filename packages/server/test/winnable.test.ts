@@ -329,7 +329,7 @@ describe('a real-corpus game runs to completion over a real socket, at every sea
    * end; `e2e.test.ts` is where two players' views are compared byte for byte.
    */
   async function driveOverSockets(n: number): Promise<{ harness: Harness; matchId: string; actions: number; state: GameState; seed: number }> {
-    const harness = await startHarness({ dispatchRate: 4000 });
+    const harness = await startHarness({ dispatchRate: 4000, messageRate: 4000 });
     open.push(harness);
 
     const host = await TestClient.connect(harness.url);

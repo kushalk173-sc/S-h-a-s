@@ -153,9 +153,23 @@ function tick(): number {
   return clock;
 }
 
-export async function startHarness(
-  opts: { cards?: CardIndex; store?: InMemoryMatchStore; dispatchRate?: number } = {},
-): Promise<Harness> {
+export type HarnessOptions = {
+  cards?: CardIndex;
+  store?: InMemoryMatchStore;
+  dispatchRate?: number;
+  messageRate?: number;
+  /**
+   * The three load ceilings. Forwarded verbatim, so a test that asserts a ceiling is
+   * asserting the SERVER's number rather than a fixture default — a harness that could
+   * only ever hand out the production ceilings would make the ceiling tests untestable
+   * without standing up sixty-four sockets.
+   */
+  maxConnections?: number;
+  maxConnectionsPerIp?: number;
+  maxWatchersPerMatch?: number;
+};
+
+export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> {
   // THE SHIPPED CORPUS, unless a test asks for something else.
   //
   // This used to default to `bigCards()`, which dealt 240 Ideology Cards against
@@ -176,6 +190,15 @@ export async function startHarness(
     skipRestore: true,
     clientDir: null,
     ...(opts.dispatchRate === undefined ? {} : { dispatchRate: opts.dispatchRate }),
+    // A test that drives a whole game over sockets in a second is not honest traffic,
+    // and the default `messageRate` (20/s, an order of magnitude above what the real
+    // client sends) will correctly refuse it. So the knob is here rather than the
+    // default being raised: the ceiling is a claim about real players, and a test that
+    // has to say so is a test that knows it is exceeding it.
+    ...(opts.messageRate === undefined ? {} : { messageRate: opts.messageRate }),
+    ...(opts.maxConnections === undefined ? {} : { maxConnections: opts.maxConnections }),
+    ...(opts.maxConnectionsPerIp === undefined ? {} : { maxConnectionsPerIp: opts.maxConnectionsPerIp }),
+    ...(opts.maxWatchersPerMatch === undefined ? {} : { maxWatchersPerMatch: opts.maxWatchersPerMatch }),
     ctx,
     store,
   });
