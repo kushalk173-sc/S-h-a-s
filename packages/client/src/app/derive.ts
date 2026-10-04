@@ -51,6 +51,7 @@ import type {
   PlayerState,
   Pool,
   Resource,
+  Stand,
   ZoneID,
 } from '@shasn/engine';
 
@@ -353,6 +354,162 @@ export function marketLockout(state: ClientState, player: PlayerID): MarketLocko
     overCap: aboveCap,
     cap,
   };
+}
+
+// ─────────────────────────── the stand of the board ───────────────────────────
+
+/**
+ * IS THE GAME STILL GOING ANYWHERE? And this is the sentence a player gets.
+ *
+ * The defect was a real three-seat browser run at 490 turns: eight constituencies
+ * held, Central one vote short with its last empty slot right there, and no
+ * screen saying any of it. The engine now computes the arithmetic and publishes
+ * it (`reach.ts`, `ClientState.stand`); this turns it into ONE line, because a
+ * badge is not a UX answer and a wall of arithmetic is a worse one.
+ *
+ * ## THE ABSENT-FIELD DEFAULT, and why it is the safe direction
+ *
+ * `stand` is absent from a payload produced by a server older than this client —
+ * and from most of the hand-built fixtures in this package's tests. Absent is
+ * read as **open**, never as dead. A table must never be told its game is over on
+ * the strength of a field that is not there; the opposite mistake costs a
+ * sentence nobody reads for one turn.
+ *
+ * ## WHAT IT WILL NOT SAY
+ *
+ * It never says the game is over. The rulebook has no provision for a table
+ * declaring itself unwinnable and this client does not invent one: `Stand.dead`
+ * means a constituency can never be decided, which closes p7's ending, and the
+ * sentence says exactly that rather than announcing a result the server has not
+ * sent.
+ */
+export type StandVerdict = {
+  readonly tone: 'open' | 'decided' | 'dead';
+  /** The sentence, or `null` when there is nothing true worth saying. */
+  readonly sentence: string | null;
+  /** Constituencies named in the sentence, so a test can check the naming. */
+  readonly namedZones: readonly string[];
+  /** Seats named in the sentence. */
+  readonly namedSeats: readonly string[];
+};
+
+const OPEN_STAND = {
+  zonesTotal: 0,
+  undecided: [],
+  lost: [],
+  dead: false,
+  inPlay: [],
+  out: [],
+  seats: [],
+  stranded: [],
+} as const;
+
+/** The engine's report, or an open one when the payload has no such field. */
+export function standOf(state: ClientState): Stand {
+  return (state.stand ?? OPEN_STAND) as unknown as Stand;
+}
+
+function zoneNames(state: ClientState, ids: readonly string[]): string[] {
+  return ids.map((id) => state.zones.find((z) => z.id === id)?.name ?? id);
+}
+
+function seatNames(state: ClientState, ids: readonly PlayerID[]): string[] {
+  return ids.map((id) => state.players[id]?.name ?? id);
+}
+
+/** THE ONE SENTENCE, with a branch per thing that is actually true. */
+export function standVerdict(state: ClientState): StandVerdict {
+  const stand = standOf(state);
+  const lostNames = zoneNames(state, stand.lost);
+  const inPlayNames = seatNames(state, stand.inPlay);
+  const outNames = seatNames(state, stand.out);
+
+  if (stand.dead) {
+    return {
+      tone: 'dead',
+      namedZones: lostNames,
+      namedSeats: [],
+      sentence:
+        `${lostNames.join(' and ')} can never be decided — no seat has the room left there to ` +
+        'reach a majority. All nine constituencies can no longer be held, so this election will ' +
+        'now finish on the board-filling rule instead.',
+    };
+  }
+
+  if (stand.inPlay.length === 1 && inPlayNames.length === 1) {
+    const only = inPlayNames[0] ?? '';
+    return {
+      tone: 'decided',
+      namedZones: [],
+      namedSeats: inPlayNames,
+      sentence:
+        stand.out.length === 0
+          ? `${only} is the only seat that can still win.`
+          : `${only} is the only seat that can still win. ${outNames.join(' and ')} cannot win from here.`,
+    };
+  }
+
+  if (stand.out.length > 0) {
+    return {
+      tone: 'decided',
+      namedZones: [],
+      namedSeats: outNames,
+      sentence: `${outNames.join(' and ')} cannot win from here. ${inPlayNames.join(' and ')} can still.`,
+    };
+  }
+
+  return { tone: 'open', sentence: null, namedZones: [], namedSeats: [] };
+}
+
+/** Ids of this seat's pending groups that fit nowhere. p10. */
+export function strandedIds(state: ClientState, player: PlayerID | null): readonly string[] {
+  if (player === null) return [];
+  return standOf(state).stranded.filter((g) => g.player === player).map((g) => g.groupId);
+}
+
+/**
+ * WHY A GROUP CANNOT BE PLACED, in the rulebook's own words and with the number
+ * that settles it.
+ *
+ * p10 (`rules-reference.md:209-210`): *"If no single zone has enough empty areas
+ * for a card's voters, all voters from that card are discarded."* The player is
+ * never asked to do the impossible — they are told what is going to happen to the
+ * voters, which is a different thing from refusing them the card, and refusing
+ * the card would be inventing a rule p10 does not contain.
+ */
+export function strandedSentence(state: ClientState, groupId: string): string | null {
+  const g = standOf(state).stranded.find((x) => x.groupId === groupId);
+  if (g === undefined) return null;
+  const name = g.roomiestZoneFree === 1 ? 'slot' : 'slots';
+  return (
+    `No constituency has ${g.count} empty ${name} — the roomiest has ${g.roomiestZoneFree}. ` +
+    `All ${g.count} voters from this ${g.source} are discarded (rule: a Voter Card's voters ` +
+    'cannot be split across constituencies).'
+  );
+}
+
+/**
+ * THE MARKET-SIDE WARNING, for the same rule seen BEFORE the purchase.
+ *
+ * A card that cannot be placed is still a card the player may buy — p10 does not
+ * make it illegal, it makes its voters vanish — so this is a warning on the card
+ * and never a disabled button. Disabling it would be a rule the rulebook does not
+ * have, and it would also be a control that cannot do anything, which §9.10 names
+ * as the prohibited case.
+ */
+export function cardStranded(state: ClientState, voters: number): boolean {
+  return voters > roomiestFree(state);
+}
+
+/** Free slots in the roomiest constituency. Public board state, no engine import. */
+export function roomiestFree(state: ClientState): number {
+  let best = 0;
+  for (const z of state.zones) {
+    let n = 0;
+    for (const a of z.areas) if (a.peg === null) n += 1;
+    best = Math.max(best, n);
+  }
+  return best;
 }
 
 // ─────────────────────────── the board projection ───────────────────────────

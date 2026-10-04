@@ -28,7 +28,7 @@
  * is deliberately no "spectating" prop driving a greyed-out look.
  */
 
-import type { ClientState, PlayerID, Pool } from '@shasn/engine';
+import type { ClientState, Delta, PlayerID, Pool, Resource } from '@shasn/engine';
 
 import {
   RESOURCE_ORDER,
@@ -39,6 +39,9 @@ import {
   marketLockout,
   poolTotal,
   freeSlotsIn,
+  standOf,
+  strandedSentence,
+  cardStranded,
 } from './derive.ts';
 import type { PendingVoters } from '@shasn/engine';
 import type { Link } from './store.ts';
@@ -282,21 +285,39 @@ export function ManifestoStrip({ state, you }: { state: ClientState; you: Player
 
 /** The pending voter groups. §6.1.1: a chip each, with the ONE ZONE badge. */
 export function PendingGroups({
+  state,
   groups,
   placingGroupId,
   pickedCount,
   disabled,
   onSelect,
 }: {
-  groups: readonly PendingVoters[];
-  placingGroupId: string | null;
-  pickedCount: number;
-  disabled: boolean;
-  onSelect: (groupId: string) => void;
+  readonly state: ClientState;
+  readonly groups: readonly PendingVoters[];
+  readonly placingGroupId: string | null;
+  readonly pickedCount: number;
+  readonly disabled: boolean;
+  readonly onSelect: (groupId: string) => void;
 }) {
+  /*
+    A GROUP THAT FITS NOWHERE SAYS SO ON THE CHIP, AT THE MOMENT IT IS DEALT.
+    p10 (`rules-reference.md:209-210`): *"If no single zone has enough empty areas
+    for a card's voters, all voters from that card are discarded."* The rule has
+    always been implemented — `placeableAreas` filters the legal set, `PLACE_VOTERS`
+    refuses the split, and the end-of-turn sweep discards the rest — so the voters
+    leave correctly and nothing is broken. What was missing is that the player is
+    never told, and a player handed three voters with nowhere to put them and never
+    told concludes the game is broken.
+
+    It is a CHIP BADGE and not a disabled button. The rule makes the voters vanish,
+    not the purchase illegal, and a control that cannot be pressed is §9.10's named
+    prohibited case; the sentence beside the chip is the whole fix.
+  */
+  const strandedSet = new Set(standOf(state).stranded.map((g) => g.groupId));
   if (groups.length === 0) {
     return <p className="panel__note panel__note--quiet">No voters waiting to be placed.</p>;
   }
+  const strandedHere = groups.filter((g) => strandedSet.has(g.id));
   return (
     <div className="col">
       <div className="groups">
@@ -313,9 +334,19 @@ export function PendingGroups({
             <span className="group__count">◈ {g.count}</span>
             <span className="group__source">{g.source}</span>
             {g.sameZone ? <span className="chip chip--positive">ONE ZONE</span> : null}
+            {strandedSet.has(g.id) ? (
+              <span className="chip chip--negative" data-testid="group-stranded">
+                NO ROOM ANYWHERE
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
+      {strandedHere.length > 0 ? (
+        <p className="panel__note panel__note--warn" data-testid="group-stranded-note">
+          {strandedHere.map((g) => strandedSentence(state, g.id) ?? '').join(' ')}
+        </p>
+      ) : null}
       {groups.length > 1 ? (
         <p className="panel__note">
           {groups.length} groups left to place — the tray empties at the end of your turn.
@@ -469,6 +500,7 @@ export function MarketStrip({
   you,
   disabled,
   disabledReason,
+  armed,
   onBuy,
 }: {
   state: ClientState;
@@ -485,6 +517,23 @@ export function MarketStrip({
    * reconnect. The caller knows which, because it is the one that decided.
    */
   disabledReason: string | null;
+  /**
+   * The market power armed on one slot, if any.
+   *
+   * PRESENT FOR ONE REASON, and it is the reason this component used to refuse a
+   * purchase the player could afford. `GameScreen`'s `buyMarketCard` has charged
+   * the DISCOUNTED cost ever since Helping Hands was folded into `INFLUENCE`,
+   * with a comment saying that checking the undiscounted cost would refuse a legal
+   * buy — and this strip checked the UNDISCOUNTED cost to decide whether to render
+   * the button live. So arm Helping Hands on a `2 funds · 2 trust` card while
+   * holding `1 funds · 3 trust`: the engine would accept the purchase and this
+   * strip rendered it dead. A player pressing a card they can afford, and nothing
+   * happening, with no reason anywhere.
+   *
+   * So affordability is computed against the same number the engine will charge,
+   * and the waived denominations are shown on the card rather than hidden.
+   */
+  armed: { readonly slot: number; readonly discounts: readonly Resource[] } | null;
   onBuy: (index: number) => void;
 }) {
   const p = state.players[you];
@@ -492,17 +541,40 @@ export function MarketStrip({
   return (
     <div className="market" data-testid="market">
       {state.market.map((slot, i) => {
-        const afford = RESOURCE_ORDER.every((r) => (slot.cost[r] ?? 0) <= p.resources[r]);
-        const miss = RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > p.resources[r]).map(
-          (r) => `${slot.cost[r]! - p.resources[r]} ${r} short`,
+        /*
+          THE COST THIS BUY ACTUALLY CHARGES. Identical to `applyDiscounts` on the
+          engine side, one denomination at a time, never below zero — a Helping
+          Hands use is spent whether or not it buys anything, so a discount on a
+          resource the card does not charge is shown as spent and gained nothing.
+        */
+        const waived =
+          armed !== null && armed.slot === i ? new Set(armed.discounts) : new Set<Resource>();
+        const charge: Delta = {};
+        for (const r of RESOURCE_ORDER) {
+          const raw = slot.cost[r] ?? 0;
+          const now = waived.has(r) ? Math.max(0, raw - 1) : raw;
+          if (now > 0) charge[r] = now;
+        }
+        const afford = RESOURCE_ORDER.every((r) => (charge[r] ?? 0) <= p.resources[r]);
+        const miss = RESOURCE_ORDER.filter((r) => (charge[r] ?? 0) > p.resources[r]).map(
+          (r) => `${charge[r]! - p.resources[r]} ${r} short`,
         );
         /*
-         * `mkt--unavail` IS THE LOOK OF "YOU CANNOT PRESS THIS", and it used to be
-         * gated on `!afford` alone — so a card that was unaffordable looked exactly
-         * like a card that was merely someone else's turn. Both are disabled; both
-         * now look disabled; and both say which they are.
-         */
+          `mkt--unavail` IS THE LOOK OF "YOU CANNOT PRESS THIS", and it used to be
+          gated on `!afford` alone — so a card that was unaffordable looked exactly
+          like a card that was merely someone else's turn. Both are disabled; both
+          now look disabled; and both say which they are.
+        */
         const unavailable = disabled || !afford;
+        /*
+          p10's discard, warned about BEFORE the purchase. "If no single zone has
+          enough empty areas for a card's voters, all voters from that card are
+          discarded" — which makes the voters vanish and NOT the purchase illegal.
+          So this is a warning printed on the card and never a disabled button:
+          refusing the sale would be a rule the rulebook does not contain, and it
+          would be a control that cannot do anything, which §9.10 names.
+        */
+        const stranded = cardStranded(state, slot.voters);
         return (
           <button
             key={`${slot.cardId}-${i}`}
@@ -515,7 +587,11 @@ export function MarketStrip({
           >
             <span className="mkt__cost">
               {RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > 0)
-                .map((r) => `${slot.cost[r]} ${r[0]!.toUpperCase()}`)
+                .map((r) =>
+                  waived.has(r)
+                    ? `${(slot.cost[r] ?? 0) - 1} ${r[0]!.toUpperCase()} (waived)`
+                    : `${slot.cost[r]} ${r[0]!.toUpperCase()}`,
+                )
                 .join(' · ') || 'free'}
             </span>
             <span className="mkt__voters">◈ {slot.voters}</span>
@@ -528,6 +604,11 @@ export function MarketStrip({
               </span>
             ) : null}
             {miss.length > 0 ? <span className="mkt__short">{miss.join(' · ')}</span> : null}
+            {stranded ? (
+              <span className="mkt__short" data-testid="market-stranded">
+                NO ROOM FOR THESE — they will be discarded
+              </span>
+            ) : null}
           </button>
         );
       })}
@@ -580,6 +661,7 @@ export function YourMat(props: YourMatProps) {
         PENDING VOTERS
       </h3>
       <PendingGroups
+        state={state}
         groups={me.pending}
         placingGroupId={props.placingGroupId}
         pickedCount={props.pickedCount}
@@ -691,8 +773,19 @@ export type MarketPanelProps = {
    */
   readonly playableConspiracies: readonly { readonly id: string }[];
   readonly onPlayConspiracy: () => void;
-  /** Which market slot holds an armed power, if any. Shown, not hidden. */
-  readonly armedSlot: number | null;
+  /**
+   * Which market slot holds an armed power, and what it waives. Shown, not hidden.
+   *
+   * The DISCOUNTS matter and are the reason this is the whole modifier rather than
+   * a slot index: `MarketStrip` prices a card against what the engine will charge,
+   * and the engine's charge is `applyDiscounts(cost, discounts)`. Handing it the
+   * index alone would leave it pricing against a number nobody charges, which is
+   * the silent-click defect this prop's docstring on `MarketStrip` describes.
+   */
+  readonly armed: {
+    readonly slot: number;
+    readonly discounts: readonly Resource[];
+  } | null;
 };
 
 /**
@@ -720,7 +813,7 @@ export function MarketPanel({
   onBuyConspiracy,
   playableConspiracies,
   onPlayConspiracy,
-  armedSlot,
+  armed,
 }: MarketPanelProps) {
   const me = state.players[you];
   if (me === undefined) return null;
@@ -745,6 +838,7 @@ export function MarketPanel({
         you={you}
         disabled={disabled}
         disabledReason={disabledReason}
+        armed={armed}
         onBuy={onBuy}
       />
       {lockout === null ? null : (
@@ -801,9 +895,9 @@ export function MarketPanel({
           {playableConspiracies.length === 1 ? 'CARD' : 'CARDS'} READY
         </button>
       ) : null}
-      {armedSlot === null ? null : (
+      {armed === null ? null : (
         <p className="panel__note" data-testid="armed-modifier">
-          A power is armed on market card {armedSlot + 1}. Buy that card to spend it, or press the
+          A power is armed on market card {armed.slot + 1}. Buy that card to spend it, or press the
           power again to cancel.
         </p>
       )}

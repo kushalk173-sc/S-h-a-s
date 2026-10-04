@@ -49,6 +49,7 @@ import { ConspiracyPicker, type PlayableConspiracy } from './ConspiracyPicker.ts
 import { ResponseWindow, type ResponsiveCard } from './ResponseWindow.tsx';
 import { openQuestionOf } from './blindWire.ts';
 import { TableQuestion } from './TableQuestion.tsx';
+import { StandBanner } from './StandBanner.tsx';
 import { windowLiveMessage } from './interrupt.ts';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
@@ -811,6 +812,22 @@ export function GameScreen({ store }: GameScreenProps) {
         <TableQuestion question={tableQuestion} answererName={answererName} />
       ) : null}
 
+      {/*
+        THE STAND OF THE BOARD, third panel in the same place and for the same
+        reason: table information, above the board, for every seat including a
+        spectator. It renders nothing until the engine says something true — a
+        game that is still going anywhere says so by being silent.
+
+        THE DEFECT THIS IS FOR: a real three-seat run sat at 490 turns with eight
+        constituencies held and Central one vote short with its last empty slot
+        right there, and every screen showed an ordinary game. A player cannot
+        concede a game they do not know is over, and they cannot tell a dead table
+        from a slow one. It does not end the game and does not say the game is
+        over — there is no such rule — so what it says is the one thing that is
+        true and was previously said nowhere.
+      */}
+      <StandBanner state={state} />
+
       <div className="shell__body">
 {/*
           THE BOARD'S BOX, AND WHAT ACTUALLY HOLDS IT UP.
@@ -976,7 +993,14 @@ export function GameScreen({ store }: GameScreenProps) {
                  */
                 playableConspiracies={myConspiracies ?? []}
                 onPlayConspiracy={() => openPicker({ forKind: 'conspiracy', total: state.conspiracyTopCost ?? 0, pick: {} })}
-                armedSlot={app.marketModifier?.slot ?? null}
+                armed={
+                  app.marketModifier === null
+                    ? null
+                    : {
+                        slot: app.marketModifier.slot,
+                        discounts: app.marketModifier.discounts,
+                      }
+                }
               />
             ) : (
               /* §5.11: the spectator treatment is the ABSENCE of controls, so the
@@ -1610,7 +1634,27 @@ function buyMarketCard(
 ): void {
   const me = state.players[you];
   const slot = state.market[index];
-  if (me === undefined || slot === undefined) return;
+  /*
+    THE SILENT BRANCH, AND IT WAS A REPORTED ONE.
+
+    "An affordable card click sometimes does nothing" was this line: a bare
+    `return` with no name on it. It is unreachable from the rendered strip — the
+    index comes from `state.market.map`, so the slot is always there and the seat
+    is always in `players` — which is exactly why it needed naming rather than
+    deleting. §9.10's rule is the whole of the argument: a branch that leaves
+    without acting and without saying why is indistinguishable, from outside, from
+    a broken control, and the cost of being wrong is a player who is told nothing
+    at all. This is the same invariant `powerInvariant.test.tsx` pins over
+    `onSlotActivate`, and it is pinned over this function too.
+  */
+  if (me === undefined) {
+    setRefusal('that seat is not in this game — nothing to buy with');
+    return;
+  }
+  if (slot === undefined) {
+    setRefusal('that Voter Card is no longer on the HQ Mat');
+    return;
+  }
 
   const mod = app.marketModifier?.slot === index ? app.marketModifier : null;
 

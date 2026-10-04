@@ -999,6 +999,35 @@
   text-align: left;
 }
 
+/* ── The stand of the board ───────────────────────────────────────────────────
+   One sentence, above the board, visible to every seat. Two tones and no
+   animation: the panel has to be readable by a player who has been staring at it
+   for two hundred turns, and a thing that pulses is a thing that becomes
+   furniture. `.stand--open` is never rendered — `StandBanner` returns null when
+   there is nothing true to say — so an empty banner cannot reserve space and
+   remind a healthy table that the game might be broken. */
+
+.stand {
+  margin: var(--sp-3) var(--sp-3) 0;
+  max-width: 46rem;
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 3px solid var(--ink-300);
+  background: var(--paper-050);
+}
+
+.stand--decided {
+  border-left-color: var(--warn-volatile);
+}
+
+.stand--dead {
+  border-left-color: var(--negative);
+}
+
+.stand__sentence {
+  margin: 0;
+  line-height: 1.45;
+}
+
 /* ── The answer's one frame ──────────────────────────────────────────────────
    §9.3 and §7.3: the payout is ONE readable moment. A single 300ms frame that
    fades in fully formed. NO count-up, NO card flip, NO reel, NO delay, and NO

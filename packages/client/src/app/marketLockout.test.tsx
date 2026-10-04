@@ -230,7 +230,7 @@ describe('the endgame: nothing affordable is a STATE, and it says so', () => {
         onBuyConspiracy={() => undefined}
         playableConspiracies={[]}
         onPlayConspiracy={() => undefined}
-        armedSlot={null}
+        armed={null}
       />,
     );
     const said = r.container.querySelector('[data-testid=market-lockout]');
@@ -273,7 +273,7 @@ describe('item 2 — an unavailable control LOOKS unavailable, and says which it
         onBuyConspiracy={() => undefined}
         playableConspiracies={[]}
         onPlayConspiracy={undefined as unknown as () => void}
-        armedSlot={null}
+        armed={null}
       />,
     );
 
@@ -317,7 +317,7 @@ describe('item 2 — an unavailable control LOOKS unavailable, and says which it
         onBuyConspiracy={() => undefined}
         playableConspiracies={[]}
         onPlayConspiracy={() => undefined}
-        armedSlot={null}
+        armed={null}
       />,
     );
     expect(r.container.querySelector('[data-testid=market-inert]')).toBeNull();

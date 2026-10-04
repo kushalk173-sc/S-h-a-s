@@ -272,6 +272,12 @@ const COMPUTED_TEXT: Readonly<Record<ComputedSource, string>> = {
   'your-gerrymander-rights': 'one per Gerrymander you have left this turn',
   'volatile-voters': 'one per voter you hold in a Volatile Area',
   'held-of-each-resource': 'for each you already hold',
+  // A computed count read off `GameState.revealedCards` — the cards a player
+  // turned face up during the current resolution. The map is exhaustive by TYPE,
+  // which is the point of it: a new `ComputedSource` in the engine stops
+  // compiling here rather than falling through to "a number this client cannot
+  // compute" on a live card.
+  'revealed-card': 'one per card you have revealed face up',
 };
 
 const DURATION_TEXT: Readonly<Record<EffectDuration, string>> = {

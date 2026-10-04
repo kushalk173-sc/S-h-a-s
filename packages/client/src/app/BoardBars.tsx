@@ -36,6 +36,7 @@ import {
   placementConsequence,
   placementRefusal,
   rightsHolder,
+  strandedSentence,
 } from './derive.ts';
 import { UI_RULES } from './derive.ts';
 
@@ -68,6 +69,14 @@ export function PlacementBar(props: PlacementBarProps) {
 
   const receipt = placementConsequence(state, props.you, picks);
   const ready = picks.length === group.count;
+  /*
+    THE GROUP FITS NOWHERE. The bar says so on entry, before a single slot is
+    picked, because the player opened this bar to find out whether they can place
+    these voters and the answer is no. The engine's rule is p10's own — all of them
+    are discarded — and this client says that in words rather than leaving the bar
+    to offer slots that `PLACE_VOTERS` will refuse.
+  */
+  const stranded = strandedSentence(state, group.id);
   // Clamped, so an over-full draft can never render "-1 more needed here". The
   // click that produced it is refused upstream, but a bar that prints a negative
   // count is worse than one that prints nothing.
@@ -94,6 +103,11 @@ export function PlacementBar(props: PlacementBarProps) {
         <strong>◈ {group.count} voters</strong>
         <span className="chip">{group.source}</span>
         {group.sameZone ? <span className="chip chip--positive">MUST SHARE ONE ZONE</span> : null}
+        {stranded !== null ? (
+          <span className="chip chip--negative" data-testid="placement-stranded">
+            NO ROOM ANYWHERE
+          </span>
+        ) : null}
         <span className="chip" data-testid="placement-counter">
           {picks.length} of {group.count} placed
         </span>
@@ -120,13 +134,15 @@ export function PlacementBar(props: PlacementBarProps) {
       </div>
 
       <p
-        className={`bar__constraint ${refusalLive ? 'bar__constraint--refused' : ''}`}
+        className={`bar__constraint ${stranded !== null ? 'bar__constraint--refused' : ''} ${refusalLive ? 'bar__constraint--refused' : ''}`}
         role="status"
         data-testid="placement-constraint"
       >
-        {refusalLive && refusal !== null
-          ? refusal.text
-          : lockedName === null
+        {stranded !== null ? (
+          stranded
+        ) : refusalLive && refusal !== null ? (
+          refusal.text
+        ) : lockedName === null
             ? group.sameZone
               ? 'Pick a slot. The first pick fixes the zone — the rest must join it.'
               : 'Pick up to ' + group.count + ' empty slots. They may go in any zones.'
