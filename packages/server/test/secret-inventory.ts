@@ -195,6 +195,25 @@ export const CHOICE_KINDS = {
   /** G16 — "a constituency of your choosing": names board areas, which are public. */
   'choose-zone': 'zones',
   /**
+   * G1 — "move one of your voters to an adjacent area": names TWO board areas.
+   *
+   * `'pegs'` and no fifth grade, and the reason is the whole argument. A `move-peg`
+   * decision names no resource, no seat and no card: it names the area a peg is standing
+   * in and the area it would land in, and every area of every constituency is on
+   * `ClientState.zones` for EVERY viewer, owner, opponent and spectator alike. The peg
+   * that stands there is face up too, which is why the same classification as
+   * `evict-voter` / `discard-voter` / `convert-voter` is literally the same set.
+   *
+   * **IT NEEDS NO RE-ARGUMENT ABOUT CARDS, and that is the point worth recording.**
+   * `choose-card` had to earn `'public-cards'` because a decision that names a card can
+   * be pointed at a hidden pile; this decision carries `count`, `scope`, `source`
+   * (a PlayerID) and `reason`, and **no `CardID` at all**, so `secret-state.test.ts`'s
+   * card assertion is not reachable from it and the narrowing there is untouched. A
+   * future decision that names a peg AND a card would need its own classification, and
+   * this one does not license that.
+   */
+  'choose-peg-dest': 'pegs',
+  /**
    * G17 — "a card of your choosing": names CARDS, and is the first entry here that does.
    *
    * `'public-cards'` is a fifth value and this file's own prose said the list was a
