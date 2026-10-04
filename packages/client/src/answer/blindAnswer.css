@@ -139,6 +139,17 @@
      content-length differences must not change box size. */
   min-height: 88px;
   display: flex;
+  /* COLUMN, and this is the fix for the two lines below having no type of their own.
+     Under the blind design a side held exactly ONE child — the answer — so the row
+     this inherited was harmless. Full information put two more spans inside it, and
+     three flex children competing for one row squeezed each of them to its
+     min-content width: the audit measured `.blind-answer__payout` at 53px wide and
+     115px tall, wrapping "pays 2 Fund · 1 Media" over five ragged lines beside the
+     answer, with the Ideologue as a second ragged strip in between. A printed card
+     reads top to bottom — the answer, whose answer, what it pays — so the three
+     parts are a column, and one declaration lays out both sides identically. */
+  flex-direction: column;
+  gap: var(--sp-2);
   align-items: center;
   justify-content: center;
   position: relative;
@@ -169,6 +180,72 @@
   max-width: 22ch;
   text-decoration: none;
   text-underline-offset: 2px;
+}
+
+/*
+   THE TWO LINES THAT HAD NO RULE AT ALL, and are now the two lines a player reads.
+   ═══════════════════════════════════════════════════════════════════════════════
+   Full information put the Ideologue and the payout on the card as two unstyled
+   `<span>`s, and `.blind-answer.css` had NO rule for either class. So they inherited
+   every visual property from the answer label — 17px, 700, INK_900, the display
+   serif — inside a `flex-direction: row`, which is how the payout became the
+   least legible thing on the card: the one datum the whole ruling exists to publish,
+   set at the same size and weight as the prose it was competing with, in a 53px
+   column.
+
+   So there are now three levels, and the point of them is that they are all
+   DIFFERENT: the answer is what you read, the attribution says whose it is, and the
+   payout is a figure. Every declaration is in LONGHAND rather than a `font:`
+   shorthand, for the reason the side rule above gives — jsdom does not expand a
+   shorthand, so a shorthand here would make the hierarchy unassertable and therefore
+   unguarded.
+
+   NONE OF IT IS PER-SIDE. All three rules are single-class and both sides carry the
+   same three, so nothing here can publish which Ideologue or which payout is in a
+   given position; the stylesheet audit below fails the build on any selector that
+   narrows a side rule, and these do not narrow one.
+*/
+
+/* WHOSE ANSWER IT IS — identity, set as a caption rather than as more prose. */
+.blind-answer__faction {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  /* Uppercase and tracked, which is what separates an attribution from a sentence
+     fragment. It was rendering as "the Capitalists' answer" in the answer's own
+     voice, immediately after the answer, with nothing between them — so it read as
+     a second clause of the answer rather than as a faction's name. */
+  text-transform: uppercase;
+  color: var(--ink-500);
+  text-align: center;
+  margin: var(--sp-1) 0 0;
+  max-width: 28ch;
+}
+
+/* WHAT IT PAYS — the published figure, on its own line under a hairline. */
+.blind-answer__payout {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 21px;
+  color: var(--ink-700);
+  text-align: center;
+  /* Tabular figures so two payouts can be compared by eye down the column without
+     the numerals dancing when they differ in digit count. */
+  font-variant-numeric: tabular-nums;
+  /* A rule above it, so the payout is a FIGURE on the card rather than the last
+     sentence of the answer. Same ink as the panel's own border, and drawn on both
+     sides identically. Written as three longhands rather than a `border-top`
+     shorthand for the reason the side rule gives: jsdom drops a shorthand's border
+     properties out of computed style, which would make this assertion vacuous. */
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: var(--ink-300);
+  padding-top: var(--sp-2);
+  margin: var(--sp-1) 0 0;
+  max-width: 26ch;
 }
 
 /* Hover: border colour and the label's underline. Identical on both sides, and

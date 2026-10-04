@@ -898,6 +898,185 @@ describe('the stylesheet itself contains no side-differentiating rule', () => {
  * to come back. The measured proof that both answers are inside a 390px viewport
  * is a browser measurement, and it is recorded in the commit that landed this.
  */
+describe('the three lines of a side have three DIFFERENT types', () => {
+  /**
+   * THE PAYOUT HAD NO RULE AT ALL.
+   *
+   * Full information added two unstyled `<span>`s inside `.blind-answer__side`, and
+   * the stylesheet had no rule for `.blind-answer__payout` or `.blind-answer__faction`
+   * — so both inherited the answer label's every visual property: 17px, 700, INK_900,
+   * the display serif. Inside a `flex-direction: row` that made the payout a 53px-wide,
+   * five-line ragged strip reading "pays / 2 / Fund / · 1 / Media", with the Ideologue
+   * as a second ragged strip beside it. The audit's closing judgement was that this is
+   * "the least legible thing on the card" — and it is the one datum the full-information
+   * ruling exists to publish.
+   *
+   * WHY IT SURVIVED EVERY GATE. Each existing assertion is about the two sides being
+   * EQUAL to each other. The payout and the Ideologue are perfectly symmetric — both
+   * sides carry the same class with the same inherited style — and completely
+   * unreadable. Symmetry and legibility are orthogonal and only the first was under
+   * test. So the assertion here is not "the payout is styled" but "the three lines
+   * are styled DIFFERENTLY from each other", which is the property that was missing.
+   *
+   * These are computed styles, so they read the stylesheet that actually reached the
+   * document — not a source regex. The values are literal px rather than a `font:`
+   * token because jsdom does not expand shorthands, and the reason the side rule is
+   * written in longhand is the same one.
+   */
+  function typeOf(container: HTMLElement, cls: string): Record<string, string> {
+    const el = container.querySelector<HTMLElement>(`.${cls}`);
+    expect(el, `${cls} rendered`).not.toBeNull();
+    const cs = window.getComputedStyle(el as Element);
+    const out: Record<string, string> = {};
+    for (const prop of [
+      'font-family',
+      'font-size',
+      'font-weight',
+      'line-height',
+      'color',
+      'text-align',
+      'text-transform',
+      'border-top-width',
+      'border-top-style',
+      'letter-spacing',
+    ]) {
+      out[prop] = cs.getPropertyValue(prop);
+    }
+    return out;
+  }
+
+  it('the payout has its own size, weight, leading and colour — not the label\'s', () => {
+    const { container, unmount } = render(
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+    );
+    const label = typeOf(container, 'blind-answer__label');
+    const payout = typeOf(container, 'blind-answer__payout');
+
+    // Real type, and not an accident of inheritance.
+    expect(payout['font-size'], 'the payout needs its own font-size').toBe('15px');
+    expect(payout['line-height'], 'and its own leading, or it is set solid').toBe('21px');
+    expect(payout['font-weight']).toBe('700');
+    // DIFFERENT from the answer's, which is the whole point: three lines, three
+    // levels. 17px/23px for the prose, 15px/21px for the figure.
+    expect(payout['font-size']).not.toBe(label['font-size']);
+    expect(payout['line-height']).not.toBe(label['line-height']);
+    // And a hairline above it, so it reads as a figure rather than as the last
+    // sentence of the answer.
+    expect(payout['border-top-width']).toBe('1px');
+    expect(payout['border-top-style']).toBe('solid');
+    expect(payout['text-align']).toBe('center');
+    // Tabular figures, so two payouts compare down the column without the numerals
+    // shifting when they differ in digit count. jsdom does not resolve
+    // `font-variant-numeric`, so this one is read from the source.
+    expect(CSS_RULES).toMatch(/\.blind-answer__payout\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/);
+    unmount();
+  });
+
+  it('the Ideologue reads as an attribution, not as a second clause of the answer', () => {
+    const { container, unmount } = render(
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+    );
+    const label = typeOf(container, 'blind-answer__label');
+    const faction = typeOf(container, 'blind-answer__faction');
+    const payout = typeOf(container, 'blind-answer__payout');
+
+    expect(faction['font-size']).toBe('13px');
+    expect(faction['font-weight']).toBe('600');
+    expect(faction['line-height']).toBe('16px');
+    // The three levels are strictly ordered, so the eye can rank them at a glance:
+    // the answer is the largest, the payout next, the attribution a caption.
+    expect(Number(faction['font-size'].replace('px', ''))).toBeLessThan(
+      Number(payout['font-size'].replace('px', '')),
+    );
+    expect(Number(payout['font-size'].replace('px', ''))).toBeLessThan(
+      Number(label['font-size'].replace('px', '')),
+    );
+    // Tracked and uppercased, which is what makes a fragment read as a name rather
+    // than as prose continuing the sentence above it.
+    expect(faction['text-transform']).toBe('uppercase');
+    expect(faction['letter-spacing']).not.toBe('normal');
+    expect(faction['letter-spacing']).not.toBe(label['letter-spacing']);
+    unmount();
+  });
+
+  it('the three lines stack down the card, side by side with nothing', () => {
+    // The row was the reason the other two were squeezed: three flex children
+    // competing for one line, each shrunk to its min-content width. A column is what
+    // a printed card does, and it is one declaration covering both sides.
+    const start = CSS_RULES.indexOf('.blind-answer__side {');
+    const base = CSS_RULES.slice(start, CSS_RULES.indexOf('}', start));
+    expect(base).toContain('flex-direction: column;');
+    expect(base).not.toMatch(/flex-direction:\s*row/);
+    // `align-items: center` (not `stretch`) so each line is its own natural width up
+    // to its own max-width, instead of all three being stretched to the panel.
+    expect(base).toContain('align-items: center;');
+  });
+
+  it('the payout and the Ideologue are the SAME on both sides, byte for byte', () => {
+    // The hierarchy above must not become a channel. Each line is a single class
+    // applied to both sides, so their computed styles are equal — and this is the
+    // assertion that would fail first if anyone ever styled one of them per side.
+    const { container, unmount } = render(
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+    );
+    const each = sides(container).map((side) => [
+      typeOf(side, 'blind-answer__label'),
+      typeOf(side, 'blind-answer__faction'),
+      typeOf(side, 'blind-answer__payout'),
+    ]);
+    expect(each).toHaveLength(2);
+    for (const line of [0, 1, 2]) {
+      const [a, b] = each.map((e) => e[line]);
+      expect(a, `line ${line} differs between the two sides`).toEqual(b);
+    }
+    unmount();
+  });
+});
+
+describe('the three lines of a side are laid out by single-class rules', () => {
+  it('neither new rule qualifies by side, position, or Ideologue', () => {
+    // `blindAnswer.test.tsx`'s own stylesheet audit forbids a narrowed SIDE rule;
+    // these two rules name a CHILD of the side, so that audit does not see them.
+    // This is the assertion that covers the gap: a rule that reached into
+    // `.blind-answer__side` to tint or resize one of its lines per side would publish
+    // the position's Ideologue, which is the one channel PLAN.md 2 amendment A'
+    // exists to prevent — and with the Ideologue printed on the card it is now a
+    // real channel rather than a hypothetical one.
+    const selectors = [...CSS_RULES.matchAll(/([^{}]+)\{/g)]
+      .map((m) => (m[1] ?? '').trim())
+      .filter((s) => s.includes('blind-answer__payout') || s.includes('blind-answer__faction'));
+    expect(selectors.length, 'both lines have a rule').toBeGreaterThanOrEqual(2);
+    for (const selector of selectors) {
+      expect(
+        ['.blind-answer__payout', '.blind-answer__faction'],
+        `"${selector}" qualifies a line rule`,
+      ).toContain(selector);
+    }
+  });
+
+  it('neither line is keyed on anything that arrives from the wire', () => {
+    // No attribute selector anywhere in the stylesheet may mention a side, a face,
+    // an Ideologue or a payout VALUE — the audit's `carries NO order` test proves
+    // the markup has nothing to key on, and this proves the CSS does not go looking.
+    //
+    // `[aria-pressed]` is deliberately NOT in this list: the chosen state uses it, it
+    // is a statement about the ANSWER rather than about a side, and it is drawn
+    // identically whichever side is chosen (asserted above). What must never appear
+    // is an attribute that says WHICH SIDE or WHAT it holds.
+    for (const forbidden of [
+      /\[data-wire-side/i,
+      /\[data-side/i,
+      /\[data-ideologue/i,
+      /\[data-pays/i,
+      /\[data-face/i,
+    ]) {
+      expect(CSS_RULES.match(forbidden), `blindAnswer.css must not contain ${forbidden}`).toBeNull();
+    }
+    // And no descendant selector reaches from a side to one of its lines at all.
+    expect(CSS_RULES).not.toMatch(/\.blind-answer__side\s+\.blind-answer__/);
+  });
+});
+
 describe('both answers fit the viewport, at every width', () => {
   it('the panel grid can shrink below its content — minmax(0, 1fr), never bare 1fr', () => {
     const decls = [...CSS_RULES.matchAll(/grid-template-columns:\s*([^;]+);/g)].map((m) => m[1] ?? '');
