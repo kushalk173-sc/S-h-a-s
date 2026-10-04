@@ -1028,6 +1028,23 @@
   line-height: 1.45;
 }
 
+/* — Why your last press did nothing ————————————————————————————————
+   One line, in the same band as `.stand`, because it is the same kind of thing:
+   a sentence the player has to read, in the space above the board where this
+   client already puts what it wants read. No border-left on the neutral ink —
+   this is not table information, it is about something that just happened to
+   YOU, and the warning colour is what makes it read as one. */
+
+.refusal {
+  margin: var(--sp-2) var(--sp-3) 0;
+  max-width: 46rem;
+  padding: var(--sp-2) var(--sp-4);
+  border-left: 3px solid var(--warn-volatile);
+  background: var(--paper-050);
+  color: var(--ink-100);
+  line-height: 1.45;
+}
+
 /* ── The answer's one frame ──────────────────────────────────────────────────
    §9.3 and §7.3: the payout is ONE readable moment. A single 300ms frame that
    fades in fully formed. NO count-up, NO card flip, NO reel, NO delay, and NO

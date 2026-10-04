@@ -50,6 +50,7 @@ import { ResponseWindow, type ResponsiveCard } from './ResponseWindow.tsx';
 import { openQuestionOf } from './blindWire.ts';
 import { TableQuestion } from './TableQuestion.tsx';
 import { StandBanner } from './StandBanner.tsx';
+import { RefusalLine } from './RefusalLine.tsx';
 import { windowLiveMessage } from './interrupt.ts';
 import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
@@ -61,6 +62,7 @@ import {
   applyConnectionStatus,
   beginPlacement,
   clearPowerTarget,
+  clearRefusal,
   clearMarketModifier,
   clearMarketPower,
   clearToughLove,
@@ -828,6 +830,27 @@ export function GameScreen({ store }: GameScreenProps) {
         true and was previously said nowhere.
       */}
       <StandBanner state={state} />
+
+      {/*
+        AND WHY YOUR LAST PRESS DID NOTHING, fourth panel in the same place.
+
+        This one is not table information, it is a sentence about something that
+        happened to THIS seat, and it existed in `store.ts` for a year of commits
+        with no renderer outside two bars that are only mounted during a
+        placement or a gerrymanding. Every refusal from the market, the powers
+        tray, the TRADE row, the Conspiracy buttons and `send` itself was written
+        and shown to nobody. Found in a browser: an enabled market card, a real
+        click, no frame on the wire and not one word on the page.
+
+        `suppressed` hands the message back to the bar that flashes its own copy,
+        so a refusal raised mid-placement is still said once, where the decision
+        is being made, and not twice.
+      */}
+      <RefusalLine
+        refusal={app.refusal}
+        suppressed={placingGroup !== null || app.gerryZoneId !== null}
+        onExpire={clearRefusal}
+      />
 
       <div className="shell__body">
 {/*
