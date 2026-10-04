@@ -398,8 +398,7 @@ export function decodeAction(value: unknown): Action | null {
 function choicePick(value: unknown): ChoicePick | null {
   if (!isRecord(value)) return null;
   const kind = value['kind'];
-  switch (kind) {
-    case 'resources': {
+  switch (kind) {    case 'resources': {
       if (!keysOnly(value, ['kind', 'res'])) return null;
       const res = delta(value['res']);
       return res === null ? null : { kind, res };
@@ -445,6 +444,26 @@ function choicePick(value: unknown): ChoicePick | null {
       if (!keysOnly(value, ['kind', 'zoneId'])) return null;
       const zoneId = zone(value['zoneId']);
       return zoneId === null ? null : { kind, zoneId };
+    }
+    /**
+     * G17 — the card's RECIPIENT named one card out of the published recycle list.
+     *
+     * **A `cardId` HERE IS NOT A CARD THE SERVER MAY HAVE NEVER HEARD OF**, and that is
+     * the whole reason this arm is not a formality. `cardId` is an opaque bounded string
+     * for the reason every other id in this file is: this module decides what the WIRE
+     * may carry, and `reduce` is the only authority on whether the named card is on the
+     * recycle list right now. What this arm adds is that a `choose-card` decision is
+     * ANSWERABLE at all — the missing-arm shape the `'player'` note above is about, in a
+     * place where a wrong answer would have been a `CardID` from the draw pile rather
+     * than a dead seat.
+     *
+     * `MAX_ID` and not something tighter because a card id is the same length of opaque
+     * string as every other id here, and `MAX_PAYLOAD_BYTES` bounds the frame.
+     */
+    case 'card': {
+      if (!keysOnly(value, ['kind', 'cardId'])) return null;
+      const cardId = str(value['cardId'], MAX_ID);
+      return cardId === null ? null : { kind, cardId };
     }
     default:
       return null;

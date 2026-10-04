@@ -17,7 +17,7 @@ Two engine changes, in this order, each a green commit. `npm run playable` — w
 schema accepts it — went from **14 of 54** to **18 of 54**, and then from **21 of 54**
 to **23 of 54** in the phase-machine iteration recorded in 2 G13. Shipping BLOCK and DEFLECT did not
 move that number - the probe writes its own reduction rather than reading the deck - but it turned
-**23 into a shipped fact**. *(HISTORY: the count on the day that iteration landed was 25 of 54, and `packages/server/test/interrupt-window.test.ts` is what proved the window itself safe to ship. The present-tense figure is **34 of 54** — see §2 G5 and `npm run playable`.)*
+**23 into a shipped fact**. *(HISTORY: the count on the day that iteration landed was 25 of 54, and `packages/server/test/interrupt-window.test.ts` is what proved the window itself safe to ship. The present-tense figure is **40 of 54** — see §2 G5 and `npm run playable`.)*
 
 | gap | what landed | cards moved |
 |---|---|---|
@@ -121,19 +121,55 @@ the playability count; a table here that disagrees with the decks is worse than 
 |---|---:|---:|
 | Recovered X-card rows probed (REF §4.1–§4.3) | 54 | **54** |
 | …distinct after de-duplicating the campaign reskins | 51 | **51** |
-| …**PLAYED**, measured by driving each through `reduce()` | 14 | **37** |
-| …shipped `adapted`, dropped clause named in `source` | 7 | **30** |
+| …**PLAYED**, measured by driving each through `reduce()` | 14 | **40** |
+| …shipped `adapted`, dropped clause named in `source` | 7 | **31** |
 | …playable but **held back on a ruling** (LAB-GROWN EARWORM) | 0 | **1** |
-| …**not representable at all** | 43 | **17** |
-| Cards shipped in the corpus | 60 | **127** |
-| `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 41 / 86** |
+| …**not representable at all** | 43 | **14** |
+| Cards shipped in the corpus | 60 | **151** |
+| `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 41 / 110** |
 | `inferred` placeholders retired for a recovered card | 0 | **9** |
 
-The 51 distinct recovered cards are 30 shipping + 1 held back + 17 not representable, and
-`npm run playable` agrees: 54 rows probed (the three campaign reskin pairs are probed under both
-names, because a duplicate is cheaper to keep visible than to deduplicate by hand), 37 played,
-0 refused, 0 played-but-no-op, 17 inexpressible.
+Of the 51 distinct recovered cards, **31 ship as `adapted`** — which is exactly the 31
+Conspiracy and Headline Cards the deck files tag `adapted` — **1** (LAB-GROWN EARWORM)
+plays and is held back on a ruling, and the remainder are not representable. `npm run
+playable` measures the ENGINE rather than the decks and reads **54 rows probed, 40 played,
+0 refused, 0 played-but-no-op, 14 inexpressible** (the three campaign reskin pairs are
+probed under both names, because a duplicate is cheaper to keep visible than to
+deduplicate by hand). The two counts differ for the reason §0bis states repeatedly: the
+probe writes its own reduction, so a card can be playable without being in the corpus.
+**Corpus composition, counted off `decks/**/*.json` and not paraphrased:** 76 Ideology /
+18 Voter / 27 Conspiracy / 30 Headline; **41 `adapted`, split 31 Conspiracy-and-Headline
+reconstructions and 10 Ideology Cards carrying a recovered question stem only**; 110
+`inferred`; **0 `verbatim`**.
 
+### 0.1 THE FIDELITY FACT, stated once, because no other document states it
+
+Counted off `decks/**/*.json` and `decks/SOURCES.md` §4 on 2026-10-04. Every figure here is
+a count, not an estimate.
+
+- **151 cards ship. 41 are `adapted`; 110 are `inferred`.** Only **31 of 151 — 21% — are
+  recovered real material**: the 31 Conspiracy and Headline Cards the decks tag `adapted`.
+  The other 10 `adapted` cards are Ideology Cards carrying a recovered question stem and
+  nothing else.
+- **All 76 Ideology Cards are authored**, and that is the deck a player handles on every
+  single turn. They rest on **ten recovered question stems** (`ig-in2020-001…008`, `-031`,
+  `-032`); every Ideology Card past `ig-in2020-032` is authored outright, and **no answer
+  side of any real Ideology Card was ever recovered** — REF §2.4 and §10 item 1.
+- **23 of the 54 named recovered cards are absent from the corpus entirely**: 17 rows in
+  `SOURCES.md` §4 are not representable, 3 (DEEP THOUGHTS, THE GRETA EFFECT, POLO RETREAT)
+  are expressible and played but not yet in `decks/`, 1 (LAB-GROWN EARWORM) plays and is
+  held back on a ruling, and 2 more are names recovered without an effect (CRUSHED UNDER
+  BELLY, IFTAR PARTY).
+- **X-card coverage**, by §4's own sections: Earth 2040 Conspiracy **11 of 16** rows and
+  Earth 2040 Headline **14 of 20** rows ship, which is **25 of the 35 distinct Earth 2040
+  names**; India Conspiracy **1 of 3** and the all-campaign Headline section **7 of 15**,
+  which is **6 of 18 named India rows**. `SOURCES.md` §6 note 3 records that REF §4.1's
+  own heading claims 19 Headline Cards where only 15 are listed, so a denominator of 22 for
+  India is reachable only by counting cards REF never printed.
+
+The `verbatim` tier is **0** and that is the rule, not an oversight — `README.md` states it
+and §0's `verbatim` row is measured. Dropping no clause is not reproducing text, which is
+why `ct-et2040-017` and `ct-et2040-018` both drop nothing and both stay `adapted`.
 
 ### 0.2 The finding, and what changed about it
 
@@ -180,6 +216,33 @@ Their `text` now states what the engine does (`hl-et2040-002`, `hl-et2040-003`,
 `ct-et2040-002` was worse: ERADICATING GERMS read *"Gain 1 resource, discard 1
 resource"*, which is not that card at all. It is now the market refresh plus the
 resource, which is the real card's single resolution.
+
+### 0.4 Two comments outside this package still assert an invariant that is false
+
+`packages/engine/**` and `packages/server/**` are not this package's to edit, so these are
+recorded here for their owner rather than fixed. Both say *"the pile can only GROW"*, which
+was true while the Conspiracy discard pile was server-only and is false now that
+`draw-conspiracy` has two **take** paths — `reduce.ts:1544` and `reduce.ts:1561` each remove
+from `_conspiracyDiscard` by index.
+
+| file:line | what it asserts | why it is false |
+|---|---|---|
+| `packages/engine/src/reduce.ts:3386` | *"Between the two the pile can only GROW — `PLAY_CONSPIRACY` appends the card it just played … so the accepted set is a SUPERSET of the offered one"* | The take paths **shrink** the pile between the raise-time copy and the answer-time read, so the accepted set is `offered minus already-taken`, not a superset. The stated safety direction — a dialog can never offer a button the server refuses — does not hold as written. |
+| `packages/engine/src/state.ts:578` | the same claim, on `Choice.cards` | Same defect. Its own field comment 37 lines above it (`:549`) records that the take paths log `Picked "NAME"` — the departure is announced — which is what makes the **reconstruction** an equality, and that is a different property from the pile being append-only. |
+
+The invariant to state instead is: *the published list equals the replay of `Played` and
+`Picked` over the public log, in order*. `state.ts:541`, `broadcast.ts:298` and
+`secret-inventory.ts:211`/`:323` already say that, and so does
+`packages/cards/schema/card.schema.json`'s `draw-conspiracy` `$comment` as of 2026-10-04 —
+it previously said a card *"leaves the pile silently on both `draw-conspiracy` take paths"*,
+which was false once the departures were announced and was a security defect while it was.
+
+**And the old "three writers" figure is already gone from four of the five places it was
+recorded.** `state.ts:541`, `broadcast.ts:298` and `secret-inventory.ts:211`/`:323` now say
+four assignment sites reached by six write paths. The survivor is
+`packages/server/test/secret-state.test.ts:2207` (*"exactly three writers"*), whose own
+comment at `:2515` states that figure is wrong — so the prose and the assertion in that one
+file still disagree with each other.
 
 ---
 
@@ -570,7 +633,7 @@ exercised** (20 answers and 80 all-declines at two seats; at 3, 4 and 5 the driv
 greedy and answers every window it is asked first on, so the all-declines route is measured
 on the uninformed table instead — 101/137/206/204 windows, every one closed by declines).
 `npm run playable` was unchanged at **25 of 54** by this iteration, because the probe writes
-its own reduction rather than reading the deck. *(History. The present-tense figure is 34 of 54.)*
+its own reduction rather than reading the deck. *(History. The present-tense figure is 40 of 54.)*
 
 ### G14 — no `when`: effects that trigger on other events
 
@@ -809,7 +872,7 @@ owner. THE BIG FREEZE is a cap change or a per-turn donation, and a cap change i
 
 **State: (a) for the SELECTOR. The selector is done; the `fill-zone` op is not, and
 one clause got WIDER rather than narrower.** Cards: JUST BREATHE, NERO'S GUESTS and CUT
-COPY AND PASTE **all ship** - **27 -> 30 of 54, measured by playing** *(history; the present-tense figure is 34 of 54)*. Zero refused,
+COPY AND PASTE **all ship** - **27 -> 30 of 54, measured by playing** *(history; the present-tense figure is 40 of 54)*. Zero refused,
 zero no-op.
 
 `ZoneSelector` in `packages/engine/src/cards.ts` is three values, and each is a
@@ -923,7 +986,7 @@ card and suppress passive income; `Effect` is a list applied inside one turn.
 
 **State: (c) → the MECHANISM LANDED, and two real cards with it.** `move-card` executes,
 `PlayerState.ideologyCards` exists, and the ruling on blind answers is made, argued and
-tested. **23 → 25 of 54** *(history; the present-tense figure is 34 of 54)*.
+tested. **23 → 25 of 54** *(history; the present-tense figure is 40 of 54)*.
 
 **The ruling, in one line: a moved Ideology Card is HELD AND HIDDEN — from everyone,
 including the player it was given to — and is put to that player at their next turn
@@ -1418,7 +1481,7 @@ longer -- that test is the only thing holding the two clocks together.
 its face.** GENDER TROUBLE (`REF 4.3`: *"You cannot use one of your unlocked Level 3
 Ideologue Powers in your next turn"*) is expressible and executable — `restrict` with kind
 `no-power`, read by `powers.ts usesLeft` — and it shipped as soon as the corpus gate below
-was removed by the server owner. `npm run playable` is **34 of 54** with it PLAYED.
+was removed by the server owner. `npm run playable` is **40 of 54** with it PLAYED.
 
 **THE GATE IS GONE, and it was a corpus gate rather than an engine one — which is what
 this section always said it was.** `packages/server/test/corpus.test.ts` used to pin the
@@ -1657,10 +1720,12 @@ board ⇒ less slack for the driver on the seeds that were already marginal.
   suite for a corpus reason rather than a design one. Nothing was deleted here.
 - **The pre-existing `ig-in2020-006` unequal payout was left alone**, and is named in
   `test/ideology-variety.test.ts` rather than fixed, for the same reason.
-- **The 20 inexpressible recovered cards were not touched.** Every one is blocked on a
-  mechanism in `reduce()` / `state.ts` - G1, G5, G11, G12, G13, G15, G17, G18, G20 - and
-  none of this iteration moved any of them. `npm run playable` is unchanged at **34 of 54**,
-  which is the measurement that says so.
+- **The 17 recovered-card rows §4 lists as not representable were not touched.** Every
+  one is blocked on a mechanism in `reduce()` / `state.ts` - G1, G5, G11, G12, G13, G15,
+  G17, G18, G20 - and none of this iteration moved any of them. `npm run playable` reads
+  **40 of 54** with **14 inexpressible**, which is the measurement that says so; the gap
+  against §4's 17 is A COWARD OR A JOURNALIST? / CARD GAMES, which §3.1 below records as
+  playing since.
 
 ---
 

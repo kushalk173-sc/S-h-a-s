@@ -210,6 +210,56 @@ function discardTo(state: GameState, deck: DeckName, cardId: CardID): GameState 
   return { ...state, [DISCARD[deck]]: [...state[DISCARD[deck]], cardId] };
 }
 
+/**
+ * ANNOUNCE A CARD LEAVING THE RECYCLE PILE. `Picked "NAME".`, by the RECIPIENT.
+ *
+ * ## WHY A DEPARTURE HAS TO BE SPOKEN ALOUD
+ *
+ * Every other writer of `_conspiracyDiscard` puts a card ON the pile and is heard
+ * doing it: `PLAY_CONSPIRACY` and `RESPOND_INTERRUPT` both write `Played "NAME".` in the
+ * same breath. These two paths are the departures, and a departure that is not announced
+ * is a side channel rather than an absence. The pile is PUBLIC — it is
+ * `PublicView.conspiracyRecycle` — so a spectator holding two payloads can diff them,
+ * see a named card leave with no log line, and combine that silence with the public
+ * `Played "NAME".` to learn the card is now in a `PRIVATE_PLAYER_KEYS` hand. One card of
+ * a hidden hand, disclosed to the whole table, by nothing but a missing line.
+ *
+ * So the departure is announced instead, and that is not a concession — it is the faithful
+ * behaviour. The Conspiracy discard pile is face up at a real table; everyone watching
+ * sees which card a player lifts off it and into whose hand it goes. Announcing removes
+ * the covert channel by making the event legitimately public, which is the same
+ * information the deduction already yields.
+ *
+ * ## AND IT REPAIRS THE PILE'S DERIVABILITY
+ *
+ * `pile = announced-Played minus announced-Picked`, in order, modulo a reshuffle. Every
+ * departure now has a line, so the replay in `packages/server/test/secret-state.test.ts`
+ * reconstructs the pile exactly and U1's safety argument is TRUE rather than merely
+ * plausible. Before this line the reconstruction was a SUBSET relation and the pile could
+ * silently lose a card — the 13% of real states where a played card is picked straight
+ * back up, which no fixture reached and the deduction did.
+ *
+ * ## THE RECIPIENT, NOT THE ACTOR
+ *
+ * `draw-conspiracy` hands the card to a resolved target, and the announcement says who
+ * now holds it. The actor is the card's player, who is on the log for the play itself.
+ *
+ * ## FAILS LOUD, NOT SILENT
+ *
+ * A card the index cannot name is announced WITHOUT a name rather than not at all. The
+ * alternative is the exact bug this function exists to close, and it is unreachable
+ * besides: every id on the pile got there via a `Played` line, and `PLAY_CONSPIRACY` and
+ * `RESPOND_INTERRUPT` both refuse a `cardId` the index cannot read.
+ */
+function announcedPick(state: GameState, recipient: PlayerID, cardId: CardID, ctx: Ctx): GameState {
+  const card = ctx.cards.conspiracy[cardId];
+  return log(state, {
+    player: recipient,
+    text: card === undefined ? 'Picked a Conspiracy Card.' : `Picked "${card.name}".`,
+    kind: 'card',
+  });
+}
+
 /** p10: three face-up Voter Cards must always be available on the HQ Mat. */
 function refillMarket(state: GameState, ctx: Ctx): GameState {
   let s = state;
@@ -1213,6 +1263,23 @@ function applyEffect(
    */
   forced: PlayerID | null = null,
   forcedZone: ZoneID | null = null,
+  /**
+   * G17 — the card a `'choose-card'` decision has already resolved to, or `null` for
+   * an ordinary resolution.
+   *
+   * **THIS IS THE WHOLE OF THE CASCADE BOUND, and it is the `'chosen-player'` /
+   * `'chosen-zone'` argument verbatim.** `draw-conspiracy { pick: true }` raises a
+   * decision and carries its own effect list, so `resolveChoice` re-runs that effect
+   * with the named card handed back in here. The case then takes THAT card instead
+   * of raising again, so one resolution can consume exactly as many cards as the
+   * decision it answered named — and a pile of *n* is finite, so the chain is
+   * `min(n, pile.length)` long whether or not anybody is trying to make it longer.
+   *
+   * It is a PARAMETER rather than a field on the effect because a card must not be
+   * able to say "take THIS card": the choice is the player's, and a card that could
+   * pre-commit one would make `pick` a lie.
+   */
+  forcedCard: CardID | null = null,
 ): GameState {
   let s = state;
   const target = 'target' in effect ? (effect.target ?? 'you') : 'you';
@@ -1387,29 +1454,105 @@ function applyEffect(
       return s;
     }
     case 'draw-conspiracy': {
-      // G17: `from: 'discard'` takes the most recently DISCARDED card rather than the
-      // top of the draw pile. `discardTo` pushes onto the end of the pile and `draw`
-      // shifts off the front, so "the top of the discard pile" is `length - 1` — and
-      // picking it that way is deterministic, which a reshuffle would not be.
+      // G17: `from: 'discard'` takes from the DISCARD pile rather than the top of the
+      // draw pile. `discardTo` pushes onto the end of the pile and `draw` shifts off
+      // the front, so "the top of the discard pile" is `length - 1` — and picking it
+      // that way is deterministic, which a reshuffle would not be.
       //
-      // No `choose-card`: SELECTIVE ACCESS MEMORY's "any card, in any order" needs a
-      // decision over the pile's contents, and a new `Choice` kind is a wire-format
-      // change the client owns. The top of the pile is the honest subset.
+      // THE THREE SHAPES THIS CASE HAS, and only one of them publishes anything:
+      //
+      //   no `pick`              take the top. Deterministic, silent, the shape every
+      //                          shipped card has always had.
+      //   `pick: true`           raise a `'choose-card'` naming the recycle list. The
+      //                          ONLY enumerated set in the game, and U1's whole reason.
+      //   `forcedCard`           the answer to such a decision, arriving here so the
+      //                          re-run cannot raise again (the cascade bound).
+      //
+      // `to: 'discard'` is honoured only from the public pile — see the field's note in
+      // `cards.ts` for why the draw-pile pairing is refused rather than merely unused.
       const fromDiscard = effect.from === 'discard';
+      const toDiscard = effect.to === 'discard';
+      if (toDiscard && !fromDiscard) {
+        // Silent refusal. No log, no event, no state change — "this clause did not
+        // fire" is not a thing a client can act on, and a message would describe the
+        // draw pile. `to: 'discard'` therefore has exactly one legal source and a
+        // corpus card cannot reach the other without the schema's own enum refusing.
+        return s;
+      }
       for (const p of resolveTargets(s, source, target, forced)) {
-        // G17's `onlyIfEmpty`, which is what makes AS CLEAR AS WATER expressible: a
-        // resolved player who is already holding a Conspiracy Card is skipped and
-        // takes nothing. The check is on the RECIPIENT, because a Conspiracy Card is
-        // bought and held and its hand is hidden from every viewer including its owner,
-        // so this reads a fact nobody at the table can see and nothing here discloses
-        // which players were skipped. There is no log line and no event on this path,
-        // and that is deliberate rather than forgotten: "p2 was given a card" would be a
+        // `onlyIfEmpty`, which is what makes AS CLEAR AS WATER expressible: a resolved
+        // player who is already holding a Conspiracy Card is skipped and takes nothing.
+        // The check is on the RECIPIENT, because a Conspiracy Card is bought and held
+        // and its hand is hidden from every viewer including its owner, so this reads a
+        // fact nobody at the table can see and nothing here discloses which players were
+        // skipped. There is no log line and no event on this path, and that is
+        // deliberate rather than forgotten: "p2 was given a card" would be a
         // disclosure about a hidden hand.
         const holder = s.players[p];
         if (effect.onlyIfEmpty === true && holder !== undefined && holder.conspiracies.length > 0) {
           continue;
         }
-        for (let i = 0; i < resolveCount(s, p, effect.n, ctx); i++) {
+        const want = resolveCount(s, p, effect.n, ctx);
+        if (effect.pick === true) {
+          // G17's `pick`, and both of its refusals, in one place.
+          //
+          // REFUSED unless `from: 'discard'`, which is the only set every client already
+          // holds in full. A decision's OPTION LIST is the disclosure (§2bis), so a
+          // `pick` over `_conspiracyDraw` raises NOTHING rather than raising a dialog
+          // whose buttons enumerate a hidden pile. And `forcedCard` short-circuits the
+          // whole branch — that is the answer arriving back from `resolveChoice`, and it
+          // is what stops one resolution from consuming the pile (the cascade bound, and
+          // the `'chosen-player'` / `'chosen-zone'` argument verbatim).
+          if (forcedCard === null) {
+            if (!fromDiscard) return s;
+            const pile = s._conspiracyDiscard;
+            if (pile.length === 0) continue;
+            // ONE DECISION PER CARD, and never more of them than the pile holds. That
+            // second half is the satisfiability proof rather than a courtesy: the k-th
+            // of these is answered when `pile.length - (k - 1)` cards remain, so the
+            // last one is answered with exactly one card left and always has a legal
+            // pick. An over-eager `n` therefore lengthens the chain and cannot strand
+            // it — the same shape as `'chosen-zone'` raising nothing for an empty
+            // candidate set, and U1's whole termination claim.
+            for (let k = 0; k < Math.min(want, pile.length); k++) {
+              s = pushChoice(
+                s,
+                {
+                  kind: 'choose-card',
+                  count: 1,
+                  cards: [...pile],
+                  effects: [effect],
+                  source: p,
+                  reason: 'Card effect',
+                },
+                p,
+              );
+            }
+            continue;
+          }
+          // The named card, taken out of the recycle list by commitment rather than by
+          // enumeration. `resolveChoice` validated it against the live pile; the `at <
+          // 0` branch is the pile having emptied between raise and answer, where the
+          // safe direction is the deterministic top — the same fallback `resolveZone`
+          // uses rather than narrowing a decision's target set to nothing.
+          const live = s._conspiracyDiscard;
+          const at = live.indexOf(forcedCard);
+          const taken = at < 0 ? live[live.length - 1] : live[at];
+          if (taken === undefined) continue;
+          s = {
+            ...s,
+            _conspiracyDiscard: at < 0 ? live.slice(0, -1) : [...live.slice(0, at), ...live.slice(at + 1)],
+          };
+          const player = s.players[p];
+          if (player) s = withPlayer(s, p, { conspiracies: [...player.conspiracies, taken] });
+          // The pile is PUBLIC, so taking a card OFF it is an event, not an absence. The
+          // announcement names `taken` and NOT `forcedCard`, because `taken` is the card
+          // that actually left — in the `at < 0` fallback those are two different cards and
+          // announcing the requested one would misdescribe the pile.
+          s = announcedPick(s, p, taken, ctx);
+          continue;
+        }
+        for (let i = 0; i < want; i++) {
           const pile = fromDiscard ? s._conspiracyDiscard : s._conspiracyDraw;
           const id = fromDiscard ? pile[pile.length - 1] : pile[0];
           if (id === undefined) break;
@@ -1418,8 +1561,22 @@ function applyEffect(
             _conspiracyDiscard: fromDiscard ? pile.slice(0, -1) : s._conspiracyDiscard,
             _conspiracyDraw: fromDiscard ? s._conspiracyDraw : pile.slice(1),
           };
+          if (toDiscard) {
+            // The recycle-loop exit. The card came OFF the public pile and goes back ON
+            // it — same card, same end, byte-identical pile — so there is no departure
+            // to announce and announcing one would put a `Picked` on the log for a card
+            // that never left. The derivation is unaffected either way, which is what
+            // makes this the one writer that can be silent.
+            s = discardTo(s, 'conspiracy', id);
+            continue;
+          }
           const player = s.players[p];
           if (player) s = withPlayer(s, p, { conspiracies: [...player.conspiracies, id] });
+          // `from: 'discard'` only. `from: 'draw'` takes a card nobody has played, and
+          // announcing THAT by name would put an unplayed card on the public record — the
+          // one thing `conspiracyRecycle` exists to avoid — so the line is gated on the
+          // pile the card actually left.
+          if (fromDiscard) s = announcedPick(s, p, id, ctx);
         }
       }
       return syncConspiracyTop(s, ctx);
@@ -3217,6 +3374,41 @@ function resolveChoice(
       if (!legal.includes(pick.zoneId)) return fail('you may not choose that constituency');
       let s = drop(state);
       for (const e of c.effects) s = applyEffect(s, c.source, e, ctx, NO_FIRE, null, null, pick.zoneId);
+      return { ok: true, state: s, events: [] };
+    }
+
+    /**
+     * G17 — the card's RECIPIENT named a card from the recycle list.
+     *
+     * ## THE VALIDATION IS THE LIVE PILE, AND THE OFFER WAS A COPY OF IT
+     *
+     * `c.cards` is `_conspiracyDiscard` copied at raise time and this reads
+     * `_conspiracyDiscard` again. Between the two the pile can only GROW — `PLAY_CONSPIRACY`
+     * appends the card it just played, in the same breath as the `Played "NAME"` line
+     * that makes it public — so the accepted set is a SUPERSET of the offered one, which
+     * is the safe direction: a client that shows a stale list has a dead button, and a
+     * dead button the server refuses is the one outcome worse than showing nothing.
+     * `applyEffect` raised at most `pile.length` decisions, so the k-th is answered with
+     * at least one card on the pile and **no state can strand this**.
+     *
+     * **`source` IS THE CHOOSER, and it is checked first.** The same reasoning as
+     * `'choose-player'`: a `'choose-card'` answered by anybody else is a card's
+     * recipient choosing for the card's actor, and the actor is the only player with
+     * standing to say who receives anything.
+     *
+     * **THE RE-RUN CANNOT RAISE AGAIN**, because `forcedCard` short-circuits the
+     * `pick` branch in `applyEffect` — the `'chosen-player'` argument again, and the
+     * bound that makes a cascade a property of the pile rather than of the state.
+     * `TRIGGER_MAX_WAVES` covers neither this nor `'choose-player'`: it bounds one
+     * FIRING EVENT, and this is a decision a player answers once.
+     */
+    case 'choose-card': {
+      if (pick.kind !== 'card') return fail('choose a card');
+      if (playerId !== c.source) return fail('that decision is not yours');
+      let s = drop(state);
+      for (const effect of c.effects) {
+        s = applyEffect(s, c.source, effect, ctx, NO_FIRE, null, c.source, null, pick.cardId);
+      }
       return { ok: true, state: s, events: [] };
     }
   }

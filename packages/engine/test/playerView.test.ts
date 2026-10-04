@@ -47,6 +47,17 @@ describe('playerView secret leak', () => {
   it('exposes NO key starting with "_" anywhere in the graph, recursively', () => {
     // Three positions: turn 1, mid-turn with a card pending, and the end of a
     // game. A leak that only exists in one of them is still a leak.
+    //
+    // **AND `playerView` IS NOT THE WHOLE PAYLOAD, which this scan cannot see.** The
+    // server's `PublicView` adds three fields on top of this projection — and one of them,
+    // `conspiracyRecycle`, is the published CONTENTS of `_conspiracyDiscard`, which is
+    // exactly the sort of field this test exists to catch and which is invisible here for
+    // a structural reason: naming a card needs the `CardIndex`, `packages/engine` does not
+    // hold one, and `PublicView` lives in `packages/server/src/broadcast.ts` — which this
+    // package cannot import. The guards that DO see it are in
+    // `packages/server/test/secret-state.test.ts` (`allKeys(viewFor(...))` and the
+    // rendered-`ServerMessage` scan). Read this test as "the engine's half is clean",
+    // never as "the payload is clean".
     const start = freshFull(3);
     const midTurn = start;
     const end = playFullGame(freshFull(3), bigCtx()).state;

@@ -181,6 +181,20 @@ export function pickFor(state: GameState, c: PendingChoice): Action {
       if (zone === undefined) throw new Error('a choose-zone decision with no legal constituency');
       return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'zone', zoneId: zone } };
     }
+    /**
+     * G17. The FIRST card on the decision's offered list — the one shape of pick that is
+     * always legal, because `applyEffect` raises at most `min(n, pile.length)` of these
+     * and the k-th is therefore answered with at least one card still on the pile.
+     *
+     * The list is read off the DECISION rather than off a pile, on purpose: this is the
+     * only source of card names the harness has, and a decision's `cards` is the exact
+     * set `resolveChoice` accepts.
+     */
+    case 'choose-card': {
+      const cardId = c.choice.cards[0];
+      if (cardId === undefined) throw new Error('a choose-card decision with an empty recycle list');
+      return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'card', cardId } };
+    }
   }
 }
 

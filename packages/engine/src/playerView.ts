@@ -71,7 +71,19 @@ export type ServerOnlyKeys =
  * `packages/server/src/FULL-INFORMATION.md` §2.
  */
 export type ClientState = Omit<GameState, ServerOnlyKeys> & {
-  /** Counts only. Never contents. Never which deck is about to be reshuffled. */
+  /**
+   * Counts only. Never which deck is about to be reshuffled.
+   *
+   * **AND THE CONTENTS OF A DISCARD PILE ARE NOT IN HERE**, which is worth saying
+   * because it is a new thing to be true of: `PublicView.conspiracyRecycle` in
+   * `packages/server/src/broadcast.ts` publishes the ordered contents of one of the
+   * eight `_` piles this type omits, and it is NOT on `ClientState` — the same split
+   * `playableConspiracies` and `openQuestion` already make, and for the same reason:
+   * naming a card needs the server's `CardIndex`, which this package does not have. So
+   * the ids reach the wire through the server projection beside this block, never
+   * through here, and this docstring's "counts only" is still literally true of the
+   * four numbers it describes.
+   */
   readonly deckSizes: {
     readonly ideology: number;
     readonly voter: number;

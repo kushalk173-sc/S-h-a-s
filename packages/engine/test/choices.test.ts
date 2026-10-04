@@ -341,6 +341,7 @@ const ALL_KINDS = [
   'convert-voter',
   'choose-player',
   'choose-zone',
+  'choose-card',
 ] as const;
 type Kind = (typeof ALL_KINDS)[number];
 
@@ -373,6 +374,16 @@ type ZoneUnderTest = (typeof ALL_ZONE_SELECTORS)[number];
 /** The kinds whose `Effect` arm has a `zone` field at all. */
 const ZONED_KINDS: readonly Kind[] = ['evict-voter', 'discard-voter', 'convert-voter'];
 
+/**
+ * G17 — the recycle list every state in the sweep carries.
+ *
+ * Two real corpus Conspiracy Card ids, DERIVED from `CARDS` rather than typed, so the
+ * pile is two cards this game actually holds and a pick can name one of them. A pile of
+ * made-up ids would satisfy the sweep and prove nothing about a pick that has to survive
+ * a card name the server can resolve.
+ */
+const RECYCLE_UNDER_TEST: readonly string[] = Object.keys(CARDS.conspiracy).slice(0, 2);
+
 /** One probe card per op that can raise a decision, so each kind is raised for real. */
 const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
   'gain-any': probeCard('probe-gain-any', [{ op: 'gain-any', n: 2, target: 'you' }]),
@@ -391,6 +402,15 @@ const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
   /** G16. `zone` narrows the pegs; `target: 'each-opponent'` makes the scope `'own'`. */
   'choose-zone': probeCard('probe-choose-zone', [
     { op: 'discard-voter', n: 1, target: 'each-opponent', zone: 'chosen-zone' },
+  ]),
+  /**
+   * G17. `pick: true` over the recycle list — and the sweep needs a NON-EMPTY pile to
+   * raise it at all, so `seeded` below is given one. `n` is the card's count, so the
+   * `[1, 2, 3, 5]` axis is what makes `min(n, pile.length)` the binding term and is the
+   * only axis in this file that tests a cap the ENGINE chose rather than the fixture.
+   */
+  'choose-card': probeCard('probe-choose-card', [
+    { op: 'draw-conspiracy', n: 1, from: 'discard', pick: true },
   ]),
 };
 
@@ -538,8 +558,20 @@ function candidatePicks(s: GameState, pending: PendingChoice): ReturnType<typeof
     for (const zoneId of zones) out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'zone', zoneId } }, probeCtx));
     return out;
   }
-  const areaIds = s.zones.flatMap((z) => z.areas.filter((a) => a.peg !== null).map((a) => a.id));
-  const subsets: string[][] = [[]];
+  /**
+   * G17 candidates, deliberately OVER-GENEROUS in the same way as the two above: every
+   * card the decision offered, plus one that is not, plus a card id that does not exist.
+   * The engine is supposed to refuse the two it was not offered — and finding nothing
+   * else is how a genuinely stranded decision shows up. A green result means the search
+   * really did find an accepted pick, not that the candidate list was one long.
+   */
+  if (c.kind === 'choose-card') {
+    for (const cardId of [...c.cards, 'ct-nowhere-0001']) {
+      out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId } }, probeCtx));
+    }
+    return out;
+  }
+  const areaIds = s.zones.flatMap((z) => z.areas.filter((a) => a.peg !== null).map((a) => a.id));  const subsets: string[][] = [[]];
   const areaReach = Math.min(Math.max(2, c.count), areaIds.length);
   for (let n = 1; n <= areaReach; n += 1) {
     for (const combo of combos(areaIds, n)) subsets.push(combo);
@@ -625,7 +657,26 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                   zone === 'this-zone' && anchored !== undefined
                     ? { ...seeded, headlineQueue: [{ areaId: anchored.id, by: 'p1' }] }
                     : seeded;
-                const playable = withHand({ ...base, phase: 'actions', activePlayer: 'p1', _pendingCard: null, choices: [] } as GameState, 'p1', [PROBE_EFFECTS[kind].id]);
+                /**
+                 * G17 — A NON-EMPTY RECYCLE LIST, and TWO cards on it rather than one.
+                 *
+                 * `pick: true` raises NOTHING for an empty pile, so without this the
+                 * ninth kind is silently unraised and `kindsRaised.size` — which is the
+                 * sweep's own non-vacuity floor — would be the only thing noticing.
+                 *
+                 * TWO is the length that matters: `applyEffect` raises at most
+                 * `min(n, pile.length)`, so a count of 1 or 2 is satisfiable with a card
+                 * left and a count of 3 or 5 is capped by the pile rather than by the ask.
+                 * A one-card pile would make every count look identically capped and the
+                 * `[1, 2, 3, 5]` axis would prove nothing about the bound. The pile is the
+                 * same for every other kind and is inert for them, which is asserted
+                 * below rather than assumed.
+                 */
+                const withRecycle: GameState = {
+                  ...base,
+                  _conspiracyDiscard: RECYCLE_UNDER_TEST,
+                };
+                const playable = withHand({ ...withRecycle, phase: 'actions', activePlayer: 'p1', _pendingCard: null, choices: [] } as GameState, 'p1', [PROBE_EFFECTS[kind].id]);
 
                 // The card's printed `n` is what sets `count`, so vary it through the
                 // card rather than through the choice — a state built by hand is not
@@ -771,6 +822,13 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     if (kind === 'choose-player') return { op: 'voters', n: count, target: 'chosen-player' };
     if (kind === 'choose-zone') {
       return { op: 'discard-voter', n: count, target: 'each-opponent', zone: 'chosen-zone' };
+    }
+    // G17. `from: 'discard'` is not optional here: `pick` over any other pile is REFUSED
+    // by `applyEffect` (a decision's option list may not enumerate a hidden pile), so a
+    // probe that omitted it would raise nothing and the sweep would count a kind it never
+    // saw.
+    if (kind === 'choose-card') {
+      return { op: 'draw-conspiracy', n: count, from: 'discard', pick: true };
     }
     const op = opFor(kind);
     if (zone === null) return { op, n: count, target: 'each-opponent' };

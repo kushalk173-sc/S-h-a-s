@@ -118,6 +118,18 @@ export function pickFor(state: GameState, c: PendingChoice): ChoicePick | null {
       const zone = effect === undefined ? undefined : zonesWithLegalPeg(state, c.player, effect.op, 'target' in effect ? effect.target : undefined);
       return zone === undefined ? null : { kind: 'zone', zoneId: zone };
     }
+    /**
+     * G17. The FIRST card on the recycle list, which is a member of exactly the set
+     * `resolveChoice` accepts — the live pile — so a driven game can always answer.
+     *
+     * `null` when the list is empty, and that is not a driver gap: `applyEffect`
+     * raises at most `pile.length` decisions, so an empty pile has no decision to
+     * answer. It is asserted rather than assumed in `choices.test.ts`.
+     */
+    case 'choose-card': {
+      const id = c.choice.cards[0];
+      return id === undefined ? null : { kind: 'card', cardId: id };
+    }
   }
 }
 

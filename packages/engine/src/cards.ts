@@ -454,15 +454,82 @@ export type Effect = (
    * `from: 'discard'` reaches the DISCARD pile instead of the draw pile (G17) — the
    * top of a discard pile being the most recently discarded card, because that is
    * the order `discardTo` pushes them in and the reducer is not allowed to invent
-   * another. SELECTIVE ACCESS MEMORY's "pick ANY Conspiracy Card from the discard
-   * pile, in ANY order" still needs a choice among the pile's contents, which is a
-   * `Choice` this engine does not have.
+   * another.
+   *
+   * ## `pick` — G17, and the only set in the game a `'choose-card'` may enumerate
+   *
+   * Absent (the default) this op takes the top deterministically and publishes
+   * nothing, which is the `onlyIfEmpty` precedent exactly. `pick: true` raises one
+   * `'choose-card'` decision per card instead, so the player names WHICH member of
+   * the pile they take and a pile of *n* takes *n* decisions — which is what makes
+   * SELECTIVE ACCESS MEMORY's whole printed clause work: *"Pick any Conspiracy
+   * Card from the discard pile. It can be in any order from the discard pile."*
+   * One card is "which card"; two is "in any order", and the two halves of that
+   * sentence are separate mechanisms that happen to be one flag.
+   *
+   * **IT IS REFUSED UNLESS `from: 'discard'`, and that is the §2bis line rather
+   * than an omission.** A decision's OPTION LIST is the disclosure (§3.1), so the
+   * only set it may name is a set every client already holds in full. U1 makes
+   * exactly one such set: `ClientState.conspiracyRecycle`, the ordered list of
+   * Conspiracy Cards currently on the recycle pile, which `playerView` publishes and
+   * which is RECONSTRUCTIBLE FROM THE PUBLIC LOG ALONE — `Played "NAME".` puts a
+   * card on it and `Picked "NAME".` takes one off, in order. `_conspiracyDraw` has no
+   * such property — a client's knowledge of it is the whole of what p19's "the top
+   * card, at a printed price" withholds — so `pick` over it raises nothing.
+   *
+   * The ORDER is derivable too, which is a change and not a detail: the two take
+   * paths used to remove a card SILENTLY, so the pile could lose a card with no log
+   * line and a spectator diffing two payloads could deduce which card went into
+   * whose hidden hand. Both departures are announced now — see `reduce.ts`'s
+   * `announcedPick` — which is also the faithful behaviour, the discard pile being
+   * face up at a real table.
+   *
+   * The other five piles are refused for the same reason and stay refused:
+   * `PRIVATE_PLAYER_KEYS` (a hand, to its own holder included), `_ideologyDraw`,
+   * `_ideologyDiscard` (an ANSWERED card is face up under its mat, so listing the
+   * pile publishes the answer), `_headlineDraw`, and `_voterDraw` (the market is
+   * face up; the pile beneath it is not).
    */
   | {
       readonly op: 'draw-conspiracy';
       readonly n: Count;
       readonly target?: EffectTarget;
       readonly from?: 'draw' | 'discard';
+      /**
+       * G17 — NAME A CARD INSTEAD OF TAKING THE TOP. See above.
+       *
+       * **AN EMPTY PILE RAISES NOTHING**, the same shape as `'chosen-zone'`'s
+       * unresolvable selector: "pick a card from the discard pile" is not a
+       * decision a player who is owed nothing can answer, and raising one would
+       * freeze the table on a clause with nothing to act on. That is the whole of
+       * U1's termination claim and it is a RULES claim, not a safety bound: the
+       * ask is bounded by the pile, and the pile is bounded by the deck.
+       */
+      readonly pick?: boolean;
+      /**
+       * G20's `to: 'discard'`, arriving inside G17's op rather than as a widening
+       * of `move-card`. Default `'hand'`, which is byte-identical to every card
+       * that shipped before this field existed.
+       *
+       * **AND IT IS HONOURED ONLY FROM THE PUBLIC PILE.** `to: 'discard'` paired
+       * with `from: 'draw'` (or with no `from`) is REFUSED: it would place a card
+       * drawn out of `_conspiracyDraw` onto the recycle list, and U1's entire
+       * security argument is that the recycle list is reconstructible from the
+       * public log. A card nobody played is not in the log, so
+       * publishing the list would publish the draw pile's next card — a
+       * `_`-prefixed value by another route, which is the failure the refusal
+       * exists to prevent and the reason the derivation test in
+       * `packages/server/test/secret-state.test.ts` is written against the LOG
+       * rather than against the pile.
+       *
+       * The refusal is silent by construction — no `LogEntry`, no `GameEvent`, no
+       * state change — because "this card did nothing" is not a thing a client
+       * needs told, and a message about it would describe the draw pile. Note the
+       * asymmetry with `announcedPick`, which is loud: silence is right for a clause
+       * that moved NOTHING and wrong for one that moved a named card off a public pile,
+       * and that is the whole difference between the two.
+       */
+      readonly to?: 'hand' | 'discard';
       /**
        * G17 — GIVE ONLY TO A PLAYER WHO IS HOLDING NOTHING.
        *

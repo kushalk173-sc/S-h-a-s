@@ -661,3 +661,97 @@ describe('every adapted card in the corpus resolves without failing', () => {
     expect(s.log.some((l) => l.text.includes('Quietly, The Ceiling Moved'))).toBe(true);
   });
 });
+/**
+* SELECTIVE ACCESS MEMORY — *"Pick any Conspiracy Card from the discard pile. It can be
+ * in any order from the discard pile."*
+ *
+ * **Both halves of the clause EXECUTE, and that is what this block is about.** It is not
+ * a provenance claim: the card is a RECONSTRUCTION whose text is paraphrased into schema
+ * ops, so it ships `adapted` and the corpus stays at **0 `verbatim`**. `verbatim` means the
+ * recovered rules text reproduced word-for-word (see `decks/SOURCES.md` §1, and
+ * `ct-et2040-017`, which also drops no clause and is still `adapted`). Executing every
+ * clause is a different property from reproducing it:
+ *
+ *  - *"pick any Conspiracy Card"* — the player NAMES a member of the recycle list, so a
+ *    card other than the one `from: 'discard'` alone would reach is reachable.
+ *  - *"it can be in any order"* — the clause is a COMPOUND sentence and the second half is
+ *    a separate mechanism: one decision per card, each offering what is left, so the order
+ *    the answers arrive in is the order the hand is built in.
+ *
+ * It runs on the SHIPPED card, out of the deck files, through `PLAY_CONSPIRACY` and
+ * `RESOLVE_CHOICE`. Nothing here is a synthetic reduction, because the claim being made is
+ * about the card a player actually holds. It is also NOT a claim that G17 is closed.
+ */
+describe('SELECTIVE ACCESS MEMORY — "pick any card, in any order", end to end', () => {
+  const SAM = 'ct-et2040-018';
+
+  /** The shipped card's own clause, read back off the deck rather than typed. */
+  it('ships the printed sentence with no clause dropped, and stays `adapted`', () => {
+    const shipped = corpus.conspiracy.find((c) => c.id === SAM);
+    expect(shipped, 'the card is in the corpus').toBeDefined();
+    if (shipped === undefined) return;
+    // `adapted`, deliberately. The clause is paraphrased into schema ops rather than
+    // reproduced word-for-word, which is the whole definition of the tier, and this file
+    // is the assertion that keeps the flip from creeping back in.
+    expect(shipped.provenance, 'a paraphrase into schema ops is adapted, never verbatim').toBe('adapted');
+    expect(shipped.text).toContain('Pick any Conspiracy Card from the discard pile');
+    expect(shipped.text).toContain('in any order');
+    // And the reduction carries the flag that makes both halves expressible.
+    expect(shipped.effects).toEqual([{ op: 'draw-conspiracy', n: 1, from: 'discard', pick: true }]);
+  });
+
+  /** A state where p1 holds SAM and two other cards are on the recycle list. */
+  function staging(pile: readonly string[]): GameState {
+    const base = game();
+    const p1 = base.players.p1!;
+    return {
+      ...base,
+      phase: 'actions',
+      _pendingCard: null,
+      _conspiracyDiscard: [...pile],
+      players: { ...base.players, p1: { ...p1, conspiracies: [SAM] } },
+    };
+  }
+
+  it('WHICH CARD: the player takes the FIRST of the recycle list, not only the top', () => {
+    const played = playConspiracy(staging(['ct-et2040-001', 'ct-et2040-002']), SAM);
+    const pending = played.choices.find((c) => c.player === 'p1');
+    expect(pending, 'the card raises a decision').toBeDefined();
+    if (pending === undefined || pending.choice.kind !== 'choose-card') return;
+    // The offer is the recycle list, in order, and the card just played is not in it —
+    // `PLAY_CONSPIRACY` puts the played card on the pile AFTER the effect resolves, so
+    // the list a player is offered is what was already face up at the table.
+    expect(pending.choice.cards).toEqual(['ct-et2040-001', 'ct-et2040-002']);
+    const answered = must(
+      reduce(
+        played,
+        'p1',
+        { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId: 'ct-et2040-001' } },
+        CTX,
+      ),
+    );
+    expect(answered.players.p1?.conspiracies).toEqual(['ct-et2040-001']);
+// The remaining member (`ct-et2040-002`) is still on the pile, so this answer is NOT
+    // the pre-U1 behaviour — `from: 'discard'` alone would have taken it and this would
+    // be empty. "Remaining", not "top": a card can leave the pile silently, and both take
+    // paths remove by index rather than from an end, so the pile's ORDER is not something
+    // either this file or a client can rely on. Its MEMBERSHIP is the public part.
+    expect(answered._conspiracyDiscard).toContain('ct-et2040-002');
+  });
+
+it('and a play IS logged by name, which is what makes the pile\'s membership public', () => {
+    // Every card on `_conspiracyDiscard` was logged publicly as `Played "<NAME>"`, so the
+    // set `choose-card` enumerates is public by derivation rather than by promise. This
+    // test shows the log line exists on the one path that puts a card on the pile; it is
+    // NOT an assertion that the whole derivation has been audited here — the sibling
+    // paths (`RESPOND_INTERRUPT`, and `draw-conspiracy`'s `to: 'discard'`, which only
+    // re-appends a card taken back off the pile) live in the engine, and a full check
+    // that no writer is silent belongs with the engine, not in this file.
+    const before = game();
+    const played = playConspiracy(
+      { ...before, phase: 'actions', _pendingCard: null, players: { ...before.players, p1: { ...before.players.p1!, conspiracies: ['ct-et2040-001'] } } },
+      'ct-et2040-001',
+    );
+    expect(played.log.some((l) => l.text.startsWith('Played "')), 'a play is not logged by name').toBe(true);
+  });
+});

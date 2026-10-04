@@ -73,7 +73,18 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   'discard-voter': ['n', 'target', 'zone'],
   'convert-voter': ['n', 'target', 'zone'],
   gerrymander: ['n', 'target'],
-  'draw-conspiracy': ['n', 'target', 'from', 'onlyIfEmpty'],
+  /**
+   * G17, all three G17 fields. `from` is the discard-pile reach, `pick` is the choice
+   * over the RECYCLE LIST (refused over the draw pile, and the refusal is a documented
+   * `return` rather than an unexecuted field), and `to` is G20's `to: 'discard'`
+   * arriving inside this op rather than as a widening of `move-card`.
+   *
+   * Every one of them is listed even where a corpus card uses only one, which is the
+   * point of an exhaustive list: a field the reducer reads and this table omits is a
+   * card that reads as though it does something and does not, and the parity test's
+   * generic check is what catches it rather than a reader noticing the omission.
+   */
+  'draw-conspiracy': ['n', 'target', 'from', 'pick', 'to', 'onlyIfEmpty'],
   'refresh-market': [],
   restrict: ['kind', 'value', 'owed', 'owedRes', 'target'],
   discount: ['n', 'target'],

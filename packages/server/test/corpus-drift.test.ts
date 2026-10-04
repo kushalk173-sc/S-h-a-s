@@ -297,6 +297,26 @@ const ALLOWED: readonly { readonly in: RegExp; readonly literal: string; readonl
     literal: '1',
     why: 'ONE DISTINCT VALUE — a uniqueness claim ("every viewer was sent the same thing"), not a count of cards. Zero and one are the two numbers that mean "none" and "no disagreement"; neither is a corpus fact.',
   },
+  {
+    in: /recycleWrite/,
+    literal: '1',
+    why: 'G17/U1. ONE WRITE SITE IN THE SOURCE — a claim about the SHAPE of `reduce.ts`, read by slicing it, and not a fact about the corpus at all. It is the uniqueness half of the writer guard in `secret-state.test.ts` ("U1\'s own write, and the only one there"), and the corpus cannot change it: adding a card does not add a branch to a `case`. The number would only move if somebody added a second silent writer, which is precisely the event the assertion exists to fail on.',
+  },
+  {
+    in: /publicWrites/,
+    literal: '2',
+    why: 'G17/U1. THE TWO PUBLIC WRITER SITES — again a property of `reduce.ts`, one per action handler (`PLAY_CONSPIRACY` and `RESPOND_INTERRUPT`), not of the corpus. Neither site is reached because a card exists: both are unconditional in their handler, so the count is 2 whether the deck holds 27 Conspiracy Cards or 270.',
+  },
+  {
+    in: /insideFieldWrites/,
+    literal: '2',
+    why: 'G17/U1. THE WRITES TO THE CONSPIRACY DISCARD PILE INSIDE ONE `case` — a shape claim about the reducer, read by slicing its source, and not a fact about the corpus: the two are the `pick` path\'s removal and the `from: \'discard\'` top path\'s removal, and adding a Conspiracy Card adds neither branch. It is pinned EXACTLY rather than floored on purpose, and that is the load-bearing part: with a floor, a silent writer added inside `case \'draw-conspiracy\'` — which is where the next one would be written — passes. **This was 3 until the departures were announced, and the 3 was counting a TERNARY**: the regex could not tell a property colon from a conditional expression\'s `? :`, which is a read. The property-position regex fixed it, and the docstring above the old pin had invented a third write to explain the phantom.',
+  },
+  {
+    in: /announcedPairs/,
+    literal: '2',
+    why: 'G17/U1. THE DEPARTURES THAT ANNOUNCE THEMSELVES — one announcement per removal inside `case \'draw-conspiracy\'`, so the count above and this one are the same fact read twice. It is pinned because it is the whole of the fix: a card leaving a PUBLIC pile with no log line is a covert channel into a hidden hand, and the spectator who diffs two payloads can read it. Measured by mutation — silencing the announcement turns the log-replay equality in the leak tests red.',
+  },
 ];
 
 function testFiles(): string[] {

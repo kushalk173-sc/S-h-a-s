@@ -525,6 +525,99 @@ export type Choice =
       readonly effects: readonly Effect[];
       readonly source: PlayerID;
       readonly reason: string;
+    }
+  /**
+   * G17 — THE CARD'S RECIPIENT NAMES A CARD. `draw-conspiracy { pick: true }`.
+   *
+   * ## THE §2bis LINE, QUOTED, AND IT IS THE WHOLE RULING
+   *
+   * *"you may choose a card the whole table can already see, or the top of a pile
+   * nobody can see; you may never be shown what is in a pile."* This kind is the
+   * first half of that sentence with a set on it, and it exists because U1 made one
+   * set public: `ClientState.conspiracyRecycle`, the ORDERED list of Conspiracy
+   * Cards played so far.
+   *
+   * **WHY THAT SET IS PUBLIC, stated as a derivation and not as an assurance.**
+   * `_conspiracyDiscard` is written at four places in `reduce.ts` and reached by six
+   * write paths, and every one of them is accounted for by the log:
+   *
+   *   - `PLAY_CONSPIRACY` → `discardTo(s, 'conspiracy', …)`, which logs `Played "NAME"`
+   *   - `RESPOND_INTERRUPT` → the same call, and the same line
+   *   - `draw-conspiracy { to: 'discard' }` → the same call, with NO line and none
+   *     needed: the card came OFF the pile and goes straight back on, same card, same
+   *     end, so the pile is byte-identical and nothing departed
+   *   - `draw-conspiracy`'s two take paths, which now log `Picked "NAME"` by the
+   *     RECIPIENT via `announcedPick` — the fix that makes the departures public
+   *     instead of a side channel, and the reason the reconstruction below is EQUALITY
+   *     rather than containment
+   *   - `draw()`'s reshuffle, which EMPTIES the pile. It has no caller for
+   *     `'conspiracy'` today, so the instant is unreachable.
+   *
+   * So the pile is always `[]`, or exactly what replaying `Played` and `Picked` over the
+   * public log yields, in order.
+   * `packages/server/test/secret-state.test.ts` asserts that equality, re-derives the
+   * writer list by slicing `reduce.ts`'s own source the way `reducer-parity.test.ts`
+   * does — so a seventh, silent writer fails a test rather than becoming a leak nobody
+   * looked for — and asserts the unreachability of the reshuffle the reconstruction
+   * would otherwise have to model.
+   *
+   * ## THE FIVE REFUSALS ARE UPHELD, AND THEY ARE NOT A LIST OF NO's
+   *
+   * `_ideologyDraw`, `_ideologyDiscard` (an ANSWERED card is face up under its mat,
+   * so listing the pile publishes the blind answer), `_headlineDraw`,
+   * `_voterDraw`, and `PRIVATE_PLAYER_KEYS` — a Conspiracy hand and a held Ideology
+   * Card, hidden from their own holders with no viewer-scoped branch, on purpose.
+   * `packages/cards/src/validate.ts` refuses to author a `'choose-card'` over any of
+   * them; this union has no field that could say which pile it meant, because
+   * `applyEffect` only ever raises it for the recycle list.
+   *
+   * ## SATISFIABILITY — the offered set and the accepted set are ONE expression
+   *
+   * `cards` is `state._conspiracyDiscard`, copied at raise time. `resolveChoice`
+   * validates the pick against `state._conspiracyDiscard` read again, and between the
+   * two the pile can only GROW — `PLAY_CONSPIRACY` appends the card it just played, and
+   * it does so in the same breath as the `Played "NAME"` line that makes it public. So
+   * **the accepted set is a superset of the offered one, by publicly-logged cards**, which
+   * is the safe direction: a dialog can never offer a button the server refuses. The
+   * client intersects the two (`choosableCards` in the app) so it never shows a card the
+   * decision did not name. `applyEffect` additionally raises NOTHING for an empty pile and
+   * at most `min(n, pile.length)` decisions otherwise, so the k-th is answered with at
+   * least one card on the pile and **no state can strand this**. Asserted exhaustively in
+   * `test/choices.test.ts`.
+   *
+   * ## `source` IS THE CHOOSER, and that is NOT the card's actor
+   *
+   * The other two new kinds anchor on the actor, because their actor IS the chooser.
+   * Here `draw-conspiracy` hands the card to a resolved TARGET, and the recipient
+   * picks — `AS CLEAR AS WATER` and GOOD GIG WELL PLAYED are both `target`ed ops, and
+   * a card that reads "each opponent takes a card of their choosing" must be answered
+   * by each opponent. So `resolveChoice` re-runs the carried effect with `forced` set
+   * to `source`, which is what `resolveTargets` turns into `[that player]`.
+   *
+   * ## VISIBILITY: `cards` is ON THE WIRE, and it is the soundness claim
+   *
+   * Every id in `cards` is in `ClientState.conspiracyRecycle`, which every viewer
+   * already holds — so this arm publishes nothing a client did not have. What it
+   * buys is AUDITABILITY: the offer travels with the decision, so a leaked id in a
+   * `PendingChoice` is a single place to look rather than a correlation to argue
+   * about, and `secret-state.test.ts`'s card assertion has a real member to bite on.
+   * **No `_`-prefixed field is added**, so `secret-inventory.ts` owes nothing beyond
+   * the classification below.
+   */
+  | {
+      readonly kind: 'choose-card';
+      /** How many cards to name. `1` for every recovered card. */
+      readonly count: number;
+      /**
+       * The cards offered, in recycle order. A COPY of `_conspiracyDiscard` at raise
+       * time, and the only pile this kind can ever name — see the note above.
+       */
+      readonly cards: readonly CardID[];
+      /** The effect list to run once per chosen card. Never empty. */
+      readonly effects: readonly Effect[];
+      /** The chooser: the resolved recipient, not necessarily the card's actor. */
+      readonly source: PlayerID;
+      readonly reason: string;
     };
 
 /** Whose decision it is. Headlines can penalise a player who is not the active one. */

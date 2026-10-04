@@ -222,7 +222,18 @@ function idsInWorld(s: GameState): string[] {
   ];
 }
 
-/** The wire payload as a string, which is what a devtools user actually reads. */
+/**
+ * The wire payload as a string, which is what a devtools user actually reads.
+ *
+ * **THE ENGINE'S HALF OF THE PAYLOAD, and only that.** `playerView` is the whole of what
+ * `packages/engine` publishes; the server's `PublicView` layers `conspiracyRecycle` on
+ * top, which is the published contents of `_conspiracyDiscard` and therefore invisible to
+ * every scan in this file. That is structural — naming a card needs the `CardIndex`, which
+ * this package does not hold and cannot import — not an oversight, and the guard that
+ * does see it is `packages/server/test/secret-state.test.ts`. Concretely: this suite can
+ * prove a card did not leak out of a HAND, and says nothing about whether the recycle
+ * list discloses one.
+ */
 function payload(s: GameState, viewer: PlayerID): string {
   return JSON.stringify(playerView(s, viewer));
 }
@@ -909,5 +920,327 @@ describe('G20 - a transfer is deterministic and cannot reach the public fields',
     }
     expect(ideologyHandOf(fromAnswer.state.players.p1)).toHaveLength(1);
     expect(payload(fromAnswer.state, 'p1')).not.toContain('xfer-3');
+  });
+});
+
+// ────────────────────────�
+// ─────────────────────────── G17: a choice over the PUBLIC recycle list ───────────────────────────
+
+/**
+ * U1. SELECTIVE ACCESS MEMORY's whole printed clause, driven through the REAL reducer:
+ * *"Pick any Conspiracy Card from the discard pile. It can be in any order from the
+ * discard pile."*
+ *
+ * **THE CLAUSE HAS TWO HALVES AND THIS BLOCK IS ABOUT BOTH**, because a mechanism that
+ * offered only "the top, or something else" would satisfy the first half and drop the
+ * second — and the second is the half the card is named for:
+ *
+ *  - **which card** — the pick may name ANY member of the pile, not only its top. Proved
+ *    by naming the FIRST of a three-card pile, which is the member the pre-U1 engine
+ *    could never reach.
+ *  - **in any order** — a two-card take is TWO decisions, and the order the player
+ *    answers them in is the order the cards arrive in the hand. Proved by answering the
+ *    top first and the bottom second, so the hand comes out in the REVERSE of the pile.
+ *
+ * Both go through `PLAY_CONSPIRACY` and `RESOLVE_CHOICE` and nothing else. A fixture
+ * that pushed a card onto a pile and read a field would prove the type, not the rule.
+ *
+* ONE THING TO KNOW BEFORE READING THE EXPECTATIONS, and it is the ORDER rather than the
+ * bookkeeping. `PLAY_CONSPIRACY` resolves the effect list FIRST and only then puts the
+ * played card on the discard pile, in the same breath as the `Played "NAME"` log line.
+ *
+ * So the OFFER a pick carries is the pile as it stood before the play, while the pile the
+ * engine VALIDATES against when the player answers is that pile with the played card
+ * appended. **The accepted set is therefore a superset of the offered one**, by exactly
+ * one publicly-logged card, and that is the safe direction — a dialog can never offer a
+ * button the server refuses. `afterResolve` names the shape so the arithmetic is stated
+ * once and no expectation has to re-derive it.
+ */
+describe('G17 - a card chosen off the recycle pile, and in an order the pile does not have', () => {
+  const probe = (id: string, effects: ConspiracyCard['effects']): ConspiracyCard => ({
+    id,
+    name: id,
+    text: 'probe',
+    cost: 0,
+    effects,
+  });
+  const PICK_ONE = probe('pick-1', [{ op: 'draw-conspiracy', n: 1, from: 'discard', pick: true }]);
+  const PICK_TWO = probe('pick-2', [{ op: 'draw-conspiracy', n: 2, from: 'discard', pick: true }]);
+  const RETURN_ONE = probe('return-1', [{ op: 'draw-conspiracy', n: 1, from: 'discard', to: 'discard' }]);
+  const PICK_FIVE = probe('pick-5', [{ op: 'draw-conspiracy', n: 5, from: 'discard', pick: true }]);
+  // Three cards that only ever sit on the pile. Real `ConspiracyCard`s, so a pick that
+  // names one is a pick the index can resolve, and separate from every probe above so a
+  // test cannot pass by picking the card that was just played.
+  const PILE_CARDS: readonly ConspiracyCard[] = ['pile-a', 'pile-b', 'pile-c'].map((id) =>
+    probe(id, [{ op: 'draw-conspiracy', n: 1, target: 'leader' }]),
+  );
+  const PILE: readonly string[] = PILE_CARDS.map((c) => c.id);
+  const ALL: readonly ConspiracyCard[] = [PICK_ONE, PICK_TWO, PICK_FIVE, RETURN_ONE, ...PILE_CARDS];
+
+  const CTX = { rules: RULES, cards: indexCards({ ideology: [], voter: [], conspiracy: [...ALL], headline: [] }) };
+
+  /** A state in the actions window with `pile` on the recycle list and `card` in hand. */
+  function staging(card: ConspiracyCard, pile: readonly string[] = PILE): GameState {
+    const base = setup({
+      players: PLAYERS_3,
+      cards: CTX.cards,
+      seed: 5,
+      ideologyDeck: [],
+      conspiracyDeck: [...pile, ...ALL.map((c) => c.id)],
+    });
+    return withConspiracies(
+      { ...base, phase: 'actions', _pendingCard: null, _conspiracyDiscard: [...pile] },
+      'p1',
+      [card.id],
+    );
+  }
+
+  function play(s: GameState, cardId: string) {
+    return reduce(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId }, CTX);
+  }
+
+/**
+   * The pile after `PLAY_CONSPIRACY` and one answer: the OFFERED pile minus the card that
+   * was taken, plus the played card, which the action appends after the effect resolves.
+   */
+  function afterResolve(offered: readonly string[], taken: string | null, played: string): readonly string[] {
+    const rest = taken === null ? [...offered] : offered.filter((id) => id !== taken);
+    return [...rest, played];
+  }
+
+  function hand(s: GameState): readonly string[] {
+    return s.players.p1?.conspiracies ?? [];
+  }
+
+  it('WHICH CARD: the player may name the FIRST of the pile, not only the top', () => {
+    const played = play(staging(PICK_ONE), PICK_ONE.id);
+    expect(played.ok, 'the picking card must resolve').toBe(true);
+    if (!played.ok) return;
+    const pending = played.state.choices.find((c) => c.player === 'p1');
+    expect(pending, 'a non-empty recycle list must raise a decision').toBeDefined();
+    if (pending === undefined) return;
+    // The OFFER is the whole pile in recycle order, and it is owed by the RECIPIENT.
+    expect(pending.choice.kind).toBe('choose-card');
+    if (pending.choice.kind !== 'choose-card') return;
+    expect(pending.choice.cards, 'the offer is the recycle list').toEqual(PILE);
+    expect(pending.choice.source, 'the RECIPIENT chooses, not the card\'s actor').toBe('p1');
+
+    // THE BOTTOM OF THE PILE. `from: 'discard'` without `pick` takes the top, so this
+    // answer is the one the pre-U1 engine had no way to accept.
+    const answered = reduce(
+      played.state,
+      'p1',
+      { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId: 'pile-a' } },
+      CTX,
+    );
+    expect(answered.ok, 'naming any member of the pile must be accepted').toBe(true);
+    if (!answered.ok) return;
+    expect(hand(answered.state), 'the named card, and only it, reached the hand').toEqual(['pile-a']);
+    expect(answered.state._conspiracyDiscard, 'the named card left the pile and the rest kept their order').toEqual(
+      afterResolve(PILE, 'pile-a', PICK_ONE.id),
+    );
+    expect(answered.state.choices, 'the decision is gone and none replaced it').toEqual([]);
+  });
+
+  it('IN ANY ORDER: two cards is two decisions, and the hand comes out in the reverse of the pile', () => {
+    const played = play(staging(PICK_TWO), PICK_TWO.id);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    const open = played.state.choices.filter((c) => c.player === 'p1');
+    expect(open.length, 'a two-card take raises one decision PER CARD, which is what "any order" is').toBe(2);
+
+// The TOP of the pile first — the card `from: 'discard'` alone would have taken.
+    const first = open[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    const one = reduce(
+      played.state,
+      'p1',
+      { type: 'RESOLVE_CHOICE', choiceId: first.id, pick: { kind: 'card', cardId: 'pile-c' } },
+      CTX,
+    );
+    expect(one.ok).toBe(true);
+    if (!one.ok) return;
+    expect(hand(one.state), 'the first answer arrived first').toEqual(['pile-c']);
+
+    const second = one.state.choices.find((c) => c.player === 'p1');
+    expect(second, 'the second card is still owed').toBeDefined();
+    if (second === undefined) return;
+    // The BOTTOM second, so the hand ends in the pile's REVERSE.
+    const done = reduce(
+      one.state,
+      second.player,
+      { type: 'RESOLVE_CHOICE', choiceId: second.id, pick: { kind: 'card', cardId: 'pile-a' } },
+      CTX,
+    );
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    expect(hand(done.state), 'the hand is in the order the player chose, not the pile').toEqual([
+      'pile-c',
+      'pile-a',
+    ]);
+    expect(done.state._conspiracyDiscard).toEqual(
+      afterResolve(PILE.filter((id) => id !== 'pile-c' && id !== 'pile-a'), null, PICK_TWO.id),
+    );
+    expect(done.state.choices, 'both decisions are closed').toEqual([]);
+  });
+
+  it('the pile is the bound: n above its length is capped, and an EMPTY pile raises NOTHING', () => {
+    const capped = play(staging(PICK_TWO), PICK_TWO.id);
+    expect(capped.ok).toBe(true);
+    if (!capped.ok) return;
+    expect(capped.state.choices.length, 'a three-card pile, so n: 2 raises two').toBe(2);
+
+    // n ABOVE THE PILE. `applyEffect` runs before the played card is appended, so a
+    // ONE-card fixture pile is the whole candidate set and `n: 5` must raise exactly one —
+    // which is the bound, and it is what makes the k-th decision satisfiable.
+    const over = play(staging(PICK_FIVE, ['pile-a']), PICK_FIVE.id);
+    expect(over.ok).toBe(true);
+    if (!over.ok) return;
+    expect(over.state.choices.length, 'n: 5 over a ONE-card pile raises one, not five').toBe(1);
+
+    // **THE EMPTY PILE RAISES NOTHING.** This is U1's whole termination claim and it is a
+    // RULES claim, not a safety bound: "pick a card from the discard pile" is not a
+    // decision a player can answer when there is nothing in it, and raising one would
+    // freeze the table on a clause with no action. This is the state a player meets on
+    // the first Conspiracy Card of a game, when nothing has been played yet.
+    const bare = play(staging(PICK_ONE, []), PICK_ONE.id);
+    expect(bare.ok, 'an empty pile must not refuse the play').toBe(true);
+    if (!bare.ok) return;
+    expect(bare.state.choices, 'an empty recycle list raised a decision nobody could answer').toEqual([]);
+    expect(hand(bare.state), 'and nothing was taken').toEqual([]);
+  });
+
+  it('a pick cannot re-raise a decision, and TRIGGER_MAX_WAVES is not what stops it', () => {
+    // The cascade bound. The answer arrives back in `applyEffect` as `forcedCard`, which
+    // short-circuits the `pick` branch — so ONE `RESOLVE_CHOICE` consumes exactly one card
+    // and leaves nothing open. `TRIGGER_MAX_WAVES` bounds one FIRING EVENT and is not
+    // consulted on this path; the property is read off the state, not off the counter.
+    const played = play(staging(PICK_ONE), PICK_ONE.id);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    const pending = played.state.choices[0];
+    expect(pending).toBeDefined();
+    if (pending === undefined) return;
+    const answered = reduce(
+      played.state,
+      'p1',
+      { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId: 'pile-b' } },
+      CTX,
+    );
+    expect(answered.ok).toBe(true);
+    if (!answered.ok) return;
+    expect(answered.state.choices, 'answering one pick raised another').toEqual([]);
+    expect(answered.state._conspiracyDiscard, 'exactly one card left the pile').toEqual(
+      afterResolve(PILE, 'pile-b', PICK_ONE.id),
+    );
+  });
+
+  it('mid-resolution, a player who is NOT the chooser learns nothing and can do nothing', () => {
+    const played = play(staging(PICK_ONE), PICK_ONE.id);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    const pending = played.state.choices[0];
+    expect(pending).toBeDefined();
+    if (pending === undefined) return;
+
+    // THE PAYLOAD IS THE SAME FOR EVERYBODY, and that is the point. `PendingChoice` is one
+    // value with no viewer parameter, so the offered list is in every viewer's state — it
+    // IS the recycle list, which `broadcast.ts` publishes, and a pick adds nothing else.
+    for (const viewer of played.state.turnOrder) {
+      const view = playerView(played.state, viewer);
+      expect(JSON.stringify(view.players[viewer]?.conspiracies), 'a Conspiracy hand is hidden from everyone').toBe('[]');
+      expect(allKeys(view).filter((k) => k.startsWith('_')), 'no server-only key reached the payload').toEqual([]);
+    }
+
+    // AND A NON-CHOOSER CANNOT ANSWER IT: the engine refuses the pick as not theirs rather
+    // than silently resolving it for them, and the refusal names nothing about the pile.
+    for (const other of played.state.turnOrder.filter((p) => p !== pending.player)) {
+      const hijack = reduce(
+        played.state,
+        other,
+        { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId: 'pile-a' } },
+        CTX,
+      );
+      expect(hijack.ok, 'a non-chooser resolved somebody else\'s card decision').toBe(false);
+      if (hijack.ok) return;
+      expect(hijack.error).toBe('that decision is not yours');
+    }
+    // And the pile is untouched WHILE the decision is open — the card has not moved until
+    // the player says which one, which is the whole difference between a pick and a draw.
+    expect(played.state._conspiracyDiscard).toEqual(afterResolve(PILE, null, PICK_ONE.id));
+    expect(hand(played.state), 'the played card left the hand before the answer').toEqual([]);
+  });
+
+  it('`to: discard` from the PUBLIC pile returns the card to the pile and to no hand', () => {
+    // `from: 'discard'` with `to: 'discard'` is the ONLY legal pairing, and it is the
+    // recycle-loop exit: a card taken off the public pile and put straight back on it.
+    // The pile is unchanged by the effect — both operations move one card inside one set
+    // every client already holds — and nothing reaches a hand.
+    const played = play(staging(RETURN_ONE), RETURN_ONE.id);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    expect(played.state.choices, 'the non-picking branch raises nothing').toEqual([]);
+    expect(played.state._conspiracyDiscard, 'the effect returned the card it took').toEqual(
+      afterResolve(PILE, null, RETURN_ONE.id),
+    );
+    expect(hand(played.state), 'nothing reached a hand').toEqual([]);
+  });
+
+  it('`to: discard` over the DRAW PILE is REFUSED, silently, and the effect moves nothing', () => {
+    // The refusal IS the security argument, so it is asserted rather than described.
+    // `PLAY_CONSPIRACY` itself puts the played card on the pile, so the pile growing by one
+    // is the PLAY and not the effect; the assertion that matters is that the draw pile is
+    // intact, no hand grew, and nothing was logged or emitted by the refused clause — a
+    // message about it would describe the draw pile.
+    const leaky = probe('return-leak', [{ op: 'draw-conspiracy', n: 1, to: 'discard' }]);
+    const ctx = { rules: RULES, cards: indexCards({ ideology: [], voter: [], conspiracy: [leaky, ...PILE_CARDS], headline: [] }) };
+    const base = setup({
+      players: PLAYERS_3,
+      cards: ctx.cards,
+      seed: 5,
+      ideologyDeck: [],
+      conspiracyDeck: ['return-leak', ...PILE_CARDS.map((c) => c.id)],
+    });
+    const seeded = withConspiracies(
+      { ...base, phase: 'actions', _pendingCard: null, _conspiracyDraw: ['return-leak'], _conspiracyDiscard: ['pile-a'] },
+      'p1',
+      [leaky.id],
+    );
+    const played = reduce(seeded, 'p1', { type: 'PLAY_CONSPIRACY', cardId: leaky.id }, ctx);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    // EXACTLY the play's own contribution — one append — and no second copy from the effect.
+    expect(played.state._conspiracyDiscard, 'the effect added a card of its own').toEqual(['pile-a', 'return-leak']);
+    expect(played.state._conspiracyDraw, 'the draw pile was disturbed').toEqual(['return-leak']);
+    expect(played.state.players.p1?.conspiracies, 'the card reached a hand instead').toEqual([]);
+    // And it is SILENT: the refused clause wrote no log line and emitted no event.
+    expect(played.events.filter((e) => e.type !== 'conspiracy')).toEqual([]);
+    expect(played.state.log.filter((e) => !e.text.startsWith('Played '))).toEqual(
+      seeded.log.filter((e) => !e.text.startsWith('Played ')),
+    );
+  });
+
+  it('`pick` over the DRAW PILE raises nothing, because an option list may not be a hidden pile', () => {
+    // The other half of §2bis, and the one `pick: true` alone would have violated.
+    const leaky = probe('pick-draw', [{ op: 'draw-conspiracy', n: 1, pick: true }]);
+    const ctx = { rules: RULES, cards: indexCards({ ideology: [], voter: [], conspiracy: [leaky, ...PILE_CARDS], headline: [] }) };
+    const base = setup({
+      players: PLAYERS_3,
+      cards: ctx.cards,
+      seed: 5,
+      ideologyDeck: [],
+      conspiracyDeck: ['pick-draw', ...PILE_CARDS.map((c) => c.id)],
+    });
+    const seeded = withConspiracies(
+      { ...base, phase: 'actions', _pendingCard: null, _conspiracyDraw: ['pick-draw'], _conspiracyDiscard: [] },
+      'p1',
+      [leaky.id],
+    );
+    const played = reduce(seeded, 'p1', { type: 'PLAY_CONSPIRACY', cardId: leaky.id }, ctx);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    expect(played.state.choices, 'a decision enumerated the draw pile').toEqual([]);
+    expect(played.state._conspiracyDraw, 'and the draw pile was left alone').toEqual(['pick-draw']);
   });
 });

@@ -154,7 +154,22 @@ function settle(s: GameState): GameState {
     if (player === undefined) break;
     const c = pending.choice;
     let next: ReturnType<typeof reduce> | null = null;
-    if (c.kind === 'gain-any' || c.kind === 'lose-any') {
+    /**
+     * G17. The FIRST card on the offered list, and the reason this arm exists at all:
+     * `pick: true` defers the whole effect until a decision is answered, so a settle
+     * loop that does not know the kind leaves the decision open, the hand unchanged, and
+     * reports a card whose printed sentence is fully implemented as having done nothing.
+     *
+     * The FIRST rather than the last deliberately: this checker measures whether a
+     * clause fires, and `packages/cards/scripts/playable.ts` separately measures that the
+     * player can name a card that is not the top — so the two together cover both halves
+     * of "pick any card, in any order" without this file growing a preference.
+     */
+    if (c.kind === 'choose-card') {
+      const cardId = c.cards[0];
+      if (cardId === undefined) break;
+      next = reduce(cur, pending.player, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId } }, CTX);
+    } else if (c.kind === 'gain-any' || c.kind === 'lose-any') {
       let left = c.count;
       const res: Delta = {};
       for (const r of RESOURCES) {

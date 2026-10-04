@@ -199,16 +199,17 @@
     },
     {
       "id": "ct-et2040-018",
-      "source": "REF 4.2.1 recovers SELECTIVE ACCESS MEMORY. G17 is HALF closed and the half that shipped is the deal: draw-conspiracy carries from: 'discard', and a Conspiracy Card discard pile is honest to read because such a card is bought and held and never answered face up. DROPPED, named, and it is the card's whole point: 'pick ANY ... in any order' is a 'choose-card' decision, REFUSED AT THE TYPE LEVEL because rendering it means listing the pile, and the piles are _-prefixed and stripped by playerView, so the OPTION LIST would be the leak. Refires the inferred SERVER SPACE.",
+      "source": "REF 4.2.1 recovers SELECTIVE ACCESS MEMORY. A RECONSTRUCTION, so `adapted`: the clause is paraphrased into schema ops, not reproduced word-for-word - cf. ct-et2040-017, also `adapted` with NOTHING dropped. `pick:true` raises one 'choose-card' per card over the recycle list, and 'in ANY ORDER' is that raised m times, each offering what is left. Public by DERIVATION is that set's MEMBERSHIP, not its ORDER: every card there was already logged as 'Played NAME', but a card can leave silently - both take paths remove by index, not an end - which reorders the rest. Refires SERVER SPACE.",
       "provenance": "adapted",
       "name": "Selective Access Memory",
-      "text": "Take the top Conspiracy Card from the discard pile into your hand. The printed card lets you pick ANY card from that pile in ANY order; only the top of it is reachable here.",
+      "text": "Pick any Conspiracy Card from the discard pile. It can be in any order from the discard pile.",
       "cost": 4,
       "effects": [
         {
           "op": "draw-conspiracy",
           "n": 1,
-          "from": "discard"
+          "from": "discard",
+          "pick": true
         }
       ]
     },

@@ -269,7 +269,124 @@ export type PublicQuestion = {
 export type PublicView = ClientState & {
   readonly playableConspiracies: readonly PlayableConspiracy[];
   readonly openQuestion: PublicQuestion | null;
+  readonly conspiracyRecycle: readonly PublicRecycleCard[];
 };
+
+/**
+ * G17 — ONE Conspiracy Card on the public discard pile, named.
+ *
+ * `id`, `name` and `text`, which is `PlayableConspiracy`'s shape exactly and for the
+ * same reason: a player choosing a card off the recycle list has to know WHICH one, or
+ * the button is a row of opaque strings and the choice is a guess. §9.10's prohibited
+ * case again, and the reason this projection is here and not on `ClientState` — naming
+ * a card needs the `CardIndex`, which `packages/engine` does not hold and which this
+ * module is handed per call.
+ */
+export type PublicRecycleCard = {
+  readonly id: CardID;
+  readonly name: string;
+  readonly text: string;
+};
+
+/**
+ * G17 — THE CONSPIRACY RECYCLE LIST: the ordered contents of the Conspiracy discard
+ * pile. Public, and it is the first thing this module has published that is the
+ * CONTENTS of a `_`-prefixed field, so the whole argument is here.
+ *
+ * ## WHY IT IS SAFE, AS A DERIVATION AND NOT AS AN ASSURANCE
+ *
+ * The pile has four assignment sites in `reduce.ts` and six write paths, and the whole
+ * engine is enumerated here rather than a number nobody re-derived:
+ *
+ * | writer | on the public log? |
+ * |---|---|
+ * | `PLAY_CONSPIRACY` → `discardTo(s, 'conspiracy', …)` | **yes** — `Played "NAME"`, by name, with the player |
+ * | `RESPOND_INTERRUPT` → the same call | **yes** — same line |
+ * | `draw-conspiracy { to: 'discard' }` → the same call | **no, and none is owed** — the card came OFF the pile and goes straight back on, same card, same end, so the pile is byte-identical and nothing departed |
+ * | the `pick` path's direct removal | **yes** — `Picked "NAME"`, by the recipient (`reduce.ts`'s `announcedPick`) |
+ * | the `from: 'discard'` top path's direct removal | **yes** — the same line, once per card |
+ * | `draw()`'s reshuffle, which sets the pile to `[]` | the result is `[]`, so there is nothing to announce; the instant is public (`deckSizes.conspiracy` is 0) |
+ *
+ * `pile = announced-Played minus announced-Picked`, in order. `secret-state.test.ts`
+ * asserts that as EQUALITY — same ids, same sequence, from `state.log` and the card index
+ * and nothing else — over corpora that actually answer a `'choose-card'`, and
+ * re-derives the writer list by slicing `reduce.ts`'s own source the way
+ * `reducer-parity.test.ts` does, so a silent writer fails a test rather than becoming a
+ * leak nobody looked for.
+ *
+ * ## THE DEPARTURES USED TO BE SILENT, AND THAT WAS THE LEAK
+ *
+ * This list is public, so a card LEAVING it is an event rather than an absence. Both take
+ * paths used to remove a card with no log line and no event, which was sound while the
+ * pile was server-only and stopped being sound the moment it was published: a spectator —
+ * who has no `playableConspiracies` and no `conspiracies` at all — diffed two payloads,
+ * saw a named card vanish with no trace, and combined that with the public
+ * `Played "NAME".` to deduce the card was now in a `PRIVATE_PLAYER_KEYS` hand. One card
+ * of a hidden hand, disclosed to the table, by nothing but a missing line.
+ *
+ * Both removals now announce (`announcedPick`), which is also the faithful behaviour: the
+ * discard pile is face up at a real table, so everyone watching sees which card a player
+ * lifts off it and whose hand it goes into. Announcing removes the covert channel by
+ * making the event legitimately public — the same information the deduction already
+ * yielded — and it is what makes the reconstruction above an equality rather than a
+ * containment.
+ *
+ * ## WHY NOT THE DRAW PILE, AND WHY NOT AFTER A RESHUFFLE
+ *
+ * After a reshuffle the new draw order is `shuffle(discard, _seed)`, so publishing the
+ * pile then would publish `_seed` — the PRNG cursor, which the seed-derived Ideology
+ * answer ORDER is read from. `_seed` is untouched here and stays in `SECRET_NAMES`; the
+ * list is `[]` across a reshuffle because `draw()` empties the pile in the same breath
+ * it shuffles, which is why this is a READ of the pile and not a reconstruction of it.
+ *
+ * **AND THE RESHUFFLE IS UNREACHABLE FOR THIS DECK.** `draw(state, 'conspiracy')` has no
+ * caller: `BUY_CONSPIRACY` refuses an exhausted deck before it would draw, and
+ * `draw-conspiracy` reads `_conspiracyDraw` directly. `no reshuffle of the Conspiracy pile
+ * is reachable` asserts that against the reducer's source, which is also what lets the
+ * equality above ignore reshuffles — a log-only reader cannot see one. So the `[]`
+ * backstop is ARGUED plus asserted on a hand-applied reshuffle, and it is a weaker claim
+ * than the equality until somebody adds the call.
+ *
+ * ## THE NAME IS NOT THE FIELD IT READS
+ *
+ * `conspiracyRecycle`, not `_conspiracyDiscard`. A member named after the field would
+ * be a claim that the PILE is public; this one is a claim that a specific derived
+ * ordered list is, and those are different rulings. `check-secrets.mjs` names this file
+ * as the one place allowed to read the pile, which is the mechanism that keeps the claim
+ * honest rather than the comment above it.
+ *
+ * ## WHAT IT DOES NOT BUY
+ *
+ * `'choose-card'` may name THIS list and nothing else. `_ideologyDraw`,
+ * `_ideologyDiscard` (an ANSWERED card is face up under its mat, so listing the pile
+ * publishes the blind answer), `_headlineDraw`, `_voterDraw` and
+ * `PRIVATE_PLAYER_KEYS` stay refused at the type level — §2bis upheld, not relaxed. And
+ * `draw-conspiracy { to: 'discard' }` is refused over `_conspiracyDraw` for the same
+ * reason: a card nobody played is not in the log, so publishing it here would publish
+ * the draw pile by another route.
+ *
+ * ## NO VIEWER PARAMETER, on `openQuestionFor`'s reasoning
+ *
+ * The discard pile is a property of the table, not of who is asking: every player has
+ * seen every card on it go down, by name. It is computed per call rather than cached,
+ * for `playableConspiraciesFor`'s reason — a play or a reshuffle changes the answer on
+ * the very next projection, with no invalidation step to forget.
+ */
+export function conspiracyRecycleFor(
+  state: GameState,
+  cards: CardIndex,
+): readonly PublicRecycleCard[] {
+  const out: PublicRecycleCard[] = [];
+  for (const id of state._conspiracyDiscard) {
+    const card = cards.conspiracy[id];
+    // A card the index cannot read is OMITTED rather than published as a bare id.
+    // An id with no name is a button a player cannot act on, and a half-rendered card
+    // is the failure §9.10 names; a missing row in a list is not.
+    if (card === undefined) continue;
+    out.push({ id, name: card.name, text: card.text });
+  }
+  return out;
+}
 
 /**
  * The public projection. One code path for players and spectators alike, which is
@@ -292,6 +409,7 @@ export function viewFor(
     ...base,
     playableConspiracies: playableConspiraciesFor(state, cards, viewer),
     openQuestion: openQuestionFor(state, cards),
+    conspiracyRecycle: conspiracyRecycleFor(state, cards),
   };
 }
 

@@ -94,7 +94,26 @@ export type ChoicePick =
    */
   | { readonly kind: 'player'; readonly id: PlayerID }
   /** G16 — answer a `'choose-zone'` decision by naming one of the nine constituencies. */
-  | { readonly kind: 'zone'; readonly zoneId: ZoneID };
+  | { readonly kind: 'zone'; readonly zoneId: ZoneID }
+  /**
+   * G17 — answer a `'choose-card'` decision by naming ONE card.
+   *
+   * A `CardID` and not a pile name, because the decision already carries the set it
+   * was offered (`Choice`'s `'choose-card'.cards`) and the resolver validates the
+   * pick against the LIVE recycle pile as well — so this is a member of a published
+   * list, not an instruction to reach into anything.
+   *
+   * One id, not a list, for the reason `player` is one id: `'choose-card'.count` is
+   * 1 for every recovered card, and one pick per decision keeps the failure mode of a
+   * bad pick local to one decision. A card wanting several cards raises several
+   * decisions — which IS SELECTIVE ACCESS MEMORY's *"it can be in any order"*, one
+   * decision per card, each offering what is left.
+   *
+   * A pick naming a card that is not in the offered set is refused by `reduce`, not
+   * merely ignored: `resolveChoice` is the only authority on the candidate set, and a
+   * silent ignore is how a player is shown they succeeded when they did not.
+   */
+  | { readonly kind: 'card'; readonly cardId: CardID };
 
 export type GameEvent =
   | { readonly type: 'answered'; readonly player: PlayerID; readonly cardId: CardID; readonly side: 0 | 1 }

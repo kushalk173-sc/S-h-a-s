@@ -441,12 +441,40 @@ describe('the fixture actually produces both fields, over a real socket', () => 
     // and not recorded, adding it here brings this file's sweep along with it rather
     // than leaving the assertion behind — and, more importantly, the ENTRY is the
     // record, so an omission is visible in the diff rather than discovered later.
-    expect(Object.keys(PUBLIC_BY_DESIGN).sort()).toEqual(['capOverride', 'liveEffects', 'restrictions']);
+    expect(Object.keys(PUBLIC_BY_DESIGN).sort()).toEqual([
+      'capOverride',
+      'conspiracyRecycle',
+      'liveEffects',
+      'restrictions',
+    ]);
     // A path and a reason, not a bare name: a bare list cannot be read by the next
     // person as a decision.
+    //
+    // THE PATH SHAPE, AND THE WRITTEN DECISION THIS IS. The guard used to be one
+    // alternation — `players[].…` or `liveEffects` — so a top-level public field had
+    // nowhere to go, and the only ways forward were to leave the field out of the
+    // inventory (which is the dishonesty: the client needs to CHOOSE from
+    // `conspiracyRecycle`, so the field is public by decision) or to loosen the regex
+    // until anything fitted. It is neither of those: the shape is still exactly two
+    // alternatives, they are both PINNED by name, and the mutual-coverage assertion
+    // below is what stops the alternation growing into a permissive prefix. A fourth
+    // top-level public field must be added HERE, in a diff, with a name in it.
     for (const [field, path] of Object.entries(PUBLIC_BY_DESIGN)) {
-      expect(path, `${field} has no path recorded`).toMatch(/^(players\[\]\.|liveEffects)/);
+      expect(path, `${field} has no path recorded`).toMatch(
+        /^(players\[\]\.[A-Za-z]+|liveEffects\[\]|conspiracyRecycle\[\])$/,
+      );
     }
+    // MUTUAL COVERAGE, so the regex above cannot rot into `/^(players\[\]\..*|.*)/`.
+    // Every path with no per-seat prefix names one of the pinned top-level fields, and
+    // every pinned top-level field is used by exactly one entry.
+    const topLevel = Object.entries(PUBLIC_BY_DESIGN)
+      .filter(([, path]) => !path.startsWith('players[].'))
+      .map(([field, path]) => [field, path.slice(0, -2)] as const)
+      .sort();
+    expect(topLevel, 'a top-level public array is not pinned in the guard above').toEqual([
+      ['conspiracyRecycle', 'conspiracyRecycle'],
+      ['liveEffects', 'liveEffects'],
+    ]);
   });
 });
 

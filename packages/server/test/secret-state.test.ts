@@ -60,9 +60,11 @@ import {
   ideologyHandOf,
   reduce,
   setup,
+  type Action,
   type ClientState,
   type GameState,
   type PlayerID,
+  type PlayerState,
 } from '@shasn/engine';
 
 import { answerSideFor, answerPromptFor, viewFor, type PublicQuestion } from '../src/broadcast.ts';
@@ -112,13 +114,23 @@ const ctx = makeCtx(CARDS);
  * `manifestoCards`, so it is public, and asserting its absence failed on the very
  * first answered card in the corpus.
  *
+ * **AND THE SECOND EXEMPTION IS G17'S, AND IT IS NARROWER IN THE OPPOSITE DIRECTION.**
+ * A PLAYED Conspiracy Card sits in `_conspiracyDiscard` and `ClientState.conspiracyRecycle`
+ * publishes it, because both of its writers log `Played "NAME"` — the card was face up
+ * on the table when it went down. So `PLAY_CONSPIRACY_CORPUS_DISCARD` is a second
+ * public set, and it applies to `_conspiracyDiscard` ONLY: a played-then-reshuffled card
+ * is in `_conspiracyDraw`, is not covered by it, and is a secret again. That asymmetry is
+ * the whole of `_seed`'s protection — after a reshuffle the draw order is
+ * `shuffle(discard, _seed)`, so an exemption that followed the card across the reshuffle
+ * would publish the seed.
+ *
  * THE SUBTRACTION IS EXACT, NOT A BLANKET EXEMPTION. `secretIds` below removes
- * precisely the ids that are in some player's `manifestoCards`, and nothing else.
- * A card sitting in the discard pile that is NOT in any mat — the `REDRAW_IDEOLOGY`
- * case, which is still a genuine secret — stays in the set and still has to be
- * absent. The two cases are distinguished by a fact about the state, not by a
- * decision about which assertion to run; see "the discard pile is not a secret
- * pile" in the LAYER 1 block for the test that holds them apart.
+ * precisely the ids that are in some player's `manifestoCards`, or in the recycle pile
+ * with a `Played` line of its own, and nothing else. A Conspiracy Card in the discard
+ * pile with NO `Played` line — which is exactly what `draw-conspiracy { to: 'discard' }`
+ * over the draw pile would have produced, and which the reducer refuses — stays in the
+ * set and still has to be absent. The cases are distinguished by a fact about the state,
+ * not by a decision about which assertion to run.
  */
 function publicCardIds(s: GameState): ReadonlySet<string> {
   const out = new Set<string>();
@@ -128,16 +140,77 @@ function publicCardIds(s: GameState): ReadonlySet<string> {
   return out;
 }
 
+/**
+ * G17 — the Conspiracy recycle pile RECONSTRUCTED FROM THE PUBLIC LOG, in order.
+ *
+ * Read from `LogEntry`s and nothing else: `Played "NAME".` puts a card on the pile,
+ * `Picked "NAME".` takes one off, and both name it. `_seed` is not consulted, no pile is
+ * read, and the card index is used only to turn a printed name back into the id a payload
+ * would carry — which is the whole of what a client can do too.
+ *
+ * ## WHY IT IS A REPLAY AND NOT A SET — and why the set version was a false guard
+ *
+ * The first version of this reader collected `Played` names into a DEDUPLICATED list in
+ * first-play order, and the derivation test compared that against the published list. It
+ * is unsound: a card that is played, picked back off the pile and played again is on the
+ * pile at its SECOND position, while a dedupe keeps it at its first. So the relation the
+ * old reader could express was "the pile is a SUBSEQUENCE of the played set", which is a
+ * weaker claim than the one the projection needs, and the weaker claim was the one
+ * asserted. On real games the two disagree in 13% of states and no fixture reached the
+ * disagreeing shape, because the driver never ANSWERED a `'choose-card'` — a decision was
+ * raised, asserted about, and abandoned.
+ *
+ * With `Picked` announced, a replay is exact: push on `Played`, remove ONE occurrence on
+ * `Picked`. Removing one occurrence rather than all of them is what keeps a same-named
+ * pair honest if the corpus ever produces one.
+ *
+ * ## WHAT THIS CANNOT SEE, AND WHY THAT IS FINE HERE
+ *
+ * A reshuffle. It moves the pile into the draw pile and empties it, and nothing in the
+ * LOG distinguishes "the pile was emptied by a reshuffle" from "every card on it was
+ * picked", so a log-only reader cannot follow a reshuffle. That is not a gap here because
+ * the instant is UNREACHABLE: `draw(s, 'conspiracy')` has no caller in `reduce.ts`
+ * (`BUY_CONSPIRACY` refuses an exhausted deck before it would draw, and `draw-conspiracy`
+ * reads `_conspiracyDraw` directly). `no reshuffle of the Conspiracy pile is reachable`
+ * asserts that by reading the reducer's own source, so the day somebody adds the call
+ * this reader is forced to learn about reshuffles rather than quietly going stale. The
+ * `[]`-across-a-reshuffle backstop is asserted separately, on a hand-applied reshuffle.
+ */
+function publicRecycleIds(s: GameState): readonly string[] {
+  const names = byName();
+  const out: string[] = [];
+  for (const e of s.log) {
+    // The trailing full stops are `reduce`'s, and a reader that drops either of them finds
+    // an empty sequence and passes every assertion above it for the wrong reason.
+    const played = /^Played "(.+)"\.$/.exec(e.text);
+    if (played !== null) {
+      const id = names.get(played[1] ?? '');
+      if (id !== undefined) out.push(id);
+      continue;
+    }
+    const picked = /^Picked "(.+)"\.$/.exec(e.text);
+    if (picked === null) continue;
+    const id = names.get(picked[1] ?? '');
+    const at = id === undefined ? -1 : out.indexOf(id);
+    if (at >= 0) out.splice(at, 1);
+  }
+  return out;
+}
+
 /** Deck ids that must never appear in a client payload. */
 function allSecretValues(s: GameState): { cards: readonly string[]; seed: string } {
   const isPublic = publicCardIds(s);
+  const playedOnTheLog = new Set(publicRecycleIds(s));
   const candidates = [
     ...s._ideologyDraw,
     ...s._ideologyDiscard,
     ...s._voterDraw,
     ...s._voterDiscard,
     ...s._conspiracyDraw,
-    ...s._conspiracyDiscard,
+    // G17. The Conspiracy discard pile is exempt ONLY for a card the log says was
+    // played, and ONLY here — see the note on `publicCardIds`. `_conspiracyDraw` above
+    // is exempt for nothing, which is what keeps a reshuffled card secret.
+    ...s._conspiracyDiscard.filter((id) => !playedOnTheLog.has(id)),
     ...s._headlineDraw,
     ...s._headlineDiscard,
     // The pending card is face DOWN and in nobody's mat, so it is never public.
@@ -150,6 +223,296 @@ function allSecretValues(s: GameState): { cards: readonly string[]; seed: string
     cards: [...new Set(candidates.filter((id) => !isPublic.has(id)))],
     seed: String(s._seed),
   };
+}
+
+/**
+ * THE PRIVATE-PLAYER KEYS, read out of the engine's OWN declaration.
+ *
+ * `PRIVATE_PLAYER_KEYS` is the list of hidden hands that are not `_`-prefixed, and it
+ * is duplicated here as a DERIVATION rather than typed, so that a new hidden hand is
+ * covered by every predicate below without anybody editing this file. The reader fails
+ * loudly if the declaration moves, which is what stops it decaying into a constant that
+ * no longer describes anything.
+ */
+function privatePlayerKeys(): readonly string[] {
+  const src = readFileSync(fileURLToPath(new URL('../../engine/src/playerView.ts', import.meta.url)), 'utf8');
+  const at = src.indexOf('export const PRIVATE_PLAYER_KEYS');
+  expect(at, 'PRIVATE_PLAYER_KEYS is no longer where this reader expects it').toBeGreaterThan(-1);
+  const body = src.slice(at, src.indexOf('as const', at));
+  const keys = [...body.matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1] ?? '');
+  expect(keys.length, 'the PRIVATE_PLAYER_KEYS reader found none — it is stale').toBeGreaterThan(0);
+  return keys;
+}
+
+/**
+ * EVERY CARD ID THAT IS NOT PUBLIC TO EVERY CLIENT in this state, for a predicate that
+ * has no per-viewer exceptions.
+ *
+ * **WHY THIS IS NOT `allSecretValues`, and the difference is the whole argument.**
+ * `allSecretValues` is what the PAYLOAD scan uses, and the payload has exactly one
+ * sanctioned exception — `playableConspiracies`, a per-VIEWER list of that viewer's own
+ * hand, which `LEAK_PATHS` records and `secret-state.test.ts` branches on. A decision
+ * has no such exception and cannot have one: `PendingChoice` is one value with no
+ * viewer parameter, so anything in it is in EVERY viewer's payload. Reusing the payload
+ * predicate here would therefore be a rule with a hole exactly where this unit lives.
+ *
+ * So the sets are read from the engine's declarations — the eight `_` piles via
+ * `ServerOnlyKeys`, the two hidden hands via `PRIVATE_PLAYER_KEYS` — with ONE carve-out,
+ * and the carve-out is U1's: the Conspiracy recycle list. `_conspiracyDraw` is not carved
+ * out, so a card that has been reshuffled is a secret again, which is exactly the `_seed`
+ * protection.
+ *
+ * ## AND WHY THE CARVE-OUT IS DERIVED FROM THE LOG, NOT FROM THE PROJECTION
+ *
+ * The first version built its public set out of `viewFor(s, CARDS, null).conspiracyRecycle`
+ * — the projection it is supposed to be auditing. That is circular in the one place a
+ * circularity hides: it exempts every id the projection emits, so a projection that
+ * emitted `_conspiracyDraw[0]` would have that id exempted from the `_conspiracyDraw`
+ * scan too, and the guard would stay green while the wire carried a draw-pile card. The
+ * guard was asking the thing under test for permission.
+ *
+ * `publicRecycleIds` reads `state.log` and the card index and nothing else, so the
+ * exemption is grounded in a source the projection cannot write to. That is what makes
+ * the guard able to go red: an id the log does not account for is hidden, whichever pile
+ * it happens to be sitting in. `conspiracyRecycle cannot launder a draw-pile id into the
+ * allowed set` proves it by mutation.
+ */
+function hiddenCardIds(s: GameState): ReadonlySet<string> {
+  const published = new Set(publicRecycleIds(s));
+  const out = new Set<string>();
+  const add = (value: unknown): void => {
+    // `_idSeq` is in `ServerOnlyKeys` and is a NUMBER, and `_pendingCard` is a single
+    // id rather than a list. Both are handled by the branch above or here, and neither
+    // is a card set — which is why this is a runtime shape check rather than a cast.
+    if (!Array.isArray(value)) return;
+    for (const id of value as readonly string[]) if (!published.has(id)) out.add(id);
+  };
+  // The eight piles, by the engine's own `ServerOnlyKeys` union rather than by name.
+  for (const key of serverOnlyKeys()) {
+    if (key === '_pendingCard') {
+      add(s._pendingCard === null ? [] : [s._pendingCard]);
+      continue;
+    }
+    if (key === '_idSeq') continue;
+    add(s[key as keyof GameState]);
+  }
+  // And the two hidden hands, which the prefix walk cannot see at all.
+  for (const key of privatePlayerKeys()) {
+    for (const pid of s.turnOrder) {
+      add((s.players[pid] as unknown as Readonly<Record<string, readonly string[]>>)[key]);
+    }
+  }
+  return out;
+}
+
+/** The engine's eleven server-only field names, sliced out of `playerView.ts`. */
+function serverOnlyKeys(): readonly string[] {
+  const src = readFileSync(fileURLToPath(new URL('../../engine/src/playerView.ts', import.meta.url)), 'utf8');
+  const at = src.indexOf('export type ServerOnlyKeys');
+  expect(at, 'ServerOnlyKeys is no longer where this reader expects it').toBeGreaterThan(-1);
+  const body = src.slice(at, src.indexOf(';', at));
+  const keys = [...body.matchAll(/'([A-Za-z_]+)'/g)].map((m) => m[1] ?? '');
+  // Eleven, and the count is asserted because a reader that silently found four would
+  // exempt almost everything below and the guard would pass for a reason nobody chose.
+  expect(keys.length, 'the ServerOnlyKeys reader found a different number of fields').toBe(11);
+  return keys;
+}
+
+/**
+ * A corpus that actually PLAYS Conspiracy Cards, which is the only way the pile under
+ * U1's projection is ever non-empty.
+ *
+ * `conspiracyCorpus` above BUYS and never plays, so every state in it has an empty
+ * discard pile — which is exactly the shape that would let a projection of that pile
+ * pass every assertion here while proving nothing. This one drives the whole protocol:
+ * answer, buy, and `PLAY_CONSPIRACY`, closing each response window, and it collects a
+ * state after every step so the assertion walks a real sequence of plays rather than a
+ * hand-built pile.
+ */
+function playedConspiracyCorpus(steps: number): readonly GameState[] {
+  const order = ['p1', 'p2', 'p3'] as const;
+  const picking = Object.values(CARDS.conspiracy).find((c) =>
+    c.effects.some((e) => e.op === 'draw-conspiracy' && e.pick === true),
+  );
+  if (picking === undefined) throw new Error('no shipped card carries `pick: true`, so U1 is untested here');
+  let s = setup({
+    players: [...order],
+    names: { p1: 'One', p2: 'Two', p3: 'Three' },
+    cards: CARDS,
+    seed: 20260930,
+    ...decksOf(CARDS),
+  });
+  const corpus: GameState[] = [s];
+  let attempts = 0;
+  while (corpus.length < steps && !s.finished && attempts < steps * 16) {
+    attempts += 1;
+    /**
+     * WHICH SEAT, chosen rather than rotated.
+     *
+     * A rotation cannot reach U1's card: the seat holding it is only `activePlayer` for
+     * one turn in three, and a walk that only ever offers a move to `order[n % 3]` skips
+     * that turn. So the seat that can actually PLAY is preferred, and within those the
+     * one holding the picking card comes first.
+     */
+    const canAct = s.turnOrder.filter(
+      (p) => s.activePlayer === p && !s.choices.some((c) => c.player === p),
+    );
+    const playable = canAct.filter((p) => s.phase === 'actions' && s.interrupt === null);
+    const me = playable[0] ?? canAct[0] ?? s.choices[0]?.player ?? s.activePlayer;
+    const held = handOf(s, me);
+    const followUp = nextConspiracyAction(s, me);
+    const candidates: readonly Action[] = [
+      ...(playable.includes(me) && held.length > 0
+        ? [{ type: 'PLAY_CONSPIRACY', cardId: held[0] as string } as const]
+        : []),
+      ...(followUp === null ? [] : [followUp as Action]),
+    ];
+    let moved = false;
+    for (const a of candidates) {
+      const r = reduce(s, me, a, { rules: ctx.rules, cards: CARDS });
+      if (!r.ok) continue;
+      s = closeWindow(r.state);
+      corpus.push(s);
+      moved = true;
+      break;
+    }
+    if (!moved) {
+      const end = reduce(s, me, { type: 'END_TURN' }, { rules: ctx.rules, cards: CARDS });
+      if (end.ok) {
+        s = end.state;
+        corpus.push(s);
+      }
+    }
+  }
+  // The whole point of this corpus is a NON-EMPTY pile; the picking card is reached by
+  // `pickDecisionStates` below, which is a different job.
+  expect(
+    corpus.some((x) => x._conspiracyDiscard.length > 0),
+    'the walk never put a card on the Conspiracy discard pile, so there is nothing for U1 to publish',
+  ).toBe(true);
+  return corpus;
+}
+
+/**
+ * The states in which the engine actually raises a `'choose-card'` — reached by HANDING
+ * a seat U1's own card rather than by waiting for the deck to deal it.
+ *
+ * `ct-et2040-018` is the eighteenth card of twenty-seven, and a walk that buys cards
+ * stalls long before it reaches it, so a walk-based corpus would leave every assertion
+ * below running over a set with no card decision in it. The fixture is therefore explicit
+ * about what it is: the pile, the turn window, the empty decision queue and the window
+ * closure are all the engine's; only the card in the hand is placed, and it is FOUND by
+ * its `pick` field rather than by name so it moves if the deck does.
+ *
+ * The returned states are genuine `reduce` outputs, which is what the derivation test
+ * needs — it reads the log, and a hand-built state has no log.
+ */
+function pickDecisionStates(): readonly GameState[] {
+  const picking = Object.values(CARDS.conspiracy).find((c) =>
+    c.effects.some((e) => e.op === 'draw-conspiracy' && e.pick === true),
+  );
+  if (picking === undefined) throw new Error('no shipped card carries `pick: true`, so U1 is untested here');
+  const out: GameState[] = [];
+  for (const s of playedConspiracyCorpus(26)) {
+    if (s._conspiracyDiscard.length === 0) continue;
+    const me = s.turnOrder[0];
+    if (me === undefined) continue;
+    const seated: GameState = {
+      ...s,
+      phase: 'actions',
+      activePlayer: me,
+      interrupt: null,
+      activeHeadline: null,
+      choices: [],
+      players: { ...s.players, [me]: { ...(s.players[me] as PlayerState), conspiracies: [picking.id] } },
+    };
+    const played = reduce(seated, me, { type: 'PLAY_CONSPIRACY', cardId: picking.id }, { rules: ctx.rules, cards: CARDS });
+    if (!played.ok) continue;
+    const settled = closeWindow(played.state);
+    if (settled.choices.some((c) => c.choice.kind === 'choose-card')) out.push(settled);
+  }
+  expect(
+    out.length,
+    'no state raised a `choose-card`, so every assertion about one is running over an empty set',
+  ).toBeGreaterThan(0);
+  return out;
+}
+
+/**
+ * THE DEPARTURE, REACHED. `pickDecisionStates` above RAISES the decision and stops; this
+ * ANSWERS it, and that one step is the whole gap the leak lived in.
+ *
+ * ## WHY A SEPARATE FIXTURE AND NOT AN EXTRA LINE IN THE WALK
+ *
+ * `playedConspiracyCorpus` and `pickDecisionStates` both stop at an open `'choose-card'`.
+ * The driver's `nextConspiracyAction` answers `'steal-any'`, `'gain-any'`, `'lose-any'`
+ * and falls through to `{ kind: 'areas' }` for anything else, which `reduce` REFUSES for a
+ * `'choose-card'`. So every corpus in this file had been walking up to the edge of the
+ * departure and turning away. That is why the old derivation test was green over a
+ * relation that real games break 13% of the time: no state in the suite had ever picked
+ * a card off the pile.
+ *
+ * ## AND THE DIVERGENT SHAPE, EXPLICITLY
+ *
+ * A single answer gives `Played A`, `Played B`, `Picked A` and a pile of `[B]`. The old
+ * deduped reader produced `[A, B]` for that log, so the pile `[B]` was neither a prefix
+ * nor equal to it — the case the auditor measured. `a departure makes the pile and a
+ * deduped replay disagree` asserts that this corpus really contains such a state, so the
+ * repaired equality is asserted over the shape that broke the old guard rather than over
+ * a shape that flatters it.
+ *
+ * The answer is dispatched through `RESOLVE_CHOICE` by the engine's own chooser field and
+ * the engine's own offered list, so nothing here hand-writes the pick.
+ */
+function pickedConspiracyStates(): readonly GameState[] {
+  const out: GameState[] = [];
+  let divergentFromDedupe = 0;
+  for (const s of pickDecisionStates()) {
+    const open = s.choices.find((c) => c.choice.kind === 'choose-card');
+    if (open === undefined || open.choice.kind !== 'choose-card') continue;
+    const named = open.choice.cards[0];
+    if (named === undefined) continue;
+    const answered = reduce(
+      s,
+      open.choice.source,
+      { type: 'RESOLVE_CHOICE', choiceId: open.id, pick: { kind: 'card', cardId: named } },
+      { rules: ctx.rules, cards: CARDS },
+    );
+    if (!answered.ok) continue;
+    const settled = closeWindow(answered.state);
+    // The control is a fact about the STATE, not about the log: the card left the public
+    // pile and landed in a hand. Whether the departure was ANNOUNCED is deliberately NOT
+    // part of it — that is what the derivation test is for, and folding it in here would
+    // mean the fixture stopped producing states the moment the announcement went missing,
+    // so the equality below would quietly assert over an empty set and pass.
+    const gone = !settled._conspiracyDiscard.includes(named);
+    const landed = settled.turnOrder.some((pid) => (settled.players[pid]?.conspiracies ?? []).includes(named));
+    if (gone && landed) out.push(settled);
+    const deduped = [...settled.log]
+      .map((e) => /^Played "(.+)"\.$/.exec(e.text))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => byName().get(m[1] ?? ''))
+      .filter((id): id is string => id !== undefined)
+      .filter((id, _i, all) => all.indexOf(id) === _i);
+    if (JSON.stringify(deduped) !== JSON.stringify([...settled._conspiracyDiscard])) divergentFromDedupe += 1;
+  }
+  expect(out.length, 'no state answered a `choose-card`, so the departure was never exercised').toBeGreaterThan(0);
+  expect(
+    divergentFromDedupe,
+    'this corpus never reaches a departure the deduped reader gets wrong, so the repaired equality is still being flattered',
+  ).toBeGreaterThan(0);
+  return out;
+}
+
+/** Printed name → id, for a log-only reader. Built once and shared with `publicRecycleIds`. */
+let NAME_TO_ID: ReadonlyMap<string, string> | null = null;
+function byName(): ReadonlyMap<string, string> {
+  if (NAME_TO_ID === null) {
+    const m = new Map<string, string>();
+    for (const [id, card] of Object.entries(CARDS.conspiracy)) m.set(card.name, id);
+    NAME_TO_ID = m;
+  }
+  return NAME_TO_ID;
 }
 
 /**
@@ -1769,7 +2132,7 @@ function engineChoiceKinds(): string[] {
   return [...body.matchAll(/kind: '([a-z-]+)'/g)].map((m) => m[1] ?? '').sort();
 }
 
-describe('every Choice kind is classified, and none of them may name a card', () => {
+describe('every Choice kind is classified, and none of them may name a card that is not public', () => {
   it("the engine's Choice union and the inventory agree", () => {
     // A parallel agent may add a kind this round. If it enumerates a hidden hand, that
     // is a leak and this is where it has to be caught: the new kind fails to be listed,
@@ -1780,56 +2143,456 @@ describe('every Choice kind is classified, and none of them may name a card', ()
     expect(Object.keys(CHOICE_KINDS).sort(), 'a Choice kind is unclassified, or a classification is obsolete').toEqual(engine);
   });
 
-  it('no classified kind is allowed to ask a player about CARDS', () => {
-    // The leak argument, as an assertion. Every current kind names resources, pegs,
-    // seats or zones, all four of which are public: a resource total is in the
-    // projection, a peg and a zone are on the board, and a seat is in `turnOrder`. A
-    // kind that named a card id would be a hand, and the projection strip would not
-    // catch it, because the strip only knows about FIELDS.
+  /**
+   * WHAT A KIND MAY ASK ABOUT, WIDENED ON PURPOSE — and the argument is about the SHAPE
+   * of this list rather than about the entry that needed it.
+   *
+   * `CHOICE_KINDS` classifies **what a player is being asked about**, not a secrecy
+   * grade, and the four original values read as a grade only because all four happen to
+   * be public sets. A resource total is in the projection; a peg and a constituency are
+   * on the board; a seat is in `turnOrder`. `'public-cards'` is a fifth NAME for a fifth
+   * set, and it is public for a reason written down on `ClientState.conspiracyRecycle`
+   * and PROVED by the reconstruction two tests below — which is a stronger warrant than
+   * "resources are in the payload" is for `resources`.
+   *
+   * **WHAT THIS DOES NOT DO IS ADMIT CARDS GENERALLY.** The category is not "cards"; it
+   * is "this one public list of cards". A `'choose-card'` naming a card from a player's
+   * hand, or from `_ideologyDraw`, `_ideologyDiscard`, `_headlineDraw` or `_voterDraw`,
+   * PASSES this assertion — it names a category that exists — and is refused by the card
+   * assertion immediately below. That is why the two are read as one argument and not as
+   * a pair of gates: widening the value list alone would be the weakening, and widening
+   * it while leaving the card assertion alone is the re-argument.
+   */
+  it('a classified kind may only ask about a set this file can account for', () => {
+    const ASKABLE = ['resources', 'pegs', 'players', 'zones', 'public-cards'];
     for (const [kind, about] of Object.entries(CHOICE_KINDS)) {
-      expect(['resources', 'pegs', 'players', 'zones'], `${kind} asks the player about ${about}`).toContain(about);
+      expect(ASKABLE, `${kind} asks the player about ${about}`).toContain(about);
     }
+    // And the new value is not decorative. A kind that classified itself `public-cards`
+    // and named a hidden pile would satisfy the line above and fail the one below, so the
+    // category is pinned to the single kind `playerView` makes public rather than to
+    // the word. This is the assertion that stops the widening from becoming a door.
+    expect(Object.entries(CHOICE_KINDS).filter(([, about]) => about === 'public-cards')).toEqual([
+      ['choose-card', 'public-cards'],
+    ]);
   });
 
-  it('no PendingChoice names a CARD, in any state either corpus reached', () => {
-    // The teeth behind the classification above, and the check that would fire if a
-    // future choice kind were built out of card ids — which is the leak this whole entry
-    // exists for.
-    //
-    // It is checkable without classifying anything: serialise every decision the engine
-    // can raise across all three corpora and assert that not one CardID from the corpus
-    // appears in it. `choose-player` carries `source`, which is a PlayerID and looks
-    // enough like a card id to be worth checking rather than reasoning about.
-    //
+  /**
+   * THE CARD ASSERTION, RE-ARGUED — and it bites harder than the one it replaces.
+   *
+   * It used to read: *no corpus `CardID` may appear in any `PendingChoice`.* That was
+   * true only because no shipped card ever raised a card choice, and it was written
+   * specifically to catch the change this file now contains. G17's `'choose-card'` IS
+   * that change, and the reason the old form cannot stand is not that it is
+   * inconvenient — it is that it was **too strong to be a rule and too weak to be a
+   * guard**: it forbade a card id appearing in a decision at all, including one already
+   * on the wire three times elsewhere, and the only way to "make it pass" was to delete
+   * it. It had to be replaced rather than edited.
+   *
+   * THE RULE IT NOW STATES: **a decision may name a card, and may name only a card that
+   * is already public to every client at the moment that decision exists.**
+   *
+   * That is the same boundary the wire draws, applied to the one place on the wire the
+   * prefix walk cannot see. Two independent facts make it checkable:
+   *
+   *  - **What "public" means is DERIVED, not typed.** The private card sets are read out
+   *    of the engine's OWN declaration — `ServerOnlyKeys` for the eight piles and
+   *    `PRIVATE_PLAYER_KEYS` for the two hidden hands — by slicing
+   *    `packages/engine/src/{state,playerView}.ts`. A new hidden pile is therefore
+   *    covered without anybody editing a list in this file. It is the
+   *    `reducer-parity` trick, and both readers fail loudly if the declaration moves.
+   *  - **The one set that IS public is the one U1 derives**, and the two tests below are
+   *    what stop that name becoming a licence: the published list is asserted equal to a
+   *    reconstruction from the public log, and `_conspiracyDiscard` is asserted to have
+   *    exactly three writers.
+   *
+   * **AND IT STILL BITES**: a decision naming a card out of `_conspiracyDraw` is built
+   * by hand below and the same predicate is run against it, so a future `'choose-card'`
+   * over a hidden pile fails on this line rather than on somebody noticing by eye.
+   */
+  it('no PendingChoice names a card that is not public to every client', () => {
     // The decisions have to be COLLECTED rather than read off a stored state, because a
     // stored state is the state AFTER the walk answered them — measured, every state in
     // all three corpora ends with an empty `choices`, so a scan over them proves nothing.
     // So this probes the same way the freeze test above does: play every card the
-    // projection offers and keep whatever the engine asks.
+    // projection offers and keep whatever the engine asks, and each decision is checked
+    // against the hidden set of the state that RAISED it rather than of the corpus entry.
     type Decision = GameState['choices'][number];
-    const decisions: Decision[] = [];
-    for (const s of [...CORPUS, ...CONSPIRACY_CORPUS, ...IDEOLOGY_HAND_CORPUS]) {
-      decisions.push(...s.choices);
+    const decisions: { readonly state: GameState; readonly pending: Decision }[] = [];
+    const states = [...CORPUS, ...CONSPIRACY_CORPUS, ...IDEOLOGY_HAND_CORPUS, ...pickDecisionStates()];
+    for (const s of states) {
+      for (const pending of s.choices) decisions.push({ state: s, pending });
       const viewer = s.activePlayer;
       for (const cardId of viewFor(s, CARDS, viewer).playableConspiracies.map((c) => c.id)) {
         const played = reduce(s, viewer, { type: 'PLAY_CONSPIRACY', cardId }, { rules: ctx.rules, cards: CARDS });
         if (!played.ok) continue;
-        decisions.push(...closeWindow(played.state).choices);
+        const settled = closeWindow(played.state);
+        for (const pending of settled.choices) decisions.push({ state: settled, pending });
       }
     }
 
-    const ids = [
-      ...Object.keys(CARDS.ideology),
-      ...Object.keys(CARDS.voter),
-      ...Object.keys(CARDS.conspiracy),
-      ...Object.keys(CARDS.headline),
-    ];
     expect(decisions.length, 'no corpus state ever opened a decision, so the scan below was empty').toBeGreaterThan(0);
-    for (const d of decisions) {
-      const json = JSON.stringify(d);
-      for (const id of ids) {
-        expect(json.includes(id), `a PendingChoice names the card ${id}: ${json.slice(0, 200)}`).toBe(false);
+    let cardNaming = 0;
+    for (const { state, pending } of decisions) {
+      const json = JSON.stringify(pending);
+      // `choose-player` carries `source`, a PlayerID that looks enough like a card id to
+      // be worth checking rather than reasoning about.
+      for (const id of hiddenCardIds(state)) {
+        expect(
+          json.includes(id),
+          `a PendingChoice names ${id}, which sits in a hidden set in the state that raised it: ${json.slice(0, 200)}`,
+        ).toBe(false);
+      }
+      if (json.includes('"choose-card"')) cardNaming += 1;
+    }
+    // And the narrowing is not vacuous: the corpus really does reach a card decision, so
+    // the loop above really did run the predicate over card ids. Without this, a corpus
+    // that stopped raising `'choose-card'` would make the assertion pass for a reason
+    // that has nothing to do with secrecy.
+    expect(cardNaming, 'no decision named a card, so the assertion above proved nothing about cards').toBeGreaterThan(0);
+  });
+
+  /**
+   * THE TEETH, as a test rather than as a paragraph.
+   *
+   * Every predicate in this file needs a positive control, or it is a rule nobody has
+   * watched fail. `hiddenCardIds` is therefore handed a decision built to violate it — a
+   * card out of `_conspiracyDraw`, the pile §2bis refused by name — and asserted to flag
+   * it, while a decision of the same shape naming a card off the RECYCLE list is asserted
+   * NOT to be flagged.
+   *
+   * The second half is what stops the first from being satisfied by a predicate that
+   * flags everything: such a predicate would also pass the test above, and would have
+   * refused a legal card.
+   */
+  it('the card guard flags a hidden pile and clears the published one, so it discriminates', () => {
+    // A REAL state with cards in both piles, so the control is the engine's own state
+    // rather than a hand-built one whose piles somebody chose.
+    const s = [...CORPUS, ...playedCorpus(16), ...playedConspiracyCorpus(26)].find(
+      (x) => x._conspiracyDiscard.length > 0 && x._conspiracyDraw.length > 0,
+    );
+    if (s === undefined) throw new Error('no corpus state has cards in both the Conspiracy draw and discard piles');
+    const inDraw = s._conspiracyDraw[0] as string;
+    const inRecycle = s._conspiracyDiscard[0] as string;
+    expect(inDraw, 'the fixture needs a card in the draw pile to be a control').toBeDefined();
+    expect(inRecycle, 'the fixture needs a card in the recycle pile to be a control').toBeDefined();
+    // And the recycle card really is one the public log accounts for — otherwise this
+    // fixture would be proving that a SECRET card in the discard pile is allowed, which
+    // is the opposite of the ruling.
+    expect(publicRecycleIds(s), 'the control state holds a card on its recycle pile that the public log cannot account for').toContain(inRecycle);
+
+    const shape = (cardId: string) => ({
+      id: `c-${cardId}`,
+      player: s.activePlayer,
+      choice: {
+        kind: 'choose-card',
+        count: 1,
+        cards: [cardId],
+        effects: [{ op: 'draw-conspiracy', n: 1, from: 'discard' }],
+        source: s.activePlayer,
+        reason: 'probe',
+      },
+    });
+    type Decision = GameState['choices'][number];
+    const hidden = hiddenCardIds(s);
+    const jsonOf = (d: Decision): string => JSON.stringify(d);
+    // A decision naming a card out of `_conspiracyDraw`: refused.
+    expect(hidden.has(inDraw), 'the control card in the draw pile is not treated as hidden').toBe(true);
+    expect(
+      jsonOf(shape(inDraw) as Decision).includes(inDraw),
+      'the guard could not even be asked about the draw-pile card',
+    ).toBe(true);
+    // The same shape naming a card off the RECYCLE list: allowed, because
+    // `ClientState.conspiracyRecycle` publishes it to every viewer.
+    expect(hidden.has(inRecycle), 'the guard flagged a card that IS public').toBe(false);
+  });
+
+/**
+   * THE DERIVATION, asserted rather than assured.
+   *
+   * `ClientState.conspiracyRecycle` is the first published contents of a `_` pile, and
+   * the whole of its safety argument is that the pile is an account the PUBLIC LOG
+   * already keeps. This walks the corpora and asserts, in this order because only the
+   * first is derived from public data alone:
+   *
+   *  1. **EQUALITY WITH THE LOG REPLAY, IN ORDER.** The published list must EQUAL
+   *     `publicRecycleIds` — the same ids, in the same sequence, from `state.log` and the
+   *     card index and nothing else. This is the load-bearing half: a silent writer fails
+   *     here, and so does a silent DEPARTURE, which is the leak this test used to be
+   *     blind to. Equality and not containment, because a projection that published a
+   *     SUBSET of what the log accounts for would leak nothing while claiming the
+   *     derivation, and the old reader could not tell the two apart.
+   *  2. **COMPLETENESS, AGAINST THE PILE.** The published list must also equal the pile.
+   *     This half reads server state and is stated as such: it catches a projection that
+   *     publishes less than the pile holds, which is a correctness bug rather than a leak.
+   *
+   * ## WHY IT IS NOT ASSERTED "ACROSS A RESHUFFLE", AND WHY THAT IS NOT A HOLE
+   *
+   * A log-only reader cannot see a reshuffle, so a replay and the pile could diverge if
+   * one were ever reachable. It is not: `draw(s, 'conspiracy')` has no caller, and
+   * `no reshuffle of the Conspiracy pile is reachable` asserts that against the reducer's
+   * own source. That is the precondition this equality rests on, asserted rather than
+   * assumed, so the day the call is added this test is forced to grow a reshuffle case
+   * instead of quietly becoming false. The `[]`-across-a-reshuffle backstop is asserted
+   * separately, below, on a hand-applied reshuffle.
+   */
+  it('the published recycle list equals what the public log replays, in order', () => {
+    let nonEmpty = 0;
+    let departures = 0;
+    const states = [...CONSPIRACY_CORPUS, ...playedConspiracyCorpus(26), ...pickDecisionStates(), ...pickedConspiracyStates()];
+    for (const s of states) {
+      const fromLog = publicRecycleIds(s);
+      departures += s.log.filter((e) => /^Picked "/.test(e.text)).length;
+      for (const viewer of [...s.turnOrder, null]) {
+        const published = viewFor(s, CARDS, viewer).conspiracyRecycle.map((c) => c.id);
+        expect(Array.isArray(published), `viewer ${String(viewer)}: conspiracyRecycle is not an array`).toBe(true);
+        // (1) — the load-bearing half. Log only, and EQUAL, not a subsequence.
+        expect(
+          fromLog,
+          `viewer ${String(viewer)}: the published list is not what the public log replays`,
+        ).toEqual([...published]);
+        // (2) — completeness, against the pile.
+        expect(
+          [...s._conspiracyDiscard].sort(),
+          `viewer ${String(viewer)}: the pile and the published list disagree`,
+        ).toEqual([...published].sort());
+        if (published.length > 0) nonEmpty += 1;
       }
     }
+    expect(nonEmpty, 'no corpus state had a non-empty recycle list, so nothing was proved').toBeGreaterThan(0);
+    // And the corpus actually EXERCISED the departure. An equality over states where
+    // nothing was ever picked is the assertion the leak hid behind: it passed for 13% of
+    // real games the fixtures never reached. `pickedConspiracyStates` is that fixture.
+    expect(departures, 'no corpus state announced a `Picked` line, so the departure half was asserted over nothing').toBeGreaterThan(0);
+  });
+
+  /**
+   * THE PRECONDITION OF THAT EQUALITY: no Conspiracy reshuffle is reachable.
+   *
+   * `publicRecycleIds` reads `state.log` and nothing else, and a reshuffle is invisible
+   * to a log — it moves the pile into the draw pile without writing a line. So the
+   * equality above is TRUE only while no reshuffle can happen, and this is what says so,
+   * by reading `reduce.ts`'s own call sites rather than by asserting the comment.
+   *
+   * It is not a stylistic assertion. `draw(state, 'conspiracy')` genuinely has no caller
+   * today: `BUY_CONSPIRACY` refuses `the Conspiracy deck is exhausted` before it would
+   * draw, and `draw-conspiracy` reads `_conspiracyDraw` directly rather than through
+   * `draw()`. The day somebody adds one, THIS fails, and the failure message says the
+   * replay has to learn about reshuffles — which is the whole value of pinning it here
+   * instead of leaving it as prose in a docstring nobody re-reads.
+   *
+   * Note what this does NOT do: it does not make the `[]`-across-a-reshuffle backstop
+   * testable, because an unreachable instant cannot be driven. That backstop is argued
+   * and asserted on a hand-applied reshuffle in the next test, and it stays a weaker
+   * claim than the one above until the instant exists.
+   */
+  it('no reshuffle of the Conspiracy pile is reachable, which is what the replay rests on', () => {
+    const src = readFileSync(fileURLToPath(new URL('../../engine/src/reduce.ts', import.meta.url)), 'utf8');
+    const calls = [...src.matchAll(/\bdraw\(\s*\w+\s*,\s*'([a-z]+)'\s*\)/g)].map((m) => m[1]);
+    // The helper's own declaration is not a call, so nothing to subtract — but say so,
+    // because the count is only meaningful if the reader and the declaration agree.
+    expect(src, "draw()'s reshuffle no longer empties the discard pile").toContain('[DISCARD[deck]]: []');
+    expect(
+      calls.filter((d) => d === 'conspiracy'),
+      'something now draws from the Conspiracy deck through draw(), so a reshuffle is reachable and the log replay must be taught about one',
+    ).toEqual([]);
+    // And the decks that ARE drawn, so a reader that had stopped finding `draw()` at all
+    // cannot pass this by matching nothing.
+    expect([...new Set(calls)].sort(), 'the draw() call reader found nothing at all — it is stale').toEqual([
+      'headline',
+      'ideology',
+      'voter',
+    ]);
+  });
+
+  /**
+   * IT IS `[]` ACROSS A RESHUFFLE, and `_seed` is nowhere in a payload.
+   *
+   * The reshuffle is the one instant the derivation needs an ARGUMENT rather than a
+   * name: it fires only when `_conspiracyDraw` is empty, which `deckSizes` publishes, and
+   * it EMPTIES the pile in the same breath it shuffles. So there is no instant at which
+   * the published list holds a seed-derived card — and that is why this projection is a
+   * read of the pile and not a reconstruction of it.
+   *
+   * The state below is driven there for real rather than built by hand: the deck is
+   * emptied, a `PLAY_CONSPIRACY` forces the reshuffle, and the assertion is made across
+   * it. `_seed` is checked in the serialised payload for every viewer because "the field
+   * is not read here" is a claim about the code and this is a claim about the wire.
+   */
+  it('the list is [] across a Conspiracy reshuffle, and _seed reaches nobody', () => {
+    const deck = CARDS.conspiracy;
+    const ids = Object.keys(deck);
+    const corpora = [...CONSPIRACY_CORPUS, ...playedConspiracyCorpus(26), ...pickDecisionStates()];
+
+    // FIRST: the standing property, over every state the corpora reach. A published id
+    // is always a card the deck holds, and `_seed` is never in a payload for ANY viewer.
+    // Both are wire claims, so both are made on the serialised projection rather than on
+    // the field — "the field is not read here" is a claim about the code and this is
+    // about what a client receives.
+    let sawNonEmpty = 0;
+    for (const s of corpora) {
+      const published = viewFor(s, CARDS, null).conspiracyRecycle.map((c) => c.id);
+      for (const id of published) expect(ids, `the recycle list names ${id}, which is not in the deck`).toContain(id);
+      if (published.length > 0) sawNonEmpty += 1;
+      for (const who of [...s.turnOrder, null]) {
+        expect(
+          JSON.stringify(viewFor(s, CARDS, who)).includes(String(s._seed)),
+          'the seed reached a payload',
+        ).toBe(false);
+      }
+    }
+    expect(sawNonEmpty, 'no corpus state had a non-empty recycle list, so nothing was proved').toBeGreaterThan(0);
+
+    // THEN THE RESHUFFLE, and this is the case that needs an argument rather than a name.
+    //
+    // **THE CONSPIRACY RESHUFFLE HAS NO ORDINARY CALLER TODAY, and that is a pre-existing
+    // gap this unit does not close.** `draw(s, 'conspiracy')` is reachable from nothing:
+    // `BUY_CONSPIRACY` refuses `the Conspiracy deck is exhausted` *before* it would
+    // draw, and `draw-conspiracy` reads `_conspiracyDraw` directly rather than through
+    // `draw()`. So the instant cannot be driven from the outside and an assertion that
+    // claimed to drive it would be asserting over nothing — which is the same defect the
+    // Ideology side of this file records at `ANSWER`.
+    //
+    // What IS true, and what U1's security argument actually rests on, is asserted
+    // instead: **the projection follows the DISCARD pile, so a card the log says was
+    // played but which has since left for the draw pile is published nowhere.** That is
+    // the `_seed` protection — after a reshuffle the new draw order is
+    // `shuffle(discard, _seed)`, so a card the log accounts for must NOT be exempt from
+    // secrecy merely because it was once played. The state below is one real corpus
+    // state with that reshuffle's EFFECT applied by hand, which is the honest way to
+    // test an unreachable instant: the mover is the fixture and the reader is the code.
+    const seeded = corpora.find((s) => s._conspiracyDiscard.length > 0);
+    if (seeded === undefined) throw new Error('no corpus state has anything on the Conspiracy discard pile');
+    const reshuffled = seeded._conspiracyDiscard[0] as string;
+    const afterReshuffle: GameState = {
+      ...seeded,
+      // What `draw()` does: the discard is emptied and its cards become the draw pile.
+      _conspiracyDraw: [reshuffled, ...seeded._conspiracyDraw],
+      _conspiracyDiscard: [],
+    };
+    expect(viewFor(afterReshuffle, CARDS, null).conspiracyRecycle, 'the projection is not [] across a reshuffle').toEqual([]);
+    for (const who of [...afterReshuffle.turnOrder, null]) {
+      const json = JSON.stringify(viewFor(afterReshuffle, CARDS, who));
+      expect(
+        json.includes(reshuffled),
+        'a reshuffled Conspiracy Card is on the wire — that is `_seed` one step from being public',
+      ).toBe(false);
+      expect(json.includes(String(afterReshuffle._seed)), 'the seed reached a payload across a reshuffle').toBe(false);
+    }
+    // And the same card, back on the pile, IS published — so the assertion above is about
+    // the reshuffle and not about a projection that is simply always empty.
+    expect(
+      viewFor(seeded, CARDS, null).conspiracyRecycle.map((c) => c.id),
+      'the control state published nothing, so the reshuffle case was asserted over nothing',
+    ).toContain(reshuffled);
+  });
+
+  /**
+   * `_conspiracyDiscard`'s WRITERS, derived from `reduce.ts`'s own source.
+   *
+   * The derivation test above proves the published list is sound *given* that every
+   * writer puts there a card the log already accounts for AND that every writer takes
+   * one off with a line. This is what checks the given, and it is a slice-and-count
+   * rather than a list of names because a list of names is a thing a future writer edits
+   * to include themselves.
+   *
+   * ## THE COUNT, AND IT IS NOT "THREE"
+   *
+   * Every count that has ever been written down here has been wrong, so the enumeration
+   * is done from the source rather than from a number:
+   *
+   * | # | site | on the public log? |
+   * |---|---|---|
+   * | 1 | `PLAY_CONSPIRACY` → `discardTo(s, 'conspiracy', action.cardId)` | **yes** — `Played "NAME".` |
+   * | 2 | `RESPOND_INTERRUPT` → the same call | **yes** — the same line |
+   * | 3 | `draw-conspiracy { to: 'discard' }` → the same call | no line, and deliberately so: the card came OFF the pile and goes straight back on, same card, same end, so the pile is byte-identical and there is no departure to announce |
+   * | 4 | the `pick` path's `_conspiracyDiscard:` removal | **yes, after this change** — `Picked "NAME".`, by the recipient |
+   * | 5 | the `from: 'discard'` top path's `_conspiracyDiscard:` removal | **yes, after this change** — the same line, once per card taken |
+   * | 6 | `draw()`'s reshuffle, `[DISCARD[deck]]: []` | nothing to announce: the pile becomes `[]`, which is the `_seed` protection rather than a claim about the log |
+   *
+   * So there are **four assignment expressions** in `reduce.ts` — the reshuffle,
+   * `discardTo`'s own body, and the two direct removals — reached by **six write paths**,
+   * plus `setup.ts`'s initial value. `state.ts` says "exactly two call sites",
+   * `secret-inventory.ts` says "three writers"; both are wrong, and this test is the
+   * thing that keeps the file honest about which.
+   *
+   * Site 3 is the only silent one left, and its silence is a NET NO-OP rather than a
+   * missing announcement. Site 6 is silent because it leaves nothing to announce.
+   */
+  it('_conspiracyDiscard is written only where the public log already accounts for it', () => {
+    const src = readFileSync(fileURLToPath(new URL('../../engine/src/reduce.ts', import.meta.url)), 'utf8');
+    const caseAt = src.indexOf("case 'draw-conspiracy':");
+    const nextCase = src.indexOf("case 'refresh-market':", caseAt);
+    expect(caseAt, "the 'draw-conspiracy' case moved — this reader is stale").toBeGreaterThan(-1);
+    expect(nextCase, "the case after 'draw-conspiracy' moved — this reader is stale").toBeGreaterThan(caseAt);
+    const before = src.slice(0, caseAt);
+    const inside = src.slice(caseAt, nextCase);
+    const after = src.slice(nextCase);
+
+    // THE TWO PUBLIC WRITES, and they are after `applyEffect` because they live in the
+    // two action handlers. Each is immediately followed by the `Played "NAME"` log line
+    // that is the whole of the argument, and the assertion below pairs the two so a
+    // future edit that moves the write away from its log line fails here.
+    //
+    // NOTE ON THE REGEX: adjacent escapes after `}` are avoided on purpose.
+    // `[...'x}'.matchAll(/x\}\./g)]` is 0 on this toolchain — the bundler rewrites them —
+    // so a guard written with the obvious spelling silently matches nothing and passes
+    // forever. The pairing is asserted as far as `Played "` and no further, which is the
+    // whole of the claim.
+    const publicWrites = [...after.matchAll(/discardTo\(\s*\w+\s*,\s*'conspiracy', action\.cardId\);[^\S\r\n]*\r?\n[^\S\r\n]*s = log\(s, \{[^\S\r\n]*player: [^\n]*text: `Played "/g)].length;
+    expect(publicWrites, 'a public write to the Conspiracy discard pile is no longer paired with its `Played` log line').toBe(2);
+    // Site 3: U1's own recycle-loop write, inside the `draw-conspiracy` case, and the
+    // ONLY `discardTo` there.
+    const recycleWrite = [...inside.matchAll(/discardTo\(\s*\w+\s*,\s*'conspiracy'/g)].length;
+    expect(
+      recycleWrite,
+      'the draw-conspiracy case has a second discardTo, and the pile it writes is only sound if it is the recycle loop',
+    ).toBe(1);
+    // And no direct field assignment anywhere OUTSIDE that case, which is what a silent
+    // writer would be. `before` is `draw()`'s reshuffle and `after` is two action
+    // handlers, and neither writes `_conspiracyDiscard` by name — they go through the
+    // `DISCARD` map. Both must be ZERO, and the regex is PROPERTY-POSITION (see below).
+    const propPos = /(?:^|[{,])[^\S\r\n]*_conspiracyDiscard[^\S\r\n]*:/gm;
+    expect([...before.matchAll(propPos)].length, 'something before draw-conspiracy writes the Conspiracy discard pile').toBe(0);
+    expect([...after.matchAll(propPos)].length, 'something after draw-conspiracy writes the Conspiracy discard pile').toBe(0);
+    // The direct field assignments inside the case, PINNED rather than floored. A floor was
+    // the first version of this line and it had a hole: a silent writer added *inside*
+    // `case 'draw-conspiracy'` — which is exactly where the next one would be written —
+    // satisfies `toBeGreaterThan(0)` and passes.
+    //
+    // **THE COUNT IS TWO, AND THE OLD PIN OF THREE WAS COUNTING A TERNARY.** The regex
+    // was `/_conspiracyDiscard\s*:/`, which cannot tell a property colon from
+    // `fromDiscard ? s._conspiracyDiscard : s._conspiracyDraw` — a read. It matched that
+    // ternary, so the pin was satisfied by a site that writes nothing, and the docstring
+    // above it invented a third write ("the `at < 0` fallback, which writes the same
+    // field") to explain the phantom. The two real ones are:
+    //   1. the pick's removal, `_conspiracyDiscard: at < 0 ? live.slice(0, -1) : …`
+    //   2. the non-picking removal, `_conspiracyDiscard: fromDiscard ? … : s._conspiracyDiscard`
+    // The property-position regex below matches exactly those and not the ternary, which
+    // is the difference between a guard and a coincidence.
+    const insideFieldWrites = [...inside.matchAll(/(?:^|[{,])[^\S\r\n]*_conspiracyDiscard[^\S\r\n]*:/gm)].length;
+    expect(insideFieldWrites, 'the draw-conspiracy case has gained or lost a write to the pile').toBe(2);
+    // And the new, load-bearing half: EVERY departure announces itself. Sites 4 and 5 are
+    // the two removals above, and `announcedPick` is the only thing that turns a removal
+    // into a public event. Pairing the two counts is what stops a fourth removal — or an
+    // edit that drops one of these two calls — from becoming the covert channel this
+    // whole arrangement exists to close. Without it the equality in the derivation test is
+    // the only thing standing between a silent departure and a disclosed hand.
+    const announcedPairs = [...inside.matchAll(/announcedPick\(\s*\w+\s*,\s*\w+\s*,\s*\w+\s*,\s*ctx\s*\)/g)].length;
+    expect(
+      announcedPairs,
+      'the draw-conspiracy case no longer pairs each of its removals with an `announcedPick` call',
+    ).toBe(2);
+    expect(
+      src.includes("text: card === undefined ? 'Picked a Conspiracy Card.' : `Picked \"${card.name}\".`"),
+      'announcedPick no longer announces the departure by name',
+    ).toBe(true);
+    // Writer six: `draw()`'s reshuffle, which EMPTIES the pile. `[DISCARD[deck]]: []`
+    // is the whole of it, and it is what makes the list `[]` rather than seed-derived.
+    // is the whole of it, and it is what makes the list `[]` rather than seed-derived.
+    expect(
+      src.includes('[DISCARD[deck]]: []'),
+      "draw()'s reshuffle no longer empties the discard pile, so the projection is not [] across one",
+    ).toBe(true);
   });
 });

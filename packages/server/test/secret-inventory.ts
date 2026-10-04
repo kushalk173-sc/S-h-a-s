@@ -194,6 +194,33 @@ export const CHOICE_KINDS = {
   'choose-player': 'players',
   /** G16 — "a constituency of your choosing": names board areas, which are public. */
   'choose-zone': 'zones',
+  /**
+   * G17 — "a card of your choosing": names CARDS, and is the first entry here that does.
+   *
+   * `'public-cards'` is a fifth value and this file's own prose said the list was a
+   * secrecy grade, so the classification is re-argued rather than the assertion
+   * relaxed: **`CHOICE_KINDS` records WHAT A PLAYER IS ASKED ABOUT, not how much they
+   * are allowed to know.** Resources, pegs, seats and constituencies are four names
+   * for four sets that happen to be public; cards are a fifth name, and the fact that
+   * this one needed an argument is an argument about THIS SET, not about cards as a
+   * category. A `'choose-card'` over a player's hand would be classified exactly the
+   * same way and would be refused by the assertion below just as hard.
+   *
+   * Why this particular set is public is on the field, in `ClientState.conspiracyRecycle`
+   * (`packages/engine/src/playerView.ts`), and it is a DERIVATION rather than an
+   * assurance: `_conspiracyDiscard` has four assignment sites in `reduce.ts` and six
+   * write paths, and every one is accounted for by the log — `Played "NAME"` puts a card
+   * on the pile and `Picked "NAME"` takes one off, so the pile EQUALS what replaying
+   * those two lines yields, in order. The reshuffle empties it and is unreachable for
+   * this deck. `secret-state.test.ts` asserts the equality and re-derives the writer list
+   * by slicing `reduce.ts`, so the argument cannot rot into a bare name.
+   *
+   * **AND WHAT IT DOES NOT CLAIM:** that cards are generally offerable. A decision
+   * naming a card from `_ideologyDraw`, `_ideologyDiscard`, `_headlineDraw`,
+   * `_voterDraw` or `PRIVATE_PLAYER_KEYS` is refused by the card assertion below, and
+   * this entry is not what stops it.
+   */
+  'choose-card': 'public-cards',
 } as const;
 
 /**
@@ -284,4 +311,36 @@ export const PUBLIC_BY_DESIGN = {
    * "invisible" is the exact bug class this file is here to catch.
    */
   liveEffects: 'liveEffects[]',
+
+  /**
+   * G17 — `ClientState.conspiracyRecycle`. THE FOURTH ENTRY, and the first one whose
+   * value is the CONTENTS of a `_`-prefixed pile rather than a per-seat rule or a
+   * standing effect. It is listed for the same reason as the other three and with a
+   * sharper edge, because this one is a list a client is expected to CHOOSE FROM:
+   * SELECTIVE ACCESS MEMORY renders a picker over it, so a field that quietly stopped
+   * being projected is a card that resolves into a dialog offering nothing.
+   *
+   * The argument is `ClientState.conspiracyRecycle`'s own, and it is a derivation from
+   * the public log rather than a promise: `_conspiracyDiscard` has four assignment sites
+   * in `reduce.ts` and six write paths; `Played "NAME"` puts a card on the pile,
+   * `Picked "NAME"` takes one off by the recipient, the `to: 'discard'` exit is a
+   * byte-identical round trip that owes no line, and the reshuffle — which is
+   * unreachable for this deck — empties the pile. So the published list EQUALS the log
+   * replay, and `[]` across a reshuffle is what keeps `_seed` out of it, because after a
+   * reshuffle the new draw order IS `shuffle(discard, _seed)`.
+   *
+   * **THE DEPARTURES ARE WHY THE EQUALITY IS EQUALITY.** Both take paths used to remove a
+   * card with no log line, which was sound while the pile was server-only and was a
+   * covert channel once it was published: a spectator diffing two payloads could deduce
+   * which card went into whose hidden hand. They announce now, which is both the fix and
+   * the faithful behaviour — the pile is face up at a real table.
+   *
+   * **`this file is not a test and this entry is not a rulebook`**: what makes the list
+   * *sound* is that no fourth writer exists, and that is asserted by slicing
+   * `reduce.ts` in `secret-state.test.ts` rather than by anything written here. A
+   * `draw-conspiracy { to: 'discard' }` over `_conspiracyDraw` is refused in the
+   * reducer for exactly this reason — a card nobody played is not in the log, so
+   * publishing the list would publish the draw pile by another route.
+   */
+  conspiracyRecycle: 'conspiracyRecycle[]',
 } as const;
