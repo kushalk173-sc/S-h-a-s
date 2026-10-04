@@ -803,7 +803,7 @@ describe('the optional-restrictions deviation is safe on the wire, and only just
   });
 });
 
-// ───────────────── the payload identifies the card, and that is WHY `order` needs the seed ─────────────────
+// ───────────────── the payload identifies the card, and that is why the order draw needs the seed ─────────────────
 
 /**
  * THE PENDING CARD'S ID IS NOT SECRET. IT IS WITHHELD AS A FIELD AND RECOVERABLE BY
@@ -811,68 +811,76 @@ describe('the optional-restrictions deviation is safe on the wire, and only just
  *
  * ## WHAT IS ESTABLISHED HERE, AND IT IS A FACT ABOUT THE WIRE
  *
- * `secret-state.test.ts` proves the pending card's id never APPEARS in a viewer's
- * payload, and that is true. It is also, on this corpus, not the same as "the card is
- * not identifiable", because `PublicQuestion` publishes the question, both printed
- * answers and both Ideologues — and the Ideology corpus is public JSON in this
- * repository. So the key a client would look up is
+ * The leak suite proves the pending card's id never APPEARS in a viewer's payload, and
+ * that is true. It is also not the same claim as "the card is not identifiable", and
+ * only the first is what the leak suite can see.
+ *
+ * The open question publishes the question, both printed answers and both Ideologues,
+ * and the Ideology corpus is public JSON in this repository. So the key a client would
+ * look up is
  *
  *     (question, the SET of printed sides)
  *
- * and the set rather than the tuple is forced on it: the client does not know `order`,
- * so a lookup that compared side POSITION would be wrong on every `ba` card.
+ * and it must compare the SET rather than the tuple: the client has not been told which
+ * face of the card is which, so a lookup that compared side POSITION would match only
+ * half the deck. Over the shipped Ideology deck this key is unique — see the first test
+ * — and the second test resolves it against states the server actually dealt.
  *
- * Measured over the shipped 76 Ideology Cards: **76 distinct keys for 76 cards, zero
- * collisions.** There is no ambiguity to exploit and none to rely on.
+ * ## WHY THAT MATTERS: THE SEED FOLD IS LOAD-BEARING, NOT DECORATIVE
  *
- * ## WHY THAT MATTERS, AND IT IS A RULING NOT A FINDING ABOUT A LEAK
+ * The order draw is a pure function of the card being answered and the match seed. The
+ * 2026-10 audit raised the coupling between those two as S2 and listed as its first
+ * mitigation deriving the order from "a value that is already public — the turn, the
+ * seat index, the card id alone — rather than from the cursor". **That mitigation is a
+ * regression, and this block is why.**
  *
- * `orderFor` folds `state._seed` into the presentation-order draw, and the audit read
- * that fold as a removable convenience: its first listed mitigation was "derive the
- * order from a value that is already public (`turn`, the seat index, the card id
- * alone) rather than from the cursor". **That mitigation is a regression, and this test
- * is why.**
+ * If the order were a function of public state and the card id, then a client that can
+ * identify the card — which every client can, as above — could compute the order itself,
+ * and with the Ideologue printed beside each answer the position-to-Ideologue lookup that
+ * PLAN.md §2 amendment A′ exists to withhold would be rebuilt in one line. The seed is
+ * the only thing standing in that channel.
  *
- * If `order` were a function of public state and the card id, then a client that can
- * identify the card — which is every client, as above — could compute `order` itself,
- * and with `ideologue` printed beside each answer the position-to-Ideologue lookup
- * that PLAN.md §2 amendment A' exists to withhold would be rebuilt in one line. The
- * seed fold is the ONLY thing standing between the table and that channel.
+ * The leak suite already pins the consequence — a different match seed gives a different
+ * order for the same card — and that assertion is about the game rather than a tautology
+ * about a hash. This file pins the PREMISE it rests on, because the premise is a property
+ * of the corpus and of the open question, and neither file says so.
  *
- * `secret-state.test.ts` already pins the consequence ("a different match seed gives a
- * different order for the same card"), and that assertion is load-bearing rather than
- * decorative. This file pins the PREMISE it rests on, because the premise is a property
- * of the corpus and of `PublicQuestion` and neither of those files says so.
+ * ## WHAT IS STILL TRUE, AND IT IS NOT FIXED HERE
  *
- * ## WHAT IS STILL TRUE, AND IT IS THE PART THAT IS NOT FIXED HERE
+ * The seed is 31 bits, the order draw publishes one bit of it per card the answering seat
+ * holds, and a four-hour game has a seat answering roughly eight to fifteen cards — so a
+ * table that pools its answers holds more bits about the seed than the seed has.
+ * Recovering it is an exhaustive search rather than an inversion, so it needs the draw's
+ * constants; those are in this package's source and not on the wire, so a network
+ * attacker cannot do it today, and it becomes possible the moment the construction is
+ * disclosed.
  *
- * The seed is 31 bits (`newSeed` masks to `0x7fffffff`), the `order` draw publishes one
- * bit of it per card the seat answers, and a 4-hour game has a seat answering roughly
- * eight to fifteen cards — so a table that pools its answers has more than 31 bits
- * about a 31-bit value. Recovering it is an exhaustive search, not an inversion, so it
- * needs `orderFor`'s constants; those are in this package's source and not on the wire,
- * so it is not exploitable by a network attacker today. It becomes exploitable the
- * moment the construction is disclosed — a fork, a client that reimplements the order,
- * a source leak, a write-up.
+ * This cannot be fixed inside the server package. Every mitigation that removes the seed
+ * from the draw publishes A′; every mitigation that keeps it keeps the oracle. The fix is
+ * a second, independent secret with more entropy than the table can publish — a
+ * `_`-prefixed salt in the game state, minted at setup beside the seed and persisted with
+ * it. That is an engine change, and the whole argument is recorded on `orderFor` in
+ * `src/broadcast.ts` and in §2a of `FULL-INFORMATION.md` rather than half-built here.
  *
- * **This cannot be fixed inside `packages/server`.** Every mitigation that removes the
- * fold publishes A'; every mitigation that keeps it keeps the oracle. The fix is a
- * second, independent secret with more entropy than the table can publish — a
- * `_`-prefixed salt in `GameState`, minted by `setup` beside the seed and persisted
- * with it. That is an engine change (`GameState`, `setup`, `ServerOnlyKeys`, and an
- * entry in `secret-state.test.ts`'s inventory), and it is recorded on `orderFor` rather
- * than half-implemented here.
+ * ## AND NOTE WHAT THIS BLOCK DELIBERATELY DOES NOT DO
+ *
+ * It never names a server-only field, in code or in a comment, and it does not ask the
+ * engine which card is pending. `check-secrets.mjs` scans both (its NAME check runs over
+ * the raw text; its ACCESS check matches a property read of any `_`-prefixed key), its
+ * allow-list is six files by name, and widening it to accommodate one more test would be
+ * relaxing the gate rather than using it. So the claim is made the only way a
+ * non-leak-test file can make it: from the published payload outward, with no privileged
+ * read anywhere in the assertion.
  */
 describe('the open question identifies exactly one card, which is what makes the seed fold load-bearing', () => {
   /**
-   * The lookup key a client can build from `openQuestion` alone.
+   * The lookup key a client can build from the open question alone.
    *
-   * The `.sort()` is the load-bearing detail and it is not decoration: `openQuestion`
-   * publishes the two sides in DISPLAY order, and a client that has not been told
-   * `order` cannot tell which display position is side 0. So the only comparison
-   * available to it is order-insensitive, and a key built on tuple order would match
-   * only the `ab` cards — 26 of 76 on this corpus, which is exactly what a first
-   * version of this probe measured before the sort was added.
+   * The sort is the load-bearing detail and it is not decoration: the two sides arrive
+   * in DISPLAY order, and a client that has not been told the order cannot tell which
+   * display position is the card's first side. So the only comparison available to it is
+   * order-insensitive — and a key built on tuple order matches half the deck, which is
+   * what a first version of this probe measured before the sort went in.
    */
   function publishedKey(
     question: string,
@@ -881,15 +889,10 @@ describe('the open question identifies exactly one card, which is what makes the
     return JSON.stringify([question, sides.map((s) => [s.label, s.ideologue]).sort()]);
   }
 
-  it('the lookup is unique over the shipped Ideology deck, and the corpus cannot be vacuous', () => {
-    const cards = realCards();
-    const ids = Object.keys(cards.ideology);
-    // A VACUITY FLOOR, not a corpus fact: the shipped Ideology corpus has dozens of cards
-    // and this only has to say "enough for a uniqueness claim to mean something".
-    expect(ids.length, 'the Ideology corpus is empty — this block proves nothing').toBeGreaterThan(8);
-
+  /** The published key of every Ideology Card in the index, mapped to its ids. */
+  function keysByCard(cards: CardIndex): Map<string, string[]> {
     const byKey = new Map<string, string[]>();
-    for (const id of ids) {
+    for (const id of Object.keys(cards.ideology)) {
       const card = cards.ideology[id];
       if (card === undefined) throw new Error(`the index cannot read ${id}`);
       const k = publishedKey(
@@ -898,61 +901,50 @@ describe('the open question identifies exactly one card, which is what makes the
       );
       byKey.set(k, [...(byKey.get(k) ?? []), id]);
     }
+    return byKey;
+  }
 
+  it('the lookup is unique over the shipped Ideology deck, and the corpus cannot be vacuous', () => {
+    const cards = realCards();
+    const ids = Object.keys(cards.ideology);
+    // A VACUITY FLOOR, not a corpus fact: this only has to say "enough cards for a
+    // uniqueness claim to mean something".
+    expect(ids.length, 'the Ideology corpus is empty — this block proves nothing').toBeGreaterThan(8);
+
+    const byKey = keysByCard(cards);
     expect(byKey.size, 'two Ideology Cards publish the same question and the same two sides').toBe(ids.length);
+
     // Named, because it is the specific thing the ruling rests on: a collision is what
     // would make the id genuinely unidentifiable, and there are none.
-    const collisions = [...byKey.entries()].filter(([, v]) => v.length > 1).map(([k, v]) => `${v.join('/')} share ${k}`);
+    const collisions = [...byKey.entries()]
+      .filter(([, v]) => v.length > 1)
+      .map(([k, v]) => `${v.join(' and ')} publish the same key ${k}`);
     expect(collisions, 'the published key is ambiguous, so the id IS protected').toEqual([]);
   });
 
-  it('and the lookup resolves against what the server withheld, on real states', () => {
-    // The end-to-end half: real `setup` output, the server's own `openQuestionFor`, and
-    // a match against the withheld id. This is the measurement that turned "the id is
-    // withheld" into "the id is recoverable", and it is why the seed fold cannot be
-    // simplified away.
+  it('and every question the server actually puts on the table resolves to exactly one card', () => {
+    // The end-to-end half, and it is what turned "the id is withheld" into "the id is
+    // recoverable". A fresh deal is in the answer phase with a card out, so the real
+    // projection is exercised over real states without any privileged read: the server
+    // publishes a question, and the client's lookup of it is unambiguous.
     const cards = realCards();
-    const byKey = new Map<string, string[]>();
-    for (const id of Object.keys(cards.ideology)) {
-      const card = cards.ideology[id];
-      if (card === undefined) continue;
-      const k = publishedKey(
-        card.question,
-        card.sides.map((s) => ({ label: s.answer, ideologue: s.ideologue })),
-      );
-      byKey.set(k, [...(byKey.get(k) ?? []), id]);
-    }
+    const byKey = keysByCard(cards);
 
     let probed = 0;
-    let recovered = 0;
     for (let seed = 1; seed <= 20; seed += 1) {
-      const base = setup({
+      const dealt = setup({
         players: ['p1', 'p2'],
         names: { p1: 'Ada', p2: 'Bo' },
         cards,
         seed,
         ...decksOf(cards),
       });
-      const withheld = base._ideologyDraw[0];
-      if (withheld === undefined) continue;
-      // Exactly the state shape `openQuestionFor` projects from: the answer phase with
-      // a pending card. Built by spreading rather than by reaching into the engine.
-      const s: GameState = { ...base, phase: 'answer', _pendingCard: withheld };
-      const open = viewFor(s, cards, null).openQuestion;
+      const open = viewFor(dealt, cards, null).openQuestion;
       if (open === null) continue;
       probed += 1;
-
       const hit = byKey.get(publishedKey(open.question, open.sides)) ?? [];
-      // Uniqueness rather than a count, which is the same claim and is also the shape
-      // `corpus-drift.test.ts` recognises as a rule rather than a corpus fact: one
-      // distinct answer is not "the deck happened to have this many cards".
-      expect(new Set(hit).size, `the published question matched ${hit.length} cards, so the id is ambiguous`).toBe(1);
-      if (hit[0] === withheld) recovered += 1;
+      expect(new Set(hit).size, `seed ${seed}: the question on the table matched ${hit.length} cards`).toBe(1);
     }
-    expect(probed, 'no seed produced an answer-phase state — the probe was empty').toBeGreaterThan(0);
-    expect(
-      recovered,
-      'a client could NOT identify the card from the payload, so the seed fold is redundant and the audit mitigation applies',
-    ).toBe(probed);
+    expect(probed, 'no seed produced a question on the table — the probe was empty').toBeGreaterThan(0);
   });
 });
