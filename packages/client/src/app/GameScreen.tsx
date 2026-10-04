@@ -1262,6 +1262,7 @@ export function GameScreen({ store }: GameScreenProps) {
       {app.pendingMarketPower !== null && me !== null ? (
         <MarketModifierDialog
           state={state}
+          you={you as PlayerID}
           power={app.pendingMarketPower}
           left={
             app.pendingMarketPower === 'going-viral'

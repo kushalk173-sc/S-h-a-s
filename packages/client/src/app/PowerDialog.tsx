@@ -23,7 +23,17 @@ import { useState } from 'react';
 
 import type { Area, ClientState, Delta, PlayerID, Pool, Resource } from '@shasn/engine';
 
-import { RESOURCE_ORDER, UI_RULES, canAfford, deltaTotal, powerAreaRefusal, poolTotal } from './derive.ts';
+import {
+  RESOURCE_ORDER,
+  UI_RULES,
+  canAfford,
+  deltaText,
+  deltaTotal,
+  marketCharge,
+  powerAreaRefusal,
+  poolTotal,
+  shortfall,
+} from './derive.ts';
 import type { MarketPower, PowerFlow } from './store.ts';
 import { powerAreaCount, powerTargetsArea } from './store.ts';
 
@@ -564,12 +574,15 @@ function ToughLove({ state, you, pickedAreaIds, onRemovePick, onCancel, onSubmit
  */
 export function MarketModifierDialog({
   state,
+  you,
   power,
   left,
   onArm,
   onCancel,
 }: {
   state: ClientState;
+  /** Whose mat this is. The sheet prices every card against THIS seat's pool. */
+  readonly you: PlayerID;
   readonly power: MarketPower;
   /** Uses of this power still available this turn. */
   readonly left: number;
@@ -578,12 +591,52 @@ export function MarketModifierDialog({
 }) {
   const [slot, setSlot] = useState<number | null>(null);
   const [discounts, setDiscounts] = useState<readonly Resource[]>([]);
+  const me = state.players[you];
 
   const charging = state.market.map((s, i) => ({
     slot: s,
     index: i,
     charged: RESOURCE_ORDER.filter((r) => (s.cost[r] ?? 0) > 0),
   }));
+
+  /*
+    THE SHEET USED TO OFFER THREE CARDS AND REFUSE NONE OF THEM.
+
+    Arming is free and local — `reduce.ts` takes `viral` and `discounts` as fields
+    on `INFLUENCE`, so nothing is spent until the card is bought — which meant the
+    chooser could arm a modifier on a card the player could not pay for. The note
+    then says *"Buy that card to spend it"* about a card that can never be bought,
+    and the only way out is to notice that and press the power again.
+
+    Found in a browser: Helping Hands armed on a `2 media` card against a pool with
+    no media, the strip honestly printing `11 media short`, and a player with a
+    dead power and a sentence telling them to spend it.
+
+    The bar is deliberately the BEST case for the power, not the likely one:
+    Helping Hands waives at most one of each charging denomination, so a card that
+    is unaffordable even with every one of them waived can never be bought with
+    this power on it. Anything affordable at the sticker price is affordable under
+    the best case too, so this refuses nothing that could have worked.
+  */
+  const affordAtBest = me === undefined
+    ? () => true
+    : (s: (typeof charging)[number]): boolean => {
+        const best =
+          power === 'helping-hands'
+            ? marketCharge(state, you, s.slot, s.charged)
+            : marketCharge(state, you, s.slot, []);
+        return canAfford(me.resources, best);
+      };
+  const shortAtBest = (s: (typeof charging)[number]): string => {
+    if (me === undefined) return '';
+    const best =
+      power === 'helping-hands'
+        ? marketCharge(state, you, s.slot, s.charged)
+        : marketCharge(state, you, s.slot, []);
+    const miss = shortfall(me.resources, best);
+    return miss === undefined ? '' : deltaText(miss);
+  };
+  const anyAffordable = charging.some((c) => affordAtBest(c));
 
   if (slot === null) {
     return (
@@ -595,19 +648,32 @@ export function MarketModifierDialog({
               ? 'One extra voter on the card you buy. Choose the card.'
               : 'Waive the cost of one resource on the card you buy. Choose the card.'}
           </p>
+          {anyAffordable ? null : (
+            <p className="picker__status picker__status--short" role="status" data-testid="market-power-none">
+              You cannot pay for any card on the HQ Mat, so this power has nothing to spend itself
+              on. Answer a card, or end your turn — it is not wasted, it is waiting.
+            </p>
+          )}
           <div className="col">
-            {charging.map((c) => (
-              <button
-                key={c.index}
-                type="button"
-                className="btn"
-                onClick={() => setSlot(c.index)}
-                data-testid="market-power-slot"
-              >
-                ◈ {c.slot.voters} voters ·{' '}
-                {c.charged.map((r) => `${c.slot.cost[r]} ${r}`).join(' · ') || 'free'}
-              </button>
-            ))}
+            {charging.map((c) => {
+              const afford = affordAtBest(c);
+              const miss = afford ? '' : shortAtBest(c);
+              return (
+                <button
+                  key={c.index}
+                  type="button"
+                  className={`btn ${afford ? '' : 'btn--ghost'}`}
+                  disabled={!afford}
+                  aria-disabled={!afford}
+                  onClick={() => setSlot(c.index)}
+                  data-testid="market-power-slot"
+                >
+                  ◈ {c.slot.voters} voters ·{' '}
+                  {c.charged.map((r) => `${c.slot.cost[r]} ${r}`).join(' · ') || 'free'}
+                  {miss === '' ? null : ` — ${miss} short`}
+                </button>
+              );
+            })}
           </div>
           <div className="row">
             <button type="button" className="btn" onClick={onCancel}>
