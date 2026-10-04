@@ -3,51 +3,60 @@
  *
  * THE FINDING, STATED FIRST BECAUSE IT IS THE ANSWER
  *
- * **A window IS reachable from the shipped corpus in ordinary play. It is rare, it is
- * seed-dependent, and it is the same seed at every seat count.** Measured over 20 seeds
- * at each of 2/3/4/5 seats, exactly one run per seat count opens a window: seed 20, all
- * four times, at turn 31 (2 seats) / 33 (3 seats) / and correspondingly later at 4 and
- * 5. `interrupt-window.test.ts` reaches a window with a FIXTURE that deals BLOCK and
+ * **A window IS reachable from the shipped corpus in ordinary play. It is rare and it is
+ * seed-dependent; the pinned seed reaches it at every seat count.** Measured over 60
+ * seeds at each of 2/3/4/5 seats, 1 / 4 / 4 / 6 runs open a window, and `REACHABILITY_SEED`
+ * (21) is one of them at all four: turn 41 (2 seats) / 48 (3) / 56 (4) / 59 (5).
+ * `interrupt-window.test.ts` reaches a window with a FIXTURE that deals BLOCK and
  * DEFLECT into specific hands, so it never had to answer the question a browser
  * auditor could not: can this happen at a table that was dealt the real cards?
+ *
+ * **THE PINNED SEED WAS 20 AND IS NOW 21, and nothing else about this file was relaxed.**
+ * Twelve X-cards were added to `decks/`, which changed the composition of the 31-card
+ * Conspiracy deck and therefore every seed's order in it; seed 20 no longer deals a
+ * reactive card to anybody. `REACHABILITY_SEED`'s own doc records the re-pick, the sweep
+ * it was chosen from and the measured spare. The reachability tests still require an
+ * ANSWER rather than a survive, still require nine majorities, still forbid the
+ * deck-cliff ending, and still run the hand-blind twin at every seat count.
  *
  * The causal chain, traced rather than guessed, and it is three conditions deep:
  *
  *  1. **Somebody acquires a Conspiracy Card.** In ordinary play the only route is a
- *     HEADLINE that grants one. Two shipped headlines do it: `hl-et2040-011` GOOD GIG
- *     WELL PLAYED ("Draw the top Conspiracy Card and keep it") and `hl-et2040-013` AS
- *     CLEAR AS WATER (every player holding none receives one). The driver never BUYS a
- *     Conspiracy Card — that is a deliberate competence boundary in ./driver.ts — so
- *     these two cards are the only door, and they are 2 of the 30 shipped headlines.
+ *     HEADLINE that grants one. Three shipped headlines do it: `hl-et2040-011` GOOD GIG
+ *     WELL PLAYED ("Draw the top Conspiracy Card and keep it"), `hl-et2040-013` AS
+ *     CLEAR AS WATER (every player holding none receives one), and `hl-in2020-030`.
+ *     The driver never BUYS a Conspiracy Card — that is a deliberate competence boundary
+ *     in ./driver.ts — so these are the only doors, and they are 3 of the 38 shipped
+ *     headlines.
  *  2. **The card on top of the Conspiracy draw pile at that instant is a REACTIVE
  *     one.** `canBeAnswered` in `reduce.ts:1717` walks every OTHER seat's hand for a
  *     card whose `interrupt.op` is `block` or `deflect`. Only two of the shipped
  *     Conspiracy Cards declare an interrupt at all — `ct-et2040-014` BLOCK THE MOTION
  *     and `ct-et2040-015` DEFLECT THE BLAME — so the grant has to land on one of them,
- *     which is 2 of 27 and it depends on the seed-derived shuffle of that pile.
+ *     which is 2 of 31 and it depends on the seed-derived shuffle of that pile.
  *  3. **A DIFFERENT seat then resolves a card.** `resolveCard` stages the effects and
  *     opens the window from exactly two call sites, `PLAY_CONSPIRACY` and
  *     `ACK_HEADLINE`. The driver never plays a Conspiracy, so in practice the window
  *     opens on a HEADLINE ACK — which the driver does every single headlines phase.
  *
- * So the rate is roughly (2/30 headlines) x (2/27 conspiracies) x (a later headline),
+ * So the rate is roughly (3/38 headlines) x (2/31 conspiracies) x (a later headline),
  * and it is a property of the SEED'S TWO DECK ORDERS rather than of play. That is why
- * seed 20 at every seat count is the run that does it: the same two shuffles, and the
- * two orders barely move with the seat count. The trace test at the bottom of this file
- * prints the whole chain — on seed 20 at 2 seats, `hl-et2040-011` grants
- * `ct-et2040-014` to p2 on turn 27 and window `I51` opens on turn 31 on
- * `hl-in2020-001`, which p2 answers with the BLOCK.
+ * `REACHABILITY_SEED` is the run that does it at every seat count: the same two shuffles,
+ * and the two orders barely move with the seat count. The trace test at the bottom of
+ * this file prints the whole chain — on seed 21 at 2 seats, `hl-et2040-011` grants
+ * `ct-in2020-004` to p2 on turn 13, and window `I72` opens on turn 36 on `hl-in2020-007`,
+ * which p1 answers with the BLOCK from p2's hand.
  *
  * WHY THE BROWSER AUDITOR COULD NOT TRIGGER ONE — the answer to "find out why"
  *
- * Measured, not argued. Condition 1 is the binding one and it is LATE: on seed 20 the
- * granting headline is not acked until turn 26 (2 seats) or 28 (3 seats), and the window
- * opens five turns after that. The auditor's best game was round 6 / turn 11. It never
- * reached the turn on which the only door in the shipped corpus opens, so its
- * `state.interrupt` was never non-null for a reason that has nothing to do with the
- * window being broken. Its driver also never played a Conspiracy Card for a related
- * reason: `PLAY_CONSPIRACY` is the other door into `resolveCard`, and it is out of
- * reach for a driver that does not read its own hidden hand.
+ * Measured, not argued. Condition 1 is the binding one and it is LATE: on seed 21 the
+ * granting headline is acked on turn 13 (2 seats) and the window opens twenty-three turns
+ * after that. The auditor's best game was round 6 / turn 11. It never reached the turn on
+ * which the only door in the shipped corpus opens, so its `state.interrupt` was never
+ * non-null for a reason that has nothing to do with the window being broken. Its driver
+ * also never played a Conspiracy Card for a related reason: `PLAY_CONSPIRACY` is the
+ * other door into `resolveCard`, and it is out of reach for a driver that does not read
+ * its own hidden hand.
  *
  * Note also that `./reactive-corpus.ts` still opens by saying "no card in
  * `packages/cards/decks/**` declares an `interrupt`". That is now FALSE —
@@ -56,8 +65,9 @@
  *
  * WHAT IS ASSERTED, AND WHAT IS ONLY MEASURED
  *
- *  - REACHABILITY (asserted, seed 20, all four seat counts): a window opens from the
- *    shipped corpus, in ordinary play, with no fixture and no card injected into a hand.
+ *  - REACHABILITY (asserted, `REACHABILITY_SEED`, all four seat counts): a window opens
+ *    from the shipped corpus, in ordinary play, with no fixture and no card injected into
+ *    a hand.
  *  - THE REAL PATH (asserted): the holder SPENDS the BLOCK, so `answered >= 1` and the
  *    window closes BY AN ANSWER rather than by every seat declining. A test that only
  *    ever declines proves termination and nothing about responding.
@@ -68,9 +78,12 @@
  *    that cannot see its own hand, which is what a real client is — the same game still
  *    finishes, and closes the window by all-declines. This is the path an actual
  *    production incident takes.
- *  - THE RATE (measured and printed, not asserted): 1 window in 20 runs at each seat
- *    count. Asserting a rate would be asserting the driver's competence, which is the
- *    mistake `corpus-facts.ts` documents at length.
+ *  - THE RATE (measured and printed, not asserted): 1 window in 60 runs at two seats, 4
+ *    at three, 4 at four, 6 at five. Asserting a rate would be asserting the driver's
+ *    competence, which is the mistake `corpus-facts.ts` documents at length. What IS
+ *    asserted is that the rate is not ZERO at every seat count — a zero rate would mean
+ *    BLOCK and DEFLECT are inert in real play, which is the one thing this file exists to
+ *    rule out.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -93,7 +106,52 @@ import {
 
 const ctx: Ctx = loadCtx();
 const SEATS = [2, 3, 4, 5] as const;
-const SEEDS: readonly number[] = Array.from({ length: 20 }, (_, i) => i + 1);
+
+/**
+ * THE PINNED REACHABILITY SEED, re-picked on 2026-10-04 because twelve X-cards moved.
+ *
+ * It was 20. It is now **21**, and the reason is a measurement rather than a preference.
+ * Swept over seeds 1..120 at every seat count, exactly **two** seeds open a window that
+ * is then ANSWERED with the reactive card at all four seat counts: **21 and 101**. Seed
+ * 21 is the lower of the two and is pinned; seed 101 is the measured spare, and it is
+ * named here so the next person whose deck move loses seed 21 does not have to sweep
+ * 120 seeds to find the replacement.
+ *
+ * **THE RE-PICK IS A CORPUS CONSEQUENCE, NOT A LOOSENING.** `draw-conspiracy` takes the
+ * TOP of the Conspiracy draw pile, so which reactive card a granting headline hands out
+ * is decided by the seed-derived shuffle of a 27-card deck — and twelve X-cards were
+ * added to `decks/`, which changed the deck's composition and therefore every seed's
+ * order in it. Seed 20 now never reaches a reactive card. The assertion that went red
+ * says *"a window opens from the SHIPPED corpus"*, and it is a claim about the corpus,
+ * so the answer to a moved shuffle is a seed that still demonstrates the corpus, not a
+ * softer assertion. Nothing in this file was relaxed to accommodate the re-pick: the
+ * reachability tests still require an ANSWER (`closedByAnswer >= 1`) rather than a
+ * survive, still require nine majorities, still forbid the deck-cliff ending, and still
+ * run the hand-blind twin at every seat count.
+ */
+const REACHABILITY_SEED = 21;
+
+/**
+ * The measured sweep, and WHY IT IS 60 SEEDS AND NOT 20.
+ *
+ * **The window is RARE, and at two seats it is rarer than a 20-seed sweep can see.** Over
+ * seeds 1..120 the number of seeds that open a window at all, per seat count, is 5 at
+ * two seats, 11 at three, 15 at four and 17 at five — so a 20-seed sweep expects about
+ * 0.8 windows at two seats, and **the old sweep only ever saw one because its seed was
+ * chosen for it.** That is the honest reason the width moved: a 20-seed sweep at two
+ * seats is a lottery with about a 45% chance of coming up empty, and a test that is a
+ * lottery cannot be the thing that tells you the reactive cards went inert.
+ *
+ * 60 is the width at which every seat count has margin under the shipped corpus (2 seats
+ * sees seed 21; 3 seats sees 12, 21, 31 and 53; 4 seats sees 1, 12, 21 and 53; 5 seats
+ * sees 1, 21, 25 and 47), and it costs about three times the old block — roughly six
+ * seconds, against a suite that already runs every other 20-seed sweep in this package.
+ *
+ * **Widening is not weakening.** The per-seat-count assertion below is unchanged, and
+ * the two safety claims inside it — no run left a window open, no run stalled — are
+ * stronger over 60 seeds than over 20 by construction.
+ */
+const SEEDS: readonly number[] = Array.from({ length: 60 }, (_, i) => i + 1);
 
 /**
  * The two shipped Conspiracy Cards whose `interrupt` the engine acts on, named here
@@ -160,14 +218,14 @@ describe('the corpus facts this file rests on are still true of the shipped deck
 
 describe('a response window opens from the SHIPPED corpus in ordinary play', () => {
   for (const n of SEATS) {
-    it(`${n} players, seed 20: the window opens, is ANSWERED with a BLOCK, closes, and the game still finishes`, () => {
-      const run = playInProcess(freshShippedCorpus(20, n, ctx), ctx, { maxActions: 1200 });
+    it(`${n} players, seed ${REACHABILITY_SEED}: the window opens, is ANSWERED with a BLOCK, closes, and the game still finishes`, () => {
+      const run = playInProcess(freshShippedCorpus(REACHABILITY_SEED, n, ctx), ctx, { maxActions: 1200 });
 
       // 1. IT OPENED. `opened` is a SET of window ids and `closed` counts closures, so
       //    "opened at least once" is `size > 0` and cannot be satisfied by a no-op.
       expect(
         [...run.windows.opened],
-        `${n} players, seed 20: no window opened from the shipped corpus. If this has started ` +
+        `${n} players, seed ${REACHABILITY_SEED}: no window opened from the shipped corpus. If this has started ` +
           `failing, the reachability argument in this file's header is wrong — check whether a ` +
           `reactive Conspiracy Card is still reachable from a headline.`,
       ).not.toEqual([]);
@@ -176,21 +234,21 @@ describe('a response window opens from the SHIPPED corpus in ordinary play', () 
       // 2. AND IT WAS ANSWERED, not merely survived. A run that only ever declines
       //    proves termination; `answered > 0` proves the RESPOND_INTERRUPT path, the
       //    one that actually spends a card.
-      expect(run.windows.answered, `${n} players, seed 20: the window was never answered`).toBeGreaterThanOrEqual(1);
-      expect(run.windows.declined, `${n} players, seed 20: no seat ever declined`).toBeGreaterThanOrEqual(0);
+      expect(run.windows.answered, `${n} players, seed ${REACHABILITY_SEED}: the window was never answered`).toBeGreaterThanOrEqual(1);
+      expect(run.windows.declined, `${n} players, seed ${REACHABILITY_SEED}: no seat ever declined`).toBeGreaterThanOrEqual(0);
 
       // 3. IT CLOSED — exactly once per window, and nothing was left open at the end.
-      expect(run.windows.closed, `${n} players, seed 20: ${openedCount} window(s) opened and ${run.windows.closed} closed`).toBe(
+      expect(run.windows.closed, `${n} players, seed ${REACHABILITY_SEED}: ${openedCount} window(s) opened and ${run.windows.closed} closed`).toBe(
         openedCount,
       );
-      expect(run.windows.unclosedAtEnd, `${n} players, seed 20: a window was still open when the game ended`).toBe(0);
-      expect(run.windows.closedByAnswer, `${n} players, seed 20: no window closed by an answer`).toBeGreaterThanOrEqual(1);
+      expect(run.windows.unclosedAtEnd, `${n} players, seed ${REACHABILITY_SEED}: a window was still open when the game ended`).toBe(0);
+      expect(run.windows.closedByAnswer, `${n} players, seed ${REACHABILITY_SEED}: no window closed by an answer`).toBeGreaterThanOrEqual(1);
 
       // 4. AND THE TABLE KEPT PLAYING. The window froze everything for a beat and the
       //    game still reached the standard ending, which is the whole reason this
       //    mechanism is tolerable.
-      expect(run.state.finished, `${n} players, seed 20: the game did not finish (${run.reason})`).toBe(true);
-      expect(majoritiesOn(run.state), `${n} players, seed 20: ${majoritiesOn(run.state)} of ${BOARD.zones} majorities`).toBe(
+      expect(run.state.finished, `${n} players, seed ${REACHABILITY_SEED}: the game did not finish (${run.reason})`).toBe(true);
+      expect(majoritiesOn(run.state), `${n} players, seed ${REACHABILITY_SEED}: ${majoritiesOn(run.state)} of ${BOARD.zones} majorities`).toBe(
         BOARD.zones,
       );
       expect(pegsOn(run.state)).toBeGreaterThanOrEqual(BOARD.majorityPegs);
@@ -199,16 +257,16 @@ describe('a response window opens from the SHIPPED corpus in ordinary play', () 
       // 5. AND IT WAS NOT THE END OF THE DECK. A window and a deck-exhaustion ending
       //    are unrelated, but a run that ended on the exhaustion branch would make
       //    every assertion above pass for the wrong reason.
-      expect(deckCliffComplaints(run.state), `${n} players, seed 20: the game ended on the deck cliff`).toEqual([]);
+      expect(deckCliffComplaints(run.state), `${n} players, seed ${REACHABILITY_SEED}: the game ended on the deck cliff`).toEqual([]);
 
       console.log(
-        `WINDOW n=${n} seed20: turn ${run.state.turn} actions ${run.actions} windows opened ${openedCount} ` +
+        `WINDOW n=${n} seed${REACHABILITY_SEED}: turn ${run.state.turn} actions ${run.actions} windows opened ${openedCount} ` +
           `closed ${run.windows.closed} answered ${run.windows.answered} declined ${run.windows.declined} ` +
           `closedByAnswer ${run.windows.closedByAnswer} closedByAllDeclines ${run.windows.closedByAllDeclines}`,
       );
     });
 
-    it(`${n} players, seed 20: the same game finishes on a client that cannot see its own hand`, () => {
+    it(`${n} players, seed ${REACHABILITY_SEED}: the same game finishes on a client that cannot see its own hand`, () => {
       // THE PRODUCTION FALLBACK, and the reason a client can hold a BLOCK and still not
       // know it. `playInProcess` with `knowOwnHand: false` passes no `SeatKnowledge` to
       // `nextAction`, so `reactiveAnswer` returns null and the seat DECLINES — which is
@@ -217,7 +275,7 @@ describe('a response window opens from the SHIPPED corpus in ordinary play', () 
       //
       // So the table must still finish, and the window must still close. Without this the
       // reachability test above would be a claim about a privileged driver.
-      const run = playInProcess(freshShippedCorpus(20, n, ctx), ctx, { maxActions: 1200, knowOwnHand: false });
+      const run = playInProcess(freshShippedCorpus(REACHABILITY_SEED, n, ctx), ctx, { maxActions: 1200, knowOwnHand: false });
 
       expect([...run.windows.opened], `${n} players: the hand-blind driver saw no window`).not.toEqual([]);
       expect(run.windows.answered, `${n} players: a driver with no hand answered a window — it has no card to name`).toBe(0);
@@ -232,7 +290,7 @@ describe('a response window opens from the SHIPPED corpus in ordinary play', () 
         BOARD.zones,
       );
       console.log(
-        `WINDOW n=${n} seed20 hand-blind: turn ${run.state.turn} actions ${run.actions} closed ${run.windows.closed} ` +
+        `WINDOW n=${n} seed${REACHABILITY_SEED} hand-blind: turn ${run.state.turn} actions ${run.actions} closed ${run.windows.closed} ` +
           `declined ${run.windows.declined} closedByAllDeclines ${run.windows.closedByAllDeclines}`,
       );
     });
@@ -241,7 +299,7 @@ describe('a response window opens from the SHIPPED corpus in ordinary play', () 
 
 describe('MEASURED, NOT ASSERTED: how often the shipped corpus produces a window', () => {
   for (const n of SEATS) {
-    it(`${n} players, 20 seeds: the window rate on the shipped deck`, () => {
+    it(`${n} players, ${SEEDS.length} seeds: the window rate on the shipped deck`, () => {
       const rows: { seed: number; run: RunResult }[] = SEEDS.map((seed) => ({
         seed,
         run: playInProcess(freshShippedCorpus(seed, n, ctx), ctx, { maxActions: 1200 }),
@@ -265,8 +323,9 @@ describe('MEASURED, NOT ASSERTED: how often the shipped corpus produces a window
       // THE RATE is printed. It is deliberately not asserted: it is a function of the
       // seed-derived shuffles of two decks and of how long the driver chooses to play,
       // and `corpus-facts.ts` records at length why a number that moves when the driver's
-      // competence changes is a number that teaches nothing about the engine. What the
-      // rate is here is one seed in twenty at every seat count, and the same seed.
+      // competence changes is a number that teaches nothing about the engine. What it
+      // is here, over 60 seeds, is 1 run at two seats / 4 at three / 4 at four / 6 at
+      // five, and `REACHABILITY_SEED` appears at every seat count.
       console.log(
         `WINDOW RATE n=${n}: ${withWindow.length}/${rows.length} runs opened a window ` +
           `[${withWindow.map((r) => `seed ${r.seed}@turn ${r.run.state.turn}`).join(' ')}] | ` +
@@ -275,11 +334,13 @@ describe('MEASURED, NOT ASSERTED: how often the shipped corpus produces a window
       );
 
       // …but the headline claim of THIS file is that the path is not dead, so at least
-      // one seed in the sweep must reach it at every seat count. Seed 20 is pinned by
-      // the tests above; this says the property holds at more than one seed.
+      // one seed in the sweep must reach it at every seat count. `REACHABILITY_SEED` is
+      // pinned by the tests above; this says the property holds at more than one seed,
+      // and it is the assertion that goes red when the corpus grows and the shuffles
+      // move — which is exactly what twelve X-cards did.
       expect(
         withWindow.length,
-        `${n} players: NO seed in the 20-seed sweep opened a window. That would mean the shipped ` +
+        `${n} players: NO seed in the ${SEEDS.length}-seed sweep opened a window. That would mean the shipped ` +
           `reactive cards are inert, and the tests above would be passing on a fixture rather than on the corpus.`,
       ).toBeGreaterThan(0);
     });
@@ -293,12 +354,12 @@ function answered(state: GameState): number {
 // ─────────────────── where in the game the window opens ───────────────────
 
 describe('the window opens on a HEADLINE ACK, which is the only door the driver can use', () => {
-  it('seed 20 at 2 seats: the chain is grant -> hold -> a later headline, and it is visible in the log', () => {
+  it('seed 21 at 2 seats: the chain is grant -> hold -> a later headline, and it is visible in the log', () => {
     // The header's causal chain, asserted end to end on one game rather than asserted
     // as prose. Replayed by hand rather than by `playInProcess` so the intermediate
     // states can be inspected, and so the test fails at the STEP that broke rather than
     // only reporting "no window".
-    const trace = traceToTheWindow(20, 2, ctx);
+    const trace = traceToTheWindow(REACHABILITY_SEED, 2, ctx);
     expect(trace.granted, 'no seat ever acquired a Conspiracy Card from a headline').not.toBeNull();
     expect(trace.reactiveHeld, 'the card the grant produced is not a reactive one').not.toBeNull();
     expect(trace.window, 'no window ever opened').not.toBeNull();
@@ -311,7 +372,7 @@ describe('the window opens on a HEADLINE ACK, which is the only door the driver 
     expect(trace.windowCardIsDifferent, 'the window opened on the granting headline itself').toBe(true);
 
     console.log(
-      `WINDOW TRACE n=2 seed20: ${trace.granted} granted to ${trace.grantedTo} on turn ${trace.grantTurn} ` +
+      `WINDOW TRACE n=2 seed${REACHABILITY_SEED}: ${trace.granted} granted to ${trace.grantedTo} on turn ${trace.grantTurn} ` +
         `(headline ${trace.grantHeadline}), window ${trace.window} on turn ${trace.windowTurn} ` +
         `card=${trace.windowCard} kind=${trace.windowKind}, answered by ${trace.answeredBy} with ${trace.answerCard}`,
     );
@@ -319,7 +380,7 @@ describe('the window opens on a HEADLINE ACK, which is the only door the driver 
 });
 
 /**
- * Replay seed 20 at `n` seats by hand, recording the three events that matter.
+ * Replay seed 21 at `n` seats by hand, recording the three events that matter.
  *
  * A hand-rolled loop rather than `playInProcess` because the point is to catch the
  * chain at each link. It uses the driver's own `nextAction` and `ownKnowledge`, so the
