@@ -20,13 +20,13 @@
  * fails the build on one, and it scans `packages/client/src` WHOLE — test files
  * included, with no exemption. (An earlier version of this comment claimed
  * `derive.test.ts` existed and "a test may import, because a test is not a
- * bundle". There is no such file, and the claim was wrong twice over: the file
- * did not exist, and a test in this tree may not value-import the engine either.
- * The consequence is real and it is stated where it bites, in
- * `choiceResolver.test.tsx`: the mirrors below cannot be checked against the
- * engine from inside the client, so their expected values are pinned as
- * literals and the live agreement is verified in a browser against the real
- * server.)
+ * bundle". There is no such exemption, and the file did not exist either, so the
+ * claim was wrong twice over. The engine is therefore read as TEXT — see
+ * `derive.test.ts`, which now exists and pins every number in `UI_RULES` plus the
+ * two printed orders against the engine's own source. What that cannot reach is a
+ * MIRRORED FUNCTION's behaviour: `choiceResolver.test.tsx` is the compensating
+ * instrument for those, and the residual hole is a divergence both sides agree
+ * on.)
  *
  * That arrangement is deliberate rather than lazy. A client that imports the
  * engine's values has a copy of every payout in its bundle, and a bundle is a
@@ -61,10 +61,23 @@ import type { BoardMode, BoardPlayer, BoardState, BoardZoneID } from '../board/t
  * The numbers the UI renders, mirrored from `packages/engine/src/rules.ts`.
  *
  * Every value here is a DISPLAY number. Nothing in this object decides legality:
- * the engine does, and a wrong mirror costs a wrong label, not a wrong game. The
- * mirror is still checked — `derive.test.ts` imports the real `RULES` and
- * asserts equality — because "a label that says 3 cards to Level 3 when the
- * engine wants 4" is a bug players report as the game lying to them.
+ * the engine does, and a wrong mirror costs a wrong label, not a wrong game. But
+ * "a wrong label" is exactly what a player reports as the game lying to them — "a
+ * label that says 3 cards to Level 3 when the engine wants 4" — so the mirror is
+ * pinned.
+ *
+ * IT IS PINNED BY `derive.test.ts`, WHICH EXISTS. An earlier version of this
+ * comment made that claim twice while no such file existed, and the same header
+ * below says so; the claim outlived the correction, twenty lines apart, which is
+ * the worst of both worlds. The test now reads the engine's `rules.ts` as TEXT
+ * (`?raw`) and compares key by key and value by value, because the secret gate
+ * forbids this package from value-importing the engine — test files included — so
+ * importing `RULES` to compare against it was never available as an option.
+ *
+ * Source-text comparison cannot see a semantic disagreement. It can see the
+ * entire class of defect this object is exposed to, which is a NUMBER moving, and
+ * that is the whole of it: every value here is a literal the engine also writes as
+ * a literal.
  */
 export const UI_RULES = Object.freeze({
   resourceCap: 12,

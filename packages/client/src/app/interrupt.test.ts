@@ -54,7 +54,6 @@ import type {
   PlayerID,
   PlayerState,
   Pool,
-  RestrictionKind,
 } from '@shasn/engine';
 
 import {
@@ -506,13 +505,26 @@ describe('every op in the engine Effect union has its own sentence', () => {
   });
 });
 
+/**
+ * The kinds the `restrict` OP can name — narrower than `RestrictionKind`, and the
+ * distinction is pinned below rather than papered over.
+ *
+ * Read off the engine's own type instead of written as a literal, so it cannot
+ * drift: `RestrictionKind` is the kind of a `Restriction` RECORD (six members,
+ * because `borrow-power` writes one directly) while this is the kind a `restrict`
+ * EFFECT can carry (five). Handing the six-member type to a `restrict` literal is
+ * a compile error, which is the correct outcome and is why this is derived rather
+ * than imported.
+ */
+type RestrictKind = Extract<Effect, { readonly op: 'restrict' }>['kind'];
+
 describe('every restrict kind describes ITSELF, and no two kinds share a sentence', () => {
   // The defect, verbatim. `no-power`, `no-income` and `voter-shortfall` all printed
   // "Every purchase costs N more": a power lock-out reported as a purchase tax, in
   // the one panel whose job is to warn the table BEFORE it happens. Each row is a
   // different subsystem, so each row must read differently.
   const KINDS: readonly {
-    readonly kind: RestrictionKind;
+    readonly kind: RestrictKind;
     readonly owed?: number;
     readonly must: RegExp;
     readonly mustNot: RegExp;
