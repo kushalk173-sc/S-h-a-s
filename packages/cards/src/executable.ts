@@ -58,8 +58,23 @@ import type { Effect } from './engine.js';
 export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   gain: ['res', 'per', 'target'],
   lose: ['res', 'per', 'target'],
-  'gain-any': ['n', 'target'],
-  'lose-any': ['n', 'target'],
+  /**
+   * G4/G15 — `per` is on both and `read` is on NEITHER, which is the honest placement and
+   * the reason it is worth a comment.
+   *
+   * `per` IS read in the case: it is passed to `resolveAsk`, which resolves `n × per`
+   * before anything is pushed. `read` is NOT, because `read` is read one function ABOVE
+   * the switch — in the same interception that turns `'chosen-player'` into a decision —
+   * and `EXECUTED_OPS` is re-derived by slicing `applyEffect`'s body, so a field claimed
+   * here that the body does not read is a parity failure by construction. It is declared in
+   * `FIELDS_READ_BY_CHOICE_INTERCEPTION` below, and `test/reducer-parity.test.ts` asserts
+   * that registry against the interception's own source for the same reason it asserts
+   * `SCOPE_FIELDS_READ_BY_INSTALL` against `installLiveEffects`. This is the FOURTH honesty
+   * seam: `applyEffect`'s cases, the installer's scope fields, `RESPOND_INTERRUPT`'s
+   * interrupt fields, and now the interception's `read`.
+   */
+  'gain-any': ['n', 'target', 'per'],
+  'lose-any': ['n', 'target', 'per'],
   'steal-any': ['n', 'target'],
   voters: ['n', 'target'],
   /**
@@ -129,6 +144,24 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
 
 
 export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(EXECUTED_OPS));
+
+/**
+ * The effect fields `applyEffect` reads in its `'chosen-player'` INTERCEPTION, one function
+ * above its switch. G4/G15's `read` is the only member today.
+ *
+ * **WHY IT IS NOT IN `EXECUTED_OPS`.** That table is re-derived by slicing `applyEffect`'s
+ * body between `case '…':` marks, so a field the CASES do not read cannot be listed there
+ * without `reducer-parity` failing — and `read` genuinely is not read by a case: it names
+ * whose board a multiplier comes off, which has to be answered BEFORE the switch, by raising
+ * the decision and re-running the effect with the named player handed back.
+ *
+ * Same reason `SCOPE_FIELDS_READ_BY_INSTALL` exists for `when` / `until` / `condition`, and
+ * same reason `EXECUTED_INTERRUPT_OPS` exists for `interrupt`. Three seams before this one
+ * and four now, and the value of the registry is exactly the value of the slicing: a field
+ * the reducer stopped honouring fails a test instead of becoming a declaration nobody checks.
+ * `test/reducer-parity.test.ts` re-derives this set from the interception's own source.
+ */
+export const FIELDS_READ_BY_CHOICE_INTERCEPTION: ReadonlySet<string> = new Set<string>(['read']);
 
 /**
  * `EffectTarget` values `reduce()` actually honours. G1.
@@ -520,6 +553,42 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
     if (reads.includes(field)) continue;
 
     /**
+     * G4/G15 — `read` WITHOUT `per` is refused, and it is refused HERE rather than left as
+     * documentation.
+     *
+     * `read` names whose board a multiplier is read from, and with no `per` there is no
+     * multiplier: the field would be read by `applyEffect` (it has to be, to raise the
+     * decision) and would change nothing, which is precisely the declaration-the-engine-
+     * ignores that this whole registry exists to catch. The message says what to write
+     * instead, because "add a `per`" is a one-word fix and a refusal that only says no is
+     * a papercut.
+     */
+    if (field === 'read') {
+      if (effect.per === undefined) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/read`,
+          message:
+            `read names whose state a multiplier is read from, and this effect has no ` +
+            '`per` - so the field would name a player and change nothing. Add the `per` ' +
+            "that consumes it, or drop the `read`. See KNOWN-GAPS.md G4.",
+        });
+        continue;
+      }
+      if (typeof effect.read !== 'string' || !EXECUTABLE_TARGETS.has(effect.read)) {
+        out.push({
+          code: 'EFFECT_FIELD_NOT_EXECUTED',
+          pointer: `${pointer}/read`,
+          message:
+            `read ${JSON.stringify(effect.read)} is not an EffectTarget reduce() honours, so ` +
+            'the multiplier would be read off the recipient - which is what the field exists ' +
+            `to stop. ${TARGET_FIX}`,
+        });
+      }
+      continue;
+    }
+
+    /**
      * VALUE checks on the three vocabulary fields, and the reason they are checks on
      * values rather than on presence. `reads` already says `applyEffect`'s case opens
      * the door; these say it opens it onto a thing it can act on. A `target` the
@@ -599,7 +668,7 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
   // `per` is the same question about a multiplier, and it is only meaningful on
   // `gain` / `lose` — but that is already covered by the field check above, because
   // `per` is registered as read on exactly those two ops and nowhere else.
-  if ('per' in effect) {
+if ('per' in effect) {
     const of = isPlainObject(effect.per) ? effect.per['of'] : undefined;
     if (typeof of !== 'string' || !EXECUTABLE_COMPUTED_SOURCES.has(of)) {
       out.push({
@@ -609,20 +678,27 @@ export function unexecutedEffectProblems(effect: unknown, pointer: string): read
           `a per multiplier of ${JSON.stringify(effect.per)} names no quantity reduce() can read. ` +
           `${COMPUTED_SOURCE_FIX}`,
       });
-    } else if (of !== 'held-of-each-resource') {
+    } else if (of !== 'held-of-each-resource' && effect.op !== 'gain-any' && effect.op !== 'lose-any') {
       // The multiplier is applied PER RESOURCE, so any other source would multiply
       // the same number into four components, which is not what any recovered card
       // means. Naming the one legal value is more useful than letting it through.
+      //
+      // **`gain-any` / `lose-any` are the carve-out, and it is the whole of G4's split.**
+      // Those two ops have no `res`: the multiplier scales the ASK, and an ask is one
+      // number, so `{ of: 'volatile-voters' }` is exactly right there — it is THOUGHTS
+      // AND PRAYERS' *"2 resources for each of their voters in a Volatile Area"*. The
+      // carve-out is on the OP, not on the source, because the two cases differ by what
+      // the number multiplies and not by what it reads.
       out.push({
         code: 'EFFECT_FIELD_NOT_EXECUTED',
         pointer: `${pointer}/per`,
         message:
           'per is a multiplier applied to EACH component of `res`, so the only source ' +
-          `that means anything is 'held-of-each-resource' — what the player holds of the ` +
+          `that means anything is 'held-of-each-resource' - what the player holds of the ` +
           `resource being gained. "${of}" would multiply one number into every resource. ` +
           `${COMPUTED_SOURCE_FIX}`,
       });
-    }
+}
   }
   return out;
 }

@@ -380,10 +380,64 @@ export type Effect = (
   | { readonly op: 'gain'; readonly res: Delta; readonly per?: ComputedCount; readonly target?: EffectTarget }
   /** Pay a fixed set to the Public Reserve. Capped at what the player holds. `per` as for `gain`. */
   | { readonly op: 'lose'; readonly res: Delta; readonly per?: ComputedCount; readonly target?: EffectTarget }
-  /** Gain N resources of the recipient's choice. `n` may be computed. */
-  | { readonly op: 'gain-any'; readonly n: Count; readonly target?: EffectTarget }
-  /** Discard N resources of the recipient's choice. `n` may be computed. */
-  | { readonly op: 'lose-any'; readonly n: Count; readonly target?: EffectTarget }
+  /**
+   * G4/G15 — gain N resources of the recipient's choice, scaled by a count read off
+   * SOMEBODY ELSE's board.
+   *
+   * ## `per` AND `read` ARE ONE MECHANISM, and the split is the whole of this card
+   *
+   * THOUGHTS AND PRAYERS (REF 4.3): *"Pick a player and get any 2 resources for each of
+   * their voters inside a Volatile Area."* Three clauses, and before this pair of fields
+   * none of them composed:
+   *
+   *  - **"get any 2 resources"** is `gain-any` — the verb is already right.
+   *  - **"for each of their voters inside a Volatile Area"** is a MULTIPLIER, and every
+   *    multiplier on this op resolves against **the player the effect resolves FOR**. With
+   *    `target` alone that is the caster, so the card would have paid the caster for the
+   *    caster's own pegs.
+   *  - **"Pick a player"** is `'chosen-player'`, which is intercepted above the switch and
+   *    *replaces* the recipient rather than adding a second addressee.
+   *
+   * So `read` says **whose state the multiplier is read from** and `target` keeps saying
+   * **who is paid**, and the two are different fields because they are different questions.
+   * KNOWN-GAPS.md has called this "the shortest route to the next playable card" since §3
+   * was written, and it was right.
+   *
+   * ## `read` WITHOUT `per` IS INERT, and that is refused rather than documented
+   *
+   * A `read` on its own names a player and changes nothing, which is a field the engine
+   * reads for no reason and `src/executable.ts` exists to prevent. `read` is therefore only
+   * honoured alongside a `per`, and `packages/cards`' validator refuses the bare form.
+   *
+   * ## SATISFIABILITY, and it is `choose-player`'s argument verbatim
+   *
+   * `read: 'chosen-player'` raises a `'choose-player'` decision whose candidate set is
+   * `turnOrder` minus the actor — the SAME expression `resolveChoice` validates against,
+   * so no state can raise one with no legal pick. The re-run passes the named player back
+   * as `forcedRead`, which short-circuits the interception, so the decision cannot be
+   * raised twice and the cascade is bounded by the card's own effect list.
+   *
+   * `per` widens `lose-any` symmetrically and for the same reason: "2 of MY resources for
+   * each of THEIR voters" is the mirror sentence, and a field that exists on one of two
+   * mirrored ops is a field the next card will reach for on the other.
+   */
+  | {
+      readonly op: 'gain-any';
+      readonly n: Count;
+      readonly target?: EffectTarget;
+      /** G4/G15 — multiply `n` by a quantity read off this player instead of the recipient. */
+      readonly per?: ComputedCount;
+      /** G4/G15 — whose state `per` is read from. Meaningful only alongside `per`. */
+      readonly read?: EffectTarget;
+    }
+  /** G4/G15 — as `gain-any`, mirrored: discard N scaled by somebody else's board. */
+  | {
+      readonly op: 'lose-any';
+      readonly n: Count;
+      readonly target?: EffectTarget;
+      readonly per?: ComputedCount;
+      readonly read?: EffectTarget;
+    }
   /**
    * p34 Snatch: take N resources from a chosen opponent, nothing in return.
    *

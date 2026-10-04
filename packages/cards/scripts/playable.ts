@@ -150,7 +150,7 @@ const PROBES: readonly Probe[] = [
   { name: 'Singularity', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'voters', n: 2 }], gap: 'G6' },
   { name: 'The Greta Effect', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'restrict', kind: 'voter-shortfall', value: 1, owed: 2, target: 'chosen-player' }], gap: 'G14b', note: 'NOT IN THE CORPUS: no card of this name is in any deck file, so this row measures the vocabulary and not the game, and it is one of the rows the old headline counted. WHAT THE VOCABULARY CAN CARRY IS the state-changing half of REF 4.2.1: "They will get 1 less voter on the next 2 Voter Cards that they influence." `value` is the voters lost per card and `owed` is the number of CARDS, which is why `remaining` means something different for this kind than for KHAKI TERROR\'s lock. INFLUENCE subtracts it in one place, AFTER Going Viral — subtracting first would let a Showstopper launder the debuff away by pairing it with their own power — and FLOORS AT ZERO: a 1-Voter Card under a 2-voter shortfall yields nothing and the purchase still succeeds, because a restriction that made the influence ILLEGAL would freeze the table on a card that cannot be unbought. DROPPED, named: "Pick up to 2 opponents" is carried as one (applyEffect computes ONE target for a whole effect list, so a card cannot raise two choose-player decisions in one resolution), and the printed rider "This applies to 2 separate voter cards for 2 different players" is therefore dropped with it — one card, one player' },
   { name: 'The Psychohistorian', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'draw-conspiracy', n: 2 }], gap: 'G7/G19', note: 'A DIFFERENT CARD from the one on disk, and undisclosed until the probe started reading the decks. ct-et2040-004 writes `voters` n1 then `gain-any` n2 — REF\'s first branch, "get 1 voter (not card) and any 2 resources". The reduction above is the OTHER branch, `draw-conspiracy` n2, which is G17/G19 and is not what the deck file says the card does. The row stays because the two branches need different engine work and collapsing them would hide one' },
-  { name: 'Thoughts and Prayers', ref: '4.2.1', kind: 'conspiracy', reduction: null, gap: 'G4', note: '"for EACH of THEIR voters" needs the read and the payout aimed at different players; there is no field that separates them' },
+  { name: 'Thoughts and Prayers', ref: '4.2.1', kind: 'conspiracy', reduction: [{ op: 'gain-any', n: 2, target: 'you', per: { of: 'volatile-voters' }, read: 'chosen-player' }], gap: 'G4', note: 'BUILT, and it is the read-vs-target split this file called "the shortest route to the next playable card" since section 3. THREE CLAUSES, THREE ALREADY-EXISTING MECHANISMS, AND NONE OF THEM COMPOSED: "get any 2 resources" is `gain-any` (the right verb, and it took no `per`); "for each of their voters inside a Volatile Area" is a MULTIPLIER, and every multiplier resolved against the player the effect resolves FOR, so the card would have paid the CASTER for the CASTER\'s own pegs; "Pick a player" is `chosen-player`, which is intercepted above the switch and REPLACES the recipient rather than adding a second addressee. So `per` widens onto `gain-any`/`lose-any` and a new `read?: EffectTarget` says whose board the multiplier is read from while `target` keeps saying who is paid - two fields because they are two questions, and `applyEffect` grows a tenth `forcedRead` argument so `resolveChoice` hands the named player back into the READ slot. `read: chosen-player` raises the ordinary `choose-player` decision (candidate set `turnOrder` minus the actor, the same expression the resolver validates against, so it cannot be unsatisfiable) and the re-run passes `forcedRead`, which short-circuits the interception so the decision cannot be raised twice. NOTHING IS DROPPED - "any 2" is `gain-any` not `gain`, "for each" is `per` not `n`, "Pick a player" is `read` - and the card still ships `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print.' },
 
 
   // ── India Conspiracy Cards, REF §4.2.2 ───────────────────────────────────
@@ -628,15 +628,26 @@ function opening(): GameState {
   // opponents with voters. Empty board would make them resolve to nothing and the
   // probe would pass for the wrong reason.
   const areas = s.zones.flatMap((z) => z.areas).filter((a) => !a.volatile).slice(0, 3);
+  // …and ONE VOLATILE PEG PER SEAT besides, which is a fixture gap G4's read half found.
+  // `{ of: 'volatile-voters' }` counts pegs in Volatile Areas, so with none anywhere the
+  // multiplier is zero, `gain-any`'s ask is zero, and the card reports NO-OP — which is the
+  // probe's most expensive kind of wrong answer, because it reads as "this cannot work"
+  // about a card that works. A VOLATILE peg per seat rather than one peg in one Volatile
+  // Area, because the multiplier is read off the seat the actor NAMES and `choose-player`
+  // offers every other seat: one seat's peg would make the card's verdict depend on which
+  // seat the pick lands on.
+  const volatileAreas = s.zones.flatMap((z) => z.areas).filter((a) => a.volatile).slice(0, 3);
   const seeded: GameState = {
     ...s,
     zones: s.zones.map((z) => ({
       ...z,
       areas: z.areas.map((a) => {
+        const owner = (['p1', 'p2', 'p3'] as const)[volatileAreas.findIndex((c) => c.id === a.id)];
+        if (owner !== undefined) return { ...a, peg: { owner, majority: false } };
         const slot = areas.findIndex((c) => c.id === a.id);
         if (slot < 0) return a;
-        const owner = (['p1', 'p2', 'p3'] as const)[slot]!;
-        return { ...a, peg: { owner, majority: false } };
+        const who = (['p1', 'p2', 'p3'] as const)[slot]!;
+        return { ...a, peg: { owner: who, majority: false } };
       }),
     })),
   };

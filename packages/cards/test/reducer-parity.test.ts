@@ -54,6 +54,7 @@ import {
   EXECUTABLE_TRIGGERS,
   INTERRUPT_FIX,
   SCOPE_FIELDS_READ_BY_INSTALL,
+  FIELDS_READ_BY_CHOICE_INTERCEPTION,
   unexecutedCardProblems,
   unexecutedEffectProblems,
   unexecutedInterruptProblems,
@@ -115,6 +116,31 @@ function installerSource(): string {
 }
 
 const INSTALLER = installerSource();
+
+/**
+ * The fields the `'chosen-player'` INTERCEPTION reads, re-derived from ITS OWN source.
+ *
+ * The same reasoning a third time, on the fourth honesty seam. `read` (G4/G15) is not read
+ * by any `case` in `applyEffect` — it names whose board a multiplier comes off, which has
+ * to be answered BEFORE the switch — so slicing the cases cannot see it, and
+ * `FIELDS_READ_BY_CHOICE_INTERCEPTION` would be an unfalsifiable claim without this.
+ *
+ * The slice is from the `target === 'chosen-player'` interception down to the `zone`
+ * interception, because those are the two decisions raised above the switch and the `read`
+ * branch sits between them. Naming the START rather than the function is deliberate: the
+ * point being proved is that `read` is read *before* `applyEffect`'s switch, and a slice
+ * that began at `function applyEffect` would silently re-admit every case and make the
+ * assertion pass for the wrong reason.
+ */
+function choiceInterceptionSource(): string {
+  const src = readFileSync(REDUCE_SRC, 'utf8');
+  const start = src.indexOf("if (target === 'chosen-player' && forced === null)");
+  expect(start, 'reduce.ts no longer intercepts chosen-player where this reader expects it').toBeGreaterThan(-1);
+  const end = src.indexOf("effect.zone === 'chosen-zone'", start);
+  return src.slice(start, end === -1 ? undefined : end);
+}
+
+const INTERCEPTION = choiceInterceptionSource();
 
 /**
  * The trigger values the reducer RAISES, re-derived from its own source.
@@ -272,11 +298,24 @@ describe('EXECUTED_OPS says which fields each case reads, and that is true', () 
       const body = CASES[op];
       expect(body, op).toBeDefined();
       expect(
-        /\bresolveCount\(/.test(body ?? ''),
+        /\bresolve(Count|Ask)\(/.test(body ?? ''),
         `${op} resolves a computed n before using it`,
       ).toBe(true);
       // And never the raw `effect.n` inside a count or a bound.
       expect(/count: effect\.n/.test(body ?? ''), `${op} does not push effect.n raw`).toBe(false);
+    }
+  });
+
+  it('`gain-any`/`lose-any` resolve `n` AND `per` before the count exists, at every seat', () => {
+    // `resolveAsk` exists because G4/G15's `per` multiplies the ASK on those two ops, and
+    // the ask is one number rather than four `res` components — so the old
+    // "only `held-of-each-resource` is a legal `per` source" rule had to be carved out for
+    // them by OP, and this asserts the carve-out rather than trusting the comment.
+    for (const op of ['gain-any', 'lose-any'] as const) {
+      const body = CASES[op] ?? '';
+      expect(body, op).toContain('effect.per');
+      expect(body, op).toContain('resolveAsk(');
+      expect(/count: effect\.n/.test(body), `${op} does not push effect.n raw`).toBe(false);
     }
   });
 
@@ -340,6 +379,48 @@ describe('SCOPE_FIELDS_READ_BY_INSTALL is what installLiveEffects actually reads
       for (const field of reads) {
         expect(SCOPE_FIELDS_READ_BY_INSTALL).not.toContain(field);
       }
+    }
+  });
+});
+
+/**
+ * THE FOURTH SEAM: `FIELDS_READ_BY_CHOICE_INTERCEPTION`, sliced from the interception
+ * rather than from `applyEffect`'s cases.
+ */
+describe('FIELDS_READ_BY_CHOICE_INTERCEPTION is what the chosen-player interception reads', () => {
+  it('every field the registry claims is read by the interception', () => {
+    for (const field of FIELDS_READ_BY_CHOICE_INTERCEPTION) {
+      expect(
+        new RegExp(`\\beffect\\.${field}\\b`).test(INTERCEPTION),
+        `the chosen-player interception reads effect.${field}`,
+      ).toBe(true);
+    }
+  });
+
+  it('and it is read BEFORE the switch, which is the whole claim', () => {
+    // The slice is between the two interceptions and `applyEffect`'s `switch` is below
+    // both, so a field that only appears in a `case` could never satisfy the assertion
+    // above. Asserted explicitly because the slice's correctness IS the argument and a
+    // reader should not have to take it on trust.
+    expect(INTERCEPTION).not.toContain('switch (effect.op)');
+    expect(INTERCEPTION).toContain("effect.read === 'chosen-player'");
+  });
+
+  it('and the list is not empty, so the seam cannot be satisfied by asserting nothing', () => {
+    expect(FIELDS_READ_BY_CHOICE_INTERCEPTION.size).toBeGreaterThan(0);
+  });
+
+  it('and none of them is claimed by an op registry or by the installer', () => {
+    // The same disjointness argument as the installer block above, for the same reason:
+    // two registries claiming one read is the validator checking it twice against two
+    // different oracles, and one of the two oracles would eventually be wrong.
+    for (const reads of Object.values(EXECUTED_OPS)) {
+      for (const field of reads) {
+        expect(FIELDS_READ_BY_CHOICE_INTERCEPTION).not.toContain(field);
+      }
+    }
+    for (const field of SCOPE_FIELDS_READ_BY_INSTALL) {
+      expect(FIELDS_READ_BY_CHOICE_INTERCEPTION).not.toContain(field);
     }
   });
 });

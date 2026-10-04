@@ -287,9 +287,7 @@
           "zone": "chosen-zone"
         }
       ]
-    }
-,
-
+    },
     {
       "id": "ct-et2040-020",
       "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for QUANTUM WRISTBAND (REF 4.2.1), RULED OUT in KNOWN-GAPS.md 8.3: its auction is the same cost as A CALL FROM KARACHI's, AND headlines are a QUEUE rather than a pile, so there is no _headlineDraw to search and no top-of-pile to take - meaning even the first branch cannot be a choose-card, and the printed OR leaves the card no honest reduced form. Same JOB: a Volatile Area that pays the player who took the risk.",
@@ -300,5 +298,16 @@
       "effects": [
         { "op": "gain-any", "n": 1, "target": "you", "when": "on-volatile-placement", "until": "rest-of-game", "condition": { "byOwner": true } }
       ]
-    }  ]
+    },
+    {
+      "id": "ct-et2040-021",
+      "source": "REF 4.3 recovers Thoughts and Prayers: 'Pick a player and get any 2 resources for each of their voters inside a Volatile Area.' G4's read-vs-target SPLIT landed and the card is WHOLE: 'any 2 resources' is `gain-any`, 'for each' is `per`, and 'Pick a player' is `read`, so `target` keeps naming the RECIPIENT and `read` names whose board the multiplier comes off. NOTHING IS DROPPED - and it still ships `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print.",
+      "provenance": "adapted",
+      "name": "Thoughts and Prayers",
+      "cost": 5,
+      "text": "Pick a player. You receive 2 resources of your choice for each of their voters in a Volatile Area.",
+      "effects": [
+        { "op": "gain-any", "n": 2, "target": "you", "per": { "of": "volatile-voters" }, "read": "chosen-player" }
+      ]
+    }  ]
 }

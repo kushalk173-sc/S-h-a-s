@@ -712,6 +712,36 @@ function resolveCount(
 }
 
 /**
+ * G4/G15 — the ask a `gain-any` / `lose-any` decision carries: `n`, times `per`.
+ *
+ * **`per` is read off `readFrom`, which is `forcedRead` when a `'chosen-player'` has
+ * already been answered and the RECIPIENT otherwise.** That single ternary is the whole of
+ * THOUGHTS AND PRAYERS: with `read: 'chosen-player'`, `per: { of: 'volatile-voters' }` and
+ * `target: 'you'`, the caster is paid `2 ×` the CHOSEN player's Volatile-Area pegs. Without
+ * `per` the multiplier is 1 and the arithmetic is byte-identical to every shipped card.
+ *
+ * `Math.max(0, …)` rather than a bare product: a computed source that reads zero must
+ * produce a ZERO ask, not a negative one, because `Choice.count` is a `number` the client
+ * renders and a negative grant would be a dialog asking for a negative amount of
+ * resources. `lose-any` clamps to the pool immediately afterwards in any case, and
+ * `gain-any` has no ceiling at all — which is the deliberate asymmetry `gain-any`'s own
+ * case documents (a resource you are about to be given is not one you must already own).
+ */
+function resolveAsk(
+  state: GameState,
+  recipient: PlayerID,
+  n: Count,
+  per: ComputedCount | undefined,
+  readFrom: PlayerID | null,
+  ctx: Ctx,
+): number {
+  const base = resolveCount(state, recipient, n, ctx);
+  if (per === undefined) return base;
+  const k = computedValue(state, readFrom ?? recipient, per.of, undefined, ctx);
+  return Math.max(0, base * k);
+}
+
+/**
  * Resolve a `gain` / `lose` `res` against player state, applying `per`.
  *
  * `per: { of: 'held-of-each-resource' }` multiplies each resource by what the player
@@ -1367,6 +1397,20 @@ function applyEffect(
    * pre-commit one would make `pick` a lie.
    */
   forcedCard: CardID | null = null,
+  /**
+   * G4/G15 — the player `effect.read` has already resolved to, or `null`.
+   *
+   * **A SEPARATE PARAMETER FROM `forced`, and that is the whole mechanism.** `forced` is
+   * who the payout LANDS ON and `forcedRead` is whose board the MULTIPLIER is read from;
+   * THOUGHTS AND PRAYERS is exactly the card where they are different people — the caster
+   * is paid, a named opponent is read. Folding them into one parameter would have made
+   * the card pay the chosen opponent for their own pegs, which is what §3 warned would
+   * happen and called "worse, not better".
+   *
+   * It is a parameter rather than state for the reason every other one here is: a replay
+   * from seed + action log reproduces the answer without re-running the decision.
+   */
+  forcedRead: PlayerID | null = null,
 ): GameState {
   let s = state;
   const target = 'target' in effect ? (effect.target ?? 'you') : 'you';
@@ -1376,6 +1420,36 @@ function applyEffect(
   // NOTHING and a non-empty one always has a legal answer. See `Choice`'s
   // `'choose-player'` note for the satisfiability proof and the visibility argument.
   if (target === 'chosen-player' && forced === null) {
+    const candidates = s.turnOrder.filter((p) => p !== source);
+    if (candidates.length === 0) return s;
+    return pushChoice(
+      s,
+      {
+        kind: 'choose-player',
+        count: 1,
+        effects: [effect],
+        source,
+        reason: 'Card effect',
+      },
+      source,
+    );
+  }
+
+  // G4/G15. The READ half of THOUGHTS AND PRAYERS, and it is the same interception one
+  // branch above with a different question: `read` names whose BOARD the multiplier is
+  // read from while `target` keeps naming who is paid, so the two are independent. The
+  // guard is the same expression `resolveChoice` validates against, so an empty candidate
+  // set raises NOTHING and a non-empty one always has a legal answer.
+  //
+  // `target !== 'chosen-player'` matters: a card may not raise two decisions for one
+  // effect, and if both fields asked the same question the second would be unreachable
+  // because `resolveChoice` re-runs with BOTH forced, short-circuiting this branch too.
+  if (
+    'read' in effect &&
+    effect.read === 'chosen-player' &&
+    target !== 'chosen-player' &&
+    forcedRead === null
+  ) {
     const candidates = s.turnOrder.filter((p) => p !== source);
     if (candidates.length === 0) return s;
     return pushChoice(
@@ -1442,14 +1516,18 @@ function applyEffect(
     }
     case 'gain-any': {
       for (const p of resolveTargets(s, source, target, forced)) {
-        s = pushChoice(s, { kind: 'gain-any', count: resolveCount(s, p, effect.n, ctx), reason: 'Card effect' }, p);
+        s = pushChoice(
+          s,
+          { kind: 'gain-any', count: resolveAsk(s, p, effect.n, effect.per, forcedRead, ctx), reason: 'Card effect' },
+          p,
+        );
       }
       return s;
     }
     case 'lose-any': {
       for (const p of resolveTargets(s, source, target, forced)) {
         const held = poolTotal(s.players[p]?.resources ?? { funds: 0, clout: 0, media: 0, trust: 0 });
-        const n = Math.min(resolveCount(s, p, effect.n, ctx), held);
+        const n = Math.min(resolveAsk(s, p, effect.n, effect.per, forcedRead, ctx), held);
         if (n > 0) s = pushChoice(s, { kind: 'lose-any', count: n, reason: 'Card effect' }, p);
       }
       return s;
@@ -3471,7 +3549,36 @@ function resolveChoice(
       const chosen = state.turnOrder.filter((p) => p !== c.source);
       if (!chosen.includes(pick.id)) return fail('you may not choose that player');
       let s = drop(state);
-      for (const effect of c.effects) s = applyEffect(s, c.source, effect, ctx, NO_FIRE, null, pick.id, null);
+      // **WHICH SLOT the named player goes in is decided here, from the effect itself**,
+      // and it is the whole of G4's read-vs-target split arriving in one place.
+      //
+      //  - the effect's `target` asked the question → the named player is the RECIPIENT,
+      //    and `forced` is where they go. That is every card that used `'chosen-player'`
+      //    before G4, and it is byte-identical for them.
+      //  - the effect's `read` asked it → the named player is the READER, `forcedRead` is
+      //    where they go, and `forced` stays null so `target` still decides who is PAID.
+      //    THOUGHTS AND PRAYERS is this case: the caster is paid, the chosen opponent's
+      //    Volatile-Area pegs are counted.
+      //
+      // Putting the named player in `forced` unconditionally would be the bug §3 warned
+      // about by name: *"aiming the card at a chosen player would pay the chosen player for
+      // their own volatile voters."* It pays the WRONG PERSON the RIGHT AMOUNT, which is
+      // the hardest kind of card bug to notice and the reason the decision is here.
+      for (const effect of c.effects) {
+        const askedByTarget = 'target' in effect && effect.target === 'chosen-player';
+        s = applyEffect(
+          s,
+          c.source,
+          effect,
+          ctx,
+          NO_FIRE,
+          null,
+          askedByTarget ? pick.id : null,
+          null,
+          null,
+          askedByTarget ? null : pick.id,
+        );
+      }
       return { ok: true, state: s, events: [] };
     }
 

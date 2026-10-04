@@ -135,6 +135,38 @@ const COMPUTED_CONSPIRACIES: readonly ConspiracyCard[] = [
       { op: 'lose-any', n: { of: 'your-pool' }, target: 'each-opponent' },
     ],
   },
+  /**
+   * THOUGHTS AND PRAYERS (REF 4.3), and the reason G4's `read` exists:
+   * *"Pick a player and get any 2 resources for each of their voters inside a Volatile
+   * Area."* `target` names the RECIPIENT (the caster) and `read` names whose board the
+   * multiplier comes off (the chosen player), which is the one card where those are
+   * different people.
+   */
+  {
+    id: 'cmp-read-other',
+    name: 'Two For Each Of Their Volatile Pegs',
+    text: 'Pick a player. You gain 2 resources of your choice for each of their voters in a Volatile Area.',
+    cost: 1,
+    effects: [
+      { op: 'gain-any', n: 2, target: 'you', per: { of: 'volatile-voters' }, read: 'chosen-player' },
+    ],
+  },
+  /**
+   * The control for the row above, and it is the whole reason this pair exists.
+   *
+   * Identical except with NO `read`, so the multiplier falls back to the RECIPIENT — the
+   * caster — and the card silently pays the caster for the caster's own pegs. It is the
+   * card KNOWN-GAPS §3 warned would be built by accident ("`chosen-player` makes it
+   * *worse*, because `n` resolves against the player the effect resolves FOR"), so it is
+   * pinned here as a DIFFERENT number rather than described in a comment.
+   */
+  {
+    id: 'cmp-read-absent',
+    name: 'Two For Each Of My Own Volatile Pegs',
+    text: 'Gain 2 resources of your choice for each of YOUR voters in a Volatile Area.',
+    cost: 1,
+    effects: [{ op: 'gain-any', n: 2, target: 'you', per: { of: 'volatile-voters' } }],
+  },
 ];
 
 const CARDS: CardIndex = indexCards({
@@ -252,6 +284,113 @@ describe('a computed count reads the state of the player it resolves for', () =>
       const held = poolTotal(s.players[p]?.resources ?? { funds: 0, clout: 0, media: 0, trust: 0 });
       expect(ask(s, p, 'lose-any'), p).toBe(held);
     }
+  });
+});
+
+// ─────────────────────────── G4/G15: the read is aimed somewhere ELSE ───────────────────────────
+
+/**
+ * `read` is the field KNOWN-GAPS §3 called "the shortest route to the next playable card"
+ * for two decades of gap notes, and it is one field: **whose state the multiplier is read
+ * from**, while `target` keeps saying **who is paid**.
+ *
+ * ## WHY THIS NEEDS ITS OWN BLOCK, and the direction it guards
+ *
+ * Every assertion above proves the read follows the RECIPIENT, which was true by
+ * construction — `resolveCount` was handed the recipient and there was no other candidate.
+ * `read` is the first field that lets a card aim the read somewhere else, so the failure
+ * mode INVERTS: instead of reading the wrong player it pays the **wrong person the right
+ * amount**. That is the hardest kind of card bug to notice — every number is a legal
+ * number, the dialog is coherent, and the card is quietly doing somebody else a favour.
+ * KNOWN-GAPS §3 named it exactly: *"`chosen-player` makes it worse, because `n` resolves
+ * against the player the effect resolves FOR, so aiming the card at a chosen player would
+ * pay the chosen player for their own volatile voters."* So the assertion is not "the read
+ * moved" but "the RECIPIENT did not".
+ */
+describe('G4/G15 `read` aims the multiplier at somebody else and leaves the payout alone', () => {
+  /**
+   * A board where p1 and p2 hold DIFFERENT numbers of Volatile-Area pegs, because a
+   * fixture where they hold the same number proves nothing: every off-by-one in the read
+   * would be invisible.
+   */
+  function peggedVolatile(s: GameState, spec: Readonly<Record<string, number>>): GameState {
+    const volatiles = s.zones.flatMap((z) => z.areas).filter((a) => a.volatile);
+    let i = 0;
+    const taken = new Map<string, number>();
+    const zones = s.zones.map((z) => ({
+      ...z,
+      areas: z.areas.map((a) => {
+        if (!a.volatile) return a;
+        const who = Object.keys(spec).find((p) => (taken.get(p) ?? 0) < (spec[p] ?? 0));
+        if (who === undefined) return a;
+        taken.set(who, (taken.get(who) ?? 0) + 1);
+        i += 1;
+        return { ...a, peg: { owner: who as PlayerID, majority: false } };
+      }),
+    }));
+    expect(i, 'the board has too few Volatile Areas for this fixture').toBeGreaterThan(0);
+    return { ...s, zones };
+  }
+
+  it('the card raises a `choose-player` decision for its own actor, and the answer re-aims the read', () => {
+    const board = peggedVolatile(answered(freshGame()), { p1: 1, p2: 2 });
+    const played = play(board, 'cmp-read-other');
+    const decision = played.choices.find((c) => c.choice.kind === 'choose-player');
+    expect(decision, 'no choose-player decision was raised').toBeDefined();
+    // The card's own actor answers it, which is `choose-player`'s standing rule.
+    expect(decision?.player).toBe('p1');
+
+    const answeredChoice = reduce(played, 'p1', { type: 'RESOLVE_CHOICE', choiceId: decision?.id ?? '', pick: { kind: 'player', id: 'p2' } }, ctx);
+    expect(answeredChoice.ok, answeredChoice.ok ? '' : answeredChoice.error).toBe(true);
+    if (!answeredChoice.ok) return;
+
+    // 2 per Volatile-Area peg of P2 — the seat the actor NAMED — and asked of the CASTER.
+    const ask2 = ask(answeredChoice.state, 'p1', 'gain-any');
+    expect(ask2, 'the multiplier did not come off the chosen player').toBe(4);
+    expect(ask(answeredChoice.state, 'p1', 'gain-any')).not.toBe(2);
+    expect(
+      answeredChoice.state.choices.some((c) => c.player === 'p2'),
+      'the CHOSEN player was asked to take the resources, which pays the wrong person',
+    ).toBe(false);
+  });
+
+  it('and with `read` ABSENT the same card pays the CASTER off the CASTER\'s own pegs', () => {
+    // The control. One peg for p1, so the correct reading would also be 2 — which is why
+    // the assertion is made against the OTHER fixture's two, not against this one's own
+    // number. The point is that the two cards are distinguishable AT ALL.
+    const board = peggedVolatile(answered(freshGame()), { p1: 1, p2: 2 });
+    const played = play(board, 'cmp-read-absent');
+    expect(ask(played, 'p1', 'gain-any')).toBe(2);
+    // …and no decision was raised at all, because nothing in the card asked a question.
+    expect(played.choices.some((c) => c.choice.kind === 'choose-player')).toBe(false);
+  });
+
+  it('and the two numbers differ on the SAME board, which is the non-vacuity floor', () => {
+    const board = peggedVolatile(answered(freshGame()), { p1: 1, p2: 2 });
+    // One board, two cards, and the asks must not agree — otherwise the pair above proves
+    // nothing, because a fixture where both readings are 2 is exactly the fixture this is
+    // built to refuse.
+    const withoutRead = play(board, 'cmp-read-absent');
+    const withRead = play(board, 'cmp-read-other');
+    const decision = withRead.choices.find((c) => c.choice.kind === 'choose-player');
+    expect(decision).toBeDefined();
+    const resolved = reduce(withRead, 'p1', { type: 'RESOLVE_CHOICE', choiceId: decision?.id ?? '', pick: { kind: 'player', id: 'p2' } }, ctx);
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(ask(resolved.state, 'p1', 'gain-any')).toBe(2 * ask(withoutRead, 'p1', 'gain-any'));
+  });
+
+  it('and a `read` naming a seat with no Volatile pegs raises a ZERO ask, not a negative one', () => {
+    // `Choice.count` is a `number` a client renders, so a negative grant would be a dialog
+    // asking for a negative amount of resources. The clamp is `Math.max(0, base * k)` in
+    // `resolveAsk`, and this is what it is for.
+    const board = peggedVolatile(answered(freshGame()), { p3: 1 });
+    const played = play(board, 'cmp-read-other');
+    const decision = played.choices.find((c) => c.choice.kind === 'choose-player');
+    const answeredChoice = reduce(played, 'p1', { type: 'RESOLVE_CHOICE', choiceId: decision?.id ?? '', pick: { kind: 'player', id: 'p2' } }, ctx);
+    expect(answeredChoice.ok).toBe(true);
+    if (!answeredChoice.ok) return;
+    expect(ask(answeredChoice.state, 'p1', 'gain-any')).toBe(0);
   });
 });
 
