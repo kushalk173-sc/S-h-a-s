@@ -86,7 +86,57 @@ import { type CorpusIdeologyCard, type CorpusVoterCard } from './corpus.js';
  * the argument about a flagged card is the design review, and it belongs in a pull
  * request with a human in it, not silently in a playtest.
  */
-export const BALANCE_TOLERANCE_TOTAL = 1;
+/**
+ * THE BAND IS ZERO, and that is a RULING rather than a rounding.
+ *
+ * ## WHAT CHANGED, AND WHY A WARNING WAS THE WRONG SEVERITY FOR A VISIBLE SKEW
+ *
+ * This was `1`, at severity `warn`. The audit's complaint is precisely that pairing: a
+ * new Ideology Card could ship a **visible one-resource edge** — `ig-in2020-006` pays
+ * `{trust 2, funds 2}` against `{media 2, funds 1}` — and the suite stayed green, because
+ * a skew of exactly 1 is inside a band of 1 and inside it there is no finding at all.
+ *
+ * **1 RESOURCE IS NOT FREE, AND THE OLD ARGUMENT WAS ABOUT THE WRONG THING.** The
+ * justification above this constant is economic: 8% of a pool of 12, a rounding error
+ * across a four-hour game. That argument is sound for a *blind* game and it does not
+ * apply to this one. This is FULL INFORMATION: `playerView` publishes both sides and
+ * their payouts, so a player is permitted to add them up. **A strict total edge therefore
+ * does not cost a resource — it costs the DECISION.** One answer is never the right
+ * answer, whatever the player believes about the question, and the card stops asking it.
+ * A decision removed is not priced in resources, so pricing it in resources is the
+ * category error.
+ *
+ * **AND IT IS THE SAME CLASS OF DEFECT AS `PURE_UPGRADE`, WHICH IS ALREADY AN ERROR AT
+ * ONE RESOURCE.** D1 says "one side pays strictly more of a resource than the other, so
+ * one answer is dominated" and D2 says "one side pays strictly more IN TOTAL, so one
+ * answer is dominated". The second is a strict superset of the first in reach and the
+ * same claim in kind. Three of the four D-codes already treat a one-resource structural
+ * edge as an **error** (`PURE_UPGRADE`, `POWER_THRESHOLD_CLIFF`, `SAME_IDEOLOGUE_SKEW`'s
+ * sibling reasoning); `TOTAL_SKEW` was the only one that called it a tilt, and a tilt you
+ * may see is not a defect you may ship.
+ *
+ * **WHY ZERO AND NOT SOME OTHER SMALLER BAND.** There is no value between 0 and 1 — the
+ * band is an integer count of resources, and 1 is the smallest non-zero one. So the
+ * choice was "1 or 0" and it is 0. A tolerance band that permits a non-zero total
+ * difference is permitting exactly the quantity being measured.
+ *
+ * **THE COUNTER-ARGUMENT, STATED BECAUSE IT IS THE STRONG ONE.** A one-resource tilt is
+ * ordinary texture, and erroring on it will annoy the next person who writes a card. It
+ * is answered by the thing the band cannot see: a one-resource tilt is **invisible to a
+ * player who does not compute and decisive to one who does**, so tolerating it silently
+ * converts the game's difficulty from "decide what you believe" into "do the addition".
+ * That is a worse outcome than the false positive, and false positives here are cheap —
+ * the fix for a flagged card is to equalise the totals, which is one number and usually
+ * improves the card.
+ *
+ * **CORPUS IMPACT, MEASURED: ONE CARD.** Over the 76 shipped Ideology Cards the
+ * distribution of `|total skew|` is 75 zeros and one 1, so at a band of 0 exactly one
+ * card is refused and it is `ig-in2020-006`. Its side 1 was rebalanced from
+ * `{media 2, funds 1}` to `{media 2, funds 2}`, which equalises the totals while leaving
+ * the two compositions genuinely incomparable — Trust-and-Funds against Media-and-Funds,
+ * where a player picks on which Ideologue they are playing rather than on arithmetic.
+ */
+export const BALANCE_TOLERANCE_TOTAL = 0;
 
 /**
  * Per-deck threshold for the resource-blind heuristic. See `resourceBlindLean`.
@@ -363,18 +413,24 @@ export function analyseIdeologyCard(card: IdeologyCard, deck = 'unknown'): reado
     });
   }
 
-  // D2 — total skew outside the tolerance band. A tilt, not a removal.
+  // D2 — total skew outside the tolerance band. AN ERROR, not a warning: see the argument
+  // on `BALANCE_TOLERANCE_TOTAL`. Under full information a strict total edge removes the
+  // decision rather than tilting it, which is D1's claim in a wider reach, and D1 is
+  // already an error at one resource.
   const skew = totalSkew(pa, pb);
   if (Math.abs(skew) > BALANCE_TOLERANCE_TOTAL) {
     out.push({
       code: 'TOTAL_SKEW',
-      severity: 'warn',
+      severity: 'error',
       deck,
       cardId: card.id,
       side: skew > 0 ? 0 : 1,
       message:
         `side ${skew > 0 ? 0 : 1} pays ${Math.abs(skew)} more in total ` +
-        `(${pa} vs ${pb}); tolerance band is +/-${BALANCE_TOLERANCE_TOTAL}`,
+        `(${pa} vs ${pb}); tolerance band is +/-${BALANCE_TOLERANCE_TOTAL}. Both sides are ` +
+        'published under full information, so one answer is never the right one — this ' +
+        'removes the decision rather than tilting it. Equalise the totals and keep the ' +
+        'compositions different.',
     });
   }
 

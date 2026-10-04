@@ -17,6 +17,7 @@ import {
 import { RULES, type Effect } from '../src/engine.js';
 import type { CorpusIdeologyCard, CorpusVoterCard } from '../src/corpus.js';
 import { DECK_IDS, loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
+import { deltaTotal } from '../../engine/src/state';
 
 let nextId = 0;
 
@@ -54,18 +55,22 @@ describe('dominance: D1 PURE_UPGRADE — the failure a totals checker misses', (
     // (docs/ARCHITECTURE.md 6.4.3 presents this as a 0-sum card. The arithmetic
     // there does not hold: if X >= Y componentwise and X != Y then sum(X) > sum(Y)
     // strictly, so a pure upgrade can never be 0-sum. The argument survives intact
-    // once the gap is stated honestly as 1, because 1 is exactly what the
-    // tolerance band swallows and exactly what removes the decision.)
-    expect(Math.abs(3 - 4)).toBe(BALANCE_TOLERANCE_TOTAL);
+    // once the gap is stated honestly as 1. The gap is no longer swallowed — the band
+    // is 0 — so D2 fires on this card as well as D1, which is the ruling's whole point:
+    // a card this dominated is refused twice over.)
+    expect(Math.abs(3 - 4)).toBe(1);
+    expect(BALANCE_TOLERANCE_TOTAL).toBeLessThan(Math.abs(3 - 4));
     const c = card(
       { answer: 'Yes. Divert the industrial supply for the tankers.', ideologue: 'idealist', pays: { funds: 1, trust: 2 } },
       { answer: 'No. Divert the industrial supply and keep the factories.', ideologue: 'capitalist', pays: { funds: 2, trust: 2 } },
     );
-    expect(codes(analyseIdeologyCard(c, 'test'))).not.toContain('TOTAL_SKEW');
     const upgrade = analyseIdeologyCard(c, 'test').find((f) => f.code === 'PURE_UPGRADE');
     expect(upgrade).toBeDefined();
     expect(upgrade?.severity).toBe('error');
     expect(upgrade?.side).toBe(1);
+    // The wider reach, asserted because it is what the band at 1 used to hide: D2 sees it
+    // too now.
+    expect(codes(analyseIdeologyCard(c, 'test'))).toContain('TOTAL_SKEW');
   });
 
   it('catches a pure upgrade in the other direction', () => {
@@ -192,27 +197,48 @@ describe('the corrected arithmetic behind the header comment', () => {
   });
 });
 
-describe('dominance: D2 TOTAL_SKEW and the tolerance band', () => {
-  it(`tolerates a gap of exactly BALANCE_TOLERANCE_TOTAL (${BALANCE_TOLERANCE_TOTAL})`, () => {
+describe('dominance: D2 TOTAL_SKEW — an ERROR at any visible skew, band is ZERO', () => {
+  it('refuses a gap of ONE resource, which the old band of 1 tolerated', () => {
+    // THE RULING, AS AN ASSERTION. A one-resource total edge used to be inside the band
+    // and therefore invisible; it is now an error. The two sides here are deliberately
+    // NOT coordinatewise comparable (Trust against Media), so D1 is silent and this is
+    // the only finding — which is exactly the class of card the band was letting through.
     const c = card(
       { answer: 'Yes. Publish the whole file and let the room decide.', ideologue: 'showstopper', pays: { media: 3, trust: 1 } },
-      { answer: 'No. Publish the summary and keep the file closed.', ideologue: 'capitalist', pays: { funds: 3, media: 1 } },
+      { answer: 'No. Publish the summary and keep the file closed.', ideologue: 'capitalist', pays: { funds: 4 } },
     );
-    const findings = analyseIdeologyCard(c, 'test');
-    expect(codes(findings)).toEqual([]);
+    // 4 against 4 — inside the band, and the card is clean.
+    expect(codes(analyseIdeologyCard(c, 'test'))).not.toContain('TOTAL_SKEW');
+
+    const tilted = card(
+      { answer: 'Yes. Publish the whole file and let the room decide.', ideologue: 'showstopper', pays: { media: 3, trust: 2 } },
+      { answer: 'No. Publish the summary and keep the file closed.', ideologue: 'capitalist', pays: { funds: 4 } },
+    );
+    const skew = analyseIdeologyCard(tilted, 'test').find((f) => f.code === 'TOTAL_SKEW');
+    expect(skew, 'a visible one-resource edge was accepted').toBeDefined();
+    expect(skew?.severity, 'a removed decision is not a tilt and is not a warning').toBe('error');
+    expect(skew?.side).toBe(0);
+    expect(skew?.message).toContain('tolerance band is +/-0');
   });
 
-  it(`flags a gap of ${BALANCE_TOLERANCE_TOTAL + 1} as a warning, not an error`, () => {
-    // 5 against 3. Not coordinatewise comparable in either direction, so D1 is
-    // clear; the only finding is the tilt.
-    const c = card(
-      { answer: 'Yes. Publish the whole file and let the room decide.', ideologue: 'showstopper', pays: { media: 4, trust: 1 } },
-      { answer: 'No. Publish the summary and keep the file closed.', ideologue: 'capitalist', pays: { funds: 3 } },
-    );
-    const skew = analyseIdeologyCard(c, 'test').find((f) => f.code === 'TOTAL_SKEW');
-    expect(skew).toBeDefined();
-    expect(skew?.severity).toBe('warn');
-    expect(skew?.message).toContain('tolerance band is +/-1');
+  it('and the band is zero, which is a ruling and not a rounding', () => {
+    // Asserted rather than merely configured, because the number is the ruling and a
+    // future edit that raises it back to 1 would re-open every card the ruling closed.
+    expect(BALANCE_TOLERANCE_TOTAL).toBe(0);
+  });
+
+  it('and NO shipped Ideology Card has a visible skew, which is the corpus measurement', () => {
+    // The ruling's effect, stated as an invariant over the corpus rather than as a number
+    // in a commit message. `ig-in2020-006` was the one card this changed: its side 1 paid
+    // {media 2, funds 1} against {trust 2, funds 2}, and its `source` field records the
+    // rebalance and why.
+    const skewed = DECK_IDS.flatMap((d) => loadIdeologyDeck(d))
+      .map((c) => ({ id: c.id, a: deltaTotal(c.sides[0].pays), b: deltaTotal(c.sides[1].pays) }))
+      .filter((r) => Math.abs(r.a - r.b) > BALANCE_TOLERANCE_TOTAL);
+    expect(skewed.map((r) => `${r.id} ${r.a} vs ${r.b}`)).toEqual([]);
+    // And the honest distribution, so a future one-resource edge is visible as such.
+    const band1 = DECK_IDS.flatMap((d) => loadIdeologyDeck(d)).filter((c) => Math.abs(deltaTotal(c.sides[0].pays) - deltaTotal(c.sides[1].pays)) === 1);
+    expect(band1.map((c) => c.id), 'a card sits exactly on the old tolerance band').toEqual([]);
   });
 });
 
@@ -222,7 +248,7 @@ describe('dominance: D3 POWER_THRESHOLD_CLIFF — overrides the band', () => {
     // is the Idealist level-3 threshold (RULES p15): crossing it unlocks a power
     // that pays out every turn for the rest of the game. The other side crosses
     // nothing at all, so its crossing set is a strict subset.
-    expect(Math.abs(3 - 2)).toBeLessThanOrEqual(BALANCE_TOLERANCE_TOTAL);
+    expect(BALANCE_TOLERANCE_TOTAL).toBeLessThan(Math.abs(3 - 2));
     const c = card(
       { answer: 'Yes. The fund should publish every payment it makes.', ideologue: 'idealist', pays: { trust: 3 } },
       { answer: 'No. The fund should publish nothing at all.', ideologue: 'showstopper', pays: { media: 2 } },
@@ -290,8 +316,10 @@ describe('dominance: D3 POWER_THRESHOLD_CLIFF — overrides the band', () => {
       { answer: 'No. Publish the register and let the commentary follow.', ideologue: 'idealist', pays: { trust: 5 } },
     );
     const findings = analyseIdeologyCard(c, 'test');
-    // Totals 6 against 5: inside the band, so D2 stays silent too.
-    expect(codes(findings)).not.toContain('TOTAL_SKEW');
+    // Totals 6 against 5: outside the band of 0, so D2 fires as well. The point of D3 is
+    // unchanged - it is still the code that names the cliff - and D2 naming it too is
+    // the ruling: a visible one-resource edge is an error in its own right.
+    expect(codes(findings)).toContain('TOTAL_SKEW');
     const cliff = findings.find((f) => f.code === 'POWER_THRESHOLD_CLIFF');
     expect(cliff).toBeDefined();
     expect(cliff?.side).toBe(1);

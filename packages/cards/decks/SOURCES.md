@@ -559,5 +559,16 @@ for *"the question has to decide this"*. The deck's `resource-blind` verdict sta
 `undecidable`, i.e. the payout structure does not tell you which side to take. That matters
 more now than it did: another agent is making the payout visible to the whole table, so a
 dominated card stops being a design smell and becomes a broken card. The single pre-existing
-unequal card, `ig-in2020-006`, is named rather than fixed — see `test/ideology-variety.test.ts`
+unequal card, `ig-in2020-006`, was named rather than fixed — see `test/ideology-variety.test.ts`
 for why swapping a shipped card for a tidier one is not this package's trade to make alone.
+
+**AND IT IS NOW FIXED, deliberately, one resource on one card.** D2's tolerance band is 0
+and `TOTAL_SKEW` is an `error`, so a visible one-resource edge is refused rather than warned
+about (see `BALANCE_TOLERANCE_TOTAL` in `src/balance.ts` for the ruling and the measurement
+behind it). `ig-in2020-006`'s side 1 was `{media 2, funds 1}` against side 0's
+`{trust 2, funds 2}`; it is now `{media 2, funds 2}`. The compositions stay incomparable,
+which is the whole point of the checker: the player picks on which Ideologue they are
+playing rather than on arithmetic. The earlier refusal is kept because it was right at the
+time — swapping a shipped card for a tidier one is not this package's trade to make alone —
+and because the trade that settled it was a RULE change with a corpus measurement behind it,
+not a preference. `test/ideology-variety.test.ts` now asserts that no unequal card exists.

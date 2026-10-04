@@ -227,7 +227,7 @@ totals-only checker is wrong in two opposite directions:
 | `EMPTY_SIDE` | D5: a side pays nothing. Not a choice. | **error** |
 | `PURE_UPGRADE` | D1: X ≥ Y on every resource and strictly more on at least one. Removes the decision. | **error** |
 | `POWER_THRESHOLD_CLIFF` | D3: X buys strictly more power unlocks than Y. Removes the decision *and* looks fair to a totals-only reader. | **error** |
-| `TOTAL_SKEW` | D2: totals differ by more than the tolerance band. A tilt, not a removal. | warn |
+| `TOTAL_SKEW` | D2: totals differ by more than the tolerance band, which is now **0**. Under full information a strict total edge removes the decision rather than tilting it, so this is an **error** — the same claim as `PURE_UPGRADE` in a wider reach. | **error** |
 | `SAME_IDEOLOGUE_SKEW` | D4: both sides the same Ideologue. Unreachable through the schema; retained because the checker also runs against an unschema-checked corpus. | warn |
 | `RESOURCE_BLIND_LEAN` | the deck-level heuristic below. | warn |
 | `IDEOLOGUE_SKEW` | an Ideologue on card sides more than 20 points off an even quarter. | warn |
@@ -255,27 +255,44 @@ review, and it belongs in a pull request with a human in it.
 ### The tolerance band
 
 ```ts
-export const BALANCE_TOLERANCE_TOTAL = 1;   // src/balance.ts
+export const BALANCE_TOLERANCE_TOTAL = 0;   // src/balance.ts
 ```
 
-**Why 1, and why D1/D3 override it:**
+**Why 0, and why D2 is an error rather than a warning** (ruling; the full argument is on
+the constant itself in `src/balance.ts`):
 
-- **±1 is free.** The resource cap is 12 (RULES p12). One resource is 8% of your pool,
-  and across a four-hour game with 30+ resources passing through it is a rounding error.
-  It cannot be strategically decisive, so it cannot cause the optimisation failure we are
-  guarding against.
-- **±2 is not free.** 17% of your pool, and precisely the difference between being able
-  to afford the 4-resource redraw (RULES p21) and not. At the margin — which is where
-  Shasn is played — two resources is a turn.
-- **D1 and D3 override the band entirely.** A 1-resource `PURE_UPGRADE` and a
-  1-resource `POWER_THRESHOLD_CLIFF` are both worse than a 3-resource symmetric card,
-  because they remove the decision rather than tilting it. A tolerance band on totals
-  must never mask a structural defect. (`test/balance.test.ts` pins exactly this pair: a
-  1-resource upgrade is an error, a 1-resource trade-off is clean.)
+- **This is FULL INFORMATION.** `playerView` publishes both sides and their payouts, so a
+  player is permitted to add them up. A strict total edge therefore does not cost a
+  resource — it costs the **decision**. One answer is never the right answer whatever the
+  player believes, and the card stops asking its question. A decision removed is not priced
+  in resources, so pricing it in resources is the category error.
+- **It is `PURE_UPGRADE`'s claim in a wider reach.** D1 says "one side pays strictly more
+  of a resource"; D2 says "one side pays strictly more in total". Same kind of claim, and
+  D1 is already an **error** at one resource. Three of the four D-codes treat a
+  one-resource structural edge as an error; D2 was the only one that called it a tilt, and
+  a tilt you may see is not a defect you may ship.
+- **The old "±1 is free" argument was about the wrong thing.** It is an economic argument
+  (8% of a pool of 12, a rounding error across a four-hour game) and it is sound for a
+  blind game. What it misses is that a one-resource tilt is **invisible to a player who
+  does not compute and decisive to one who does**, so tolerating it converts the
+  difficulty from "decide what you believe" into "do the addition".
+- **The band could only ever be 0 or 1.** It is an integer count of resources and 1 is the
+  smallest non-zero one, so there is no third option. A band that permits a non-zero total
+  difference permits exactly the quantity being measured.
+- **CORPUS IMPACT, MEASURED: ONE CARD.** Over the 76 Ideology Cards, `|total skew|` is 75
+  zeros and one 1. That one is `ig-in2020-006` (`{trust 2, funds 2}` vs `{media 2,
+  funds 1}`), which had been named in `test/ideology-variety.test.ts` as a known unequal
+  card rather than fixed. Its side 1 is now `{media 2, funds 2}`: one resource, on one
+  card, and the two compositions stay incomparable.
+- **D1 and D3 name the same class of defect from two directions**, and with D2 also an
+  error all three agree. A 1-resource `PURE_UPGRADE`, a 1-resource `TOTAL_SKEW` and a
+  1-resource `POWER_THRESHOLD_CLIFF` are all worse than a symmetric card, because they
+  remove the decision rather than tilting it. (`test/balance.test.ts` pins each one.)
 
-**What the band costs:** some genuinely fine cards get flagged and argued about. That is
-the intended price. The argument is the design review, and it belongs in a pull request
-with a human in it, not silently in a playtest.
+**What a band of 0 costs:** every unequal pair of totals is now argued about. That is the
+intended price, and the argument is the design review — it belongs in a pull request with a
+human in it, not silently in a playtest. What it no longer does is let a **visible**
+one-resource edge through on the grounds that one resource is economically free.
 
 ### D3 is a count, not a per-direction test
 

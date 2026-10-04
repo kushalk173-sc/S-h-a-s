@@ -83,11 +83,19 @@ describe('the India Ideology deck is a deck, not a list', () => {
     // makes `resourcePreferredSide` return `null` for the card, which is the checker's
     // own words for *"the question has to decide this"*.
     //
-    // The pre-existing unequal card is named rather than deleted: swapping a shipped
-    // card for a tidier one is the corpus swap `KNOWN-GAPS.md` §4 records as having
-    // regressed the server suite, and `packages/cards` may not make that trade alone.
+    // `ig-in2020-006` WAS the one unequal card and it was named here rather than deleted,
+    // on the grounds that swapping a shipped card for a tidier one is the corpus swap
+    // `KNOWN-GAPS.md` §4 records as having regressed the server suite, and
+    // `packages/cards` may not make that trade alone. **That trade has since been made,
+    // deliberately and one number at a time**: D2's tolerance band is now 0 and
+    // `TOTAL_SKEW` is an error, so a visible one-resource edge is refused rather than
+    // warned about, and this card's side 1 was rebalanced from `{media 2, funds 1}` to
+    // `{media 2, funds 2}` — one resource, on the one card that had it. The two
+    // compositions stay incomparable, which is the point of the checker: the player picks
+    // on which Ideologue they are playing rather than on arithmetic. See
+    // `BALANCE_TOLERANCE_TOTAL` in `src/balance.ts`.
     const unequal = india.filter((c) => sidePayout(c.sides[0]) !== sidePayout(c.sides[1]));
-    expect(unequal.map((c) => c.id)).toEqual(['ig-in2020-006']);
+    expect(unequal.map((c) => c.id), 'a card pays its two sides different totals; D2 now refuses the corpus').toEqual([]);
   });
 
   it('never pays 3 or more of one resource, so no card can cross a power threshold', () => {

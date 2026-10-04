@@ -100,7 +100,7 @@
     },
     {
       "id": "ig-in2020-006",
-      "source": "REF 8.1 question 6, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 question 6, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. REBALANCED for D2: side 1 paid {media 2, funds 1} against side 0's {trust 2, funds 2}, a visible ONE-RESOURCE total edge the old tolerance band swallowed, so one answer was never right under full information. Side 1 now pays {media 2, funds 2}; the two compositions stay incomparable. See BALANCE_TOLERANCE_TOTAL in src/balance.ts.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Is providing free food, housing and healthcare to all citizens a good idea?",
@@ -113,7 +113,7 @@
         {
           "answer": "No. Free is not a policy. Free is a queue with a nicer name.",
           "ideologue": "showstopper",
-          "pays": { "media": 2, "funds": 1 }
+          "pays": { "media": 2, "funds": 2 }
         }
       ]
     },
