@@ -238,9 +238,15 @@ describe('the discard-and-reshuffle path fires in ORDINARY PLAY, at every seat c
         );
         expect(exhausted(s), `${n} players, ${SHORT_DECK}-card deck, seed ${seed}: the deck still exhausted`).toBe(false);
         expect(
-          s.log.filter((l) => l.text === 'The election is decided.').length,
+          s.log.filter((l) => l.text === 'The election is decided.'),
           `${n} players, ${SHORT_DECK}-card deck, seed ${seed}: the game did not end on a decided board`,
-        ).toBe(1);
+        ).toEqual([expect.objectContaining({ text: 'The election is decided.' })]);
+        // …and it is the LAST thing logged, so a client can render the ending from the
+        // log alone. `endOfGame` appends exactly one entry and nothing runs after it.
+        expect(
+          s.log[s.log.length - 1]?.text,
+          `${n} players, ${SHORT_DECK}-card deck, seed ${seed}: something was logged after the ending`,
+        ).toBe('The election is decided.');
       }
 
       console.log(

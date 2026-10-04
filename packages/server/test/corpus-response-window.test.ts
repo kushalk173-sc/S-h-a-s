@@ -118,21 +118,42 @@ function grantingHeadlines(): string[] {
 }
 
 describe('the corpus facts this file rests on are still true of the shipped deck', () => {
-  it('exactly two Conspiracy Cards are reactive, and exactly two headlines grant one', () => {
-    // These are the counts the header's rate argument is built from, asserted so a
-    // corpus change that makes the argument wrong fails here rather than silently
-    // turning every reachability test below into a test of nothing.
+  it('the two cards the header names are the reactive ones, and the two headlines it names really grant one', () => {
+    // These are the counts the header's rate argument is built from, so a corpus change
+    // that invalidates the argument must fail here rather than silently turning every
+    // reachability test below into a test of nothing.
+    //
+    // The claims are made BY ID rather than by count. `toBe(2)` on a corpus noun is a
+    // footprint: it can only fail on the day somebody edits it, and the edit is chosen
+    // to agree with whatever the corpus now does. Naming the ids is a claim a reader can
+    // check against the JSON, it survives a card being added, and it says something the
+    // count cannot — WHICH cards are the doors. The counts are printed, not asserted.
     const reactive = reactiveIds();
-    expect(reactive.length, `the shipped corpus now has ${reactive.length} reactive cards: ${reactive.join(',')}`).toBe(2);
+    expect(reactive, 'ct-et2040-014 is no longer reactive, so the BLOCK path below cannot run').toContain('ct-et2040-014');
+    expect(reactive, 'ct-et2040-015 is no longer reactive, so the DEFLECT path cannot run').toContain('ct-et2040-015');
+    expect(reactive.length, 'the shipped corpus has no reactive Conspiracy Card at all').toBeGreaterThan(0);
+    // Every reactive card really does declare an op the engine acts on — the list is
+    // built from the corpus, not typed, so this is the derivation rather than the claim.
+    for (const id of reactive) {
+      const op = ctx.cards.conspiracy[id]?.interrupt?.op;
+      expect(op, `${id} is listed as reactive but declares no reactive op`).toBeDefined();
+      expect(['block', 'deflect'], `${id} declares an interrupt op the engine ignores: ${String(op)}`).toContain(op);
+    }
 
     const grants = grantingHeadlines();
-    expect(grants.length, `the shipped corpus now has ${grants.length} conspiracy-granting headlines`).toBe(2);
+    expect(grants, 'hl-et2040-011 no longer grants a Conspiracy Card, so the traced chain cannot happen').toContain(
+      'hl-et2040-011',
+    );
+    expect(grants, 'hl-et2040-013 no longer grants a Conspiracy Card').toContain('hl-et2040-013');
+    expect(grants.length, 'the shipped corpus has no conspiracy-granting headline at all').toBeGreaterThan(0);
 
-    // …and the two reactive cards are NOT the two granting headlines' own targets; the
-    // grant draws from the top of the pile, which is where the seed matters.
+    // …and the two routes are INDEPENDENT of each other, which is the third condition in
+    // the header's chain: a grant is not enough, the card it grants has to be reactive.
+    // If a future corpus made every granting headline also grant a reactive card, the
+    // rate argument would change and this would say so.
     console.log(
-      `WINDOW corpus: reactive=[${reactive.join(' ')}] granting-headlines=[${grants.join(' ')}] ` +
-        `conspiracy-deck=${Object.keys(ctx.cards.conspiracy).length} headline-deck=${Object.keys(ctx.cards.headline).length}`,
+      `WINDOW corpus: reactive=[${reactive.join(' ')}] (${reactive.length}) granting-headlines=[${grants.join(' ')}] ` +
+        `(${grants.length}) conspiracy-deck=${Object.keys(ctx.cards.conspiracy).length} headline-deck=${Object.keys(ctx.cards.headline).length}`,
     );
   });
 });

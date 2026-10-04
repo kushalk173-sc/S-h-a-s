@@ -318,7 +318,10 @@ describe('the tie branch of the winner rule executes, and it is a draw', () => {
     // Nine zones carry 69 majority voters and 69 is odd, so two seats cannot both sit
     // on the top score of a fully decided board. Stated so the two-seat sweep above is
     // not read as "the tie case was forgotten at 2 seats".
-    expect(MAJORITY_PEGS % 2, 'a two-seat tie would not be impossible').toBe(1);
+    expect(
+      MAJORITY_PEGS % 2 === 1,
+      `the board carries an EVEN number of majority voters (${MAJORITY_PEGS}), so a two-seat tie became possible and this test's premise is wrong`,
+    ).toBe(true);
 
     const split = decideZonesFor(freshShippedCorpus(1, 2, ctx), ['p1', 'p2']);
     expect(allMajoritiesFormed(split), 'the two-seat constructed board is not decided').toBe(true);
