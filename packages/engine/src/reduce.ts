@@ -212,6 +212,29 @@ function discardTo(state: GameState, deck: DeckName, cardId: CardID): GameState 
 }
 
 /**
+ * THE DECK `id` BELONGS TO, read off the card index, or `null` for an id no deck holds.
+ *
+ * `reveal` takes a card OFF a pile and publishes it, and `settleRevealedCards` gives it
+ * back at the turn boundary — which means the boundary has to know which pile to give it
+ * back to, and the card is on NO pile at that moment by construction. So the answer comes
+ * from the one thing that still says what a card is: **the index**. Every pile in the game
+ * is built from `ctx.cards`, and the four buckets are disjoint by `indexCards`, so this is
+ * a lookup rather than a guess.
+ *
+ * `null` is a refusal, not a fallback: an id the index cannot place has no origin, and
+ * inventing one is how a card ends up in two decks. It is unreachable from a real game —
+ * `setup` deals only indexed ids and no op mints one — and it is a branch rather than a
+ * comment because a comment does not fail a test.
+ */
+function deckOf(ctx: Ctx, id: CardID): DeckName | null {
+  if (ctx.cards.ideology[id] !== undefined) return 'ideology';
+  if (ctx.cards.voter[id] !== undefined) return 'voter';
+  if (ctx.cards.conspiracy[id] !== undefined) return 'conspiracy';
+  if (ctx.cards.headline[id] !== undefined) return 'headline';
+  return null;
+}
+
+/**
  * ANNOUNCE A CARD LEAVING THE RECYCLE PILE. `Picked "NAME".`, by the RECIPIENT.
  *
  * ## WHY A DEPARTURE HAS TO BE SPOKEN ALOUD
@@ -284,6 +307,79 @@ function syncConspiracyTop(state: GameState, ctx: Ctx): GameState {
     conspiracyTopCost: card ? card.cost : null,
     conspiracyRemaining: state._conspiracyDraw.length,
   };
+}
+
+/**
+ * GIVE EVERY UNRESOLVED REVEALED CARD BACK TO THE PILE IT CAME FROM. The turn boundary's
+ * first act, and the reason the mechanic is safe at all.
+ *
+ * ## WHAT WENT WRONG WITHOUT THIS
+ *
+ * `reveal` takes a card OFF a draw pile and puts it on `GameState.revealedCards`, which is
+ * a window that must be EMPTY in every state outside a resolution. So the boundary cleared
+ * the set — and a cleared list is not a returned card. Every resolved `reveal` therefore
+ * **permanently deleted** the cards it published, from every game, forever. On a deck that
+ * can run out this is a table which can never finish, and it shipped: `hl-et2040-027`
+ * (BLESSINGS OF PARENTS PAST, `{op:'reveal', kind:'voter', n:2}`) took two Voter Cards off
+ * an 18-card deck each time it resolved and put nothing back, and
+ * `corpus-response-window.test.ts` seed 35 at two seats was still unfinished at 12000
+ * actions and turn 3975 with nobody able to be dealt a card to answer. This project refuses
+ * mechanisms that can make a table never finish, and this is the line where that is paid.
+ *
+ * ## WHY A CARD STILL LISTED IS EXACTLY A CARD THAT WAS NEVER MOVED
+ *
+ * The set is the record of the resolution, so membership is the test: `move-card { from:
+ * 'revealed' }` removes a card from the set in the same write that files it in a hand or
+ * destroys it, so a card still listed when the boundary runs is one that nothing has taken
+ * anywhere — and those are precisely the ones this returns. Nothing has to guess which pile
+ * a card came from by looking at the world, because the card is on NO pile right now; `deckOf`
+ * asks the card index instead, which is the one thing that still says what a card is.
+ *
+ * ## BACK TO THE FRONT, in `turnOrder` then list order, and why that restores the pile
+ *
+ * `reveal` takes from `pile[0]`, so putting the ids back at the front in the order they were
+ * taken puts the deck back exactly as it was: a reveal off one deck leaves that deck
+ * byte-identical across the resolution, whatever else happened in between. `turnOrder` is
+ * the order `resolveTargets` hands targets out in, so the take order and the return order
+ * agree for `'each-opponent'` and `'everyone'`.
+ *
+ * ## THE TWO REFUSALS, and both are "do not create a second copy"
+ *
+ *  - **A card the engine has already placed somewhere else is NOT returned.** Nothing in the
+ *    engine puts a face-up card anywhere else today — a take off the set is the only route —
+ *    so this is a guard against the future rather than a branch a card can reach.
+ *  - **A card the INDEX cannot place is not returned.** `deckOf`'s `null`. Putting it in a
+ *    guessed pile would be the one outcome worse than losing it.
+ */
+function settleRevealedCards(state: GameState, ctx: Ctx): GameState {
+  const listed = state.turnOrder.flatMap((p) => revealedCardsOf(state, p));
+  if (listed.length === 0) return state;
+
+  // Where is an id already? A return is a WRITE into a pile, so the only thing that can go
+  // wrong is writing a second copy of a card the world already holds.
+  const locatedElsewhere = (s: GameState, id: CardID): boolean =>
+    s._pendingCard === id ||
+    s.turnOrder.some((p) => ideologyHandOf(s.players[p]).includes(id)) ||
+    (Object.keys(DISCARD) as DeckName[]).some((deck) => s[DISCARD[deck]].includes(id));
+
+  const back = new Map<DeckName, CardID[]>();
+  let s = state;
+  for (const id of listed) {
+    if (locatedElsewhere(s, id)) continue;
+    const deck = deckOf(ctx, id);
+    if (deck === null) continue;
+    const pile = back.get(deck) ?? [];
+    pile.push(id);
+    back.set(deck, pile);
+  }
+  for (const [deck, ids] of back) {
+    s = { ...s, [DRAW[deck]]: [...ids, ...s[DRAW[deck]]] };
+  }
+  s = { ...s, revealedCards: {} };
+  // `_conspiracyDraw`'s LENGTH and its top card's COST are public fields, and returning a
+  // Conspiracy Card onto that pile changes both — including by changing WHICH card is on
+  // top, so this is not merely a length fix.
+  return back.has('conspiracy') ? syncConspiracyTop(s, ctx) : s;
 }
 
 // ─────────────────────────── board mutation ───────────────────────────
@@ -1774,6 +1870,11 @@ function applyEffect(
                 {
                   kind: 'choose-card',
                   count: 1,
+                  // WHICH SET, named at construction. See `CardPool`: the offer is a
+                  // copy of ONE public list and the answer is validated against that
+                  // same list, so a market pick and a recycle pick are different
+                  // questions rather than two answers to one.
+                  pool: 'conspiracy-recycle',
                   cards: [...pile],
                   effects: [effect],
                   source: p,
@@ -1898,6 +1999,84 @@ function applyEffect(
       }
       return s;
     }
+    case 'take-voter': {
+      // G17, widened to the second public set. The whole contract is on `Effect`'s
+      // `take-voter` arm in cards.ts and on `CardPool` in state.ts; what is left here
+      // is the branch rather than a comment, because a comment does not fail a test.
+      //
+      // NO VOTERS ARE GRANTED, and that is a refusal rather than an omission. There is
+      // no Voter Card hand in this engine, so a card taken off the mat goes to the
+      // Voter DISCARD by `discardTo` — exactly what `INFLUENCE` does to the card in a
+      // slot it empties — and `refillMarket` puts a fresh one up. Handing the chooser
+      // the card's voters instead would be a free INFLUENCE, which is G15's missing
+      // `price` field: no `Effect` may grant an action's `pay`, and this op does not
+      // become the place that grant sneaks in through.
+      //
+      // SILENT, and the reason is that the change is ALREADY PUBLIC: `GameState.market`
+      // is on every payload, so a card leaving it is visible in the market itself.
+      // `refresh-market`, the closest analogue, writes no log line either.
+      const want = resolveCount(s, source, effect.n, ctx);
+      if (want <= 0) return s;
+      const take = (slot: number): GameState => {
+        const id = s.market[slot]?.cardId;
+        if (id === undefined) return s;
+        s = discardTo({ ...s, market: s.market.filter((_, i) => i !== slot) }, 'voter', id);
+        return refillMarket(s, ctx);
+      };
+      if (effect.pick === true) {
+        for (const p of resolveTargets(s, source, target, forced)) {
+          // `forcedCard` is the ANSWER arriving back from `resolveChoice`, and it
+          // short-circuits this branch so one resolution consumes exactly as many cards
+          // as the decision it answered named — the cascade bound, and the same argument
+          // as `'chosen-player'`.
+          if (forcedCard === null) {
+            const offer = s.market.map((slot) => slot.cardId);
+            // AN EMPTY MARKET RAISES NOTHING, and this is the `'chosen-zone'` /
+            // empty-recycle-pile rule: a decision with no legal pick is a frozen table,
+            // so the ask is bounded by the set and the set is bounded by the deck. The
+            // k-th of at most `min(n, market.length)` decisions is answered with at
+            // least one card still on the mat, so no state can strand this.
+            if (offer.length === 0) continue;
+            for (let k = 0; k < Math.min(want, offer.length); k += 1) {
+              s = pushChoice(
+                s,
+                {
+                  kind: 'choose-card',
+                  count: 1,
+                  pool: 'voter-market',
+                  cards: [...offer],
+                  effects: [effect],
+                  source: p,
+                  reason: 'Card effect',
+                },
+                p,
+              );
+            }
+            continue;
+          }
+          // The named card, taken out of the market BY COMMITMENT rather than by
+          // enumeration — `resolveChoice` has already checked that it was offered and
+          // that it is still on the mat. The `at < 0` fallback is the world having moved
+          // on between the raise and the answer (anybody may buy the card the dialog was
+          // offering); the safe direction is the leftmost slot of the SAME pool rather
+          // than a refusal, because a refusal here is a dead seat. It never reaches
+          // across pools: the only ids this line can name are in `s.market`.
+          const at = s.market.findIndex((slot) => slot.cardId === forcedCard);
+          s = take(at < 0 ? 0 : at);
+        }
+        return s;
+      }
+      // No `pick`: the leftmost slot, which is the commit-then-publish shape and the same
+      // read `INFLUENCE`'s slot index is. An empty market is a no-op, and the market is a
+      // shared resource, so two `to`-less takes in one resolution compete for the top —
+      // a partially-applied take is correct rather than a bug, exactly as two
+      // `move-card { to: 'hand' }` effects compete for the draw pile.
+      for (const _taker of resolveTargets(s, source, target, forced).values()) {
+        void _taker;
+        s = take(0);
+      }
+      return s;
+    }
     case 'move-card': {
       // G20. The whole of the contract is on `Effect`'s `move-card` arm in cards.ts
       // and on `PlayerState.ideologyCards` in state.ts; what is left here is the
@@ -1926,6 +2105,13 @@ function applyEffect(
       // `'draw'` below is the *"the top of a pile nobody can see"* one, and neither
       // touches the half §2bis refuses. There is no `from` in this union that
       // enumerates a pile: one member each, taken by position.
+      //
+      // A REVEALED CARD IS NOT ON ANY PILE, because `reveal` took it off the pile it was
+      // read from, so this half has no pile to keep consistent: taking one into a hand or
+      // out of the world is one write, and the id ends up in exactly one place. That is
+      // also why nothing here needs to know the card's origin — and why the boundary can
+      // return only the cards still LISTED here (`settleRevealedCards`): a card that left
+      // the set is a card the engine has already placed somewhere real.
       //
       // THE CARD LEAVES THE REVEALED SET, and that is not bookkeeping. The invariant on
       // `GameState.revealedCards` is that it holds what the table can currently SEE; a
@@ -1965,7 +2151,65 @@ function applyEffect(
         return s;
       }
 
-      // `from: 'draw'` is the other of the two sources the type allows, and the
+      // `from: 'held-received'` — A DONATION, AND THE ONLY BRANCH THAT READS A HAND.
+      //
+      // THE ORDERING, and it is read off the two writers rather than assumed. Cards
+      // ARRIVE at the END (`[...ideologyHandOf(player), id]`, both `to: 'hand'` paths
+      // above) and the boundary DRAINS FROM THE FRONT (`const [heldCard, ...heldRest]`
+      // in `advanceTurn`), so the hand is a FIFO queue and its LAST element is the most
+      // recently arrived card — which is what "a card you just received" names. Taking
+      // the front instead would pass on the OLDEST card, the one the donor was about to
+      // be dealt, and would silently reorder a queue nobody may look at.
+      //
+      // COMMIT BY POSITION, ONCE, AND SAY NOTHING. One element, chosen by index before
+      // the write; no `pick`, no search, no enumeration; no `log(...)` and no
+      // `GameEvent`. This is `onlyIfEmpty`'s shape exactly — it reads a hidden hand and
+      // emits nothing, so a player who gave a card away and a player who held nothing
+      // are indistinguishable from outside. A line reading "p1 passed on a card" would
+      // report that p1's hand was non-empty a moment earlier, which is a fact about a
+      // set hidden from everyone INCLUDING p1 (`PlayerState.ideologyCards`, state.ts).
+      //
+      // THE DONOR IS THE CARD'S ACTOR (`source`) and `target` says who receives it, so
+      // a card writes `target: 'chosen-player'` — the printed subject of A COWARD OR A
+      // JOURNALIST? is YOU. A donation to the donor's own hand is refused rather than
+      // performed: it would move the newest card to the end of the queue it is already
+      // at, which is a no-op with two writes on a hidden hand.
+      //
+      // ONE CARD, ONE RECEIVER: the loop `break`s after the first eligible target
+      // because a single id cannot be in two hands, and `n` is a bound rather than a
+      // search — the hand shrinks by one per pass, so the inner loop is bounded by the
+      // hand's own length and cannot append to a structure that grows on its own.
+      if (effect.from === 'held-received') {
+        const donor = s.players[source];
+        if (!donor) return s;
+        for (const p of resolveTargets(s, source, target, forced)) {
+          if (p === source) break;
+          const receiver = s.players[p];
+          if (!receiver) break;
+          for (let i = 0; i < n; i += 1) {
+            const hand = ideologyHandOf(donor);
+            // AN EMPTY HAND IS A SAFE NO-OP, the same `break` an exhausted pile gets on
+            // the paths above: a clause can name a donation the donor has nothing to
+            // make, and the world is left exactly as it was.
+            const id = hand[hand.length - 1];
+            if (id === undefined) break;
+            // Checked BEFORE the card leaves the donor, for the reason the draw path
+            // checks it before the card leaves the pile: a refused move must not
+            // half-happen, and the receiver's hand is the one bound being tested.
+            if (effect.to === 'hand' && ideologyHandOf(receiver).length >= IDEOLOGY_HAND_MAX) break;
+            s = withPlayer(s, source, { ideologyCards: hand.slice(0, -1) });
+            if (effect.to === 'hand') {
+              const to = s.players[p];
+              if (!to) break;
+              s = withPlayer(s, p, { ideologyCards: [...ideologyHandOf(to), id] });
+            }
+          }
+          break;
+        }
+        return s;
+      }
+
+      // `from: 'draw'` is the third of the three sources the type allows, and the
       // draw-pile one: a card in the Ideology DISCARD pile has been ANSWERED, which p13
       // makes face up under its owner's mat, so handing one to a player blind would
       // publish the answer they are about to give. See the `move-card` arm in cards.ts,
@@ -2037,6 +2281,19 @@ function applyEffect(
           // keeps `to: 'discard'` off `_conspiracyDraw` from being reached by another
           // route. Written as two spreads so the pile write and the list write are one
           // expression each and neither can be dropped by accident.
+          //
+          // **AND THE BOUNDARY GIVES IT BACK.** Taking the card off the pile is what
+          // makes it the one card the resolution can publish, and it is only half the
+          // mechanic: `settleRevealedCards` puts every card that is STILL LISTED back on
+          // the pile it came from at the turn boundary, so a card revealed and never moved
+          // is in its deck again before the next player acts. Without that second half
+          // this case deletes cards from the game — which is exactly what shipped:
+          // `hl-et2040-027` (BLESSINGS OF PARENTS PAST, `{op:'reveal', kind:'voter',
+          // n:2}`) took two Voter Cards off a 18-card deck every time it resolved and put
+          // nothing back, and `corpus-response-window.test.ts` seed 35 at two seats was
+          // still unfinished at 12000 actions, turn 3975, because the deck had run out and
+          // no player could be dealt a card to answer. See the ruling on
+          // `GameState.revealedCards` in state.ts.
           s = { ...s, [DRAW[effect.kind]]: pile.slice(1) };
           s = {
             ...s,
@@ -2053,8 +2310,8 @@ function applyEffect(
       // `_conspiracyDraw` is the one pile whose LENGTH is on the wire
       // (`conspiracyRemaining`), so a reveal off it re-syncs the two derived public
       // counters `syncConspiracyTop` owns — the same call `draw-conspiracy` ends with.
-      // A stale count is a public field reporting a number the engine no longer
-      // believes.
+      // A stale count is a public field reporting a number the engine no longer believes.
+      // `settleRevealedCards` re-syncs them again on the way back.
       return effect.kind === 'conspiracy' ? syncConspiracyTop(s, ctx) : s;
     }
     case 'borrow-power': {
@@ -2663,6 +2920,16 @@ function endOfGame(state: GameState, events: GameEvent[] = []): Result {
  * cleared by the same boundary that fired it — a reveal whose whole lifetime is one
  * function is a card doing nothing, which is what such a card should do.
  *
+ * ## WHY THE POST-PASS IS NOT ALSO WHERE THE CARDS COME BACK
+ *
+ * The clear is a post-pass because it has to survive an exit somebody forgets; the RETURN
+ * is not, because it has to happen before this boundary reads a single pile.
+ * `turnBoundary` calls `settleRevealedCards` on its first line, before the turn draw and
+ * before R10's exhaustion check, and this line is left as the second guarantee that the set
+ * is empty in every state outside a resolution — including any exit added to `turnBoundary`
+ * later. After the settle there is nothing left for it to do, and that is the point: an
+ * empty list cannot go stale, and a returned card cannot be lost.
+ *
  * ## WHY NOT IN `resolveChoice` OR `closeInterrupt`, where `interrupt` and `choices` go
  *
  * Both of those clear at the point of CLOSURE, and neither is this boundary: a decision
@@ -2676,7 +2943,18 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
 }
 
 function turnBoundary(state: GameState, ctx: Ctx): Result {
-  let s = state;
+  // THE REVEALED CARDS GO HOME FIRST, before this boundary reads a single pile.
+  //
+  // The rule is that this boundary never acts on a deck that is missing a card which is
+  // face up, and there are two reads below. **The turn draw** takes `_ideologyDraw[0]` for
+  // the next player, so returning first means the draw finds the deck whole and the card
+  // that was turned over is the card that comes up — which is what *"back where it was"*
+  // means at a table. **R10** ends the election when `draw` finds nothing, and a face-up
+  // card is in no pile and no discard, so a deck that is only empty because of a reveal
+  // would read as exhausted. Neither of those is reachable from a card today — R10 needs a
+  // discard pile empty at a boundary and `ANSWER` always puts one card in it — and the
+  // ordering is settled here rather than left to the first clause that changes it.
+  let s = settleRevealedCards(state, ctx);
   const events: GameEvent[] = [{ type: 'turn-ended', player: s.activePlayer }];
 
   // p10: influenced voters not placed by the end of the turn are discarded.
@@ -3974,16 +4252,24 @@ function resolveChoice(
     /**
      * G17 — the card's RECIPIENT named a card from the recycle list.
      *
-     * ## THE VALIDATION IS THE LIVE PILE, AND THE OFFER WAS A COPY OF IT
+     * ## THE OFFER IS THE GATE, and it is one pool at a time
      *
-     * `c.cards` is `_conspiracyDiscard` copied at raise time and this reads
-     * `_conspiracyDiscard` again. Between the two the pile can only GROW — `PLAY_CONSPIRACY`
-     * appends the card it just played, in the same breath as the `Played "NAME"` line
-     * that makes it public — so the accepted set is a SUPERSET of the offered one, which
-     * is the safe direction: a client that shows a stale list has a dead button, and a
-     * dead button the server refuses is the one outcome worse than showing nothing.
-     * `applyEffect` raised at most `pile.length` decisions, so the k-th is answered with
-     * at least one card on the pile and **no state can strand this**.
+     * `c.cards` is `_conspiracyDiscard` or `GameState.market` copied at raise time, and
+     * `c.pool` says which — so the pick is validated against the OFFER rather than
+     * against a re-read of the live set. For the recycle list the two are monotone the
+     * safe way (`PLAY_CONSPIRACY` appends the card it just played, in the same breath
+     * as the `Played "NAME"` line that makes it public, so a stale dialog's list is a
+     * subset of the live pile); for the market they diverge the OTHER way, because any
+     * seat may buy the card a dialog is offering. Validating the offer is what covers
+     * both without a per-pool argument, and it is the check that stops the two sets
+     * being mixed: neither pool's ids are ever in the other's offer.
+     *
+     * `applyEffect` raised at most `set.length` decisions, and each answer commits to
+     * one member of the SAME pool by position (`at < 0` falls to the pool's
+     * deterministic end), so **no state can strand this**: a card the world has taken
+     * since the raise closes the decision rather than refusing it, because a refusal
+     * here has no exit and a frozen seat is the dead-table class this file has been
+     * bitten by five times. `packages/engine/test/choose-card-pool.test.ts` asserts it.
      *
      * **`source` IS THE CHOOSER, and it is checked first.** The same reasoning as
      * `'choose-player'`: a `'choose-card'` answered by anybody else is a card's
@@ -3999,6 +4285,24 @@ function resolveChoice(
     case 'choose-card': {
       if (pick.kind !== 'card') return fail('choose a card');
       if (playerId !== c.source) return fail('that decision is not yours');
+      // G17, widened. **THE PICK MUST NAME A MEMBER OF THE OFFERED SET**, checked
+      // against `c.cards` — the copy taken from the ONE pool `c.pool` names. This is
+      // the guard that makes the two candidate sets unable to mix: a market id is
+      // never in a recycle offer and a recycle id is never in a market offer, so a
+      // cross-pool pick is not a near-miss here, it is a pick of a card this dialog
+      // never showed. It is also what makes the client's own intersection honest.
+      //
+      // **THE OFFER, NOT THE LIVE SET, IS THE GATE, and the distinction is the whole
+      // answer to staleness.** The two public sets move in OPPOSITE directions between
+      // a raise and an answer — `PLAY_CONSPIRACY` can only grow the recycle list, while
+      // any seat may buy a card off the market — so there is no single monotone
+      // argument over both. Instead the dialog's own list is the contract and the
+      // effect commits inside `c.pool`: a card the world has taken since the raise is
+      // committed by position from the same pool, which is `relocationLapsed`'s ruling
+      // applied to a card (an answer the world has already answered closes; refusing it
+      // would freeze the seat, which is the dead-table class this file has been bitten
+      // by five times).
+      if (!c.cards.includes(pick.cardId)) return fail('that card was not one of the options');
       let s = drop(state);
       for (const effect of c.effects) {
         s = applyEffect(s, c.source, effect, ctx, NO_FIRE, null, c.source, null, pick.cardId);

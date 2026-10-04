@@ -832,6 +832,28 @@ const OBLIGATIONS: Readonly<Record<Effect['op'], Obligation>> = {
     // `choose-peg-dest` test asserts directly.
     holds: (e) => e.choiceDelta > 0,
   },
+  'take-voter': {
+    because: '"take N Voter Cards off the mat"',
+    // THE OBLIGATION IS "A CARD LEFT THE MAT", and nothing here may claim the chooser
+    // GAINED anything — because they do not. There is no Voter Card hand in this
+    // engine, so a taken card goes onto the Voter DISCARD through `discardTo` and
+    // grants NO voters, which is a deliberate refusal (a free `INFLUENCE` is exactly
+    // the clause G15 refuses: no `Effect` may grant an action's `pay`). An obligation
+    // reading `poolDelta > 0` here would be claiming a payout the implementation
+    // deliberately does not make, which is worse than a missing one.
+    //
+    // Both halves of the OR are the real promise. Without `pick` the leftmost slot is
+    // taken and refilled, so `marketChanged` is true. With `pick` the card has not
+    // moved YET — the honest observation is that the DECISION was offered, and that
+    // is the same shape `move-peg` and `gain-any` use for the same reason: the player
+    // has not chosen yet, and the choice is where the printed sentence lives.
+    //
+    // The one case neither half covers is an EMPTY market, where `pick` raises nothing
+    // at all (the `'chosen-zone'` / empty-recycle-pile rule). That is the documented
+    // no-op rather than a card failing to work, and it is why this obligation does not
+    // also demand that a decision appear.
+    holds: (e) => e.marketChanged || e.choiceDelta > 0,
+  },
 };
 
 /**
@@ -1145,6 +1167,7 @@ describe('semantic agreement — every clause of every shipped card does what it
       'move-peg',
       'reveal',
       'set-cap',
+      'take-voter',
     ]);
   });
 

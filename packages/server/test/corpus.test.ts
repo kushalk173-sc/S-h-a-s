@@ -369,6 +369,23 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // remembered", which is the exact failure the paragraph above describes. Measured
     // over seeds 1..5 at each seat count, all three are raised at ALL FOUR seat counts, so
     // adding them costs nothing and the list now says what it means.
+    // **THE RANGE IS NOW SEEDS 1..12, which `hl-et2040-027` is why.** Adding that
+    // headline (BLESSINGS OF PARENTS PAST, REF 4.1) moved the shared shuffle stream
+    // again — the same paragraph above, one corpus addition later — and `convert-voter`
+    // fell out of reach at TWO seats within seeds 1..5, even though it is still raised
+    // at 3, 4 and 5. Measured rather than guessed: over seeds 1..12 `convert-voter` is
+    // raised at seeds 6, 8, 10, 11 and 12 at EVERY seat count. So the width moved
+    // instead of the list, which is the remedy this file already documents for exactly
+    // this event.
+    //
+    // **WIDENING IS NOT WEAKENING, and the per-seat-count claim is why.** The loop
+    // asserts each kind at each seat count over the union of the range, so it still
+    // fails the moment a kind stops being raisable AT THAT SEAT COUNT — 12 seeds cannot
+    // mask a 2-seat regression the way an over-the-union claim would. It demands more
+    // of the driver than five seeds did, not less. The alternative, dropping
+    // `convert-voter` from KINDS, would have been the real weakening: it would have
+    // turned "the driver handles every kind the corpus can raise" into "the driver
+    // handles the kinds seeds 1-5 happened to raise".
     const KINDS = [
       'evict-voter',
       'discard-voter',
@@ -379,7 +396,7 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
       'choose-player',
       'choose-peg-dest',
     ];
-    const SEEDS = [1, 2, 3, 4, 5];
+    const SEEDS = Array.from({ length: 12 }, (_, i) => i + 1);
     for (const n of [2, 3, 4, 5]) {
       const kinds = new Set<string>();
       for (const seed of SEEDS) {

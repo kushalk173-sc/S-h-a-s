@@ -912,6 +912,7 @@ const SCENARIOS: readonly Scenario[] = [
     choice: {
       kind: 'choose-card',
       count: 1,
+      pool: 'conspiracy-recycle',
       cards: ['ct-et2040-001', 'ct-et2040-002'],
       effects: [{ op: 'draw-conspiracy', n: 1, from: 'discard', pick: true }],
       source: P1,
@@ -1011,6 +1012,7 @@ const SCENARIOS: readonly Scenario[] = [
     choice: {
       kind: 'choose-card',
       count: 1,
+      pool: 'conspiracy-recycle',
       cards: [],
       effects: [{ op: 'draw-conspiracy', n: 1, from: 'discard', pick: true }],
       source: P1,

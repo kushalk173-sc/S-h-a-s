@@ -440,6 +440,64 @@ export type ChoiceScope = 'any' | 'others' | 'own';
 export type ZoneScope = 'any' | 'this-zone' | 'your-strongest' | 'chosen-zone';
 
 /**
+ * G17 — WHICH PUBLIC SET a `'choose-card'` decision is allowed to enumerate. Two
+ * members, and the union is the whole allow-list.
+ *
+ * ## THE RULE IS UNCHANGED BY THE WIDENING, and it is worth stating in the form an
+ * implementer can be held to
+ *
+ * **A mechanism may READ a hidden set only by committing to one member of it before
+ * anything is published, and may never place that set's CONTENTS in any value that
+ * reaches a client. An OPTION LIST is as revealing as a value** — so a decision may
+ * only enumerate a set that is ALREADY public to every client at the moment the
+ * decision is raised. Commit-then-publish (`move-card`, `reveal`, `onlyIfEmpty`) is
+ * the other shape, and it needs no entry here because it publishes one card and no
+ * list.
+ *
+ *  - **`'conspiracy-recycle'` — `ClientState.conspiracyRecycle`.** Its membership is
+ *    DERIVABLE FROM THE PUBLIC LOG ALONE: `Played "NAME".` puts a card on it and
+ *    `Picked "NAME".` takes one off, in order, so a client holding nothing else can
+ *    rebuild the list and its order. `packages/server/test/secret-state.test.ts`
+ *    asserts that equality by re-deriving it from the log rather than from the pile.
+ *  - **`'voter-market'` — `GameState.market`.** p10 keeps three Voter Cards face up on
+ *    the HQ Mat and the rulebook has no hidden phase, so the field is unprefixed, is
+ *    not in `PRIVATE_PLAYER_KEYS`, and reaches every payload with its slot order
+ *    intact. **The market passes because it is ALREADY public — not because this
+ *    decision published it, which is the whole reason it needs no server projection.**
+ *
+ * ## WHAT WOULD DISQUALIFY A THIRD SET, so the next author does not have to re-derive it
+ *
+ * A set is disqualified by any ONE of these, and each is a fact about the wire rather
+ * than about how careful the implementation is:
+ *
+ *  1. **Its contents are not already on every payload.** A `_`-prefixed pile
+ *     (`_voterDraw` beneath the market, `_ideologyDraw`, `_ideologyDiscard`,
+ *     `_headlineDraw`, `_conspiracyDraw`) is stripped by `playerView`, so an option
+ *     list over one is the ordered deck on the wire. Note that `_conspiracyDiscard` is
+ *     the interesting case: every card in it is individually public, and the rule is
+ *     still **no**, because the rule is about the CHANNEL and not about what the field
+ *     happens to hold today.
+ *  2. **It is a hand.** `PRIVATE_PLAYER_KEYS` hides `conspiracies` and `ideologyCards`
+ *    from every viewer INCLUDING the holder, with no viewer-scoped branch, so listing
+ *    one is worse than publishing a value: it publishes a set the holder is not allowed
+ *    to know either.
+ *  3. **Its ORDER is not public.** A set every client holds as an unordered collection
+ *    cannot be offered in an order, and offering it in the engine's order discloses
+ *    that order. Both members here are public *in order*, which is a stronger claim
+ *    than "public".
+ *  4. **It becomes public only because the decision would publish it.** A set that is
+ *    derivable from state a client does not have is not public, however well
+ *    documented the derivation is — that is the difference between the recycle list
+ *    (derived from the log, which is on the wire) and a pile whose order is the shuffle.
+ *
+ * `revealedCards` is the near-miss worth naming: every entry has been turned face up, so
+ * it passes (1), (3) and (4), and fails (2) only because it is not a set at all but a
+ * window that the turn boundary empties. It is in this union's future, not in its
+ * present, and `ComputedSource`'s note says so.
+ */
+export type CardPool = 'conspiracy-recycle' | 'voter-market';
+
+/**
  * A decision the engine is waiting on. Conspiracies and Headlines are data, and
  * some of their effects need a target the engine cannot pick for the player.
  */
@@ -589,52 +647,82 @@ export type Choice =
    *
    * `_ideologyDraw`, `_ideologyDiscard` (an ANSWERED card is face up under its mat,
    * so listing the pile publishes the blind answer), `_headlineDraw`,
-   * `_voterDraw`, and `PRIVATE_PLAYER_KEYS` — a Conspiracy hand and a held Ideology
+   * `_voterDraw` (the MARKET is face up; the pile beneath it is not, which is why
+   * `'voter-market'` is in `CardPool` and `_voterDraw` is not), and
+   * `PRIVATE_PLAYER_KEYS` — a Conspiracy hand and a held Ideology
    * Card, hidden from their own holders with no viewer-scoped branch, on purpose.
    * `packages/cards/src/validate.ts` refuses to author a `'choose-card'` over any of
-   * them; this union has no field that could say which pile it meant, because
-   * `applyEffect` only ever raises it for the recycle list.
+   * them; `CardPool` is the whole allow-list, and a member of it has to be justified by
+   * the four disqualifying tests written on that type.
+   *
+   * ## THE TWO SETS, AND WHY THE WIDENING IS NOT A NEW SECRET
+   *
+   * `pool` names which of the two public sets this decision is over, and **a decision
+   * never mixes them**: `cards` is a copy of that one set, the answer is validated
+   * against that one set, and the effect that runs on the answer commits inside that
+   * one set. A pick that names a market card and a pick that names a discard card are
+   * different questions and the type says so, rather than leaving it to convention.
+   *
+   * The market needed **no new server projection**, and that is the point of the
+   * whole addition: `GameState.market` is unprefixed, is not in `PRIVATE_PLAYER_KEYS`,
+   * and rides every payload with its order intact, so every id in `cards` is a card
+   * every viewer is already looking at. It is the recycle list's publicness by
+   * derivation rather than by projection, and it satisfies the same rule for a
+   * different reason.
    *
    * ## SATISFIABILITY — the offered set and the accepted set are ONE expression
    *
-   * `cards` is `state._conspiracyDiscard`, copied at raise time. `resolveChoice`
-   * validates the pick against `state._conspiracyDiscard` read again, and between the
-   * two the pile can only GROW — `PLAY_CONSPIRACY` appends the card it just played, and
-   * it does so in the same breath as the `Played "NAME"` line that makes it public. So
-   * **the accepted set is a superset of the offered one, by publicly-logged cards**, which
-   * is the safe direction: a dialog can never offer a button the server refuses. The
-   * client intersects the two (`choosableCards` in the app) so it never shows a card the
-   * decision did not name. `applyEffect` additionally raises NOTHING for an empty pile and
-   * at most `min(n, pile.length)` decisions otherwise, so the k-th is answered with at
-   * least one card on the pile and **no state can strand this**. Asserted exhaustively in
-   * `test/choices.test.ts`.
+   * `cards` is `state._conspiracyDiscard` or `state.market`, copied at raise time, and
+   * `resolveChoice` refuses any pick that is not in `cards` and re-reads the live set.
+   * For the recycle list the pile can only GROW between the two — `PLAY_CONSPIRACY`
+   * appends the card it just played, in the same breath as the `Played "NAME"` line
+   * that makes it public — so **the accepted set is a superset of the offered one, by
+   * publicly-logged cards**, which is the safe direction: a dialog can never offer a
+   * button the server refuses. For the market the two can DIVERGE the other way,
+   * because anybody may buy the card the dialog is offering; the engine's answer is
+   * the same in kind as `relocationLapsed`'s — the named card is gone, so a
+   * deterministic member of the SAME pool is taken and the decision closes rather than
+   * refusing and leaving the seat frozen. `applyEffect` raises NOTHING for an empty set
+   * and at most `min(n, set.length)` decisions otherwise, so the k-th is always
+   * answerable and **no state can strand this**. Asserted exhaustively in
+   * `test/choices.test.ts` and in `test/choose-card-pool.test.ts`.
    *
    * ## `source` IS THE CHOOSER, and that is NOT the card's actor
    *
    * The other two new kinds anchor on the actor, because their actor IS the chooser.
-   * Here `draw-conspiracy` hands the card to a resolved TARGET, and the recipient
-   * picks — `AS CLEAR AS WATER` and GOOD GIG WELL PLAYED are both `target`ed ops, and
-   * a card that reads "each opponent takes a card of their choosing" must be answered
-   * by each opponent. So `resolveChoice` re-runs the carried effect with `forced` set
-   * to `source`, which is what `resolveTargets` turns into `[that player]`.
+   * Here `draw-conspiracy` and `take-voter` hand the card to a resolved TARGET, and the
+   * recipient picks — `AS CLEAR AS WATER` and GOOD GIG WELL PLAYED are both `target`ed
+   * ops, and a card that reads "each opponent takes a card of their choosing" must be
+   * answered by each opponent. So `resolveChoice` re-runs the carried effect with
+   * `forced` set to `source`, which is what `resolveTargets` turns into `[that player]`.
    *
    * ## VISIBILITY: `cards` is ON THE WIRE, and it is the soundness claim
    *
-   * Every id in `cards` is in `ClientState.conspiracyRecycle`, which every viewer
-   * already holds — so this arm publishes nothing a client did not have. What it
-   * buys is AUDITABILITY: the offer travels with the decision, so a leaked id in a
-   * `PendingChoice` is a single place to look rather than a correlation to argue
-   * about, and `secret-state.test.ts`'s card assertion has a real member to bite on.
-   * **No `_`-prefixed field is added**, so `secret-inventory.ts` owes nothing beyond
-   * the classification below.
+   * Every id in `cards` is in `ClientState.conspiracyRecycle` or in
+   * `GameState.market`, which every viewer already holds — so this arm publishes
+   * nothing a client did not have. What it buys is AUDITABILITY: the offer travels with
+   * the decision, so a leaked id in a `PendingChoice` is a single place to look rather
+   * than a correlation to argue about, and `secret-state.test.ts`'s card assertion has a
+   * real member to bite on. **No `_`-prefixed field is added**, so `secret-inventory.ts`
+   * owes nothing beyond the classification below.
    */
   | {
       readonly kind: 'choose-card';
       /** How many cards to name. `1` for every recovered card. */
       readonly count: number;
       /**
-       * The cards offered, in recycle order. A COPY of `_conspiracyDiscard` at raise
-       * time, and the only pile this kind can ever name — see the note above.
+       * WHICH PUBLIC SET this decision enumerates, named at construction and never by
+       * convention. There are exactly two, and **a decision names ONE of them and can
+       * never mix them**: `cards` is a copy of that set and nothing else, so the two
+       * questions are not merely kept apart by habit but are different questions by
+       * construction. A pick naming a market card and a pick naming a discard card
+       * cannot be confused, cannot be substituted for one another, and are validated
+       * against two different live sets — see `resolveChoice`.
+       */
+      readonly pool: CardPool;
+      /**
+       * The cards offered, in the named pool's own order. A COPY of `_conspiracyDiscard`
+       * or of `state.market` at raise time — see the note above for which is which.
        */
       readonly cards: readonly CardID[];
       /** The effect list to run once per chosen card. Never empty. */
@@ -1329,7 +1417,7 @@ export type GameState = {
    * of it before anything is published, and may never place that set's CONTENTS in any
    * value that reaches a client.** Two shapes satisfy it and one does not:
    *
-   *  - **COMMIT-THEN-PUBLISH, which is this field.** `reveal` takes the top of a draw
+*  - **COMMIT-THEN-PUBLISH, which is this field.** `reveal` reads the top of a draw
    *    pile — one member, decided before the write — and publishes that one card because
    *    the rule of the card is to turn it face up. The other cards on the pile are still
    *    nobody's business and still live in their `_` field. Precedents for the safe
@@ -1349,21 +1437,45 @@ export type GameState = {
    * list of cards nobody had any business knowing, which is precisely the state this
    * design must never publish.
    *
+   * ## THIS IS A WINDOW OVER THE PILES, AND THE BOUNDARY CLOSES IT
+   *
+   * A reveal takes the card OFF its draw pile and puts it HERE, because a card that were
+   * still on its pile could not be published as a thing the resolution can act on and the
+   * set would be a copy rather than a location. **So the card is in this window and nowhere
+   * else, and `settleRevealedCards` puts it back**: at the turn boundary every card still
+   * LISTED goes onto the front of the pile it was read from, in the order `resolveTargets`
+   * handed the targets out, and the set is emptied.
+   *
+   * That return is not bookkeeping, and its absence is not a leak but a much worse thing:
+   * the first version of this field took the card off the pile and then CLEARED the set at
+   * the boundary, and a cleared list is not a returned card, so every resolved `reveal`
+   * deleted one card per card revealed from the game. On a deck that can exhaust — the
+   * Voter pile, refilled only by `refresh-market` and by the reshuffle in `draw()` — that
+   * is a table which can never finish, and it shipped once: `hl-et2040-027` stalled a
+   * 60-seed corpus sweep.
+   *
+   * **MEMBERSHIP IS THE TEST FOR "WAS THIS CARD MOVED".** `move-card { from: 'revealed' }`
+   * files a card in a hand or destroys it in the same write that drops it from this map, so
+   * a card listed at the boundary is one nothing ever took. The origin is never asked about
+   * at take time — a face-up card is on no pile at that moment — and the boundary recovers
+   * it from the card index, which is the one thing that still says what a card is. An id the
+   * index cannot place is not returned at all: guessing a pile is strictly worse than
+   * losing the card.
+   *
    * ## THE TWO INVARIANTS THE EXECUTION AGENT OWES, both falsifiable
    *
    *  1. **EMPTY IN EVERY STATE OUTSIDE A RESOLUTION.** `setup()` writes `{}` and the
-   *     resolution that raised a reveal clears it when that resolution ends — the same
+   *     resolution that raised a reveal settles it when that resolution ends — the same
    *     discipline `advanceTurn` applies to live effects, restrictions and cap overrides,
-   *     on the same clock. A stale entry is not a cosmetic bug: it is a card sitting in
-   *     the public list that no longer belongs there, and `move-card { from: 'revealed' }`
-   *     would move a card nobody can see is being moved.
-   *  2. **EVERY ENTRY IS A CARD THE GAME LEGITIMATELY DREW.** A reveal moves the card
-   *     OFF its `_` pile and ONTO this list in one write. It must never be a copy: a
-   *     revealed card still sitting in `_ideologyDraw` would be a second copy of pile
-   *     contents on the wire by another route, which is the exact failure `to: 'discard'`
-   *     is refused over `_conspiracyDraw` for. And the deck count therefore falls by
-   *     exactly the number of cards revealed, monotonically — the same conservation
-   *     property `move-card`'s `'draw'` half is argued for.
+   *     on the same clock. A stale entry is not a cosmetic bug: it is a card sitting in the
+   *     public list that no longer belongs there, and it is a card the boundary would then
+   *     put back into a deck it has already left.
+   *  2. **EVERY ENTRY IS A CARD THE GAME LEGITIMATELY DREW.** The reveal reads one member
+   *     of a hidden pile by position, so an entry can never be a card the game never dealt.
+   *     And it must never be a copy: the card leaves its `_` pile in the same write that
+   *     puts it on this list, so an id here is in no pile, which is what keeps a take
+   *     consistent and what makes the boundary's return unambiguous.
+   *
    *
    * ## `ServerOnlyKeys` IS AT ELEVEN AND THIS FIELD DOES NOT TOUCH IT
    *

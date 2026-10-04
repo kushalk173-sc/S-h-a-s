@@ -586,6 +586,21 @@
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "$comment": "G17, the SECOND public set: a Voter Card off the HQ Mat, which is the second set a 'choose-card' may enumerate. `draw-conspiracy`'s `pick` is welded to Conspiracy Cards \u2014 the card it names is filed in `PlayerState.conspiracies`, and a Voter Card filed there would be a card the engine could never resolve \u2014 so the market needed a second op rather than a widening that lies about what it moves.\n\nTHE OPTION LIST PUBLISHES NOTHING, and that is why `pick` is legal here at all. p10 keeps three Voter Cards face up and the rulebook has no hidden phase: `GameState.market` is unprefixed, is not in `PRIVATE_PLAYER_KEYS`, and rides every client payload WITH ITS SLOT ORDER INTACT. A decision over it therefore enumerates a set every viewer already holds. A third set \u2014 a draw pile, a player hand \u2014 would fail exactly this test, which is the standing requirement `Choice`'s `choose-card` arm records against its `pool` enum.\n\n`n` is bounded by what the decision can be: `pick` raises at most `min(n, market.length)` decisions, so the k-th is answered with at least one card still on the mat and no position can strand the table. `pick` TRUE raises one 'choose-card' per card instead of taking the leftmost slot. AN EMPTY MARKET RAISES NOTHING \u2014 the same unresolvable-selector rule as 'chosen-zone' and as `draw-conspiracy`'s empty recycle pile \u2014 because a dialog with zero options is a frozen table on a clause with nothing to act on.\n\nTHERE IS NO `to`, AND THAT REFUSAL IS THE OP. There is no Voter Card hand in this engine, so a taken card goes onto the Voter DISCARD through `discardTo` \u2014 exactly as the card in a slot emptied by INFLUENCE does \u2014 and `refillMarket` deals a fresh one. NO VOTERS ARE GRANTED, because a free influence is precisely the clause G15 refuses (no `Effect` may grant an action's `pay`); a `to` field here would be that grant wearing a different hat. Keeping a market card stays blocked on a private Voter Card hand, and a card that needs one names the gap on its face.",
+          "properties": {
+            "op": { "const": "take-voter" },
+            "n": { "$ref": "#/$defs/countOrComputed" },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "pick": { "type": "boolean" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
+          }
         }
       ]
     },

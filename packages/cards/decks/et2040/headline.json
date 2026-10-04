@@ -372,6 +372,20 @@
       ]
     },
     {
+      "id": "hl-et2040-027",
+      "source": "REF 4.1: \"Draw 2 Voter Cards. Keep 1 and donate the other to an opponent. These Voter Cards are influenced for free immediately.\" `adapted`: paraphrased into ops. ONE of four clauses ships, the setup: `reveal {kind:'voter', n:2}` publishes both face up on `revealedCards`. DROPPED, with mechanisms: \"Keep 1\" needs a VOTER CARD HAND (`to:'hand'` is the IDEOLOGY hand, where `ANSWER` fails) + a `choose-card` still limited to `_conspiracyDiscard` (G17); \"donate the other\" needs `move-card` onto a named hand (G20); \"for free\" needs a free `INFLUENCE` (G15); ORDER 8.2b. LOSSY: both cards LEAVE.",
+      "provenance": "adapted",
+      "name": "Blessings Of Parents Past",
+      "text": "Turn the top 2 Voter Cards of the draw pile face up for the whole table to look at. That is all this card does today: there is nowhere in this engine to keep a Voter Card, so the two you turn over leave the game when this Headline resolves. It keeps none, donates none, and influences none for free.",
+      "effects": [
+        {
+          "op": "reveal",
+          "kind": "voter",
+          "n": 2
+        }
+      ]
+    },
+    {
       "id": "hl-et2040-026",
       "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for FUELLING THE NEWS (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3: headlines are dealt from a QUEUE (`GameState.headlineQueue`) and there is no Headline hand and no Headline draw pile, so 'draw 3' has no referent and 'choose the order in which to resolve these Headlines' needs a resolution-order queue as well. Same JOB: a headline that lands on everybody at once, which is what handing out headlines actually feels like.",
       "provenance": "inferred",

@@ -242,6 +242,11 @@ const EFFECT_OP_ORDER: Readonly<Record<string, number>> = {
   // out of `card.schema.json`, so the schema and this table are two lists that can drift
   // and the drift is a thrown error at validate time rather than a silent mis-validation.
   'move-peg': 18,
+  // G17, the SECOND public set. Appended rather than slotted in beside
+  // `refresh-market`: this table and the `oneOf` are two hand-maintained lists that
+  // `validateEffect` walks BY POSITION, so the only thing that has to hold is that
+  // both agree — and appending is what keeps `move-peg`'s index at 18 above.
+  'take-voter': 19,
 };
 
 /**

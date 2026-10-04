@@ -463,18 +463,23 @@ const ONE_PER_OP: Readonly<Record<string, Effect>> = {
   // not 1, so the representative is the one that ships — which is what makes the
   // singular/plural branch in `describeEffect` covered by this table.
   'move-peg': { op: 'move-peg', n: 1 },
+  // G17, the SECOND public set. The representative carries `pick`, so the sentence's
+  // "of your choice" branch is the one this table exercises rather than only the
+  // leftmost-slot one — the same reason `reveal` above carries its `target`.
+  'take-voter': { op: 'take-voter', n: 1, pick: true },
 };
 
 describe('every op in the engine Effect union has its own sentence', () => {
   it('the op list was actually derived — non-vacuity', () => {
-    // Nineteen, asserted rather than assumed: a slice that silently matched nothing
+    // Twenty, asserted rather than assumed: a slice that silently matched nothing
     // would make every other assertion in this block pass for the wrong reason,
     // which is the exact failure mode this file exists to prevent.
-    expect(ENGINE_OPS.size).toBe(19);
+    expect(ENGINE_OPS.size).toBe(20);
     // And the slice really is the `Effect` union rather than the whole file:
-    // `block` is an `Interrupt` op outside it, and `reveal` is the nineteenth.
+    // `block` is an `Interrupt` op outside it, and `take-voter` is the twentieth.
     expect(ENGINE_OPS.has('set-cap')).toBe(true);
     expect(ENGINE_OPS.has('move-peg')).toBe(true);
+    expect(ENGINE_OPS.has('take-voter')).toBe(true);
     expect(ENGINE_OPS.has('reveal')).toBe(true);
     expect(ENGINE_OPS.has('block')).toBe(false);
   });

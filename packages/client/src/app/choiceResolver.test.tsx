@@ -1718,8 +1718,9 @@ describe('the gate covers the KINDS, not only the shapes that found the bug', ()
  */
 describe("G17 'choose-card' - the picker, and the two ways it could be wrong", () => {
   const choice = (cards: readonly string[]): Choice => ({
-    kind: 'choose-card',
+kind: 'choose-card',
     count: 1,
+    pool: 'conspiracy-recycle',
     cards,
     effects: [{ op: 'draw-conspiracy', n: 1, from: 'discard', pick: true }],
     source: P1,

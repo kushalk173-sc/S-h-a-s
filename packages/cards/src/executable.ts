@@ -165,6 +165,29 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
    * `EffectScope` fields, exactly as GROWING DISSENT's are.
    */
   'move-peg': ['n', 'target'],
+  /**
+   * G17, second public set. All three fields are read by the case, and the list was
+   * derived from `packages/engine/src/reduce.ts` by slicing the `case 'take-voter'`
+   * arm out of `applyEffect` — the same re-derivation `reducer-parity` runs on every
+   * op, so an entry that over- or under-claimed here fails the test rather than
+   * misleading a card author.
+   *
+   *  - `n` is the loop bound, resolved through `resolveCount` so a computed `n` works.
+   *  - `target` is the consumed local, resolved through `resolveTargets` like every
+   *    other targetable op. It is listed because the case consults the local `target`,
+   *    and the parity test greps for that bare word — the same reason `reveal`'s and
+   *    `move-peg`'s `target` entries exist.
+   *  - `pick` is the choice over the MARKET rather than `draw-conspiracy`'s over the
+   *    recycle list, and the refusal is a documented `continue` rather than an
+   *    unexecuted field: an empty market raises nothing, which is the
+   *    `'chosen-zone'` / empty-recycle-pile rule.
+   *
+   * There is deliberately NO `to` field, and that omission is the op's whole content:
+   * a taken Voter Card goes to the Voter DISCARD through `discardTo` and grants no
+   * voters, because there is no Voter Card hand and because a free `INFLUENCE` is
+   * the clause G15 refuses. A registry entry claiming otherwise would be the lie.
+   */
+  'take-voter': ['n', 'target', 'pick'],
 };
 
 

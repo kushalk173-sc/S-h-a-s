@@ -89,6 +89,17 @@ const MINIMAL_EFFECT: Readonly<Record<string, Effect>> = {
    * invariant checker reason about an op", not "what does the real card say".
    */
   'move-peg': { op: 'move-peg', n: 1 },
+  /**
+   * The FIRST shipped headline to use `reveal` is `hl-et2040-027` (BLESSINGS OF PARENTS
+   * PAST, REF 4.1), so this row arrived with that card rather than with the op.
+   *
+   * `n: 1` and `kind: 'voter'` are the smallest values the case will act on: `kind`
+   * names a pile through the one `DRAW` table `reveal` reads, and a `voter` pile is the
+   * one a MINIMAL example can be sure is non-empty in this suite's fixture. No `target`,
+   * because the op defaults to the card's own player and this table answers "can the
+   * invariant checker reason about an op", not "what does the real card say".
+   */
+  reveal: { op: 'reveal', kind: 'voter', n: 1 },
 };
 
 /**

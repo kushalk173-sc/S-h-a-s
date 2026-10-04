@@ -263,6 +263,10 @@ describe('schema: the effect union', () => {
       // asking for 2 would be offered ONE move and read as though it had made two, so the
       // schema refuses it at the type level rather than letting `reduce()` clamp it.
       'move-peg': { op: 'move-peg', n: 1, target: 'player-after' },
+      // G17, the second public set. `op` and `n` are required and `pick` is the mode,
+      // not a destination — there is deliberately NO `to`, because a taken Voter Card
+      // goes to the Voter discard and grants no voters.
+      'take-voter': { op: 'take-voter', n: 1, target: 'each-opponent', pick: true },
     };
     for (const op of EFFECT_OP_SET) {
       expect(validateEffect(FILE, samples[op], EFFECT_OP_SET), op).toEqual([]);

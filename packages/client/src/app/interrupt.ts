@@ -482,6 +482,31 @@ case 'borrow-power':
       const n = countText(e.n);
       return `Move ${n} ${n === '1' ? 'voter' : 'voters'} to an empty area in an adjacent constituency${target}`;
     }
+    case 'take-voter': {
+      /*
+        THE OMISSION IS THE SENTENCE, and it is the same discipline `move-card` above
+        keeps: the panel's job is to tell the table what is about to happen, so it may
+        not print a payout the engine does not make.
+
+        A card taken off the HQ Mat goes onto the VOTER DISCARD pile and a fresh one is
+        dealt onto the mat. It grants NO voters, and there is no Voter Card hand to
+        hold it — handing the taker the card's voters would be a free INFLUENCE, which
+        is the clause G15 refuses (no effect may grant an action's cost). So the
+        sentence names where the card GOES and never says the taker gains anything. A
+        wording like "take ... and place N voters" is the exact failure this file
+        exists to prevent: true of the op the author wished for, false of the one that
+        ships.
+
+        `pick` is a MODE, not a destination, and both readings are printed because the
+        table is deciding whether to let this happen: without it the leftmost card
+        goes, with it the taker names which one. `face-up` is deliberately absent as
+        well — nothing here turns a card over; the mat is already public.
+      */
+      const n = countText(e.n);
+      const noun = `Voter Card${n === '1' ? '' : 's'}`;
+      const which = e.pick === true ? 'of your choice off the mat' : 'off the mat';
+      return `Take ${n} ${noun} ${which} — each goes to the discard pile and a fresh one is dealt${target}`;
+    }
     default:
       return 'an effect this client has no words for';
   }

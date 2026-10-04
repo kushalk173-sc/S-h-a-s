@@ -441,6 +441,42 @@ effects: [{ op: 'discard-voter', n: 2, target: 'you', zone: 'chosen-zone' }],
       void s;
     },
   },
+  {
+    name: 'Blessings Of Parents Past',
+    ref: 'REF 4.1 (2024 Headline And Conspiracy Cards Explained)',
+    kind: 'headline',
+    verbatim:
+      'Draw 2 Voter Cards. Keep 1 and donate the other to an opponent. These Voter Cards are influenced for free immediately.',
+    drops: [
+      "'Keep 1' needs a private VOTER CARD HAND to hold the kept card and a `choose-card` over it. `move-card { from: 'revealed', to: 'hand' }` cannot stand in: it writes `PlayerState.ideologyCards`, the IDEOLOGY hand, where `advanceTurn` hands that Voter Card id to the next player as their Ideology Card and `ANSWER` reads `cards.ideology[id]` and fails permanently. The CHOICE is refused too — `Choice`'s `choose-card` arm names `_conspiracyDiscard` and nothing else, so G17's market enumeration (the one set 2bis calls legitimate, since p10 keeps three Voter Cards face up on the HQ Mat) is still unbuilt and U1 did not reach this card.",
+      "'donate the other to an opponent' needs `move-card` to carry a Voter Card into a NAMED OPPONENT's container. `to` is 'hand' | 'destroy', and 'destroy' is the wrong verb anyway because the donated card must still be influenced afterwards (G20), though G1's `chosen-player` would have supplied the seat.",
+      "'These Voter Cards are influenced for free immediately' needs a free INFLUENCE: `INFLUENCE` is an ACTION whose `pay` the player must be able to afford, and no `Effect` can grant it (G15's `price`) — the identical drop `hl-et2040-018` Fatality names. `sameZone` does not rescue it: `INFLUENCE` is the only writer of `PendingVoterGroup.sameZone` and no op exposes the field, so `voters` cannot stand in for a Voter Card's unsplittable group.",
+      "REF 4.1's own gloss, 'you place your influenced voters first, then the opponent places theirs', needs a `PendingVoters` group whose deadline is the DONOR's resolution rather than the RECIPIENT's turn. That is the open decision in KNOWN-GAPS.md 8.2(b), which carries no gap number because this package declined to file one (G20).",
+    ],
+    card: {
+      id: 'hl-recovered-blessings',
+      name: 'Blessings Of Parents Past',
+      text: 'Turn the top 2 Voter Cards of the draw pile face up for the whole table to look at. That is all this card does today: there is nowhere in this engine to keep a Voter Card, so the two you turn over leave the game when this Headline resolves.',
+      effects: [{ op: 'reveal', kind: 'voter', n: 2 }],
+    } as HeadlineCard,
+    check: (raised, before) => {
+      // The one clause that ships, asserted on the state the moment the card
+      // resolved: two Voter Cards came off `_voterDraw` and are FACE UP on the public
+      // revealed set. `revealedCards` is unprefixed and on every payload, so this is
+      // the one card in the corpus that publishes cards deliberately — and the
+      // assertion is that the ids are the pile's OWN top two, in order.
+      const drawn = before._voterDraw.slice(0, 2);
+      expect(drawn.length, 'the fixture draw pile must have 2 Voter Cards in it').toBe(2);
+      expect(raised.revealedCards.p1).toEqual(drawn);
+      expect(raised._voterDraw).toEqual(before._voterDraw.slice(2));
+      // …and NOT kept, and NOT donated. `to: 'hand'` would have written the IDEOLOGY
+      // hand and `chosen-player` would have needed a Voter Card container that does
+      // not exist; asserting the absence is what stops a future edit quietly making
+      // this card claim more than the corpus supports.
+      expect(raised.players.p1!.ideologyCards).toEqual(before.players.p1!.ideologyCards);
+      expect(raised.players.p2!.ideologyCards).toEqual(before.players.p2!.ideologyCards);
+    },
+  },
 ];
 
 // ─────────────────────────── the measurement ───────────────────────────

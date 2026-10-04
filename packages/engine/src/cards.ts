@@ -640,7 +640,7 @@ export type Effect = (
        */
       readonly onlyIfEmpty?: boolean;
     }
-  /**
+/**
    * REVEAL the top of a draw pile, face up, to the players it is aimed at. G-new.
    *
    * ## WHAT IT IS, and why it is not `move-card` with a different verb
@@ -649,9 +649,33 @@ export type Effect = (
    * gone. This op leaves the card ON THE TABLE with its faces showing, attached to a seat,
    * so that a later clause can count it (`'revealed-card'`) or take it
    * (`move-card { from: 'revealed' }`). **There is no destination, and that is the whole
-   * difference**: `revealedCards` is not a fourth place a card can be filed, it is a
-   * window, and the invariant on `GameState.revealedCards` — EMPTY outside a resolution —
-   * is what stops it becoming one.
+   * difference**: `revealedCards` is not a fourth place a card can be filed, it is a window
+   * onto the card, and the turn boundary is what closes the window and **gives the card
+   * back to the pile it was read from**.
+   *
+   * **THE CARD IS OFF THE PILE WHILE IT IS FACE UP, and the boundary puts it back.** It
+   * has to be: a card that were still on its pile could not be published as a thing the
+   * resolution can act on, and the set would be a copy rather than a location. So the take
+   * is half the mechanic and `settleRevealedCards` is the other half — every card still
+   * LISTED when the boundary runs goes back to the FRONT of the pile it came from, in the
+   * order `resolveTargets` handed the targets out, which restores that deck exactly.
+   *
+   * **WITHOUT THE SECOND HALF THE CARD IS DELETED FROM THE GAME, and that is not a
+   * hypothetical.** A set that must be empty outside a resolution gets cleared at the
+   * boundary, and a cleared list is not a returned card: the first version of this op took
+   * the card off the pile, cleared the set, and thereby deleted one card per reveal per
+   * resolution. On a deck that can run out this is a table which can never finish, and it
+   * shipped — `hl-et2040-027` (BLESSINGS OF PARENTS PAST, `{op:'reveal', kind:'voter',
+   * n:2}`) stalled a 60-seed corpus sweep at two seats while the same card rebuilt against
+   * another pile did not. This project refuses mechanisms that can make a table never
+   * finish, and the boundary return is the price of this one.
+   *
+   * **MEMBERSHIP IS WHAT DECIDES "WAS IT MOVED".** `move-card { from: 'revealed' }` files
+   * a card in a hand or destroys it in the same write that drops it from the set, so a card
+   * still listed at the boundary is one nothing ever took. The origin itself is never asked
+   * about at take time, because a face-up card is on no pile at that moment; the boundary
+   * recovers it from the card index instead, which is the one thing that still says what a
+   * card is.
    *
    * ## THE SECURITY ARGUMENT, because this is the op the rule is about
    *
@@ -663,13 +687,15 @@ export type Effect = (
    *
    * This op is COMMIT-THEN-PUBLISH and is therefore on the right side of the rule:
    *
-   *  - **COMMIT FIRST.** The member is `_pile[0]`, the same end `draw()` takes from, so
+   *  - **COMMIT FIRST.** The member is `pile[0]`, the same end `draw()` takes from, so
    *    the choice is made by position and not by anything a client can observe. It is
    *    decided before the write and it is ONE card — `n` is a bound, not a search, and
    *    there is no `pick` flag on this op because a search is the other mechanism.
    *  - **THEN PUBLISH, AND PUBLISH ONLY THE CARD.** What reaches a client is one face-up
    *    card that the card's whole printed text is about. The rest of the pile stays in its
-   *    `_` field and stays unpublished.
+   *    `_` field and stays unpublished. Leaving the published card on its pile publishes
+   *    nothing further: the pile is not on the wire, and neither its length nor its order
+   *    is disclosed by turning one card over.
    *  - **THE PRECEDENTS FOR THE SAFE SHAPE ARE ALREADY IN THIS FILE.** `onlyIfEmpty` reads
    *    the recipient's hidden hand, and `move-card { from: 'draw' }` reads a draw pile —
    *    both take the top deterministically, and BOTH EMIT NO LOG LINE AND NO EVENT. That
@@ -688,7 +714,7 @@ export type Effect = (
    * not elsewhere
    *
    * The draw piles are the four `_`-prefixed fields, and naming one on an op is a request
-   * to read it. It is honest for all four because the operation is identical: take one
+   * to read it. It is honest for all four because the operation is identical: read one
    * member, publish that member. **It would stop being honest the moment `kind` gained a
    * value that names a set rather than a pile** — `_ideologyDiscard` in particular, whose
    * contents are ANSWERED cards that p13 has already made face up under a mat, so listing
@@ -706,15 +732,21 @@ export type Effect = (
    * public and unprefixed, so there is no viewer-scoped branch and no
    * `(pid === viewer)` case — adding one would be the R1 bug in a plausible-looking form.
    *
+   * Because the pile is shared, two targets off one pile are handed DIFFERENT cards: the
+   * pile shrinks as it is read, so the second target walks on past what the first was
+   * given and no id is published twice.
+   *
    * ## SATISFIABILITY AND TERMINATION, and both are the deck's own bounds
    *
    * A short pile reveals what it has: `n` is an upper bound and a partially-applied
-   * reveal is correct, not a bug, exactly as a partially-applied `move-card` is — two
-   * reveals in one resolution compete for the same shared pile. **The op cannot be
-   * unsatisfiable because it raises no decision at all**: there is no dialog, so there is
-   * no frozen player and no `blockedBy` deadlock, which is the failure class this codebase
-   * has been bitten by three times. And the reveal count is bounded by the pile, which is
-   * bounded by the deck, so it cannot append to a structure that grows on its own.
+   * reveal is correct, not a bug, exactly as a partially-applied `move-card` is — and the
+   * pile cannot run dry, because the boundary hands every card back.
+   * **The op cannot be unsatisfiable because it raises no decision at all**: there is no
+   * dialog, so there is no frozen player and no `blockedBy` deadlock, which is the failure
+   * class this codebase has been bitten by three times. And each pass removes one card
+   * from a pile that is finite and shrinking, so a resolution that resolves the same card
+   * three times takes three cards or stops — it cannot cascade and it cannot append to a
+   * structure that grows on its own.
    *
    * ## INERT UNTIL THE REDUCER HAS A CASE FOR IT, and the compiler says so out loud
    *
@@ -725,12 +757,12 @@ export type Effect = (
    * must not ship using behaviour the engine does not perform**, and this op is written
    * down so the execution agent has a contract to satisfy rather than a shape to invent.
    */
-  | {
+   | {
       readonly op: 'reveal';
       /**
-       * Which draw pile to take the top of. Four values and no `'discard'` — see the
+       * Which draw pile to read the top of. Four values and no `'discard'` — see the
        * section above; `_ideologyDiscard`'s contents are answered cards and listing them
-       * would publish a blind answer.
+       * would publish a blind answer. The pile is NOT written: a reveal leaves it whole.
        */
       readonly kind: 'ideology' | 'voter' | 'conspiracy' | 'headline';
       /** How many cards off the top, face up, onto each resolved player's revealed set. */
@@ -740,6 +772,67 @@ export type Effect = (
     }
   /** Discard all face-up Voter Cards and deal fresh ones. */
   | { readonly op: 'refresh-market' }
+  /**
+   * G17, WIDENED — take a Voter Card off the HQ Mat, which is the SECOND set a
+   * `'choose-card'` may enumerate.
+   *
+   * ## WHY THIS OP EXISTS AT ALL
+   *
+   * `draw-conspiracy`'s `pick` is welded to Conspiracy Cards: the card it names is
+   * filed in `PlayerState.conspiracies`, and a Voter Card filed there would be a card
+   * the engine could never resolve. So the market could not be reached by widening
+   * that op's fields without lying about what it moves, and the honest seam is a
+   * second op over the second public set. `INFLUENCE` is an ACTION, not an `Effect`,
+   * and an effect that wanted to be one would have to grant an action's `pay` — which
+   * is G15's missing `price` field and a refusal this op keeps rather than works
+   * around.
+   *
+   * ## THE MARKET IS THE SECOND PUBLIC SET, and it needs no projection
+   *
+   * p10 keeps three Voter Cards face up on the HQ Mat and the rulebook has no hidden
+   * phase, so `GameState.market` is unprefixed, is not in `PRIVATE_PLAYER_KEYS`, and
+   * rides every client payload **with its slot order intact**. A decision over it
+   * therefore publishes nothing that was not already published: `Choice`'s
+   * `'choose-card'` arm says so at length, and this op is the second member of that
+   * union. The secrecy rule is unchanged and is not weakened by being widened — see
+   * `pool` on that arm for what would disqualify a third set.
+   *
+   * ## WHAT A TAKEN CARD BECOMES, and the reduction that is named rather than hidden
+   *
+   * **THERE IS NO VOTER CARD HAND IN THIS ENGINE**, so a card taken off the market
+   * cannot be kept: it goes onto the Voter discard pile through `discardTo`, exactly
+   * as the card in a slot emptied by `INFLUENCE` does, and `refillMarket` puts a
+   * fresh one up. **No voters are granted**, because a free influence is precisely the
+   * clause G15 refuses (no `Effect` may grant an action's `pay`), and granting the
+   * voters behind its back would be that grant wearing a different hat. Keeping a
+   * market card is still blocked on a private Voter Card hand and this op does not
+   * pretend otherwise; a card that needs one names the gap on its face.
+   *
+   * ## `pick` — AND WHY AN EMPTY MARKET RAISES NOTHING
+   *
+   * `pick: true` raises one `'choose-card'` per card over the market instead of
+   * taking the leftmost slot. At most `min(n, market.length)` decisions are raised,
+   * which is the satisfiability proof rather than a courtesy: the k-th is answered
+   * when at least one offered card is still on the mat, so no position can strand it.
+   *
+   * **AN EMPTY MARKET RAISES NOTHING** — the same `'chosen-zone'` unresolvable-selector
+   * argument G17's empty recycle pile already uses. "Take a Voter Card from the
+   * market" is not a decision a player can answer when there is no market, and a
+   * dialog with zero options is a frozen table on a clause with nothing to act on.
+   * Raising one would be the soft-lock this codebase has been bitten by repeatedly.
+   */
+  | {
+      readonly op: 'take-voter';
+      /** How many cards, one per decision when `pick` is set. */
+      readonly n: Count;
+      /** Who takes them. Defaults to the card's own actor. */
+      readonly target?: EffectTarget;
+      /**
+       * `true` raises a `'choose-card'` over the market rather than taking the
+       * leftmost slot. See above for the empty-market rule.
+       */
+      readonly pick?: boolean;
+    }
   /**
    * G5 — attach a RULE to a player that other actions must consult.
    *
@@ -844,11 +937,19 @@ export type Effect = (
    *    all, because `ANSWER` says "no card has been put to you" and `END_TURN` says
    *    "answer your Ideology Card first". A COWARD OR A JOURNALIST? is exactly this
    *    card, which is why it stays blocked on G12 as well as on G20.
-   * 2. **`from: 'hand'` - a donation out of a hidden hand.** A hand is a QUEUE the
+   * 2. **`from: 'hand'` - a SEARCH of a hidden hand.** A hand is a QUEUE the
    *    engine drains, not a thing a player can reach into and read: the ruling is
    *    that the holder does not know what they are holding, and an op that takes
-   *    "the top card of this player's hand" is an op that requires somebody to be
-   *    able to enumerate it.
+   *    "any card of this player's hand", or one whose member is chosen by anything a
+   *    client could observe, is an op that requires somebody to be able to
+   *    enumerate it. **`from: 'held-received'` is not that op and is the reason this
+   *    refusal survived**: it takes ONE member BY POSITION (the last, i.e. the most
+   *    recently arrived), commits to it before anything is published, and emits
+   *    nothing - the `onlyIfEmpty` shape exactly, and the same reason a hand of
+   *    Conspiracy Cards is readable-but-untouchable by any decision. The
+   *    `_`-prefixed name `'hand'` stays refused because there is no such position-
+   *    taking spelling: a hand's order is not part of any printed clause, so an op
+   *    that used it would be inventing a rule rather than expressing one.
    * 3. **`to: 'pending'` and `to: 'manifesto'`.** See the ruling's "NO THIRD
    *    CATEGORY" section: there are exactly two places an Ideology Card can be -
    *    face down in a hand, or face up under a mat HAVING BEEN ANSWERED. Writing
@@ -904,13 +1005,75 @@ export type Effect = (
    * spelling (`'pending'`, `'hand'`, `'discard'`) is refused above for reasons that do not
    * change with this addition.
    *
-   * **IT MUST TAKE THE CARD OUT OF THE RESOLVED SEAT'S `revealedCards`, and that is not
-   * bookkeeping.** The invariant on `GameState.revealedCards` is that it holds cards the
-   * table can currently SEE; a card moved to a hidden hand is a card the table can no
-   * longer see, and leaving it listed would publish a card's identity after it has been
-   * hidden again — the `choose-card` refusal over `_ideologyDraw`, arriving by a
-   * different route. The read side is `revealedCardsOf(state, seat)`, one accessor, so the
-   * take and the removal are the same expression and cannot drift.
+   * **IT MUST TAKE THE CARD OUT OF THE RESOLVED SEAT'S `revealedCards` — AND OUT OF THE
+   * PILE IT CAME FROM, and that is not bookkeeping either.** The invariant on
+   * `GameState.revealedCards` is that it holds cards the table can currently SEE; a card
+   * moved to a hidden hand is a card the table can no longer see, and leaving it listed
+   * would publish a card's identity after it has been hidden again — the `choose-card`
+   * refusal over `_ideologyDraw`, arriving by a different route. The read side is
+   * `revealedCardsOf(state, seat)`, one accessor, so the take and the removal are the same
+   * expression and cannot drift.
+   *
+   * **AND IT IS THE ONLY OP THAT MOVES A REVEALED CARD OUT OF THE SET**, which is what
+   * tells the turn boundary which cards were never moved: a card still LISTED at the
+   * boundary is one nothing has taken anywhere, and `settleRevealedCards` returns exactly
+   * those to the pile they came from. So the boundary's answer to "does this card still
+   * exist" is membership of this set, and an implementation that removed a card from the
+   * set without filing it somewhere real would have made the boundary put it in two decks
+   * at once. The read side is `revealedCardsOf(state, seat)`, one accessor, so the take and
+   * the removal are the same expression and cannot drift.
+   *
+   * **`to: 'hand'` files the card in an Ideology Card hand, which is where a
+   * `PlayerState.ideologyCards` id belongs.** That is the whole reason a face-up card is
+   * removed from its pile on the reveal: by the time it is taken, it is in exactly one place
+   * — on this set — so this half is a single write and needs no pile to keep consistent.
+   *
+   * ## `from: 'held-received'` - A DONATION, AND THE ORDERING IT READS
+   *
+   * A COWARD OR A JOURNALIST? is *"you may pass along a card you just received"*, and
+   * CARD GAMES moves the same card. The donor is **the card's own actor** (`source`) -
+   * the printed subject is YOU - and `target` says who ends up holding it, so a card
+   * writes `target: 'chosen-player'` and the donation goes to a named opponent. A
+   * donation to the donor's own hand is refused as a no-op rather than performed, so
+   * the clause cannot quietly reorder the donor's queue.
+   *
+   * **THE MEMBER IS THE LAST ELEMENT, and that is `hand[hand.length - 1]` because the
+   * engine APPENDS on the way in and DRAINS FROM THE FRONT on the way out.** Both
+   * halves are in `reduce.ts` and neither is a convention: `from: 'revealed'` and
+   * `from: 'draw'` both file a card with `ideologyCards: [...ideologyHandOf(player),
+   * id]` (arriving at the END), and `advanceTurn` drains with `const [heldCard,
+   * ...heldRest] = held` (leaving from the FRONT). So the hand is a FIFO queue and its
+   * last element is the most recently ARRIVED card, which is what "a card you just
+   * received" names. **The two ends are deliberately different and that is the whole
+   * mechanic**: a donation passes on the newest card while the oldest is the next one
+   * the donor would have been dealt, so passing one on never reorders what anybody is
+   * about to be asked. `move-card` is the ONLY writer of arrivals - `setup()` writes
+   * `[]` and `advanceTurn` is the only writer of departures - so there is no second
+   * way a hand acquires an order this reading could be wrong about.
+   *
+   * **THE SECRECY ARGUMENT, and it is the `onlyIfEmpty` argument verbatim.** The
+   * ruling on `PlayerState.ideologyCards` is that a held Ideology Card is hidden from
+   * EVERYONE INCLUDING ITS HOLDER, so the donor does not know what they are holding and
+   * neither does anybody else. This branch therefore:
+   *
+   *  - **COMMITS FIRST, BY POSITION.** One element, chosen by index, decided before
+   *    the write. There is no `pick`, no search, no `n` that means "any", and nothing
+   *    anywhere that puts the hand's contents into a value on its way to a client.
+   *  - **EMITS NOTHING.** No `LogEntry` and no `GameEvent`, for either `to`. "p1 gave
+   *    away a card" would tell every viewer that p1's hand was non-empty a moment
+   *    before, which is a fact about a hidden hand - and `onlyIfEmpty` is the
+   *    precedent that already reads a hidden hand and says nothing, precisely so a
+   *    skipped player and an unskipped one are indistinguishable. A donation is the
+   *    same shape with a card instead of a skip.
+   *  - **IS SILENT ABOUT THE HAND'S SIZE.** An empty donor hand is a bare `break`, the
+   *    same no-op an exhausted pile is on the other two branches, so a clause that
+   *    found nothing to pass on leaves the world exactly as it was and says so to
+   *    nobody. `to: 'hand'` checks `IDEOLOGY_HAND_MAX` on the RECEIVER before the card
+   *    leaves the donor, for the reason the draw path checks it before the card leaves
+   *    the pile: a refused move must not half-happen.
+   *
+   * `to: 'destroy'` is honoured here too, because `to` is not widened by this addition
+   * and the alternative is a source that reads a hidden hand and does nothing with it.
    *
    * ## AND IT DOES NOT WIDEN `to`
    *
@@ -926,10 +1089,12 @@ export type Effect = (
       /**
        * The top of the Ideology draw pile - a card that has never been answered. Or, for
        * `'revealed'`, the top of the resolved seat's revealed set - a card the whole table
-       * has already seen face up. See the two sections above: one member taken blind, one
-       * member already public. There is no third spelling and no pile enumeration.
+       * has already seen face up. Or, for `'held-received'`, the card that most recently
+       * ARRIVED in the donor's own hidden hand. See the three sections above: one member
+       * taken blind, one member already public, one member out of a hand nobody can see.
+       * There is no fourth spelling, and no spelling that enumerates anything.
        */
-      readonly from: 'draw' | 'revealed';
+      readonly from: 'draw' | 'revealed' | 'held-received';
       readonly to: 'hand' | 'destroy';
       readonly n: Count;
       /**

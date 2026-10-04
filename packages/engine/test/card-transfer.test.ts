@@ -1241,6 +1241,291 @@ describe('G17 - a card chosen off the recycle pile, and in an order the pile doe
     expect(played.ok).toBe(true);
     if (!played.ok) return;
     expect(played.state.choices, 'a decision enumerated the draw pile').toEqual([]);
-    expect(played.state._conspiracyDraw, 'and the draw pile was left alone').toEqual(['pick-draw']);
+expect(played.state._conspiracyDraw, 'and the draw pile was left alone').toEqual(['pick-draw']);
+  });
+});
+
+// ─────────────────────────── 4. `from: 'held-received'` — the donation ───────────────────────────
+
+/**
+ * `move-card { from: 'held-received' }` — A COWARD OR A JOURNALIST? and CARD GAMES, the
+ * two recovered cards whose printed clause is a donation of a card you are HOLDING.
+ *
+ * ## WHY THIS BLOCK IS SEPARATE FROM THE THREE ABOVE
+ *
+ * The first three ask what a card moving INTO a hand does. This one asks the only
+ * question the ruling on `PlayerState.ideologyCards` makes genuinely new: **what may an
+ * op do with a hand that is hidden from every viewer INCLUDING its own holder?** The
+ * answer pinned here is the `onlyIfEmpty` answer — commit to one member by position,
+ * publish nothing — and the payload assertion below is the proof, byte for byte.
+ *
+ * ## THE ORDERING IS ASSERTED, NOT ASSUMED
+ *
+ * "A card you JUST RECEIVED" only means something if arrival order is a fact, so the two
+ * ends of the queue are each pinned by their own test: the arm takes the LAST element
+ * (arrivals append), and the boundary drains from the FIRST (`advanceTurn`, `const
+ * [heldCard, ...heldRest]`). A hand of two is therefore the strongest fixture available —
+ * one card can be the newest and the other the oldest, and taking the wrong end fails
+ * the test instead of agreeing with it.
+ */
+describe('G20 - `from: held-received`, a donation out of a hand nobody can see', () => {
+  const DONATE: ConspiracyCard = {
+    id: 'mover-donate',
+    name: 'Pass It On',
+    text: 'An opponent receives the Ideology Card you received most recently.',
+    cost: 3,
+    effects: [{ op: 'move-card', from: 'held-received', to: 'hand', n: 1, target: 'chosen-player' }],
+  };
+
+  /** `[DONATE, ...XFER_CARDS]` — a deck that can also play every fixture above. */
+  function donateCards(): CardIndex {
+    return indexCards({
+      ideology: Object.values(XFER_CTX.cards.ideology),
+      voter: [],
+      conspiracy: [DONATE, ...XFER_CARDS],
+      headline: [],
+    });
+  }
+
+  function donateCtx(): Ctx {
+    return { rules: RULES, cards: donateCards() };
+  }
+
+  function donateSetup(held: readonly string[] = []): GameState {
+    const base = setup({
+      players: PLAYERS_3,
+      cards: donateCards(),
+      seed: 3,
+      ideologyDeck: [...XFER_IDS],
+      conspiracyDeck: [DONATE.id, ...XFER_CARDS.map((c) => c.id)],
+    });
+    const inPhase = { ...base, phase: 'actions' as const, _pendingCard: null };
+    const holding = held.length > 0 ? withHeld(inPhase, 'p1', held) : inPhase;
+    return withConspiracies(holding, 'p1', [DONATE.id]);
+  }
+
+  function play(s: GameState, cardId = DONATE.id) {
+    return reduce(s, 'p1', { type: 'PLAY_CONSPIRACY', cardId }, donateCtx());
+  }
+
+  /** Answer the `'chosen-player'` decision that `target: 'chosen-player'` raises. */
+  function giveTo(s: GameState, who: PlayerID): GameState {
+    const open = s.choices.find((c) => c.player === 'p1');
+    expect(open, 'the donation must ask who receives it').toBeDefined();
+    if (open === undefined) throw new Error('no decision');
+    const r = reduce(
+      s,
+      'p1',
+      { type: 'RESOLVE_CHOICE', choiceId: open.id, pick: { kind: 'player', id: who } },
+      donateCtx(),
+    );
+    expect(r.ok, 'naming a receiver must be accepted').toBe(true);
+    if (!r.ok) throw new Error(r.error);
+    return r.state;
+  }
+
+  /** An id that is neither the dealt card nor `newer`, so the two ends are distinct. */
+  function olderThan(s: GameState): string {
+    return XFER_IDS.find((id) => id !== s._pendingCard && id !== NEWER) ?? 'xfer-2';
+  }
+
+  const NEWER = 'xfer-4';
+
+  it('moves the MOST RECENTLY ARRIVED card, and it leaves the donor and arrives at the target', () => {
+    const seed0 = donateSetup();
+    const older = olderThan(seed0);
+    const donor = donateSetup([older, NEWER]);
+    expect(ideologyHandOf(donor.players.p1)).toEqual([older, NEWER]);
+
+    const played = play(donor);
+    expect(played.ok, 'the donation card must resolve').toBe(true);
+    if (!played.ok) return;
+    const after = giveTo(played.state, 'p2');
+
+    // THE DONOR LOSES THE NEWEST, the receiver gains exactly that one card.
+    expect(ideologyHandOf(after.players.p1), 'the oldest card is what the donor still holds').toEqual([older]);
+    expect(ideologyHandOf(after.players.p2), 'and the newest is what the receiver holds').toEqual([NEWER]);
+    expect(ideologyHandOf(after.players.p3), 'a third seat was not involved').toEqual([]);
+    // The world still holds exactly one of each: a move, never a copy.
+    expect([...idsInWorld(after)].sort()).toEqual([...idsInWorld(donor)].sort());
+  });
+
+  it('the boundary still deals the FRONT of a hand, so a donation reorders nobody', () => {
+    // The other end of the same queue, and the reason the two ends differ. A hand is
+    // FIFO: the OLDEST card in it is the next one its owner is dealt, so passing on the
+    // newest card cannot change what anybody is about to be asked.
+    const seed0 = donateSetup();
+    const two = XFER_IDS.filter((id) => id !== seed0._pendingCard).slice(0, 2);
+    const seated = withHeld(seed0, 'p2', two);
+    expect(ideologyHandOf(seated.players.p2)).toEqual(two);
+
+    const ended = reduce(seated, 'p1', { type: 'END_TURN' }, donateCtx());
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+    expect(ended.state.activePlayer).toBe('p2');
+    expect(ended.state._pendingCard, 'the FRONT of the hand is what the boundary deals').toBe(two[0]);
+    expect(ideologyHandOf(ended.state.players.p2), 'and the rest of the queue is untouched').toEqual([two[1]]);
+  });
+
+  it('an EMPTY hand is a no-op, and the card still resolves', () => {
+    const donor = donateSetup([]);
+    const played = play(donor);
+    expect(played.ok, 'a donation the donor cannot make must not fail the card').toBe(true);
+    if (!played.ok) return;
+    const after = giveTo(played.state, 'p2');
+    for (const p of after.turnOrder) expect(ideologyHandOf(after.players[p])).toEqual([]);
+    expect(after.choices, 'and nothing is left owed').toEqual([]);
+    // The world is untouched, and the only new log line is the play itself.
+    expect([...idsInWorld(after)].sort()).toEqual([...idsInWorld(donor)].sort());
+    const fresh = after.log.map((l) => l.text).filter((t) => !donor.log.map((l) => l.text).includes(t));
+    expect(fresh).toEqual(['Played "Pass It On".']);
+  });
+
+  it('the payload is BYTE-IDENTICAL before and after, for every viewer', () => {
+    const older = olderThan(donateSetup());
+    const donor = donateSetup([older, NEWER]);
+    const played = play(donor);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    const after = giveTo(played.state, 'p2');
+
+    // **THE DONATION IS THE ONLY DIFFERENCE**, and `played.state` is its control: the same
+    // world with the card played and the receiver named, one decision before the card
+    // moves. Two things are scrubbed, and both are public by construction rather than
+    // scrubbed so a leak could hide: the open decision (the card's own printed "choose a
+    // player") and the `Played` line (you played it). Each is asserted to be exactly what
+    // it is claimed to be, immediately below, so the scrub cannot be doing the work.
+    const plays = (s: GameState): string[] => s.log.filter((l) => l.text.startsWith('Played ')).map((l) => l.text);
+    expect(plays(after), 'the play is the only new log line').toEqual(['Played "Pass It On".']);
+    expect(played.state.choices, 'one decision was open before the answer').toHaveLength(1);
+    expect(after.choices, 'and it is closed after').toEqual([]);
+
+    const scrubbed = (s: GameState, viewer: PlayerID): string => {
+      const v = playerView(s, viewer);
+      return JSON.stringify({ ...v, choices: [], log: v.log.filter((l) => !l.text.startsWith('Played ')) });
+    };
+
+    // `playerView` takes a viewer and IGNORES it — there is no `pid === viewer` branch
+    // anywhere in it, which is the ruling on `ideologyCards` in one fact. So the seats
+    // plus a synthetic non-seat id cover every viewer there is or can be, the DONOR
+    // included.
+    const viewers = [...after.turnOrder, 'nobody' as PlayerID];
+    expect(viewers.length).toBe(4);
+    for (const viewer of viewers) {
+      expect(scrubbed(after, viewer), `${String(viewer)}: the donation moved something on the wire`).toBe(
+        scrubbed(played.state, viewer),
+      );
+      // And the ids, with BOTH sides' payouts, are absent from every payload before and
+      // after: a player shown the card in their own hand has not made the coin flip the
+      // ruling protects.
+      for (const id of [older, NEWER]) {
+        for (const when of [played.state, after]) {
+          expect(payload(when, viewer), `${String(viewer)} sees ${id}`).not.toContain(id);
+          for (const side of payoutsOf(id)) expect(payload(when, viewer)).not.toContain(side);
+        }
+      }
+    }
+  });
+
+  it('mentions the card in NO LogEntry and NO GameEvent', () => {
+    const older = olderThan(donateSetup());
+    const played = play(donateSetup([older, NEWER]));
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+    const after = giveTo(played.state, 'p2');
+    // A SECOND donation from the same donor, so the assertion covers a repeat rather
+    // than one lucky resolution. The card has to be back in p1's hand and p1 has to be
+    // able to afford it again — `PLAY_CONSPIRACY` charges the printed cost.
+    const p1 = after.players.p1;
+    if (!p1) throw new Error('no p1');
+    const rearmed = withConspiracies(
+      { ...after, players: { ...after.players, p1: { ...p1, resources: { funds: 9, clout: 0, media: 0, trust: 0 } } } },
+      'p1',
+      [DONATE.id],
+    );
+    const again = reduce(rearmed, 'p1', { type: 'PLAY_CONSPIRACY', cardId: DONATE.id }, donateCtx());
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    const done = giveTo(again.state, 'p3');
+
+    // `visibleStrings` scans the log and the events TOGETHER, which is the point: "the
+    // log is empty" and "the log does not mention the card" are different claims, and only
+    // the second is the property. Both donations happened — `done` is asserted below — so
+    // the scan is over a real movement of a real card.
+    expect(ideologyHandOf(done.players.p2), 'the first donation happened').toEqual([NEWER]);
+    expect(ideologyHandOf(done.players.p3), 'and so did the second').toEqual([older]);
+
+    const said = visibleStrings(done, again.events);
+    expect(said).not.toContain(NEWER);
+    expect(said).not.toContain(older);
+    for (const side of payoutsOf(NEWER)) expect(said).not.toContain(side);
+    for (const side of payoutsOf(older)) expect(said).not.toContain(side);
+    // The played card IS public by construction, so the scan is not vacuous: the log
+    // names the card that was played.
+    expect(said).toContain('Pass It On');
+  });
+
+  it('a card cannot be moved ONTO a hand already at IDEOLOGY_HAND_MAX', () => {
+    const older = olderThan(donateSetup());
+    const base = donateSetup([older, NEWER]);
+    expect(IDEOLOGY_HAND_MAX).toBe(2);
+    const full = withHeld(base, 'p2', ['xfer-6', 'xfer-7']);
+    expect(ideologyHandOf(full.players.p2).length).toBe(IDEOLOGY_HAND_MAX);
+
+    const toFull = play(full);
+    expect(toFull.ok).toBe(true);
+    if (!toFull.ok) return;
+    const refused = giveTo(toFull.state, 'p2');
+    // A refused move leaves the world EXACTLY as it was: the cap is checked BEFORE the
+    // card leaves the donor, so a half-move cannot empty one hand into a full one.
+    expect(ideologyHandOf(refused.players.p1), 'the donor gave a card to a full hand').toEqual([older, NEWER]);
+    expect(ideologyHandOf(refused.players.p2), 'and the full hand is untouched').toEqual(['xfer-6', 'xfer-7']);
+    expect([...idsInWorld(refused)].sort()).toEqual([...idsInWorld(full)].sort());
+
+    // The same card to an EMPTY hand still moves, so the refusal above is the cap and
+    // not a broken op.
+    const toEmpty = play(full);
+    expect(toEmpty.ok).toBe(true);
+    if (!toEmpty.ok) return;
+    const moved = giveTo(toEmpty.state, 'p3');
+    expect(ideologyHandOf(moved.players.p1)).toEqual([older]);
+    expect(ideologyHandOf(moved.players.p3)).toEqual([NEWER]);
+  });
+
+  it('ONE card, ONE receiver: `each-opponent` cannot put the same id in two hands', () => {
+    const each: ConspiracyCard = {
+      id: 'mover-donate-each',
+      name: 'Pass It On To One',
+      text: 'An opponent receives the Ideology Card you received most recently.',
+      cost: 3,
+      effects: [{ op: 'move-card', from: 'held-received', to: 'hand', n: 1, target: 'each-opponent' }],
+    };
+    const cards = indexCards({
+      ideology: Object.values(XFER_CTX.cards.ideology),
+      voter: [],
+      conspiracy: [each, ...XFER_CARDS],
+      headline: [],
+    });
+    const ctx: Ctx = { rules: RULES, cards };
+    const base = setup({
+      players: PLAYERS_3,
+      cards,
+      seed: 3,
+      ideologyDeck: [...XFER_IDS],
+      conspiracyDeck: [each.id, ...XFER_CARDS.map((c) => c.id)],
+    });
+    const older = XFER_IDS.find((id) => id !== base._pendingCard && id !== NEWER) ?? 'xfer-2';
+    const seeded = withConspiracies(
+      withHeld({ ...base, phase: 'actions' as const, _pendingCard: null }, 'p1', [older, NEWER]),
+      'p1',
+      [each.id],
+    );
+    const played = reduce(seeded, 'p1', { type: 'PLAY_CONSPIRACY', cardId: each.id }, ctx);
+    expect(played.ok).toBe(true);
+    if (!played.ok) return;
+
+    const every = played.state.turnOrder.flatMap((p) => ideologyHandOf(played.state.players[p]));
+    expect(every, 'an id is in two hands at once').toEqual([...new Set(every)]);
+    expect([...idsInWorld(played.state)].sort()).toEqual([...idsInWorld(seeded)].sort());
   });
 });

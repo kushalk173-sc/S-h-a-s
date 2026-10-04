@@ -62,6 +62,12 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
       { op: 'move-card', from: 'revealed', to: 'hand', n: 1 },
       { op: 'reveal', kind: 'ideology', n: 1 },
       { op: 'reveal', kind: 'conspiracy', n: 2, target: 'each-opponent' },
+      // G17, the second public set. Both halves of the op are represented, because
+      // they are different code paths in the case: `pick` raises a 'choose-card'
+      // decision, and its absence takes the leftmost slot. `n` is a `Count`, so it is
+      // a positive number here and the computed form is `reveal`'s separate concern.
+      { op: 'take-voter', n: 1 },
+      { op: 'take-voter', n: 2, target: 'each-opponent', pick: true },
     ];
     for (const effect of samples) {
       switch (effect.op) {
@@ -132,6 +138,19 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
           // schema that widens alone is caught here and a reducer that widens alone is
           // caught by `EXECUTED_OPS` having no field for it.
           expect(effect.n).toBe(1);
+          break;
+        case 'take-voter':
+          // G17, the second public set. The count is checked against the SET it is
+          // drawn from rather than against a fixed ceiling: `pick` raises at most
+          // `min(n, market.length)` decisions, so any positive `n` is satisfiable and
+          // there is no schema floor to pin here the way `move-peg`'s `maximum: 1`
+          // pins that one.
+          //
+          // `pick` is asserted as a boolean-or-absent because it is a MODE, not a
+          // count: `true` enumerates the mat and absent takes the leftmost slot, and
+          // a third value would be a mode the reducer cannot distinguish.
+          expect(effect.n).toBeGreaterThan(0);
+          expect([true, false, undefined]).toContain(effect.pick);
           break;
         default: {
           const never: never = effect;
