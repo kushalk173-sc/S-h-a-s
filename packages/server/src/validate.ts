@@ -20,7 +20,22 @@
  *      plus the caller's own input).
  */
 
-import { RESOURCES, ZONE_IDS, type Action, type AreaID, type CardID, type ChoicePick, type Delta, type PlayerID, type Resource, type ZoneID } from '@shasn/engine';
+import {
+  BOARD,
+  RESOURCES,
+  ZONE_IDS,
+  areNeighbours,
+  zoneOfArea,
+  type Action,
+  type AreaID,
+  type CardID,
+  type ChoicePick,
+  type Delta,
+  type GameState,
+  type PlayerID,
+  type Resource,
+  type ZoneID,
+} from '@shasn/engine';
 
 import type { ClientMessage, SeatCount } from './protocol.ts';
 
@@ -465,9 +480,141 @@ function choicePick(value: unknown): ChoicePick | null {
       const cardId = str(value['cardId'], MAX_ID);
       return cardId === null ? null : { kind, cardId };
     }
+    /**
+     * G1 — the answerer names ONE voter AND an adjacent empty area for it to land in.
+     *
+     * ## THIS ARM WAS MISSING WHILE THE ENGINE COULD ALREADY RAISE THE DECISION
+     *
+     * The same shape as the `'player'` arm above, and found the same way: a live table
+     * could be handed a `choose-peg-dest` dialog and **every** answer to it was refused
+     * `malformed action`, so the seat froze with no legal reply. `decodeAction`'s
+     * `switch` is exhaustive, so the omission was a compile-clean `default: return null`
+     * — and the client sees it as "malformed action" rather than "unknown action", which
+     * is what makes it hard to diagnose from a log. It was found by the socket driver in
+     * `test/winnable.test.ts`, which is the only path that goes through the wire at all.
+     *
+     * ## ADJACENCY IS DECIDED **HERE**, AND THAT IS THE POINT OF THIS ARM
+     *
+     * Every other arm checks SHAPE: `zone` checks the name against `ZONE_IDS` because
+     * nine fixed names is a closed set, and this one checks both ids against the real
+     * areas of `BOARD`. What it adds on top is the first check in this file that reads
+     * the *relationship* between two values — and it is cheap and exact because
+     * **adjacency is board data, not game state**. `Zone.neighbours` is fixed data
+     * copied out of `BOARD` by `freshZones` and no action moves a constituency, so
+     * `areNeighbours` is the same answer before and after every action in the match.
+     *
+     * So a pick whose two areas are in the same zone or in non-touching zones is
+     * refused at the wire rather than reaching `reduce`. `pegDestinations` in the engine
+     * says *"an empty area in a zone adjacent to the peg's own"* and refuses the peg's
+     * OWN zone for a reason the engine states: a peg lifted and put back in the same
+     * constituency changes nothing, so a decision must never offer a move that does
+     * nothing. That reasoning holds for the wire too, and a non-adjacent pair is the
+     * cheapest possible malformed pick — no state read, no rollback, nothing to undo.
+     *
+     * **What is NOT checked here, and why.** Whether `areaId` holds a movable peg and
+     * whether `toAreaId` is empty are properties of the board *as it stands*, and they
+     * change under the table's feet — between the offer and the answer a majority can
+     * form and an area can be filled. Deciding them at decode time would be deciding
+     * them against a stale board, and `decodeFrame` has no state to be stale against.
+     * They are the other half of the trust boundary and they live in
+     * `pegDestRefusal` below, which reads the live board.
+     */
+    case 'peg-dest': {
+      if (!keysOnly(value, ['kind', 'areaId', 'toAreaId'])) return null;
+      const areaId = area(value['areaId']);
+      const toAreaId = area(value['toAreaId']);
+      if (areaId === null || toAreaId === null) return null;
+      if (!areNeighbours(zoneOfArea(areaId), zoneOfArea(toAreaId))) return null;
+      return { kind, areaId, toAreaId };
+    }
     default:
       return null;
   }
+}
+
+// ─────────────────────── the second half of the pick boundary ───────────────────────
+
+/**
+ * The state-dependent half of a `'peg-dest'` answer: does this pair name anything that
+ * could be moved, *on the board as it stands*?
+ *
+ * ## WHY THIS IS NOT IN `choicePick`
+ *
+ * `choicePick` decides what the WIRE may carry. It has no state — it cannot have one,
+ * because `decodeFrame` runs before the message is bound to a room, and a
+ * `RESOLVE_CHOICE` naming a `choiceId` the table never issued is legal to decode and
+ * refused later. Occupancy and p18 are properties of the board, and the board moves
+ * between the offer and the answer, so a decode-time check would be a check against a
+ * board that does not exist. `Room.dispatch` calls this instead, where the live
+ * `GameState` is the same one `reduce` is about to be handed.
+ *
+ * ## AND IT REFUSES EXACTLY WHAT `reduce` REFUSES, NO MORE
+ *
+ * That is the load-bearing property and it is not automatic. The three clauses below are
+ * `movablePegIds`' two exclusions and `pegDestinations`' emptiness test, transcribed, so
+ * **anything this accepts, `reduce` accepts.** Nothing legal is dropped: if the engine
+ * would accept a pair then the peg is not a majority peg, is not in a Volatile Area, and
+ * the destination is empty and adjacent — which is exactly what was just checked. The
+ * one clause deliberately LEFT to `reduce` is ownership (`peg.owner === c.source`),
+ * because that needs the pending decision and this function is handed a bare pick.
+ *
+ * ## THE RULING ON A VOLATILE **DESTINATION**, which is the reading worth having written
+ *
+ * The ask was "refuse a destination naming a non-adjacent, occupied, or volatile area".
+ * Non-adjacent and occupied are refused. Volatile is refused for the peg's OWN area and
+ * **accepted for the destination**, because the engine accepts it: `pegDestinations`
+ * filters on `peg === null` and nothing else, and `setArea` puts the peg down and draws
+ * the Headline p18 owes for it — the peg lands there and is permanent from then on.
+ *
+ * That is a legal outcome and the engine means it. Refusing it here would make the wire
+ * accept a strict SUBSET of the picks `reduce` accepts, which is the one thing this
+ * function must not do: the client's own invariant suite asserts every `Choice` kind
+ * renders a resolvable control, so a wire narrower than the engine is a dialog with a
+ * button the server rejects — the failure mode the `'zone'` arm's note calls worse than
+ * not offering the choice at all. The engine's `movablePegIds` docstring says the same
+ * thing about the OTHER end of the move ("this is a rules exclusion rather than an
+ * engine one"), and rules exclusions belong where the printed card can name them.
+ *
+ * **THE TWO REFUSAL STRINGS ARE `reduce`'s OWN, VERBATIM AND UNINTERPOLATED.** No id
+ * from the wire reaches them, so nothing an attacker sends can reach a client-visible
+ * string through this path — and the client cannot tell whether the pair was refused at
+ * the wire or in the reducer, which is the point: a wire check that changes the wording
+ * is a wire check that has started telling the client something about the board.
+ */
+export function pegDestRefusal(state: GameState, pick: ChoicePick): string | null {
+  if (pick.kind !== 'peg-dest') return null;
+  const from = findArea(state, pick.areaId);
+  if (from === undefined || from.peg === null) return 'that voter may not be moved';
+  // p18: a peg in a Volatile Area is permanent. A majority peg IS the score (p20), so
+  // relocating one would move points rather than position.
+  if (from.volatile || from.peg.majority) return 'that voter may not be moved';
+  const to = findArea(state, pick.toAreaId);
+  if (to === undefined || to.peg !== null) return 'that is not an empty area in an adjacent zone';
+  return null;
+}
+
+function findArea(
+  state: GameState,
+  id: AreaID,
+): { readonly peg: { readonly owner: PlayerID; readonly majority: boolean } | null; readonly volatile: boolean } | undefined {
+  for (const z of state.zones) {
+    for (const a of z.areas) if (a.id === id) return a;
+  }
+  return undefined;
+}
+
+/** Every area id on the fixed board — the closed set an `AreaID` has to come from. */
+const AREA_IDS: ReadonlySet<string> = new Set(BOARD.flatMap((z) => z.areas.map((a) => a.id)));
+
+/**
+ * An area id, checked against the board rather than accepted as a string.
+ *
+ * The same argument as `zone()` below, one level down: 129 fixed names is a closed set,
+ * and `zoneOfArea` will happily return a constituency for any string with a dash in it,
+ * so an unchecked id would sail past the adjacency check by naming a zone twice.
+ */
+function area(v: unknown): AreaID | null {
+  return typeof v === 'string' && AREA_IDS.has(v) ? (v as AreaID) : null;
 }
 
 // ─────────────────────────── scalar checks ───────────────────────────

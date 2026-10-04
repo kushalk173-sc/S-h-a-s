@@ -8,11 +8,19 @@
  *
  *  1. THE SERVER NEVER RE-IMPLEMENTS A RULE. Turn order, phase legality, costs and
  *     caps are the reducer's business. The only server-side rejections are "you are
- *     not in this match", "that is not your seat", "the message was malformed", and
- *     the answer-prompt remap, which is a presentation concern rather than a rule.
- *     Every other refusal is `Result.error` forwarded verbatim. The cost is that a
- *     determined client can fuzz engine internals out of error strings; the
- *     benefit is that there is exactly one implementation of Shasn.
+ *     not in this match", "that is not your seat", "the message was malformed", the
+ *     `peg-dest` board check below, and the answer-prompt remap, which is a presentation
+ *     concern rather than a rule. Every other refusal is `Result.error` forwarded
+ *     verbatim. The cost is that a determined client can fuzz engine internals out of
+ *     error strings; the benefit is that there is exactly one implementation of Shasn.
+ *
+ *     **THE `peg-dest` CHECK IS NOT A FIFTH RULE, and that is what keeps rule 1 true.**
+ *     `pegDestRefusal` in `validate.ts` re-reads the two candidate sets `resolveChoice`
+ *     validates against and refuses a pick inconsistent with the board — the same "the
+ *     message was malformed" category as a `choiceId` the table never issued, and not
+ *     "you may not move that voter", which is `reduce`'s. It accepts exactly what
+ *     `reduce` accepts, so it cannot become a second authority on what is legal, and it
+ *     is asserted against `reduce` over the whole board so it cannot drift into one.
  *
  *  2. THERE IS NO INTERRUPT FRAMEWORK. `PendingChoice` is the engine's existing
  *     general channel for a decision it owes someone, and `reduce` already encodes
@@ -34,6 +42,7 @@ import { reduce, type Action, type Ctx, type GameEvent, type GameState, type Pla
 
 import { answerSideFor, answerPromptFor, viewFor } from './broadcast.ts';
 import type { AnswerPrompt } from './protocol.ts';
+import { pegDestRefusal } from './validate.ts';
 import {
   cardsVersion,
   rulesVersion,
@@ -252,6 +261,22 @@ export class Room {
     if (seat === undefined) {
       throw new RoomError('NOT_A_PLAYER', 'you are not seated at this table');
     }
+
+    // A malformed `peg-dest` ANSWER, refused at the wire rather than in the reducer.
+    // This is the second server-side rejection and it is the one place the state boundary
+    // earns its keep: `validate.ts`'s `choicePick` has no state, so the half of a
+    // `peg-dest` pick that depends on the BOARD — a peg that is not movable, a
+    // destination that is no longer empty — can only be checked here, where the board is
+    // the same one `reduce` is about to be handed. `pegDestRefusal` refuses exactly the
+    // pairs `reduce` refuses and no others, and its two strings are `reduce`'s own, so
+    // the client cannot tell which door stopped it and nothing a client sent can reach a
+    // client-visible string through this path.
+    //
+    // Read on `action` and NOT on `engineAction`: `#toEngineAction` is the ANSWER
+    // remap, which never touches a `RESOLVE_CHOICE`, so the two are the same pick here
+    // and the honest order is to check the wire before spending the remap.
+    const refusal = action.type === 'RESOLVE_CHOICE' ? pegDestRefusal(this.#state, action.pick) : null;
+    if (refusal !== null) return { ok: false, error: refusal };
 
     const engineAction = this.#toEngineAction(playerId, action);
     const result = reduce(this.#state, playerId, engineAction, this.ctx);
