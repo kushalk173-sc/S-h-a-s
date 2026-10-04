@@ -36,12 +36,14 @@ import {
   IDEOLOGUE_NAME,
   effectiveCap,
   manifestoCells,
+  marketCharge,
   marketLockout,
   poolTotal,
   freeSlotsIn,
   standOf,
   strandedSentence,
   cardStranded,
+  surchargeOf,
 } from './derive.ts';
 import type { PendingVoters } from '@shasn/engine';
 import type { Link } from './store.ts';
@@ -542,19 +544,16 @@ export function MarketStrip({
     <div className="market" data-testid="market">
       {state.market.map((slot, i) => {
         /*
-          THE COST THIS BUY ACTUALLY CHARGES. Identical to `applyDiscounts` on the
-          engine side, one denomination at a time, never below zero — a Helping
-          Hands use is spent whether or not it buys anything, so a discount on a
-          resource the card does not charge is shown as spent and gained nothing.
+          THE COST THIS BUY ACTUALLY CHARGES — `marketCharge`, the one place that
+          knows it: the card's printed cost, every Helping Hands denomination armed
+          against THIS slot down by one, and then this player's surcharges added in
+          Funds. The surcharge is the second half of the silent click; see
+          `derive.ts:marketCharge` for the engine lines it mirrors.
         */
         const waived =
           armed !== null && armed.slot === i ? new Set(armed.discounts) : new Set<Resource>();
-        const charge: Delta = {};
-        for (const r of RESOURCE_ORDER) {
-          const raw = slot.cost[r] ?? 0;
-          const now = waived.has(r) ? Math.max(0, raw - 1) : raw;
-          if (now > 0) charge[r] = now;
-        }
+        const charge = marketCharge(state, you, slot, [...waived]);
+        const tax = surchargeOf(state, you);
         const afford = RESOURCE_ORDER.every((r) => (charge[r] ?? 0) <= p.resources[r]);
         const miss = RESOURCE_ORDER.filter((r) => (charge[r] ?? 0) > p.resources[r]).map(
           (r) => `${charge[r]! - p.resources[r]} ${r} short`,
@@ -585,13 +584,17 @@ export function MarketStrip({
             onClick={() => onBuy(i)}
             data-testid="market-card"
           >
-            <span className="mkt__cost">
+            <span className="mkt__cost" data-testid="market-charge">
               {RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > 0)
-                .map((r) =>
-                  waived.has(r)
-                    ? `${(slot.cost[r] ?? 0) - 1} ${r[0]!.toUpperCase()} (waived)`
-                    : `${slot.cost[r]} ${r[0]!.toUpperCase()}`,
-                )
+                .map((r) => {
+                  const left = Math.max(0, (slot.cost[r] ?? 0) - (waived.has(r) ? 1 : 0));
+                  return waived.has(r)
+                    ? left === 0
+                      ? `${r[0]!.toUpperCase()} waived`
+                      : `${left} ${r[0]!.toUpperCase()} (waived)`
+                    : `${slot.cost[r]} ${r[0]!.toUpperCase()}`;
+                })
+                .concat(tax > 0 ? [`+${tax} F tax`] : [])
                 .join(' · ') || 'free'}
             </span>
             <span className="mkt__voters">◈ {slot.voters}</span>

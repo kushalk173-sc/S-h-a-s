@@ -103,6 +103,7 @@ import {
   deltaTotal,
   gerrymanderRefusal,
   lockedZoneFor,
+  marketCharge,
   pegMovePick,
   placementRefusal,
   powerAreaRefusal,
@@ -1542,17 +1543,15 @@ function DeltaStepper({
 
 type Dispatch = (a: import('@shasn/engine').Action) => void;
 
-function onBuyMarket(state: ClientState, you: PlayerID | null, index: number, dispatch: Dispatch): void {
-  if (you === null) return;
-  const me = state.players[you];
-  const slot = state.market[index];
-  if (me === undefined || slot === undefined) return;
-  if (!canAfford(me.resources, slot.cost)) {
-    setRefusal('you cannot afford that Voter Card');
-    return;
-  }
-  dispatch(actions.influence(index));
-}
+/*
+  A SECOND, UNDISCOUNTED COPY OF THE MARKET BUY WAS HERE AND IT WAS DEAD.
+  `onBuyMarket` priced `slot.cost` — no Helping Hands, no surcharge — and dispatched
+  `actions.influence(index)` with no modifier at all. Nothing called it: every
+  rendered control routes through `buyMarketCard`. So it was not a live defect, it
+  was the silent click's own shape sitting in the tree waiting for someone to wire
+  it to something, and the two copies disagreed about money. Deleted rather than
+  fixed, because a second entry point for one action is a second thing to keep true.
+*/
 
 /**
  * Powers that need a target open a second step; the two market-modifier powers
@@ -1658,10 +1657,17 @@ function buyMarketCard(
 
   const mod = app.marketModifier?.slot === index ? app.marketModifier : null;
 
-  // Affordability is checked against the DISCOUNTED cost, because that is what the
-  // engine charges (`applyDiscounts`). Checking the undiscounted cost would refuse a
-  // buy the Helping Hands discount has already made legal.
-  const cost = mod === null ? slot.cost : discounted(slot.cost, mod.discounts);
+  /*
+    THE PRICE IS `marketCharge`, THE SAME NUMBER THE STRIP PRINTS AND THE SAME
+    NUMBER THE ENGINE CHARGES: the card's cost, the armed Helping Hands
+    denominations down by one, and this player's surcharges added in Funds.
+    Checking the undiscounted cost would refuse a legal buy; checking the
+    DISCOUNTED-but-not-taxed cost — which is what lived here until the surcharge
+    was found — refuses a buy the Conspiracy Card tax has already made illegal,
+    from a button the strip had rendered live a moment earlier. See
+    `derive.ts:marketCharge`.
+  */
+  const cost = marketCharge(state, you, slot, mod === null ? [] : mod.discounts);
   if (!canAfford(me.resources, cost)) {
     setRefusal('you cannot afford that Voter Card');
     return;
@@ -1674,19 +1680,6 @@ function buyMarketCard(
   );
   clearMarketModifier();
   closePicker();
-}
-
-/** `reduce.ts:applyDiscounts`, mirrored so the client can refuse before sending. */
-function discounted(cost: Delta, discounts: readonly Resource[]): Delta {
-  const out: Record<string, number> = {};
-  for (const r of RESOURCE_ORDER) {
-    const n = cost[r] ?? 0;
-    if (n === 0) continue;
-    const waived = discounts.includes(r) ? 1 : 0;
-    const left = n - waived;
-    if (left > 0) out[r] = left;
-  }
-  return out as Delta;
 }
 
 // ─────────────────────────── small pure helpers ───────────────────────────

@@ -253,6 +253,95 @@ export function deltaText(d: Delta): string {
   return parts.length === 0 ? 'nothing' : parts.join(' · ');
 }
 
+// ─────────────────── WHAT A BUY ACTUALLY COSTS, IN ONE PLACE ───────────────────
+
+/**
+ * THE PRICE OF A VOTER CARD IS NOT `slot.cost`, AND THIS IS THE ONLY PLACE THAT KNOWS.
+ *
+ * ## THE SECOND HALF OF THE SILENT CLICK
+ *
+ * The reported defect — "an affordable card sometimes does nothing" — was first
+ * blamed on the Helping Hands discount: `MarketStrip` priced `slot.cost` while
+ * `buyMarketCard` charged `applyDiscounts(cost, discounts)`, so a card the engine
+ * would accept rendered dead. That half is fixed. The half that was still open is
+ * one line further down the engine, and it is the same defect wearing a different
+ * hat:
+ *
+ * ```ts
+ * // reduce.ts, INFLUENCE
+ * const discounted = applyDiscounts(slot.cost, discounts);
+ * // A surcharge is added AFTER Helping Hands, and that ordering is a ruling.
+ * const cost = surcharge > 0 ? { ...discounted, funds: (discounted.funds ?? 0) + surcharge } : discounted;
+ * if (!canAfford(self.resources, cost)) return fail('you cannot afford that Voter Card');
+ * ```
+ *
+ * So the engine charges the discounted cost **PLUS every surcharge this player
+ * carries**, in Funds. PYTHONPOST and SNOOP B-O-DOUBLE-T are the cards that put one
+ * there ("for the rest of the game, you have to pay an extra resource for every
+ * Conspiracy Card that you buy"), and `surchargeFor` SUMS them, so two cards mean
+ * two extra.
+ *
+ * A player holding exactly the card's printed price therefore saw a live button,
+ * pressed it, and got a toast saying they could not afford it — from a card whose
+ * printed price they could afford. That is the reported bug again, one clause
+ * further on, and it is the same failure: **the number on the card and the number
+ * the engine charges are two different numbers.**
+ *
+ * ## WHY IT IS HERE AND NOT IN THE COMPONENT
+ *
+ * Three call sites need it — the strip (which decides whether the button is live
+ * and what shortfall to print), the dispatch guard in `GameScreen` (which decides
+ * whether to refuse before sending), and `marketLockout` below (which prints the
+ * cheapest card's cost and shortfall). Three copies of a money rule is three
+ * chances to be wrong, and the bug being closed here existed precisely because two
+ * copies already disagreed.
+ *
+ * ## IT IS A MIRROR, NOT A SECOND TRUTH
+ *
+ * `reduce.ts` owns the rule; this mirrors it so the client can refuse before
+ * sending, exactly as `canAfford` and `shortfall` already mirror `state.ts`. The
+ * engine stays authoritative: if the two ever disagree the engine's answer is the
+ * real one and the client is wrong. `marketCharge.test.tsx` pins the formula
+ * against the engine's own source text so the mirror cannot rot quietly.
+ */
+export function surchargeOf(state: ClientState, player: PlayerID): number {
+  const me = state.players[player];
+  if (me === undefined) return 0;
+  return (me.restrictions ?? [])
+    .filter((r) => r.kind === 'surcharge')
+    .reduce((n, r) => n + Math.max(0, r.value), 0);
+}
+
+/** `reduce.ts:applyDiscounts`, one denomination at a time, never below zero. */
+export function applyDiscounts(cost: Delta, discounts: readonly Resource[]): Delta {
+  const out: Record<string, number> = {};
+  for (const r of RESOURCE_ORDER) {
+    const n = cost[r] ?? 0;
+    if (n <= 0) continue;
+    const left = n - (discounts.includes(r) ? 1 : 0);
+    if (left > 0) out[r] = left;
+  }
+  return out as Delta;
+}
+
+/**
+ * EXACTLY WHAT THE ENGINE WILL CHARGE for `slot` bought by `player` with these
+ * Helping Hands discounts: the card's cost, each waived denomination down by one,
+ * then this player's surcharges added in Funds. Discounts come before the
+ * surcharge, which is the engine's own ordering and a ruling, not an accident.
+ */
+export function marketCharge(
+  state: ClientState,
+  player: PlayerID,
+  slot: MarketSlot,
+  discounts: readonly Resource[] = [],
+): Delta {
+  const base = applyDiscounts(slot.cost, discounts);
+  const surcharge = surchargeOf(state, player);
+  if (surcharge <= 0) return base;
+  return { ...base, funds: (base.funds ?? 0) + surcharge };
+}
+
 // ─────────────────── THE LOCKOUT, AND WHY IT IS A DESIGN FAILURE ───────────────────
 
 /**
@@ -319,21 +408,34 @@ export type MarketLockout = {
 export function marketLockout(state: ClientState, player: PlayerID): MarketLockout | null {
   const me = state.players[player];
   if (me === undefined || state.market.length === 0) return null;
+  /*
+    PRICED AT WHAT A BUY COSTS, NOT AT WHAT THE CARD SAYS. A player carrying a
+    PYTHONPOST surcharge is short of the *charged* price, and a lockout sentence
+    naming the sticker is a sentence about a card they could afford. The no-power
+    case is `marketCharge` with no discounts — the surcharge and nothing else —
+    and no power can be armed while this is computed, because a power is armed on
+    one slot at a time and this sentence is about the mat as a whole.
+  */
   // Anything affordable and there is no lockout to explain. This is the whole
   // predicate: the panel stays silent whenever a purchase exists.
   for (const slot of state.market) {
-    if (canAfford(me.resources, slot.cost)) return null;
+    if (canAfford(me.resources, marketCharge(state, player, slot))) return null;
   }
 
   // "Cheapest" by TOTAL cost, because a player comparing three cards is comparing
   // what they would have to earn, not which denominations happen to suit them. Ties
   // keep mat order, which is stable enough to read.
   let cheapest = state.market[0] as MarketSlot;
+  let cheapestCost = marketCharge(state, player, cheapest);
   for (const slot of state.market) {
-    if (deltaTotal(slot.cost) < deltaTotal(cheapest.cost)) cheapest = slot;
+    const cost = marketCharge(state, player, slot);
+    if (deltaTotal(cost) < deltaTotal(cheapestCost)) {
+      cheapest = slot;
+      cheapestCost = cost;
+    }
   }
 
-  const short = shortfall(me.resources, cheapest.cost);
+  const short = shortfall(me.resources, cheapestCost);
   const cap = effectiveCap(me);
   const aboveCap = overCap(me.resources, cap) > 0;
   const shortText = deltaText(short);
@@ -342,15 +444,22 @@ export function marketLockout(state: ClientState, player: PlayerID): MarketLocko
   // full stop, on a sentence whose entire job is to be read. (A test caught this.)
   const lead =
     shortText === 'nothing'
-      ? `Nothing on the HQ Mat is affordable. The cheapest card here costs ${deltaText(cheapest.cost)}.`
-      : `Nothing on the HQ Mat is affordable. The cheapest card here costs ${deltaText(cheapest.cost)} and you are ${shortText} short.`;
+      ? `Nothing on the HQ Mat is affordable. The cheapest card here costs ${deltaText(cheapestCost)}.`
+      : `Nothing on the HQ Mat is affordable. The cheapest card here costs ${deltaText(cheapestCost)} and you are ${shortText} short.`;
+  /*
+    AND THE TAX IS NAMED NEXT TO THE NUMBER. A cost larger than the card's printed
+    price, with nothing on screen saying why, is the same arithmetic the silent
+    click was: two numbers, one printed and one charged.
+  */
+  const taxed =
+    surchargeOf(state, player) > 0 ? ' A Conspiracy Card is taxing every purchase you make.' : '';
   const tail = aboveCap
     ? ` You are also over your cap of ${cap}, so the next resource you take comes straight back as a discard.`
     : '';
   return {
-    cheapest: cheapest.cost,
+    cheapest: cheapestCost,
     short,
-    sentence: `${lead}${tail} Resources come from answering your Ideology Card, or from a power.`,
+    sentence: `${lead}${taxed}${tail} Resources come from answering your Ideology Card, or from a power.`,
     overCap: aboveCap,
     cap,
   };
