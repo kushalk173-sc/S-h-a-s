@@ -324,6 +324,23 @@ function resolveTargets(
       // is what makes a future `EffectTarget` member a compile error at every site
       // rather than a `undefined` player list at runtime.
       return [];
+    case 'player-after': {
+      // G12. One index into the seat order, wrapping. See `EffectTarget` in cards.ts for
+      // why one member serves both recovered phrasings ("the opponent on their left"
+      // and "the player after you") and why this is a pure function rather than a
+      // decision — it is `turnOrder`, which every client already has in full, so it
+      // adds nothing to the wire and needs no `Choice` kind.
+      //
+      // The `indexOf === -1` guard is about a HAND-BUILT state rather than a card: the
+      // seat is always in the order the engine produced. It returns `[]` rather than
+      // `undefined`-ish nonsense because "affects nobody" is the safe direction for a
+      // target, and it is a branch rather than a comment because a comment does not
+      // fail a test.
+      const i = state.turnOrder.indexOf(source);
+      if (i < 0 || state.turnOrder.length < 2) return [];
+      const next = state.turnOrder[(i + 1) % state.turnOrder.length];
+      return next === undefined ? [] : [next];
+    }
   }
 }
 

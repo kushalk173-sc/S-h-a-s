@@ -72,7 +72,59 @@ export type EffectTarget =
   /** The player currently holding the most majority voters. Ties → nobody. */
   | 'leader'
   /** G1 — the card's actor names one player, from every seat but their own. */
-  | 'chosen-player';
+  | 'chosen-player'
+  /**
+   * G12 — the seat immediately AFTER the card's actor in `GameState.turnOrder`,
+   * wrapping. **A fixed seat, not a decision, and never an empty list.**
+   *
+   * ## WHY ONE INDEX SERVES TWO RECOVERED PHRASINGS
+   *
+   * A COWARD OR A JOURNALIST? (REF 4.1) reads *"Starting from you, each player can
+   * donate 1 of their Ideology Cards to **the opponent on their left**"*; GREAT
+   * LEADER, BAD ECONOMY (REF 4.2.1) reads *"**the player after you** may move 1 of
+   * your non-majority voters to an adjacent zone."* In a turn order that runs
+   * clockwise, those are the same seat, so one union member is honest to both rather
+   * than two values that differ only in which card happens to use them.
+   *
+   * ## IT IS NOT A DECISION, and that is the whole reason it is cheap
+   *
+   * `'chosen-player'` had to raise a `Choice`, a new wire-format kind, and a
+   * satisfiability proof. This needs none of that: the seat is a **pure function of
+   * `(turnOrder, source)`**, both public, so a replay from seed + action log derives
+   * it without re-running anything — R2, the same property that made
+   * `'this-zone'` safe in G16. There is nothing to render, so `derive.ts` needs no
+   * arm and no client change is owed for the decision itself.
+   *
+   * ## IT CANNOT BE UNSATISFIABLE
+   *
+   * `setup()` supports 2..5 seats (rules-reference.md pp26-40) and a table always has
+   * a seat after the actor's — with two seats it is the actor's only opponent, and
+   * `(i + 1) % n` is `1` in a two-seat game. A one-seat table does not exist, so
+   * `resolveTargets` can return an empty list here only for a hand-built state, and it
+   * degrades to "affects nobody" rather than to a decision nobody can answer. Asserted
+   * at 2/3/4/5 seats in `test/choices.test.ts`.
+   *
+   * ## VISIBILITY: PUBLIC, and it discloses nothing at all
+   *
+   * `turnOrder` is on every payload already, so this names a seat rather than
+   * revealing a set. It is the same class of read as `'leader'`, which is also a
+   * function of public state. **No `_`-prefixed field is added**, so
+   * `packages/server/test/secret-inventory.ts` owes nothing.
+   *
+   * ## WHAT IT IS NOT, and the two refusals
+   *
+   *  - **Not `'left-of-me'`.** Same seat, second name, and a second member would be a
+   *    second spelling the engine cannot distinguish — which is the exact failure
+   *    `packages/cards/src/executable.ts` exists to prevent. It is also not true in
+   *    every reading: the recovered corpus has both phrasings for ONE seat, and
+   *    naming it after the card that is easier to implement is how a card ends up
+   *    reading as though it did something directional that it does not.
+   *  - **Not a per-opponent iteration.** *"Starting from you, **each** player"* is a
+   *    loop over the table, and one `EffectTarget` is resolved once for the whole
+   *    effect list (`applyEffect` computes one `target`). That half of the card is
+   *    dropped and named on the card rather than approximated.
+   */
+  | 'player-after';
 
 /**
  * G16 — WHICH constituency a voter-targeting op may reach.

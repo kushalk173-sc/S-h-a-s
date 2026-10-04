@@ -112,6 +112,10 @@ export const EXECUTED_OP_SET: ReadonlySet<string> = new Set<string>(Object.keys(
  *
  * `test/reducer-parity.test.ts` re-derives this set from `resolveTargets`'s own case
  * labels in `reduce.ts`, so the registry cannot claim a target the switch dropped.
+ *
+ * `'player-after'` (G12) is the value that shows the registry earns its keep in the
+ * OTHER direction too: it was added to the union, to this list and to `resolveTargets`
+ * in one pass, and the parity test is what proves the three cannot drift apart.
  */
 export const EXECUTABLE_TARGETS: ReadonlySet<string> = new Set([
   'you',
@@ -119,6 +123,7 @@ export const EXECUTABLE_TARGETS: ReadonlySet<string> = new Set([
   'everyone',
   'leader',
   'chosen-player',
+  'player-after',
 ]);
 
 /**
@@ -140,8 +145,9 @@ export const TARGET_FIX =
   'EffectTarget values reduce() honours are listed in EXECUTABLE_TARGETS. ' +
   "'chosen-player' is executed: applyEffect intercepts it above its switch and raises a " +
   "'choose-player' PendingChoice for the card's own actor, carrying the effect list to re-run " +
-  "once the player is named. A value that is not in the registry would resolve against the " +
-  "card's own player and read as though it hit somebody else. See KNOWN-GAPS.md G1.";
+  "once the player is named; 'player-after' is executed as one index into GameState.turnOrder " +
+  "from the card's actor, wrapping. A value that is not in the registry would resolve against " +
+  "the card's own player and read as though it hit somebody else. See KNOWN-GAPS.md G1.";
 
 export const ZONE_FIX =
   'ZoneSelector values reduce() resolves are listed in EXECUTABLE_ZONE_SELECTORS. ' +

@@ -37,6 +37,7 @@ import { RULES } from '../src/rules';
 import {
   RESOURCES,
   NO_POWER_USES,
+  EMPTY_POOL,
   poolTotal,
   type Choice,
   type Delta,
@@ -553,9 +554,12 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                 const inHand = withHand(playable, 'p1', [card.id]);
 
                 // `each-opponent` raises the decision for the OPPONENTS, and their
-                // scope is what varies above. `you` raises it for the chooser. Both
-                // are real raise paths, so both are probed.
-                for (const castAt of ['you', 'each-opponent', 'chosen-player'] as const) {
+                // scope is what varies above. `you` raises it for the chooser.
+                // `'chosen-player'` raises a decision the ACTOR answers. `'player-after'`
+                // (G12) raises it for the seat one along, which is a different owner again
+                // and therefore a different `blockedBy` owner — so it belongs in the sweep
+                // rather than beside it. Both are real raise paths, so all are probed.
+                for (const castAt of ['you', 'each-opponent', 'chosen-player', 'player-after'] as const) {
                   const out = playAndRead(inHand, card.id, castAt, ctxN);
                   if (out === null) continue; // this raise path did not apply here
                   for (const pending of out.choices) {
@@ -739,6 +743,62 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     expect(stranded, `${stranded.length} raised decisions had NO legal pick:\n${stranded.join('\n')}`).toEqual([]);
   });
 
+  /**
+   * G12 — `'player-after'` IS satisfiable, and it raises no kind of its own.
+   *
+   * The property is weaker than the two above and therefore easier to get wrong in a
+   * way that hides: `'player-after'` is a fixed seat, so there is no candidate set to
+   * be empty and no `Choice` to be unsatisfiable. What can go wrong is the OPPOSITE —
+   * the value resolving to nobody, which is a card that reads as though it hits the
+   * player on your left and hits nobody at all, and is silent.
+   *
+   * So the assertions are: the seat is the one index along `turnOrder` at EVERY seat
+   * count (the two-seat case is the load-bearing one, where it must be the actor's only
+   * opponent and NOT the actor); a decision raised through it is answered for the RIGHT
+   * player; and the reducer is not left stuck by it.
+   */
+  it("'player-after' names the next seat along at 2/3/4/5 seats, and its decision is answerable", () => {
+    const CARD = probeCard('probe-player-after', [{ op: 'gain-any', n: 2, target: 'player-after' }]);
+    const idx = indexCards({
+      ideology: Object.values(CARDS.ideology),
+      voter: Object.values(CARDS.voter),
+      conspiracy: [CARD],
+      headline: Object.values(CARDS.headline),
+    });
+    const ctxA: Ctx = { rules: RULES, cards: idx };
+    let raised = 0;
+
+    for (const seats of [2, 3, 4, 5] as const) {
+      const ids = Array.from({ length: seats }, (_, i) => `p${i + 1}`);
+      const base = {
+        ...fresh(1, ids, { startResources: ids.map(() => ({})) }),
+        phase: 'actions',
+        activePlayer: 'p1',
+        _pendingCard: null,
+        choices: [],
+      } as GameState;
+
+      const played = reduce(withHand(base, 'p1', [CARD.id]), 'p1', { type: 'PLAY_CONSPIRACY', cardId: CARD.id }, ctxA);
+      expect(played.ok, `${seats} seats: ${played.ok ? '' : played.error}`).toBe(true);
+      if (!played.ok) continue;
+
+      const expected = ids[(0 + 1) % seats] ?? ids[0];
+      if (expected === undefined) continue;
+      const pending = played.state.choices.find((c) => c.player === expected);
+      expect(pending, `${seats} seats: no decision was raised for ${expected}, the seat after p1`).toBeDefined();
+      if (pending === undefined) continue;
+      // It must NOT be raised for the caster, or the card is aimed at the wrong player.
+      expect(played.state.choices.some((c) => c.player === 'p1'), `${seats} seats: the card aimed at itself`).toBe(false);
+      raised += 1;
+
+      const answered = candidatePicks(played.state, pending).some((r) => r.ok);
+      expect(answered, `${seats} seats: ${JSON.stringify(pending.choice)} had no legal pick`).toBe(true);
+      expect(poolTotal(played.state.players[expected]?.resources ?? EMPTY_POOL), 'not credited yet').toBe(0);
+    }
+
+    expect(raised, "'player-after' raised nothing, so nothing was proved").toBe(4);
+  });
+
   /** Which reducer `op` raises `kind`. `evict` is the op; `evict-voter` is the choice. */
   function opFor(kind: Kind): 'gain-any' | 'lose-any' | 'steal-any' | 'evict' | 'discard-voter' | 'convert-voter' {
     return kind === 'evict-voter' ? 'evict' : (kind as 'gain-any');
@@ -751,7 +811,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
   function playAndRead(
     s: GameState,
     cardId: string,
-    castAt: 'you' | 'each-opponent' | 'chosen-player',
+    castAt: 'you' | 'each-opponent' | 'chosen-player' | 'player-after',
     ctxN: Ctx,
   ): { state: GameState; choices: PendingChoice[] } | null {
     const card = ctxN.cards.conspiracy[cardId];
@@ -759,12 +819,13 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     // A `'chosen-player'` effect is NOT retargeted: the whole point of the value is
     // that the card's ACTOR names the player, so overwriting it with `'you'` or
     // `'each-opponent'` would remove the decision this probe exists to raise. Its own
-    // axis is `castAt === 'chosen-player'`, which is a no-op retarget.
+    // axis is `castAt === 'chosen-player'`, which is a no-op retarget. `'player-after'`
+    // IS a plain target like `'you'` and is retargeted normally.
     const retargeted: ConspiracyCard = {
       ...card,
       effects: card.effects.map((e) =>
         'target' in e && e.target !== 'chosen-player' && castAt !== 'chosen-player'
-          ? { ...e, target: castAt as 'you' | 'each-opponent' }
+          ? { ...e, target: castAt as 'you' | 'each-opponent' | 'player-after' }
           : e,
       ) as ConspiracyCard['effects'],
     };

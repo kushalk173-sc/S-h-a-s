@@ -1139,7 +1139,7 @@ THOUGHTS AND PRAYERS faithful rather than approximate — and `chosen-player` ma
 so aiming the card at a chosen player would pay the chosen player for their own volatile
 voters.
 
-### 3.1 THE ONE CHANGE THAT UNBLOCKS TWO MORE CARDS FOR A SINGLE LINE SOMEONE ELSE OWNS
+### 3.1 `'player-after'` — **LANDED (G12's target half), and two cards with it**
 
 **`'player-after'` on `EffectTarget` is one union member and one `case` in `resolveTargets`,
 and it is the whole of A COWARD OR A JOURNALIST? / CARD GAMES.** REF 4.1 reads *"Starting
@@ -1147,44 +1147,68 @@ from you, each player can donate 1 of their Ideology Cards to the opponent on th
 — and in a turn order that runs clockwise, *"the opponent on their left"* and *"the player
 after you"* are one index into `turnOrder`, so one value serves both recovered phrasings
 (GREAT LEADER BAD ECONOMY names the second). Every op already loops `resolveTargets`, so
-the value would be honoured everywhere for free, including the three voter ops — whose
+the value is honoured everywhere for free, including the three voter ops — whose
 `voterScope` reads `target` through `resolveTargets` and gives the named player `'own'`
 without a further edit.
 
-**The reduction it unblocks**, and its named drops:
+**The reduction it unblocked**, and its named drops:
 `[{ op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'player-after' },
   { op: 'gain-any', n: 6, target: 'player-after' }]` — one `target` for the whole effect
 list, which happens to be exactly right here because the card goes to the player on your
 left AND the 6 resources go to whoever receives it.
 
-**Why it is not done in this file: `packages/client/src/app/interrupt.ts` line 251 is a
-`Readonly<Record<EffectTarget, string>>`, which is one of the client's three totality
-proofs and therefore a compile error on a new member.** Adding the value to
-`packages/engine/src/cards.ts` turns `npm run typecheck` red in a package this one may not
-edit. **The one-line ask is:** add `'player-after': ' · the player after you',` to
-`TARGET_TEXT`. Nothing else in the client changes — `describeEffect`'s `switch` has a
-`default`, `derive.ts` does not enumerate targets, and no `Choice` kind is involved.
+**WHY IT IS NOT A `Choice`, and that is what made it cheap.** `'chosen-player'` cost a new
+wire-format kind, a satisfiability proof and a client arm. `'player-after'` raises nothing:
+the seat is `(turnOrder.indexOf(source) + 1) % turnOrder.length` — a **pure function of
+public state**, so a replay from seed + action log derives it without re-running anything
+(R2, the same property that made `'this-zone'` safe in G16). There is nothing to render, so
+`derive.ts` owes nothing. **Satisfiability is therefore not a proof but an arithmetic
+fact**: `setup()` supports 2..5 seats (rules-reference.md pp26-40), so a table always has
+a seat after the actor's, and at two seats it is the actor's only opponent. Asserted at
+2/3/4/5 seats in `packages/engine/test/choices.test.ts` — the test checks the FAILURE
+direction too, because the hazard here is the opposite of an unsatisfiable choice: a value
+resolving to nobody is a card that reads as though it hits the player on your left and
+hits nobody, silently.
 
-**What it does NOT buy, stated so the trade is honest:** the real card's *"starting from
-you, each player can"* means N donations and this ships one; *"optional"* and *"you may
-pass along a card you just received"* are dropped; and the card comes off the Ideology
-**draw** pile rather than out of a hand, because a hand is a queue its holder cannot
-enumerate — which is the same refusal that keeps A COWARD OR A JOURNALIST? on G12's list
-even after the target exists.
+**`playable` 37 → 39 of 54, measured by playing.** Both re-skins moved: A COWARD OR A
+JOURNALIST? (`REF 4.1`) and CARD GAMES (`REF 4.3`), which REF 4.3 lists as the same card.
+**Four clauses dropped on each**, named on the probe rows: *"starting from you, **each**
+player"* is N donations and this is one, because `applyEffect` computes ONE `target` for
+the whole list; *"optional"*; *"you may pass along a card you just received"*; and the card
+comes off the Ideology **draw** pile rather than out of a hand, because `from: 'hand'` is
+refused at the type level for exactly that reason. CARD GAMES drops a fifth: REF 4.3 adds
+*"Can be blocked only at the beginning"*, which is a rule about WHEN the response window
+opens, and the window that already exists (`GameState.interrupt`, G13) opens for the whole
+resolution.
+
+**NOT IN THE CORPUS YET.** `playable` measures by playing each reduction through the real
+reducer, and the probe writes its own reduction rather than reading the deck — so 39 of 54
+is a statement about the ENGINE, not about `decks/`. Shipping either card is a corpus
+change, and §6bis records what growing the corpus costs the server suite, which is the
+server owner's call to accept.
+
+**ONE LINE IS OWED BY `packages/client`, and it is not mine to write.**
+`packages/client/src/app/interrupt.ts:251` is a
+`Readonly<Record<EffectTarget, string>>`, which is one of the client's three totality
+proofs and therefore a compile error on a new member. **The ask:** add
+`'player-after': ' · the player after you',` to `TARGET_TEXT`. Nothing else in the client
+changes — `describeEffect`'s `switch` has a `default`, `derive.ts` does not enumerate
+targets, and no `Choice` kind is involved, so `npm run typecheck` in `packages/client` is
+red on that one line until it lands.
 
 ### 3.2 WHAT IS STILL BLOCKED, AND ON WHAT, AFTER THIS ITERATION
 
 | card | blocked on | owner |
 |---|---|---|
-| A COWARD OR A JOURNALIST?, CARD GAMES | the one-line `TARGET_TEXT` change above | **client** |
+| A COWARD OR A JOURNALIST?, CARD GAMES | **CLOSED — G12's target half landed (§3.1)**. Still blocked on the in-flight-queue half, which buys nothing without this | — |
 | 404, BRAVE NEW WORLDS | a card-level `answerPhase` read by `reduce`'s `answer` branch — `BRAVE NEW WORLDS`'s *"will not receive any resources"* half is already shipped as `no-income`, and its first sentence is the part that moves no state | engine, large |
 | THE BIG FREEZE | a `PlayerState` cap field read by `canAfford` / `enforceCap` / `overCap` / `poolTotal` / the balance checker. **Warned, not merely sized:** lowering a cap under a player who is already over it is the exact `convert-voter` soft-lock shape, and it would have to be gated | engine, large, deadlock risk |
 | QUANTUM WRISTBAND, A CALL FROM KARACHI, NEXT BILLION DATA POINTS | **RULED OUT** — auction, vote. See §2 G13b/c. Do not rebuild | — |
 | FUELLING THE NEWS | a Headline draw pile, which does not exist: headlines are a QUEUE (`headlineQueue`), not a hand or a market | engine, large |
 | BLESSINGS OF PARENTS PAST | the ONE pile §2bis allows a `choose-card` to enumerate (the public market), so this is blocked on the **client wire format** rather than on the leak, plus "keep 1 and donate the other" | client |
 | CULT-IVATING OBEDIENCE, ON THE "HIGH" SEAS | G11: a board-resident object that outlives its resolution | engine, large |
-| HIGGS MORON | G10 (a token counter on a card) *and* G12 (an in-flight card with an owner, a seat and a deadline) | engine, large |
-| GREAT LEADER, BAD ECONOMY | `'player-after'` **and** a `move-peg` op: *"may move 1 of your non-majority voters to an adjacent zone"* needs a move to an adjacent zone, and `evict`/`discard-voter` are the wrong verb — the card HELPS the beneficiary | engine |
+| HIGGS MORON | G10 (a token counter on a card) *and* the in-flight half of G12, which `'player-after'` did not close | engine, large |
+| GREAT LEADER, BAD ECONOMY | a `move-peg` op: *"may move 1 of your non-majority voters to an adjacent zone"* needs a move to an adjacent zone, and `evict`/`discard-voter` are the wrong verb — the card HELPS the beneficiary. **The `'player-after'` half is now DONE** | engine |
 | THOUGHTS AND PRAYERS | the `read`-vs-`target` split on a computed `n`. `chosen-player` makes it *worse*, not better | engine |
 | DOSTI BANI RAHE | a turn trigger on a seat OTHER than the owner: `installLiveEffects` re-applies a standing effect at the top of the **owner's** turns, and this card's whole content is somebody else's turn | engine |
 | CHAI-PAANI | **NOT A GAP AND NOT FIXABLE.** Only a re-application clause was recovered; the base effect was never recovered, and inventing a card is forbidden. See §7 | — |
