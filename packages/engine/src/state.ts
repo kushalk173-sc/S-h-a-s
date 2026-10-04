@@ -17,6 +17,30 @@
  * and the pending card's ID. The full record of the change, with the measurements behind it,
  * is `packages/server/src/FULL-INFORMATION.md`, and the rulings are on `GameState._pendingCard`
  * and on `playerView`'s own header.
+ *
+ * ## THE ORDER IS A **PER-CARD** CONSTANT, and this line used to say "answer ORDER"
+ *
+ * The server derives the two faces' presentation order from `_seed` and the pending card's
+ * id, and `_seed` advances **only on a reshuffle** — so a given Ideology Card is presented
+ * in the same order every time it is dealt in a match. Turn 1 and turn 400 are the same card
+ * and the same `order`. That is the shipped design and it is the intended one, and the
+ * design records that specify it say so in words: `PLAN.md` row 18 is *"Seeded **per-card**
+ * answer ordering"*, `PLAN.md` §2's status note calls `orderFor` *"a derived **per-card**
+ * field, a pure function of the match seed and the card id"*, `docs/UI-SPEC.md` §1.2 is
+ * *"Randomise the presentation order **per card**"*, and `broadcast.ts` argues from it
+ * directly (*"a redraw changes the card and therefore the order, which is correct: it is a
+ * different question"* — a claim that is only true if the card is the whole input).
+ *
+ * **It is also the better reading for the leak `docs/AUDIT-2026-10.md` §S2 raises**, which
+ * measured `order` as a one-bit-per-answer oracle on `_seed` and offered *"rotate a
+ * dedicated order-salt in state each answer so consecutive answers are independent"* as a
+ * cheap fix. Per-card leaks **less**, not more: the same card dealt twice hands the answerer
+ * the same bit, so it carries no new information about the cursor, while a per-answer salt
+ * would publish a fresh bit every turn forever. The cost is that an answerer who has seen a
+ * card before sees the same order again — and they have already read that card's two printed
+ * sides and Ideologues, so the repeat carries nothing they do not hold. See
+ * `GameState._seed` and `packages/engine/test/rng.test.ts`'s "the order is a per-card
+ * constant" block, which pins the engine half of this so the ambiguity cannot reopen.
  */
 
 import type { Effect, EffectCondition, EffectDuration, EffectTiming, EffectTrigger } from './cards';
@@ -1326,7 +1350,18 @@ export type GameState = {
   readonly _conspiracyDiscard: readonly CardID[];
   readonly _headlineDraw: readonly CardID[];
   readonly _headlineDiscard: readonly CardID[];
-  /** Deterministic PRNG cursor. The engine never calls Math.random. */
+  /**
+   * Deterministic PRNG cursor. The engine never calls Math.random.
+   *
+   * **IT ADVANCES ON A RESHUFFLE AND ON NOTHING ELSE** — `draw()` is the only writer in
+   * `reduce.ts`, and it writes here only when a pile empties and the discard is re-shuffled.
+   * `ANSWER` does not touch it, `END_TURN` does not touch it, and no `PLAY_CONSPIRACY` does.
+   * That is load-bearing for one thing above everything else in this file: the server derives
+   * a card's two-faces presentation order from `_seed` and the card id, so **the order is a
+   * per-card constant for the life of the match**, not a per-answer draw. The header's ruling
+   * on that is `GameState` §"THE ORDER IS A **PER-CARD** CONSTANT"; this line is the engine
+   * half of it and `packages/engine/test/rng.test.ts` pins it.
+   */
   readonly _seed: number;
 
   /**

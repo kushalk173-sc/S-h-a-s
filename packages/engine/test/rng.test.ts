@@ -129,3 +129,93 @@ describe('deck drawing', () => {
     if (!r.ok) expect(r.error).toBe('no card has been put to you');
   });
 });
+
+/**
+ * THE ORDER IS A **PER-CARD CONSTANT**, not a per-answer draw — and this block exists so
+ * that the ambiguity cannot reopen.
+ *
+ * ## WHAT WAS IN QUESTION
+ *
+ * The server derives a pending card's two-faces presentation order from `state._seed` and
+ * the card's id (`broadcast.ts#orderFor`), and reproduces it verbatim on both the table's
+ * `openQuestion` and the answerer's prompt. Turn 1 shows a card one way; turn 400 shows the
+ * SAME card the same way, because `_seed` has not moved. Two records read that as a per-answer
+ * draw; the records that SPECIFY the mechanic say per-card (`PLAN.md` row 18, `PLAN.md` §2's
+ * status note, `docs/UI-SPEC.md` §1.2), and `broadcast.ts` argues from it — *"a redraw changes
+ * the card and therefore the order, which is correct: it is a different question"* is only
+ * true if the card is the whole input. So this is the shipped, intended design, and it is
+ * also the SMALLER leak: `docs/AUDIT-2026-10.md` §S2 measured `order` as one bit of
+ * avalanche output per turn about a 32-bit cursor and proposed rotating a salt per answer,
+ * which would publish a FRESH bit every turn forever where this publishes one bit per card
+ * ever dealt.
+ *
+ * ## WHY THE ASSERTION LIVES HERE
+ *
+ * `orderFor` is the server's file and the server's concern. The **engine half** of the
+ * property is that nothing but a reshuffle moves the cursor, and that is `draw()`'s only
+ * writer — which is this package's code, in this package's state type, documented in this
+ * package's header. A test that asserted the server's hash would be a test of somebody
+ * else's arithmetic; a test that asserts the cursor does not move is a test of the fact the
+ * hash is a function of, and it fails loudly if a future card adds an entropy draw.
+ */
+describe('the order is a per-card constant: `_seed` moves on a reshuffle and on NOTHING else', () => {
+  it('ANSWER leaves the cursor exactly where it was', () => {
+    for (const seats of [2, 3, 4, 5] as const) {
+      const ids = Array.from({ length: seats }, (_, i) => `p${i + 1}`);
+      const s = fresh(1, ids);
+      expect(s._pendingCard, `${seats} seats: no card to answer`).not.toBeNull();
+      const before = s._seed;
+      const r = reduce(s, 'p1', { type: 'ANSWER', side: 0 }, ctx);
+      expect(r.ok, `${seats} seats: ANSWER was refused`).toBe(true);
+      if (!r.ok) continue;
+      expect(r.state._seed, `${seats} seats: ANSWER moved the PRNG cursor, so the order is per-answer after all`).toBe(before);
+    }
+  });
+
+  it('the whole of an ordinary turn leaves it where it was — influence, gerrymander, end turn', () => {
+    // The negative space matters as much as `ANSWER`: any action anywhere that drew entropy
+    // would make the cursor, and therefore the order, move. So this walks the three actions
+    // a turn is made of and asserts the cursor is unmoved after each.
+    const base = fresh(1);
+    const start: GameState = {
+      ...base,
+      phase: 'actions',
+      activePlayer: 'p1',
+      _pendingCard: null,
+      players: { ...base.players, p1: { ...base.players.p1!, resources: { funds: 4, clout: 0, media: 0, trust: 0 } } },
+    };
+    expect(start.market.length, 'no open Voter Card, so the walk proves nothing').toBeGreaterThan(0);
+    expect(start.players.p1?.resources.funds ?? 0, 'p1 cannot afford to influence').toBeGreaterThanOrEqual(2);
+    const steps: readonly { readonly label: string; readonly action: Parameters<typeof reduce>[2] }[] = [
+      { label: 'INFLUENCE', action: { type: 'INFLUENCE', slot: 0 } },
+      { label: 'END_TURN', action: { type: 'END_TURN' } },
+    ];
+    let cursor = start._seed;
+    let s = start;
+    for (const step of steps) {
+      const r = reduce(s, 'p1', step.action, ctx);
+      expect(r.ok, `${step.label} was refused: ${r.ok ? '' : r.error}`).toBe(true);
+      if (!r.ok) continue;
+      s = r.state;
+      expect(s._seed, `${step.label} moved the PRNG cursor`).toBe(cursor);
+      cursor = s._seed;
+    }
+  });
+
+  it('and a reshuffle DOES move it, or the property above would be vacuous', () => {
+    // The other half. Without this the two tests above would pass for the wrong reason —
+    // a frozen cursor would satisfy them too — and "the order never changes" is a different
+    // and much worse claim than "the order is a function of the card and the cursor".
+    const s: GameState = {
+      ...fresh(1),
+      phase: 'actions',
+      _pendingCard: null,
+      _ideologyDraw: [],
+      _ideologyDiscard: ['ide-01', 'ide-02', 'ide-03'],
+    };
+    const r = reduce(s, 'p1', { type: 'END_TURN' }, ctx);
+    expect(r.ok, `END_TURN was refused: ${r.ok ? '' : r.error}`).toBe(true);
+    if (!r.ok) return;
+    expect(r.state._seed, 'a reshuffle did not move the cursor, so the cursor is frozen and the per-card claim is untested').not.toBe(s._seed);
+  });
+});
