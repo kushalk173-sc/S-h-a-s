@@ -780,7 +780,6 @@ export function GameScreen({ store }: GameScreenProps) {
               framed={isMyTurn && state.phase === 'actions'}
               showControls={role === 'player' && you !== null && !windowOpen}
               onSelectGroup={(id) => beginPlacement(id)}
-              onRedraw={() => openPicker({ forKind: 'redraw', total: UI_RULES.redrawCost, pick: {} })}
               onTradeWith={(other) => openTrade(other)}
               onGerry={() => {
                 if (you === null) return;

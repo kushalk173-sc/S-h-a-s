@@ -59,7 +59,12 @@ export type YourMatProps = {
   /** The ONE region allowed a `SEAL` frame at a time (§5.0). */
   readonly framed: boolean;
   readonly onSelectGroup: (groupId: string) => void;
-  readonly onRedraw: () => void;
+  /**
+   * GERRYMANDER only. There is deliberately no `onRedraw` here any more: the redraw
+   * is legal only while a card is pending, which is precisely when this column is
+   * behind `AnswerScreen`'s full-viewport takeover, so a second control for it could
+   * only ever be a duplicate of the one on that screen. See the GERRYMANDER row.
+   */
   readonly onGerry: () => void;
   readonly onPower: (power: string) => void;
   readonly onEndTurn: () => void;
@@ -411,6 +416,26 @@ export function YourMat(props: YourMatProps) {
             </div>
           )}
 
+          {/*
+            THE REDRAW USED TO BE HERE TOO, and it was the wrong place.
+
+            `REDRAW_IDEOLOGY` is legal only while a card is pending — `reduce.ts`
+            refuses it with "no card to redraw" otherwise — and a pending card is
+            exactly the state in which `AnswerScreen` is a full-viewport takeover
+            over this whole column. So this button was rendered, enabled, and
+            unreachable at the only moment it could do anything: the audit measured
+            `open-redraw disabled=false` and `redraw-offer disabled=false` on one
+            screen, both labelled "REDRAW — 4 RESOURCES", both present, one of them
+            behind a z-index 20 scrim.
+
+            Two identically labelled controls for one action is a player with two
+            keys and no way to tell which is which, and the copy that explains what
+            the redraw now means — that both payouts are printed, so you are buying
+            a different question — only makes sense next to the two payouts. So the
+            control that survives is the one in `AnswerScreen`, and this row is left
+            with GERRYMANDER alone rather than padded with a second way to do
+            something already on screen.
+          */}
           <div className="row" style={{ marginTop: 'var(--sp-3)' }}>
             <button
               type="button"
@@ -420,15 +445,6 @@ export function YourMat(props: YourMatProps) {
               data-testid="enter-gerry"
             >
               GERRYMANDER
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={props.onRedraw}
-              disabled={!actionable}
-              data-testid="open-redraw"
-            >
-              REDRAW — {UI_RULES.redrawCost} RESOURCES
             </button>
           </div>
         </>
