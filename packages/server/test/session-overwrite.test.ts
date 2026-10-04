@@ -38,15 +38,96 @@
  *     player as present on a socket that has left. Part 1 is the fix; part 2 is what
  *     makes it structural rather than a rule four call sites have to remember.
  *
- * Every test below drives real sockets against the real server. Section A is the
- * regression the bug report was about, section B is the backstop, and section C pins
- * the two things the fix must NOT do — a legitimate handover has to keep working, and
+* Every test below drives real sockets against the real server. Section A is the
+ * regression the bug report was about, section B is the backstop, section C pins the
+ * two things the fix must NOT do — a legitimate handover has to keep working, and
  * an ended record has to actually stop resolving.
+ *
+ * ── WHAT WAS VERIFIED ON 2026-10-04, AND THE ONE REMAINDER THAT WAS FOUND ──────────
+ *
+ * **The reported hole is closed, and structurally rather than by four copies of a
+ * rule.** `MINTING` covers every message whose handler can reach `#adoptSession`, in
+ * both directions, and section C derives that from `src/index.ts` rather than restating
+ * it — so a fifth minting message added next to the other four fails the suite instead of
+ * silently re-opening the hang. Verified by deleting `'lobby:spectate'` from `MINTING`:
+ * three tests go red, the coverage one naming the exact pair.
+ *
+ * **One remainder WAS real and is now fixed.** `#adoptSession`'s disconnection clause was
+ * keyed on `prev.matchId !== rec.matchId`, which is one condition too many — see the
+ * test in section B. `session:resume` is exempt from the seal by design (it carries the
+ * seat's own token), and a resume that moves a connection to ANOTHER SEAT OF THE SAME
+ * MATCH left the seat it walked away from reported `connected` with a credential nobody
+ * held: the reported bug's exact signature, reached through the one door the seal leaves
+ * open. It is now keyed on the seat, and the test reproduced it before the fix.
+ *
+ * ── AND ONE RESIDUAL THAT IS RECORDED RATHER THAN FIXED ─────────────────────────────
+ *
+ * **ONE `SessionRecord` CAN BE HELD BY TWO SOCKETS.** `#resume` rotates the seat's token
+ * before adopting, so presenting it on a second socket is legal and intended — and
+ * nothing tells the FIRST socket, because `#adoptSession` can only see the connection it
+ * is called on. Two consequences, both measured and both recorded here rather than
+ * silently patched:
+ *
+ *  - The stale socket keeps dispatching as the seat. Both clients see the same seat, so
+ *    one of them is always acting on a board it knows is stale; that is a liveness wart,
+ *    not a privilege gain, because the token was already that seat's.
+ *  - When the stale socket closes, `#onClose` marks the seat disconnected while the live
+ *    socket still holds it. That mislabels a live seat — and `allSeatsExpired` is
+ *    consulted in exactly one place (`#resume`, as a gate on reclaiming a seat), so a
+ *    mislabel makes reclaiming EASIER rather than harder. **It is not a hang and not the
+ *    reported bug**: `Room.dispatch` does not consult `connected`, so the table keeps
+ *    playing, and no seat is released.
+ *
+ * **Why it was left.** The only fix is to evict every other connection holding the record,
+ * and the resume token lives in the client — so opening the game in a second tab resumes
+ * the same seat and would throw the first tab out of a game in progress. That is a real
+ * regression traded for a mislabel, on a bug that is not the one that was reported, and
+ * the decision belongs to whoever owns the product. It is written down so the next person
+ * meets it here rather than in a bug report.
  */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { TestClient, startHarness, type Harness } from './fixtures.ts';
+
+/**
+ * `src/index.ts` with comments blanked, so a docstring that MENTIONS a name is not a
+ * code path. The same trick `interrupt-window.test.ts` uses on `driver.ts`, and for the
+ * same reason: this file's structural assertions read source text, and prose in this
+ * codebase names every symbol it discusses.
+ */
+function serverSource(): string {
+  return readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+/**
+ * `MINTING`, read out of `src/index.ts` rather than imported.
+ *
+ * It is a module-private `const`, so it cannot be imported — and importing it would be
+ * the weaker test anyway, because it would assert that two references to one value agree
+ * instead of asserting that the set is still complete. The literal is read from the
+ * source, so the assertion below is about the declaration the server actually runs.
+ *
+ * **It THROWS rather than returning an empty set on a failed read.** An `expect` at module
+ * scope has no test to fail into, so a stale reader would hand the assertion below an
+ * empty set and every coverage claim would pass for the wrong reason — which is the exact
+ * class of vacuous assertion this file is about. A throw at import time is loud instead.
+ */
+function mintingSet(): ReadonlySet<string> {
+  const src = serverSource();
+  const decl = src.match(/const MINTING[^=]*=\s*new Set<[^>]*>\(\[([\s\S]*?)\]\)/);
+  if (decl === null) throw new Error('MINTING is not declared where this reader expects it');
+  const entries = [...(decl[1] ?? '').matchAll(/'([a-z:]+)'/g)].map((x) => x[1] as string);
+  if (entries.length === 0) throw new Error('MINTING parsed as an empty set — the reader is stale');
+  return new Set(entries);
+}
+
+const MINTING: ReadonlySet<string> = mintingSet();
 
 let harness: Harness | null = null;
 const clients: TestClient[] = [];
@@ -256,6 +337,105 @@ describe('a SEATED client cannot spectate its own seat away', () => {
   });
 });
 
+// ─────────────── C. the seal is STRUCTURAL, not four copies of a rule ───────────────
+
+describe('the seat seal covers every message that can replace a credential', () => {
+  /**
+   * `MINTING` in `src/index.ts` is a `Set` of four message types, and the seal is one
+   * `if` in `#handle`. Both are easy to keep true by hand and impossible to keep true by
+   * accident, which is the point — but only if something CHECKS them, because a fifth
+   * message that mints a session and is missing from the set is a compile-clean
+   * regression that reintroduces the reported hang.
+   *
+   * So this derives both sides from `src/index.ts`'s own text rather than restating them:
+   *
+   *  - a private method is a **MINTER** if its body reaches `#adoptSession` (the one
+   *    function in the file that writes `conn.session`), and
+   *  - each `case` in `#handle`'s switch says which method the message type reaches.
+   *
+   * The assertion is then a COVERAGE claim — every message type that can reach a minter
+   * is in `MINTING` — plus the converse, that `MINTING` names no message type which
+   * cannot mint, so the set cannot rot into a list of names that mean nothing.
+   *
+   * `session:resume` is the deliberate exemption and is excluded BY NAME, with its
+   * reason: it is the only path that carries the seat's own token, so it is the only path
+   * that proves the asker may. `#adoptSession` is what makes it safe.
+   *
+   * **Why source slicing rather than a runtime probe.** A runtime probe can only check the
+   * messages somebody thought to send; the failure mode here is a message nobody sends.
+   * Reading the dispatch table is what notices a handler that was added next to the other
+   * four and is not in the set. Comments are blanked first, so a docstring that MENTIONS
+   * `MINTING` or `#adoptSession` is not a code path.
+   */
+  it('MINTING and the handlers that adopt a session agree, in both directions', () => {
+    const source = serverSource();
+
+    // 1. Every private method, by brace matching from its declaration. `async` is part of
+    //    the pattern because `#resume` is async, and MISSING IT WOULD SILENTLY UNSEAL
+    //    `session:resume` — the one message whose exemption is the whole argument for
+    //    having an exemption.
+    const bodies = new Map<string, string>();
+    const decl = /^ {2}(?:async )?#([A-Za-z]\w*)\([^\n]*\{/gm;
+    let m = decl.exec(source);
+    while (m !== null) {
+      const name = m[1] as string;
+      const open = decl.lastIndex - 1;
+      let depth = 0;
+      let i = open;
+      for (; i < source.length; i += 1) {
+        const ch = source[i];
+        if (ch === '{') depth += 1;
+        else if (ch === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            i += 1;
+            break;
+          }
+        }
+      }
+      bodies.set(name, source.slice(open, i));
+      decl.lastIndex = i;
+      m = decl.exec(source);
+    }
+    expect(bodies.size, `only ${bodies.size} private methods were read - the reader is stale`).toBeGreaterThan(10);
+    expect(
+      bodies.has('resume'),
+      'the reader missed #resume, so session:resume would read as unsealed and the exemption would prove nothing',
+    ).toBe(true);
+
+    // 2. A MINTER is a method that reaches `#adoptSession`, the sole writer of
+    //    `conn.session`. Derived, not listed, so a new writer has to be added here.
+    const minters = new Set(
+      [...bodies.entries()].filter(([, body]) => body.includes('#adoptSession(')).map(([name]) => name),
+    );
+    expect([...minters].sort(), 'no method adopts a session - the reader is stale').not.toEqual([]);
+
+    // 3. `#handle`'s switch: which method each message type reaches.
+    const handle = bodies.get('handle') ?? '';
+    const routed = new Map<string, string>();
+    for (const hit of handle.matchAll(/case '([a-z:]+)':\s*this\.#(\w+)\(/g)) {
+      routed.set(hit[1] as string, hit[2] as string);
+    }
+    expect(
+      routed.size,
+      `only ${routed.size} message types were routed out of #handle - the reader is stale, so the coverage claim below would be vacuous`,
+    ).toBeGreaterThanOrEqual(10);
+
+    // 4. THE COVERAGE CLAIM. Every message type that can replace a credential is sealed.
+    const EXEMPT = 'session:resume';
+    const unsealed = [...routed.entries()]
+      .filter(([t, method]) => t !== EXEMPT && minters.has(method) && !MINTING.has(t))
+      .map(([t, method]) => `${t} -> #${method} (reaches #adoptSession and is not in MINTING)`);
+    expect(unsealed, 'a message can replace a seated connection\'s credential and is not sealed').toEqual([]);
+
+    // 5. THE CONVERSE, so the set cannot rot into a list of names that mean nothing.
+    const dead = [...MINTING].filter((t) => !minters.has(routed.get(t) ?? ''));
+    expect(dead, 'MINTING names a message whose handler cannot replace a credential').toEqual([]);
+
+    console.log(`SEAL: MINTING=[${[...MINTING].join(' ')}] minters=[${[...minters].sort().join(' ')}] exempt=[${EXEMPT}]`);
+  });
+});
+
 // ─────────────── B. the backstop: no replacement leaks a record ───────────────
 
 describe('no session replacement leaks the record it displaced', () => {
@@ -315,6 +495,74 @@ describe('no session replacement leaks the record it displaced', () => {
       'the sequence did not run ended-then-granted',
     ).toEqual(['session:ended', 'session:granted', 'lobby:state']);
     expect(a.latestSession().lobbyId, 'the join did not take effect').toBe(otherLobby);
+  });
+
+  it('a displaced LIVE seat is marked disconnected even when the seat it moves to is in the SAME match', async () => {
+    // THE REMAINDER, and it is the SAME BUG reached through the one door the seal
+    // deliberately leaves open.
+    //
+    // `session:resume` is exempt from `#refuseSeatHandover` because it carries the
+    // seat's own token — it is the only path that proves the asker may. And
+    // `#adoptSession` is the backstop for everything the seal lets through. The
+    // backstop's disconnection clause read:
+    //
+    //     if (prev.matchId !== null && prev.matchId !== rec.matchId) { … }
+    //
+    // **`prev.matchId !== rec.matchId` was one condition too many.** Presenting a
+    // DIFFERENT seat's token from the SAME match is legal — the token verifies against
+    // that seat's stored hash — and it leaves the table exactly where the reported bug
+    // did: the connection's old record is `end`ed, so its token stops resolving and no
+    // socket anywhere holds it, while `room.seats` still lists that seat `connected`
+    // with its resume hash intact. `allSeatsExpired` is then false for a seat nobody can
+    // reach, and the player who owned it waits for a turn that has no credential behind
+    // it. One room, two of its own seats, and the `!==` was the whole difference between
+    // "the room is told" and "the room lies".
+    //
+    // The fix is to key on the SEAT rather than on the ROOM: a displaced record whose
+    // `matchId` is set and whose `playerId` differs from the new one has orphaned a seat
+    // in whatever room that record named.
+    const { h, matchId, seats } = await liveMatch();
+    const host = seats[0];
+    const guest = seats[1];
+    if (host === undefined || guest === undefined) throw new Error('no two-seat match');
+    const room = h.server.hub.rooms.get(matchId);
+    if (room === undefined) throw new Error('no room');
+
+    const hostSeatId = host.playerId;
+    const hostToken = host.client.tokenFor(matchId);
+    // The other seat's own token, which is the proof `session:resume` exists for.
+    const guestToken = guest.client.tokenFor(matchId);
+    expect(guestToken, 'the fixture could not read the second seat\'s token').not.toBe('');
+    expect(room.seat(hostSeatId)?.connected, 'the host seat was never connected').toBe(true);
+
+    host.client.clear();
+    host.client.send({ t: 'session:resume', resumeToken: guestToken });
+    const moved = await host.client.expect(host.client.is('session:granted'), 'the seat moved within the match');
+    expect(moved.session.matchId, 'the resume left the match').toBe(matchId);
+    expect(moved.session.playerId, 'the resume did not address the second seat').toBe(guest.playerId);
+
+    // THE ORPHAN IS TOLD ABOUT. The seat the connection walked away from is no longer
+    // reported as present, because no live credential names it any more.
+    expect(
+      room.seat(hostSeatId)?.connected,
+      'the orphaned seat is still reported CONNECTED: the room is lying, and allSeatsExpired can never fire',
+    ).toBe(false);
+    expect(room.seat(hostSeatId), 'the orphaned seat was RELEASED, which is a different fix and the wrong one').toBeDefined();
+    expect(room.seat(hostSeatId)?.resumeHash, 'the orphaned seat lost its hash, so the game could not be resumed at all').not.toBe(
+      '',
+    );
+    // And the seat the connection actually holds is connected, which is the other half:
+    // a fix that marks both seats absent would be a table where nobody is present.
+    expect(room.seat(guest.playerId)?.connected, 'the seat the connection now holds is not connected').toBe(true);
+
+    // One socket, one live credential — the property the whole file is about, asserted on
+    // the store rather than on the socket. The record the connection walked away from is
+    // gone and its token no longer resolves.
+    expect(h.server.sessions.find(hostToken), 'the displaced seat\'s token still resolves').toBeUndefined();
+    expect(
+      h.server.sessions.all().filter((r) => r.playerId === hostSeatId),
+      'the displaced record is still in the store',
+    ).toEqual([]);
   });
 
   it('a displaced LIVE seat is marked disconnected, so the room stops reporting a ghost', async () => {

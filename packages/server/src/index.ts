@@ -1135,12 +1135,25 @@ async listen(): Promise<{ port: number; host: string }> {
    *     resolving the instant it is displaced. One socket, one live credential â€” which
    *     is what the store's own `#byHash` index is a single-entry-per-session
    *     structure for.
+/**
    *  2. **A displaced LIVE SEAT is marked disconnected.** If the record being replaced
-   *     named a match this connection is not staying in, the room is told the seat is
-   *     no longer being driven. The seat is NOT released and nothing is skipped â€”
-   *     that is `#onClose`'s long-standing rule and it is unchanged â€” but the room
-   *     stops reporting a player as present on a socket that has left, so the grace
-   *     window can do its job instead of the seat sitting `connected` forever.
+   *     named a seat in a match this connection is not staying in, the room is told the
+   *     seat is no longer being driven. The seat is NOT released and nothing is skipped —
+   *     that is `#onClose`'s long-standing rule and it is unchanged — but the room stops
+   *     reporting a player as present on a socket that has left, so the grace window can
+   *     do its job instead of the seat sitting `connected` forever.
+   *
+   *     **THE CLAUSE IS KEYED ON THE SEAT, NOT ON THE ROOM, and that correction is the
+   *     whole of a remainder found on 2026-10-04.** It read
+   *     `prev.matchId !== null && prev.matchId !== rec.matchId`, and the second half was
+   *     one condition too many: `session:resume` is exempt from `#refuseSeatHandover` on
+   *     purpose — it carries the seat's own token, so it is the only path that proves the
+   *     asker may — and presenting a DIFFERENT seat's token from the SAME match is legal.
+   *     That left a table in the reported bug's exact shape: the old record is `end`ed so
+   *     its token stops resolving and no socket holds it, while `room.seats` still lists
+   *     that seat `connected` with its hash intact, so `allSeatsExpired` is false for a
+   *     seat nobody can reach. What decides it is whether the SEAT changed, because a seat
+   *     that did not change was not orphaned by this call.
    *
    * The same `sessionId` is not ended, because that is `#resume` finding the record
    * it was already holding: a reconnect on the same socket rotates the token IN PLACE
@@ -1158,7 +1171,12 @@ async listen(): Promise<{ port: number; host: string }> {
     conn.session = rec;
     if (prev === null || prev.sessionId === rec.sessionId) return;
 
-    if (prev.matchId !== null && prev.matchId !== rec.matchId) {
+    // The SEAT, not the room. `prev.matchId !== rec.matchId` used to guard this and it was
+    // one condition too many: a resume can move a connection to another seat of the SAME
+    // match, which orphans the seat it left just as thoroughly. Keyed on the player,
+    // which is what `room.seats` is keyed on, and the clause is a no-op for the ordinary
+    // same-seat resume because there `prev.playerId === rec.playerId`.
+    if (prev.matchId !== null && prev.playerId !== rec.playerId) {
       this.hub.rooms.get(prev.matchId)?.setConnected(prev.playerId, false, this.#cfg.now());
     }
     const ended = this.sessions.end(prev.sessionId, 'replaced by a new session on this connection');
