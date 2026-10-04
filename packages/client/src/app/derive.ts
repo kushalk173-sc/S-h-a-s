@@ -189,6 +189,19 @@ export function poolTotal(p: Pool): number {
  */
 const EMPTY_POOL: Pool = { funds: 0, clout: 0, media: 0, trust: 0 };
 
+/**
+ * A resource draft with every denomination named at zero.
+ *
+ * Named rather than written `{}` at call sites because `{}` is a draft that
+ * `deltaTotal` reads as 0 and `shortfall` reads as satisfied — identical to
+ * `{funds: 0}`, but it renders `undefined / 12` in the picker's `want / have`
+ * fraction instead of `0 / 12`. The picker's aria-label then reads "You hold 12,
+ * undefined chosen", which is what a screen-reader user is told.
+ */
+export function emptyDraft(): Readonly<Record<string, number>> {
+  return { funds: 0, clout: 0, media: 0, trust: 0 };
+}
+
 export function deltaTotal(d: Delta): number {
   return (d.funds ?? 0) + (d.clout ?? 0) + (d.media ?? 0) + (d.trust ?? 0);
 }

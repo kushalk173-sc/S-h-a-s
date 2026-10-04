@@ -334,10 +334,11 @@ const P3: PlayerID = 'p3';
 // ─────────────────────────── the harness, mirroring GameScreen ───────────────────
 
 /**
- * `ChoiceResolver` is a CONTROLLED dialog: the draft and the picked area ids live
- * in `GameScreen` and come back as props. Driving it with a bare `vi.fn()` would
- * freeze the draft at zero and make every assertion vacuous, so the harness runs
- * the same one-way loop the real screen does.
+ * `ChoiceResolver` keeps the PICKED AREA IDS controlled — they are board picks, so
+ * `GameScreen` owns them — and keeps the RESOURCE DRAFT itself, keyed on the
+ * decision id. Driving it with a bare `vi.fn()` for either would make every
+ * assertion vacuous, so the harness runs the same one-way loop the real screen
+ * does for the ids, and presses the picker for the draft.
  *
  * The stand-in board stands in for the 129-slot SVG, which is not this file's to
  * render. Crucially it gates on the CLIENT'S OWN `targetableAreas` — the same
@@ -352,13 +353,8 @@ function Harness({
   sc: Scenario;
   onResolved: (pick: ChoicePick) => void;
 }) {
-  const [draft, setDraft] = useState<Readonly<Record<string, number>>>({
-    funds: 0,
-    clout: 0,
-    media: 0,
-    trust: 0,
-  });
   const [pickedAreaIds, setPickedAreaIds] = useState<readonly string[]>([]);
+
   const state = buildState(sc);
   const owed = state.choices.find((c) => c.player === sc.you)?.choice ?? null;
   const legal: ReadonlySet<string> =
@@ -390,8 +386,6 @@ function Harness({
     // is held to the engine's own refusal strings below rather than a local check.
     onResolveCard: (_id, cardId) => onResolved({ kind: 'card', cardId }),
     recycle: recycleNames(sc),
-    draft,
-    onDraft: setDraft,
   };
 
   return (

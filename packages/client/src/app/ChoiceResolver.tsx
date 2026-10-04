@@ -30,6 +30,8 @@
 
 import { useMemo, useState } from 'react';
 
+import { emptyDraft } from './derive.ts';
+
 import type { ClientState, PlayerID } from '@shasn/engine';
 
 import { choosableCards, choosablePlayers, choosableZones, isVoterDecision, myChoices, pegMoveOptions, targetableAreas, type MyChoice, type PegDestChoice } from './derive.ts';
@@ -71,14 +73,82 @@ export type ChoiceResolverProps = {
    * is safe to make on the server's behalf.
    */
   readonly recycle: readonly { readonly id: string; readonly name: string }[];
-  /** The draft the resource picker is holding, when it is for this choice. */
-  readonly draft: Readonly<Record<string, number>>;
-  readonly onDraft: (next: Readonly<Record<string, number>>) => void;
 };
 
+/**
+ * ═══════════════════════════ DEFECT C — WHY THE DRAFT LIVES HERE ═══════════════════════════
+ *
+ * THE OVER-CAP DISCARD COULD NOT BE DISCHARGED. Ten playthroughs, 300+ turns each:
+ * every seat over its cap, every seat pressing DISCARD every turn, and not one
+ * resource ever left the pool. The dialog read `40 of 41 chosen. 1 still to choose.`
+ * for the whole game.
+ *
+ * ## WHERE THE DRAFT USED TO LIVE, AND WHY THAT IS A LOCK
+ *
+ * `app.picker.pick`, in `app/store.ts` — ONE slot, shared by the redraw payment,
+ * the Conspiracy purchase, Prospecting, the trade composer AND this dialog. And
+ * `GameScreen` runs
+ *
+ *     useEffect(() => { clearTurnInteraction(); }, [store.viewId, state?.turn])
+ *
+ * which sets `picker: null`. `store.viewId` is the sync envelope's counter
+ * (`net/store.ts`), so **every `match:state` the server sends nulls the draft** —
+ * a peer's answer, a log line, a card played two seats away. Nothing has to be
+ * wrong for this to bite: at a table of three, somebody is always doing something.
+ *
+ * So the number of `+` presses a player could bank between two broadcasts was
+ * the number of resources they could discard. At an ask of 41 that is a
+ * permanent lock, and it is not a race — it is arithmetic.
+ *
+ * ## THE TWO FACTS THAT MAKE IT AN ARITHMETIC LOCK RATHER THAN AN UNLUCKY ONE
+ *
+ * 1. **The draft had to be re-entered from nothing, every single time.** The
+ *    evidence is in the harness arcs: `$TEMP/opencode/shasn-play/client-verify.json`
+ *    carries 41 consecutive `picker-unsolved` events whose `status` is the SAME
+ *    `"40 of 41 chosen. 1 still to choose."` — never `"39 of 41"`, which is what
+ *    a surviving draft would have read on the second attempt.
+ * 2. **A cap discard is the one ask in the game whose size is unbounded.** p12
+ *    makes the ask `held - cap`, and nothing returns resources except card
+ *    payouts (max 4). A seat that crosses the cap and cannot discharge it climbs
+ *    every turn: the recorded arcs hold 53 (`ask 41`) and 83 (`ask 71`) against
+ *    a cap of 12. So the ask GROWS while the number of presses the dialog can
+ *    absorb stays fixed. `lean-4.json` ends with a seat at 83 and a dialog
+ *    asking for 71 one-at-a-time.
+ *
+ * ## AND IT WAS ALSO CROSS-CONTAMINATION
+ *
+ * `onDraft` wrote into the shared slot, and when nothing was open it wrote
+ * `openPicker({ forKind: 'redraw', total: 0, … })` — a REDRAW picker with nothing
+ * to pay, on a screen that is a full-viewport takeover. `AnswerScreen` renders
+ * `props.picker?.forKind === 'redraw'`, and `reduce.ts` keeps `RESOLVE_CHOICE`
+ * legal for the whole of an answer window, so a player who owed a cap discard
+ * while answering could summon a free redraw offer by pressing `+`. A control
+ * that appears because you pressed an unrelated one.
+ *
+ * ## THE FIX, AND WHY IT IS LOCAL STATE AND NOT A BETTER KEY
+ *
+ * The draft belongs to the DECISION, so it is keyed by `pending.id` and held
+ * here. A new decision empties it; nothing else touches it — not a broadcast, not
+ * a turn boundary, not a peer. Every other caller of this widget (the redraw
+ * payment, the Conspiracy purchase) still owns its own draft through the store,
+ * because those are payments for something the player is buying and they have a
+ * cancel; this dialog is a decision the table is blocked on and it does not.
+ */
 export function ChoiceResolver(props: ChoiceResolverProps) {
   const { state, you } = props;
   const owed = useMemo(() => myChoices(state, you), [state, you]);
+
+  /* The hooks run before every early return, and the draft is RESET BY THE
+     DECISION'S ID — the adjust-state-during-render pattern React documents for
+     exactly this, rather than an effect that paints one frame of the previous
+     decision's draft against the new decision's ask. */
+  const owedId = owed[0]?.pending.id ?? null;
+  const [draftFor, setDraftFor] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Readonly<Record<string, number>>>(emptyDraft());
+  if (draftFor !== owedId) {
+    setDraftFor(owedId);
+    setDraft(emptyDraft());
+  }
 
   if (owed.length === 0) return null;
   // The engine processes one at a time, and the last is the important one, so
@@ -223,8 +293,8 @@ So an area-shaped choice gets a scrim variant that does NOT cover the board:
             state={state}
             you={you}
             choice={first}
-            draft={props.draft}
-            onDraft={props.onDraft}
+            draft={draft}
+            onDraft={setDraft}
             onResolve={props.onResolveSteal}
           />
         ) : (
@@ -251,8 +321,8 @@ So an area-shaped choice gets a scrim variant that does NOT cover the board:
             mode={pending.choice.kind === 'gain-any' ? 'gain' : 'cost'}
             pool={me.resources}
             total={required}
-            pick={props.draft}
-            onPick={props.onDraft}
+            pick={draft}
+            onPick={setDraft}
             heading={
               pending.choice.kind === 'gain-any'
                 ? `Take exactly ${required}`
@@ -261,7 +331,7 @@ So an area-shaped choice gets a scrim variant that does NOT cover the board:
             confirmLabel={
               pending.choice.kind === 'gain-any' ? `TAKE ${required}` : `DISCARD ${required}`
             }
-            onConfirm={() => props.onResolveResources(pending.id, props.draft)}
+            onConfirm={() => props.onResolveResources(pending.id, draft)}
             /* No `onCancel`, and that is the correction rather than an omission.
                The old one was `() => undefined`: a Cancel button wired to a no-op,
                which reads as a way out of a decision that has none. `ResourcePicker`

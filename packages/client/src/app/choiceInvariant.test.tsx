@@ -72,6 +72,12 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, type RenderResult } from '@testing-library/react';
 import { useState } from 'react';
+// The BYTES of the two files whose wiring this defect was in. `?raw` is the route
+// `derive.test.ts` established, and it reads what the bundler sees rather than a
+// copy of it — see `the mirrors these rules rest on are still literally in
+// reduce.ts` below for why a source assertion is a gate and not a snapshot.
+import gameScreenSource from './GameScreen.tsx?raw';
+import resolverSource from './ChoiceResolver.tsx?raw';
 // TYPE-ONLY. See the header: the secret gate scans this directory whole.
 import type {
   Choice,
@@ -177,6 +183,17 @@ type Scenario = {
   readonly engineHasNoAnswer?: boolean;
   /** The `data-testid` of the sentence that must state the rule edge. */
   readonly statedBy?: string;
+  /**
+   * The decision's id, defaulting to one constant.
+   *
+   * It is settable because Defect C's fix keys the resource draft on the DECISION
+   * (`ChoiceResolver`'s own `pending.id`), so "a different decision starts from
+   * nothing" is a property of the fix and has to be assertable — and a harness
+   * that could only ever produce one id could not tell a key from a constant.
+   */
+  readonly choiceId?: string;
+  /** Turn number, so "a turn boundary does not wipe the draft" is assertable too. */
+  readonly turn?: number;
 };
 
 const NO_LOG: readonly LogEntry[] = [];
@@ -200,7 +217,7 @@ function buildState(sc: Scenario): ClientState {
     turnOrder: sc.seats.map((s) => s.player),
     activePlayer: sc.you,
     phase: 'actions',
-    turn: 1,
+    turn: sc.turn ?? 1,
     round: 1,
     finished: false,
     market: NO_MARKET,
@@ -208,7 +225,7 @@ function buildState(sc: Scenario): ClientState {
     conspiracyRemaining: 0,
     headlineQueue: [],
     activeHeadline: null,
-    choices: [{ id: 'ch-invariant', player: sc.you, choice: sc.choice }],
+    choices: [{ id: sc.choiceId ?? 'ch-invariant', player: sc.you, choice: sc.choice }],
     log: NO_LOG,
     deckSizes: { ideology: 0, voter: 0, conspiracy: 0, headline: 0 },
     awaitingAnswer: false,
@@ -237,12 +254,6 @@ type Refusal = { readonly areaId: string; readonly reason: string };
  * does — legal set, toggle, then the DERIVED cap.
  */
 function Harness({ sc, onResolved }: { sc: Scenario; onResolved: (p: ChoicePick) => void }) {
-  const [draft, setDraft] = useState<Readonly<Record<string, number>>>({
-    funds: 0,
-    clout: 0,
-    media: 0,
-    trust: 0,
-  });
   const [picks, setPicks] = useState<readonly string[]>([]);
   const [refusals, setRefusals] = useState<readonly Refusal[]>([]);
 
@@ -267,8 +278,6 @@ function Harness({ sc, onResolved }: { sc: Scenario; onResolved: (p: ChoicePick)
     onResolveZone: (_id, zoneId) => onResolved({ kind: 'zone', zoneId: zoneId as ZoneID }),
     onResolveCard: (_id, cardId) => onResolved({ kind: 'card', cardId }),
     recycle: recycleFor(sc),
-    draft,
-    onDraft: setDraft,
   };
 
   const onSlotActivate = (areaId: string): void => {
@@ -1585,9 +1594,231 @@ describe('the mirrors these rules rest on are still literally in reduce.ts', () 
     expect(engineReduceSource).toContain('if (deltaTotal(pick.res) !== c.count) return fail(`choose exactly ${c.count}`);');
   });
 
-  it('the theft is still clamped to the victim’s pool at resolution time', () => {
+it('the theft is still clamped to the victim’s pool at resolution time', () => {
     expect(engineReduceSource).toContain(
       'const want = Math.min(c.count, poolTotal(victim.resources));',
     );
+  });
+});
+
+// ─────────────────────────── Defect C ───────────────────────────
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * DEFECT C — AN OVER-CAP ASK COULD NOT BE DISCHARGED, IN TEN PLAYTHROUGHS
+ * ═════════════════════════════════════════════════════════════════════════════
+ *
+ * The sixth and worst recurrence of this project's dead-dialog class, and the only
+ * one where the dialog was not dead but UNREACHABLE: every seat sat at CONFIRM's
+ * threshold minus one, for three hundred turns, with a live table.
+ *
+ * The cause was not arithmetic — `requiredPicks` already mirrored the engine's
+ * clamp, and Defect B's suite above already drove an ask of 41 to CONFIRM. The
+ * cause was WHERE THE DRAFT LIVES. It was `app.picker.pick`, one store slot
+ * shared with three payment widgets, and `GameScreen` nulls it on
+ * `[store.viewId, state?.turn]` — `store.viewId` being the sync envelope's
+ * counter. **Every `match:state` the server sent erased a half-entered
+ * discard.**
+ *
+ * So the ask was dischargeable only if the player could bank every press between
+ * two broadcasts. At an ask of 41, that is a permanent lock. And the ask GROWS
+ * while the budget does not: p12's ask is `held - cap`, nothing returns resources
+ * except card payouts (max 4), so a seat that crosses and cannot discharge climbs
+ * every turn — the recorded arcs hold 53 (ask 41) and 83 (ask 71) against a cap
+ * of 12.
+ *
+ * The tell in the arcs is that the status line NEVER moved off the same number:
+ * `$TEMP/opencode/shasn-play/client-verify.json` holds 41 consecutive
+ * `picker-unsolved` events, every one reading `"40 of 41 chosen. 1 still to
+ * choose."` — and never `"39 of 41"`, which is what a surviving draft reads on
+ * the second attempt.
+ *
+ * THESE TESTS SIMULATE THE BROADCAST, which is the part the old suite could not
+ * see: `rerender` with a freshly-built `ClientState` is exactly what
+ * `net/store.ts` hands the tree when a peer's action lands, and `Harness` builds
+ * a new state object on every render, so a bare `rerender` IS a new envelope.
+ */
+
+/** `"N of M chosen"`, read off the status line the way the harness reads it. */
+function pickerProgress(root: HTMLElement): { chosen: number; need: number } {
+  const txt = (root.querySelector('[data-testid=picker-status]')?.textContent ?? '').replace(
+    /\s+/g,
+    ' ',
+  );
+  const m = /(\d+)\s+of\s+(\d+)\s+chosen/i.exec(txt);
+  if (m === null) throw new Error(`status not parseable: "${txt}"`);
+  return { chosen: Number(m[1]), need: Number(m[2]) };
+}
+
+/** The one enabled `+` in the picker grid — a denomination with headroom. */
+function enabledPlus(root: HTMLElement): HTMLElement | null {
+  return (
+    [...root.querySelectorAll<HTMLElement>('.picker__grid .row--tight button')].find(
+      (b) => enabled(b) && !(b.getAttribute('aria-label') ?? '').startsWith('Remove'),
+    ) ?? null
+  );
+}
+
+/** The `Delta` of a `resources` pick, once narrowed — the shape these asks dispatch. */
+function resOf(pick: ChoicePick): Readonly<Record<string, number | undefined>> {
+  expect(pick.kind, `expected a resources pick, got ${pick.kind}`).toBe('resources');
+  return pick.kind === 'resources' ? pick.res : {};
+}
+
+/**
+ * Press `+` until CONFIRM goes live, re-rendering between EVERY press.
+ *
+ * The re-render is the point, and it is deliberately the worst case rather than a
+ * realistic one: it asserts the draft survives a fresh `ClientState` on every
+ * single press, which is strictly stronger than "survives some of them" and is
+ * what the recorded failure needed to not happen.
+ */
+function fillAcrossBroadcasts(
+  r: RenderResult,
+  sc: Scenario,
+  onResolved: (p: ChoicePick) => void,
+  limit = 200,
+): void {
+  for (let i = 0; i < limit; i += 1) {
+    const confirm = confirmOf(r.container);
+    if (enabled(confirm)) return;
+    const plus = enabledPlus(r.container);
+    expect(plus, `${sc.name}: the picker ran out of enabled + at ${JSON.stringify(pickerProgress(r.container))}`).not.toBeNull();
+    fireEvent.click(plus as HTMLElement);
+    // A NEW `ClientState`, as `net/store.ts` delivers on every `match:state`. The
+    // `onResolved` seam is re-supplied because a rerender replaces every prop, and
+    // a seam replaced with a no-op would make the dispatch assertions vacuous.
+    r.rerender(<Harness sc={sc} onResolved={onResolved} />);
+  }
+  expect(confirmOf(r.container), `${sc.name}: CONFIRM never went live`).not.toBeNull();
+  expect(enabled(confirmOf(r.container)), `${sc.name}: CONFIRM never went live`).toBe(true);
+}
+
+describe('Defect C — an over-cap ask is DISCHARGEABLE, across a broadcast on every press', () => {
+  it('the recorded 53-held / cap-12 shape (ask 41) reaches a dispatched pick', () => {
+    // `$TEMP/opencode/shasn-play/client-verify.json`, `unsatisfiablePicker`:
+    //   { seat 1, demand 41, offer 13, status: "40 of 41 chosen. 1 still to choose." }
+    // `offer` is the harness's own headroom sum, `poolTotal - chosen`, so 13 + 40
+    // fixes the held pool at **53** — which is 41 asked and 13 spare, and why the
+    // status could read "1 still to choose" with thirteen resources in hand.
+    const held: Pool = { funds: 21, clout: 15, media: 14, trust: 3 };
+    expect(total(held), 'the recorded arc held 53, not 40').toBe(53);
+    const sc = OVER_CAP(41, held);
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    expect(pickerProgress(r.container), 'the ask is not the cap excess').toEqual({
+      chosen: 0,
+      need: 41,
+    });
+    fillAcrossBroadcasts(r, sc, (p) => seen.push(p));
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+
+    expect(seen, 'the 41-resource discard was never dispatched').toHaveLength(1);
+    const res = resOf(seen[0] as ChoicePick);
+    assertEngineAccepts(sc, seen[0] as ChoicePick);
+    expect(total(res), 'the pick does not discharge the whole ask').toBe(41);
+    const left = RES.reduce((n, r2) => n + held[r2] - (res[r2] ?? 0), 0);
+    expect(left, 'a player over a cap of 12 must be brought DOWN TO the cap').toBe(12);
+  });
+
+  it('the 459-turn shape — 0/0/12/12 against a cap of 12 — discharges', () => {
+    // The state every one of the ten playthroughs ended in, read off the DOM:
+    // `0 funds 0 clout 12 media 12 trust` with `12/12 held`. Three seats, all of
+    // them locked, for 300+ turns. Ask 12, and it goes.
+    const sc = OVER_CAP(12, { funds: 0, clout: 0, media: 12, trust: 12 });
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    expect(pickerProgress(r.container), 'the ask is not the cap excess').toEqual({
+      chosen: 0,
+      need: 12,
+    });
+    fillAcrossBroadcasts(r, sc, (p) => seen.push(p));
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+    expect(seen).toHaveLength(1);
+    assertEngineAccepts(sc, seen[0] as ChoicePick);
+    expect(total(resOf(seen[0] as ChoicePick))).toBe(12);
+  });
+
+  it('a draft is NOT the sum of the table: 71 against a cap of 12 is dischargeable too', () => {
+    // `lean-4.json` ends with a seat at 83 held, asking for 71. The seat that got
+    // there climbed one turn at a time because the ask never went down, and the
+    // largest recorded ask is the one this asserts, because it is the case where
+    // "press + until it works" stops being a strategy at all.
+    const held: Pool = { funds: 21, clout: 15, media: 33, trust: 14 };
+    expect(total(held), 'the recorded lean-4 seat held 83').toBe(83);
+    const sc = OVER_CAP(71, held);
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    expect(pickerProgress(r.container).need).toBe(71);
+    fillAcrossBroadcasts(r, sc, (p) => seen.push(p));
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+    expect(seen).toHaveLength(1);
+    assertEngineAccepts(sc, seen[0] as ChoicePick);
+    expect(total(resOf(seen[0] as ChoicePick))).toBe(71);
+  });
+
+  it('the draft survives a TURN boundary as well as a broadcast', () => {
+    // `clearTurnInteraction` was keyed on `[store.viewId, state?.turn]` — two
+    // dependencies, so pinning only the first would have left half the bug.
+    const sc = OVER_CAP(12, { funds: 0, clout: 0, media: 12, trust: 12 });
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    for (let i = 0; i < 5; i += 1) {
+      fireEvent.click(enabledPlus(r.container) as HTMLElement);
+      r.rerender(<Harness sc={{ ...sc, turn: (sc.turn ?? 1) + i + 1 }} onResolved={() => undefined} />);
+    }
+    expect(pickerProgress(r.container).chosen, 'a turn boundary wiped the draft').toBe(5);
+    fillAcrossBroadcasts(r, sc, (p) => seen.push(p));
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+    expect(seen).toHaveLength(1);
+    expect(total(resOf(seen[0] as ChoicePick))).toBe(12);
+  });
+
+  it('a DIFFERENT decision starts from nothing — the draft is keyed, not sticky', () => {
+    // The other half of the fix. Keying the draft on `pending.id` is what makes it
+    // safe to stop clearing it on every broadcast: a decision the table has moved
+    // on from must not inherit the previous one's arithmetic, or CONFIRM would go
+    // live against a draft composed for a different ask.
+    const first = OVER_CAP(12, { funds: 0, clout: 0, media: 12, trust: 12 });
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={{ ...first, choiceId: 'ch-one' }} onResolved={(p) => seen.push(p)} />);
+    for (let i = 0; i < 7; i += 1) fireEvent.click(enabledPlus(r.container) as HTMLElement);
+    expect(pickerProgress(r.container).chosen).toBe(7);
+
+    const second = { ...first, choiceId: 'ch-two', choice: { kind: 'gain-any' as const, count: 2, reason: 'Card effect' as const } };
+    r.rerender(<Harness sc={second} onResolved={(p) => seen.push(p)} />);
+    expect(
+      pickerProgress(r.container),
+      'the new decision inherited the old decision’s draft',
+    ).toEqual({ chosen: 0, need: 2 });
+  });
+
+  it('the discard draft is NOT written into the shared payment picker any more', () => {
+    // The cross-contamination half. `onDraft` used to write into `app.picker.pick`,
+    // and when nothing was open it wrote `openPicker({ forKind: 'redraw', total: 0 })`
+    // — a redraw offer with nothing to pay, summoned by pressing `+` on a discard.
+    // `reduce.ts` keeps `RESOLVE_CHOICE` legal for the whole of an answer window,
+    // so that offer could appear on the answer screen, which is a full-viewport
+    // takeover that is supposed to own exactly one commit control.
+    //
+    // Asserted on the SOURCE rather than on a render, because the symptom was a
+    // store write from a component that has no store: there is no DOM to catch it.
+    // `?raw` is the route `derive.test.ts` established, and it reads the bytes the
+    // bundler sees rather than a copy of them.
+    expect(resolverSource, 'ChoiceResolver takes a draft from the store again').not.toMatch(
+      /readonly draft:/,
+    );
+    expect(resolverSource, 'ChoiceResolver takes an onDraft from the store again').not.toMatch(
+      /readonly onDraft:/,
+    );
+    expect(
+      gameScreenSource,
+      'GameScreen passes a store-backed draft into the choice resolver again',
+    ).not.toMatch(/draft=\{app\.picker\?\.pick/);
+    // …and the placeholder that made a free redraw offer is gone with it.
+    expect(
+      gameScreenSource,
+      'GameScreen writes a redraw picker with no payment into the shared slot again',
+    ).not.toContain("openPicker({ forKind: 'redraw', total: 0, pick: next })");
   });
 });

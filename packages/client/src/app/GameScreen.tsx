@@ -1039,12 +1039,18 @@ export function GameScreen({ store }: GameScreenProps) {
             dispatch(actions.resolveChoice(choiceId, { kind: 'card', cardId }));
             clearPowerTarget();
           }}
-          draft={app.picker?.pick ?? {}}
-          onDraft={(next) => {
-            const p = app.picker;
-            if (p === null) openPicker({ forKind: 'redraw', total: 0, pick: next });
-            else openPicker({ ...p, pick: next });
-          }}
+          /*
+             NO `draft` / `onDraft`, AND THE ABSENCE IS THE FIX.
+             The draft used to be `app.picker.pick` — one store slot shared with the
+             redraw payment, the Conspiracy purchase and the trade composer, and
+             nulled by `clearTurnInteraction()` on `[store.viewId, state?.turn]`. So
+             every `match:state` the server sent wiped a half-entered over-cap
+             discard, and at an ask of 41 against a cap of 12 that is a permanent
+             lock rather than a race: ten playthroughs, 300+ turns, no resource ever
+             discarded. `ChoiceResolver` now keys its own draft on the decision id.
+             The full argument, with the harness arcs as evidence, is on that
+             component.
+          */
         />
       ) : null}
 
