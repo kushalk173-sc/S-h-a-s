@@ -565,6 +565,61 @@ function legalZone(s: ClientState, me: PlayerID, effect: Effect | undefined): Zo
 }
 
 /**
+ * G1 — ONE `(voter, destination)` pair for a `'choose-peg-dest'` decision.
+ *
+ * ## THE CANDIDATE SET IS THE ENGINE'S, CLAUSE FOR CLAUSE
+ *
+ * `movablePegIds(state, c.source)` crossed with `pegDestinations(state, areaId)`, both
+ * re-derived here rather than approximated, because the engine validates the answer
+ * against the *same two expressions* and a pick outside them is a `reduce` refusal — which
+ * on a frozen seat is a dead table rather than a bad move. See the `case` above for the
+ * clause-by-clause argument and for why `scope` is descriptive rather than a filter.
+ *
+ * ## AND NO PREFERENCE IS EXPRESSED AMONG THE LEGAL MOVES
+ *
+ * The engine offers a SET and accepts any member, so the first pair in board order is a
+ * legal answer — the same reasoning as `choose-player` and `choose-zone` above.
+ *
+ * **The obvious refinement was considered and is deliberately not in here**, and this
+ * file has already paid for the lesson once. A relocation can strand a zone exactly the
+ * way `convert-voter` does — `orderedAreas` documents a measured 4-seat seed 18 where a
+ * pair of conversions killed `north_west` for the rest of the game — so ranking pairs by
+ * "both constituencies still decidable afterwards" is the obvious move, and it is the
+ * same class of refinement `targetZone`'s note records being MEASURED AND REJECTED:
+ * it perturbs every trajectory, so it buys a reshuffle of the failure rather than an exit
+ * from it. There is exactly one reactive card that raises this decision and it appears
+ * a handful of times in a 20-seed sweep, so the evidence either way would be thin. The
+ * honest form of this driver is the first legal move, and if a stall ever traces to this
+ * pick the fix belongs in a measurement rather than in a guess. Recorded here so the next
+ * reader knows the omission is a decision and not an oversight.
+ *
+ * `null` is reachable only when the board moved between the offer and the answer.
+ */
+export function pegMove(s: ClientState, choice: PendingChoice): ChoicePick | null {
+  const c = choice.choice;
+  if (c.kind !== 'choose-peg-dest') return null;
+  // `c.source` — the card's ACTOR — and never `choice.player`, the answerer. This is the
+  // line that makes GREAT LEADER, BAD ECONOMY answerable at all.
+  const owner = c.source;
+  for (const z of s.zones) {
+    for (const a of z.areas) {
+      // `movablePegIds`: the peg is there, it is the source's, it is not a majority
+      // voter, and it is not in a Volatile Area.
+      if (a.peg === null || a.peg.owner !== owner) continue;
+      if (a.peg.majority || a.volatile) continue;
+      for (const nz of s.zones) {
+        // `pegDestinations`: a DIFFERENT zone, and a neighbour of this one. The
+        // same-zone refusal is what stops the offer being a move that does nothing.
+        if (nz.id === z.id || !z.neighbours.includes(nz.id)) continue;
+        const spot = nz.areas.find((x) => x.peg === null);
+        if (spot !== undefined) return { kind: 'peg-dest', areaId: a.id, toAreaId: spot.id };
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * A legal pick for a `PendingChoice`, whatever raised it.
  *
  * Every branch is reachable against the shipped corpus. The `evict-voter`,
@@ -636,6 +691,52 @@ export function pickForChoice(s: ClientState, choice: PendingChoice): ChoicePick
       const zone = legalZone(s, me, choice.choice.effects[0]);
       return zone === null ? null : { kind: 'zone', zoneId: zone };
     }
+    /**
+     * G1 — GREAT LEADER, BAD ECONOMY: the answerer names ONE of the card's actor's
+     * voters AND an adjacent empty area for it to land in. The pick is the pair, and
+     * both halves are in the engine's accepted set by construction.
+     *
+     * ## THE PEG BELONGS TO `choice.source`, NOT TO `me` — which is what `scope` is for
+     *
+     * `scope` reads `'own'` when the answerer IS the card's actor and `'others'` when
+     * they are a different seat, and **it is descriptive: `resolveChoice` never reads
+     * it.** It decides on `peg.owner === c.source`, one expression, and `c.source` names
+     * the card's ACTOR — a different field from the answerer, which is the only reason
+     * `'others'` means anything. GREAT LEADER is the card that produces it: the card is
+     * played by one seat and answered by the player after them, so the voter on offer
+     * belongs to somebody who is not sitting in the dialog.
+     *
+     * So the trap is a filter on `me`. A driver that read `scope` as "the peg must be
+     * mine" would find nothing the moment a card handed the decision to another seat and
+     * throw `no legal pick` on a table the engine had just made answerable — and worse,
+     * the version that reads `scope === 'others' ? a.peg.owner !== me : a.peg.owner === me`
+     * would silently pick a *different seat's* voter on the `'own'` half, which
+     * `reduce` refuses. `source` is the filter. `scope` is read here only to record that
+     * it was considered, and `pegMove` asserts on it.
+     *
+     * ## THE THREE CLAUSES THE ENGINE FILTERS ON, ALL THREE MIRRORED
+     *
+     * `movablePegIds` refuses a peg that is not `c.source`'s, a MAJORITY peg (a majority
+     * peg IS the score, so moving it would move points rather than position), and a peg
+     * in a VOLATILE area (p18 makes a peg there permanent — a rules exclusion, and the
+     * reason the card names it rather than the engine approximating it). All three are
+     * read off the projection, where every peg is face up for every viewer.
+     *
+     * ## AND THE DESTINATION IS EMPTY **AND ADJACENT**
+     *
+     * `pegDestinations` collects every `peg === null` area in a zone neighbouring the
+     * peg's own, and refuses the peg's OWN zone — a peg lifted and put back in the same
+     * constituency changes nothing on the board, so refusing it is also what guarantees
+     * the decision never offers a move that does nothing. Adjacency is `neighbours` as
+     * the projection carries it, which `freshZones` copies out of `BOARD` and
+     * `areNeighbours` reads: the same fixed data, so there is no iteration-order
+     * dependency and a replayed match reproduces the pick (ENGINE-AUDIT R2).
+     *
+     * `null` when no pair exists, and reaching this arm with `null` means the board
+     * moved between the offer and the answer — `pegMoveOffered` guaranteed a pair then.
+     */
+    case 'choose-peg-dest':
+      return pegMove(s, choice);
     default:
       // Unreachable against a corpus the cards package has validated. Returning
       // `null` makes the caller throw with the kind in the message, which is the
