@@ -47,7 +47,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { loadCorpus, toEngineConspiracyCard, toEngineHeadlineCard, toEngineIdeologyCard, toEngineVoterCard } from '../src/corpus.js';
-import { RULES, RESOURCES, deltaTotal, type CardID, type CardIndex, type ConspiracyCard, type Effect, type PlayerID } from '../src/engine.js';
+import { RULES, RESOURCES, deltaTotal, type CardID, type CardIndex, type ConspiracyCard, type Effect, type HeadlineCard, type PlayerID } from '../src/engine.js';
 
 import { reduce, type Ctx } from '../../engine/src/reduce';
 import { setup } from '../../engine/src/setup';
@@ -136,6 +136,22 @@ function game(): GameState {
   // one wrong answer a measurement of this kind must never give. (Same argument, same
   // fixture, as `playable.ts` and `card-playback.test.ts` make independently.)
   return { ...answered.state, _conspiracyDiscard: ['ct-et2040-002'] };
+}
+
+/**
+ * Do two effect lists say the same thing?
+ *
+ * **BY CONTENT, AND THE BY-IDENTITY VERSION OF THIS QUESTION WAS A SILENT NO-OP.** Both
+ * `play` and `resolveHeadline` used to ask "is the effect list I was handed the same object
+ * as the one on the spec?" and take the unmodified `CTX` when it was. That is true for a
+ * card resolved whole — and also true for a DELIBERATELY CORRUPTED card, because the
+ * corrupted list is the corruptor's own array and so is trivially identical to itself. So
+ * `disagreements(corruptedCard, …)` measured the card in the INDEX, not the card it was
+ * given, and every "checker has teeth" case that leaned on it was leaning on nothing. A
+ * corrupted card's text stays, its clause does not, and the index does not know.
+ */
+function sameEffects(a: readonly Effect[], b: readonly Effect[]): boolean {
+  return a.length === b.length && a.every((e, i) => JSON.stringify(e) === JSON.stringify(b[i]));
 }
 
 /**
@@ -351,6 +367,7 @@ function play(
   if (spec === undefined) return { error: `no card ${String(card)}` };
   const effects = override ?? spec.effects;
   const synthetic = CTX.cards.conspiracy[spec.id] === undefined;
+  const indexed = CTX.cards.conspiracy[spec.id];
   const ctx: Ctx = synthetic
     ? {
         ...CTX,
@@ -362,7 +379,7 @@ function play(
           },
         },
       }
-    : effects === spec.effects
+    : sameEffects(effects, indexed?.effects ?? [])
       ? CTX
       : {
           ...CTX,
@@ -370,7 +387,7 @@ function play(
             ...CTX.cards,
             conspiracy: {
               ...CTX.cards.conspiracy,
-              [spec.id]: { ...(CTX.cards.conspiracy[spec.id] as ConspiracyCard), effects },
+              [spec.id]: { ...(indexed as ConspiracyCard), effects },
             },
           },
         };
@@ -646,16 +663,33 @@ const OBLIGATIONS: Readonly<Record<Effect['op'], Obligation>> = {
   },
   'convert-voter': {
     because: '"convert N of an opponent\'s voters into your own"',
-    // THE CONSERVATION OBLIGATION. A conversion moves a peg; it does not make one and it
-    // does not destroy one. So one seat must rise AND another must fall by the same
-    // count — which is what distinguishes `convert-voter` from `evict` and from `voters`,
-    // all three of which move pegs. Pegs on the BOARD only, because a conversion is about
-    // placed voters; the mat is where the two sides would meet and mixing them would let
-    // a card satisfy the claim by creating and discarding nothing.
+    // THE CONSERVATION OBLIGATION, IN AGGREGATE. A conversion moves a peg; it does not make
+    // one and it does not destroy one. Pegs on the BOARD only, because a conversion is about
+    // placed voters; the mat is where the two sides would meet and mixing them would let a
+    // card satisfy the claim by creating and discarding nothing.
+    //
+    // **AGGREGATE, AND THE PER-PAIR FORM WAS WRONG — a finding, not a preference.** The
+    // first version demanded that ONE seat rise by a count that appears verbatim among the
+    // seats that fell. That holds only when a card takes both of its voters from ONE
+    // opponent, and it fired the moment headline coverage was switched on, on
+    // `hl-in2020-012` STAY IN YOUR LIMITS: *"Convert 2 of an opponent's voters into your
+    // own"*, which with two opponents on the board and no target converts one from each —
+    // `board p1 +2, p2 -1, p3 -1`. That is the printed sentence performed exactly, and the
+    // obligation called it a lie. The corrected claim is the one the card makes: the gain
+    // is ONE seat's, that seat is the caster, it is positive, and the total taken equals the
+    // total gained.
+    //
+    // Teeth, so this is a correction and not a relaxation: `voters` fails (it creates, so
+    // the downs do not balance the ups), `evict` and `discard-voter` fail (nothing rises),
+    // and a conversion that hands a peg to a second seat fails on `ups.length !== 1` —
+    // which is the specific thing that separates a conversion from a grant.
     holds: (e) => {
-      const ups = [...e.pegDelta.entries()].filter(([, d]) => d > 0).map(([, d]) => d);
-      const downs = [...e.pegDelta.entries()].filter(([, d]) => d < 0).map(([, d]) => -d);
-      return ups.some((u) => downs.includes(u));
+      const ups = [...e.pegDelta.entries()].filter(([, d]) => d > 0);
+      const downs = [...e.pegDelta.entries()].filter(([, d]) => d < 0);
+      if (ups.length !== 1) return false;
+      const [seat, gained] = ups[0] as [PlayerID, number];
+      const taken = downs.reduce((sum, [, d]) => sum - d, 0);
+      return seat === e.caster && gained > 0 && gained === taken;
     },
   },
   gerrymander: {
@@ -810,25 +844,94 @@ const SHIPPED: readonly ShippedCard[] = [
 ];
 
 /**
+ * Resolve a HEADLINE through the path its kind really takes, with `override` standing in
+ * for the card's own effect list.
+ *
+ * ## THE OBSTRUCTION THIS DISSOLVES, and it is a real one
+ *
+ * A Headline resolves through the post-turn queue, and the queue drains inside
+ * `ACK_HEADLINE`, which calls `nextHeadlineOrAdvance` — and that **advances the turn** when
+ * the queue empties. A leave-one-out measurement compares two states, so a turn boundary
+ * between them rewrites the active player, pays a different passive bonus, draws the next
+ * Ideology Card and can raise p12's own decision. Every delta would be that noise, and the
+ * honest-looking answer would be to stop measuring Headlines at all — which is exactly what
+ * `disagreements` used to do, silently, in one line: `if (card.kind !== 'conspiracy') return`.
+ *
+ * ## THE FIX IS A TWO-ENTRY QUEUE, and it is not a trick
+ *
+ * `ACK_HEADLINE` advances the turn **only when the queue empties**. So a position with the
+ * card under test `activeHeadline` and a SECOND entry still queued comes back with the
+ * card's effects applied, the first entry sliced off, and the turn exactly where it was.
+ * The comparison is then between two states that differ only by the clause. The second
+ * entry needs a card in the draw pile to resolve to, or `draw` returns `null` and the
+ * advance happens anyway.
+ *
+ * Nothing here reaches around the engine: the position is a `GameState`, the action is the
+ * real `ACK_HEADLINE`, and the effects are applied by `reduce`.
+ */
+function resolveHeadline(s: GameState, card: ShippedCard, override?: readonly Effect[]): { readonly raw: GameState; readonly settled: GameState } | { readonly error: string } {
+  const effects = override ?? card.effects;
+  const original = CTX.cards.headline[card.id];
+  if (original === undefined) return { error: `no headline card ${card.id} in the index` };
+  // CONTENT, not identity — see `sameEffects`. A corrupted Headline's effect list is the
+  // corruptor's own array, so the identity test this replaced was always true for one and
+  // the corruption never reached the engine.
+  const ctx: Ctx = sameEffects(effects, original.effects)
+    ? CTX
+    : { ...CTX, cards: { ...CTX.cards, headline: { ...CTX.cards.headline, [card.id]: { ...original, effects: effects as HeadlineCard['effects'] } } } };
+  // A Volatile Area whose placement drew the Headline — the shape p18 describes, and what
+  // `zone: 'this-zone'` reads off `headlineQueue[0].areaId`. The AREA does not have to be
+  // volatile for this file: `zone: 'this-zone'` needs the entry, and a headline that does
+  // not use the selector ignores it.
+  const areaId = s.zones.flatMap((z) => z.areas).find((a) => a.volatile)?.id ?? s.zones[0]?.areas[0]?.id;
+  if (areaId === undefined) return { error: 'the fixture board has no areas' };
+  // ONE card still to come, so the queue does not empty and the turn does not advance.
+  const nextUp = corpus.headline.map((h) => h.id).find((id) => id !== card.id);
+  if (nextUp === undefined) return { error: 'the corpus has no second headline to queue' };
+  const staged: GameState = {
+    ...s,
+    phase: 'headlines',
+    activeHeadline: card.id,
+    headlineQueue: [
+      { areaId, by: 'p1' },
+      { areaId, by: 'p1' },
+    ],
+    _headlineDraw: [nextUp, ...s._headlineDraw.filter((id) => id !== nextUp)],
+  };
+  const r = reduce(staged, 'p1', { type: 'ACK_HEADLINE' }, ctx);
+  if (!r.ok) return { error: r.error };
+  return { raw: r.state, settled: settle(r.state) };
+}
+
+/**
  * THE CHECK, once per card, over the card's OWN effect list.
  *
  * Returns every clause that failed its op's obligation, or `[]` when the card agrees with
  * itself. It is an exported plain function so the TEETH block below can call it on a
  * deliberately corrupted reduction — the only honest way to claim a checker has teeth is
  * to show it biting.
+ *
+ * ## IT WALKS HEADLINES TOO, and until 2026-10 it did not
+ *
+ * The old first line was `if (card.kind !== 'conspiracy') return bad;`, and the comment
+ * above it gave a real reason — a Headline resolves through the queue and could not be
+ * leave-one-out-ed from a fixed position. The reason was true and the conclusion was not:
+ * `resolveHeadline` above solves it with a two-entry queue, so **every** shipped effect is
+ * measured, Headline included. That matters because the ops only a Headline ships are
+ * exactly the ops nothing else reached: `move-peg` (GREAT LEADER, BAD ECONOMY),
+ * `borrow-power` and `set-cap`. A suite that skips a whole card kind is a suite whose
+ * second list is a list of CLAIMS rather than of coverage, and the card that caused a
+ * five-instance dead-table class was on the skipped side of the line.
  */
 export function disagreements(card: ShippedCard, position: GameState): readonly string[] {
   const bad: string[] = [];
-  // Headlines resolve through the post-turn queue, which advances the turn when the queue
-  // empties and so cannot be leave-one-out-ed from a fixed position. They are covered by
-  // the KIND arm below, which is a reduction-shape claim and needs no position.
-  if (card.kind !== 'conspiracy') return bad;
   if (card.effects.length === 0) return bad;
-  const base = play(position, card.id);
+  const resolve = card.kind === 'conspiracy' ? play : resolveHeadline;
+  const base = resolve(position, card);
   if ('error' in base) return [`${card.id} was refused outright: ${base.error}`];
   for (const [i, effect] of card.effects.entries()) {
     const rest = card.effects.filter((_, j) => j !== i) as Effect[];
-    const without = play(position, card.id, rest);
+    const without = resolve(position, card, rest);
     if ('error' in without) {
       bad.push(`${card.id} clause ${i} (${effect.op}): removing it changed the refusal (${without.error}), so the clause cannot be measured`);
       continue;
@@ -893,17 +996,24 @@ function explain(e: ClauseEffect): string {
 }
 
 describe('semantic agreement — every clause of every shipped card does what its op promises', () => {
-  it('no Conspiracy Card clause contradicts the op it is written with', () => {
+  it('no shipped card clause contradicts the op it is written with, CONSPIRACY OR HEADLINE', () => {
+    // THE HEADLINES ARE IN HERE NOW, and their being here is the fix. `disagreements` used
+    // to return `[]` for every Headline on its first line, so the sweep asserted a clause
+    // count that was silently conspiracy-only and the ops a Headline alone ships —
+    // `move-peg`, `borrow-power`, `set-cap` — were never measured by anything in this file.
+    // `resolveHeadline`'s two-entry queue is what makes the measurement possible at all.
     const position = game();
     const failures: string[] = [];
     let checked = 0;
+    let headlines = 0;
     for (const card of SHIPPED) {
-      if (card.kind !== 'conspiracy') continue;
       if (card.effects.length === 0) continue;
       failures.push(...disagreements(card, position));
       checked += 1;
+      if (card.kind === 'headline') headlines += 1;
     }
     expect(checked, 'no card was checked, so nothing was proved').toBeGreaterThan(20);
+    expect(headlines, 'no HEADLINE was checked, so the skipped half is back').toBeGreaterThanOrEqual(20);
     expect(failures, `${failures.length} clause(s) do not do what their op promises:\n${failures.join('\n')}`).toEqual([]);
   });
 
@@ -913,18 +1023,21 @@ describe('semantic agreement — every clause of every shipped card does what it
     // be different from.
     //
     // The direction is deliberately ONE-WAY, and the other direction is the interesting
-    // one: an obligation may exist for an op no Conspiracy Card uses, because a Headline
-    // resolves through the queue and cannot be leave-one-out-ed from a fixed position. The
-    // two ops in that position — `borrow-power` and `set-cap` — ship on Headline Cards
-    // ONLY, and that is stated rather than left as a silent gap: they are in
-    // `RESTRICTION_KIND_CLAIMS`' shadow (a `borrowed-powers` entry and a `capOverride`
-    // respectively) and `packages/cards/test/card-playback.test.ts` drives both.
-    // `move-peg` is in that position too — GREAT LEADER, BAD ECONOMY is a Headline
-    // (REF 4.1) — and it is not merely LISTED here: the clause checker above walks every
-    // shipped effect, headline included, through `OBLIGATIONS` and fails on one that does
-    // not hold, so an obligation nothing checks is still a hole. `gain-any` LEFT this list
-    // when FEED THE TICKER shipped as `ct-et2040-020`, which is the assertion working: an
-    // op that used to have no Conspiracy Card at all now has one, and the list says so.
+    // one: an obligation may exist for an op no Conspiracy Card uses. Three ops are in
+    // that position — `borrow-power`, `set-cap` and `move-peg` — and all three ship on
+    // HEADLINE Cards ONLY. That is now a fact about the SWEEP rather than about coverage:
+    // the clause checker above walks every shipped effect, headline included, through
+    // `OBLIGATIONS` and fails on one that does not hold, so "no Conspiracy Card uses it" is
+    // no longer the same sentence as "nothing checks it". `set-cap` and `borrow-power` are
+    // additionally checked by kind (`RESTRICTION_KIND_CLAIMS`' shadow: a `borrowed-powers`
+    // entry and a `capOverride`) and `packages/cards/test/card-playback.test.ts` drives
+    // both; `move-peg` has a behavioural probe of its own in the `move-peg` block below,
+    // because its obligation (`choiceDelta > 0`) is about the OFFER and the offer needs the
+    // trigger to fire, which a headline's own resolution does not do.
+    //
+    // `gain-any` LEFT this list when FEED THE TICKER shipped as `ct-et2040-020`, which is
+    // the assertion working: an op that used to have no Conspiracy Card at all now has one,
+    // and the list says so.
     const used = new Set<Effect['op']>();
     for (const card of SHIPPED) {
       if (card.kind !== 'conspiracy') continue;
@@ -979,6 +1092,172 @@ describe('semantic agreement — every clause of every shipped card does what it
     expect(unused, `${unused.length} exclusion(s) match no shipped card:\n${unused.join('\n')}`).toEqual([]);
     const covered = SHIPPED.filter((c) => EXCLUDED.some((x) => x.pattern.test(c.text)) || RESTRICTION_KIND_CLAIMS.some((k) => k.printed.test(c.text)));
     expect(covered.length, 'no shipped card text is covered by any claim or exclusion, so the arms are not reaching the corpus').toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────── `move-peg`: the probe that HAS to be behavioural ───────────────────────────
+
+/**
+ * GREAT LEADER, BAD ECONOMY (`hl-et2040-022`), and the reason this block exists at all.
+ *
+ * ## WHAT THE CLAUSE SWEEP CANNOT SEE ABOUT THIS OP
+ *
+ * `move-peg`'s obligation is `choiceDelta > 0` — *"the OFFER was made"* — and that is the
+ * right shape for a card whose printed sentence lives inside a decision. But GREAT LEADER
+ * is a SCOPED clause: `when: 'on-voter-influenced'`, `until: 'rest-of-game'` and a
+ * three-voter condition. Resolving the Headline therefore installs a live effect and
+ * offers nothing, so the sweep's `scoped` branch measures `liveEffectDelta` — "did it
+ * install a hook" — and stops. The hook never fires in a headline resolution.
+ *
+ * Before headline coverage existed the sweep did not even reach that branch, because
+ * `disagreements` returned `[]` for every Headline on its first line. So **the op had an
+ * obligation, and nothing in this file ran it**, and the list at
+ * "an op a CONSPIRACY CARD uses" cited this very clause as its justification for keeping
+ * `move-peg` on a reached-by-nobody list. That is a claim about coverage made by a
+ * coverage list, which is not evidence.
+ *
+ * ## SO THIS IS A BEHAVIOURAL PROBE, and it is the instrument the C1 block already uses
+ *
+ * Drive the real card from the real engine: resolve the Headline, then have its owner
+ * influence a 3-Voter Card, and assert that a `'choose-peg-dest'` is raised for the seat
+ * AFTER them — naming the OWNER's peg, which is the whole of the card — and that
+ * answering it moves that peg to an empty area in a NEIGHBOURING zone.
+ *
+ * This is also the honest answer to "does `reduce()` execute `move-peg` at all": **yes**,
+ * in two places. `applyEffect`'s `case 'move-peg'` raises the decision and
+ * `resolveChoice`'s `case 'choose-peg-dest'` performs the two `setArea` calls. The engine
+ * was never the problem; the checker was the only thing in the repository that could not
+ * see it.
+ */
+describe('move-peg is EXECUTED, which is the only thing a per-clause sweep cannot show', () => {
+  /** A 3-Voter Card, priced in Funds, taken from the shipped corpus rather than invented. */
+  const THREE_VOTERS = 'vo-core-009';
+
+  /** The card under test, taken from `SHIPPED` so the fixture is the shipped reduction. */
+  function leader(): ShippedCard {
+    const c = SHIPPED.find((x) => x.id === 'hl-et2040-022');
+    if (c === undefined) throw new Error('GREAT LEADER, BAD ECONOMY is not in the corpus');
+    return c;
+  }
+
+  /**
+   * `game()`, arranged so the card has something to offer: p1 owns one NON-MAJORITY peg in
+   * `north_west`, `north` is empty and adjacent, and the HQ Mat's first slot is a
+   * 3-Voter Card p1 can afford — because `influencedVotersAtLeast: 3` is read off the
+   * PURCHASED CARD, not off a running total.
+   */
+  function arranged(): GameState {
+    const base = game();
+    return {
+      ...base,
+      market: [{ cardId: THREE_VOTERS, cost: { funds: 3 }, voters: 3 }, ...base.market.slice(1)],
+      players: {
+        ...base.players,
+        p1: { ...base.players.p1!, resources: { funds: 6, clout: 1, media: 1, trust: 1 } },
+      },
+      zones: base.zones.map((z) => ({
+        ...z,
+        areas: z.areas.map((a) => {
+          // The peg the card may offer: p1's, non-majority, in a zone with free neighbours.
+          if (a.id === 'north_west-01') return { ...a, peg: { owner: 'p1' as PlayerID, majority: false } };
+          // And no other peg anywhere, so "the peg on offer" is unambiguous.
+          return a.peg === null ? a : { ...a, peg: null };
+        }),
+      })),
+    };
+  }
+
+  /**
+   * THE INSTALLED HOOK, grafted onto a live `actions` position.
+   *
+   * **A FIXTURE EDIT, and it is labelled because it is the one thing in this block that is
+   * not the engine talking.** A Headline resolves through the post-turn queue, so the state
+   * the engine hands back is a `headlines` phase with the NEXT Headline queued — there is no
+   * action a player can take from it, and `INFLUENCE` is refused with *"answer your Ideology
+   * Card first"*. Draining the queue would advance the turn and take the card's owner out of
+   * the active seat, and `byOwner: true` means the influencer has to BE the owner.
+   *
+   * So the two halves are separated, which is what the block wants to assert anyway:
+   *
+   *  - "resolving the Headline installed the hook" is measured on the engine's own result;
+   *  - "the hook FIRES on the right event, names the right seat and the right owner, and the
+   *    answer relocates that peg" is measured on a position whose `liveEffects` is that
+   *    engine-produced array and whose everything else is a fixture.
+   *
+   * Nothing about the trigger is asserted by proxy: the `INFLUENCE` below is a real action
+   * through the real reducer, and `reduce` has no way to know the hook was grafted.
+   */
+  function installedOnLivePosition(): GameState {
+    const base = arranged();
+    const resolved = resolveHeadline(base, leader());
+    if ('error' in resolved) throw new Error(`GREAT LEADER was refused: ${resolved.error}`);
+    expect(resolved.raw.liveEffects.length, 'the Headline installed no live effect to graft').toBeGreaterThan(0);
+    return { ...base, liveEffects: resolved.raw.liveEffects };
+  }
+
+  it('installs a live effect and NOTHING else when the Headline resolves', () => {
+    const before = snapshot(arranged());
+    const r = resolveHeadline(arranged(), leader());
+    expect('error' in r, `the Headline was refused: ${'error' in r ? r.error : ''}`).toBe(false);
+    if ('error' in r) return;
+    const after = snapshot(r.settled);
+    expect(after.liveEffects - before.liveEffects, 'a lasting clause installed no live effect').toBeGreaterThan(0);
+    // The OFFER is the thing the trigger owes, and it is emphatically not owed at install.
+    expect(after.pendingChoices, 'the Headline offered a relocation before anything was influenced').toBe(before.pendingChoices);
+  });
+
+  it('and the trigger FIRES: the owner influences a 3-Voter Card and the NEXT seat is offered the owner\'s peg', () => {
+    const fired = reduce(installedOnLivePosition(), 'p1', { type: 'INFLUENCE', slot: 0 }, CTX);
+    expect(fired.ok, `INFLUENCE was refused: ${fired.ok ? '' : fired.error}`).toBe(true);
+    if (!fired.ok) return;
+
+    const offered = fired.state.choices.find((c) => c.choice.kind === 'choose-peg-dest');
+    expect(offered, 'influencing a 3-Voter Card raised no relocation offer at all').toBeDefined();
+    if (offered === undefined) return;
+    // THE SEAT, THE OWNER AND THE SCOPE — the three facts that make this card the card.
+    expect(offered.player, "the card says 'the player after you'").toBe('p2');
+    expect(offered.player === 'p1', 'the beneficiary must not be the actor').toBe(false);
+    expect(offered.choice.kind === 'choose-peg-dest' && offered.choice.source, 'the peg offered must be the ACTOR\'s').toBe('p1');
+    expect(offered.choice.kind === 'choose-peg-dest' && offered.choice.scope).toBe('others');
+  });
+
+  it('and answering it RELOCATES the owner\'s peg into a neighbouring zone, and only there', () => {
+    const start = installedOnLivePosition();
+    const fired = reduce(start, 'p1', { type: 'INFLUENCE', slot: 0 }, CTX);
+    if (!fired.ok) throw new Error(`INFLUENCE was refused: ${fired.error}`);
+    const offered = fired.state.choices.find((c) => c.choice.kind === 'choose-peg-dest');
+    if (offered === undefined) throw new Error('no relocation offer, so nothing to answer');
+
+    const moved = reduce(fired.state, offered.player, { type: 'RESOLVE_CHOICE', choiceId: offered.id, pick: { kind: 'peg-dest', areaId: 'north_west-01', toAreaId: 'north-01' } }, CTX);
+    expect(moved.ok, `the relocation was refused: ${moved.ok ? '' : moved.error}`).toBe(true);
+    if (!moved.ok) return;
+    const areas = moved.state.zones.flatMap((z) => z.areas);
+    expect(areas.find((a) => a.id === 'north_west-01')?.peg, 'the peg did not leave').toBeNull();
+    expect(areas.find((a) => a.id === 'north-01')?.peg, 'the peg did not land').toEqual({ owner: 'p1', majority: false });
+    expect(moved.events.some((e) => e.type === 'gerrymandered'), 'the client is told about the move').toBe(true);
+    // …and the negative half, because "it moved" alone would pass for a board-wide teleport.
+    const sameZone = reduce(fired.state, offered.player, { type: 'RESOLVE_CHOICE', choiceId: offered.id, pick: { kind: 'peg-dest', areaId: 'north_west-01', toAreaId: 'north_west-02' } }, CTX);
+    expect(sameZone.ok, 'a same-zone landing is not "adjacent" and must be refused').toBe(false);
+  });
+
+  it('and the clause sweep ALONE would not have caught any of that, which is why this block is separate', () => {
+    // The instrument-validity assertion, and the reason the two blocks are not merged. The
+    // sweep sees GREAT LEADER as a SCOPED clause and stops at "did it install a live effect",
+    // which is true of the shipped card and of a card whose hook never fires at all. If
+    // `disagreements` ever grows the power to fire the trigger, the first assertion below
+    // fails and the prose above can be deleted rather than left as a claim.
+    const base = arranged();
+    expect(disagreements(leader(), base), 'the sweep now detects the corruption this probe exists for').toEqual([]);
+    // …and the corruption the sweep DOES see: the hook removed, leaving a card that prints a
+    // relocation and can never perform one on its own trigger.
+    const unscoped: ShippedCard = { ...leader(), effects: [{ op: 'move-peg', n: 1, target: 'player-after' } as Effect] };
+    const installed = resolveHeadline(base, unscoped);
+    expect('error' in installed, `the unscoped card was refused: ${'error' in installed ? installed.error : ''}`).toBe(false);
+    if ('error' in installed) return;
+    expect(installed.raw.choices.some((c) => c.choice.kind === 'choose-peg-dest'), 'an unscoped move-peg offered nothing on resolution').toBe(true);
+    // …which is `applyEffect`'s arm being reachable at all, so the two engine sites are named
+    // here rather than left as a claim in a docstring.
+    expect(settle(installed.raw).zones.flatMap((z) => z.areas).find((a) => a.id === 'north_west-01')?.peg, 'answering the unscoped offer did not relocate the peg').toBeNull();
   });
 });
 
