@@ -380,9 +380,27 @@ export function LobbyScreen(props: LobbyScreenProps) {
       <div className="lobby__sheet">
         <div>
           <h1 className="lobby__h1">SHASN</h1>
+          {/* THE PITCH, AND IT IS THE FIRST THING THE PRODUCT SAYS.
+           *
+           * It used to read "...and you cannot see the card you are about to answer",
+           * which the full-information ruling made false — `FULL-INFORMATION.md` opens
+           * "The blind answer is gone", and every seat now sees the question, both
+           * answers, both Ideologues and both payouts before anybody answers. The
+           * audit's judgement was right that this is the highest-visibility stale
+           * string in the app: it is the first line a player reads.
+           *
+           * It survived because it is copy. None of the gates in the ruling can see
+           * copy — they are about what crosses the wire and what reaches the DOM — so
+           * this needed a gate of its own, and `staleWording.test.tsx` is it.
+           *
+           * WHAT THE NEW LINE PROMISES IS WHAT THE SERVER NOW SENDS, and no more: the
+           * two answers and the two payouts are on the card before the choice. It does
+           * NOT claim the payouts are knowable or that choosing is easy — the Ideologue
+           * balance still makes one side the better bet, and that is a balance problem
+           * argued in the corpus checker, not something a pitch line may paper over. */}
           <p className="lobby__sub">
-            Four Ideologues. Nine constituencies. One hundred and twenty-nine voters, and you
-            cannot see the card you are about to answer.
+            Four Ideologues. Nine constituencies. One hundred and twenty-nine voters, and both
+            answers — with what each one pays — printed before you choose.
           </p>
         </div>
 
