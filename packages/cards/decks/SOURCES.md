@@ -63,7 +63,7 @@ unchanged:
 
 - **31** ship as `adapted`, each with the dropped clause named in its `source`. That is 31
   Conspiracy and Headline Cards in the deck files, which is the whole of the corpus's
-  recovered material — **31 of 151 shipped cards, 21%**.
+  recovered material — **31 of 209 shipped cards, 15%**.
 - **19** do not ship at all: 17 are not representable, each listed in §4 below with the gap
   that blocks it, and 2 — DEEP THOUGHTS and THE GRETA EFFECT — are expressible and PLAYED
   but not yet in `decks/`. POLO RETREAT is a third of that shape and sits in §4.4.
@@ -102,7 +102,7 @@ is exhausted: everything past `ig-in2020-032` is authored.
 
 ## 3. Per-card index, all 151 shipped cards
 
-### `in2020` / ideology — 56 cards
+### `in2020` / ideology — 92 cards
 
 | # | card id | question | provenance | source |
 |---|---|---|---|---|
@@ -163,7 +163,73 @@ is exhausted: everything past `ig-in2020-032` is authored.
 | 55 | `ig-in2020-055` | Should the minister's own district get the new hospital? | `inferred` | original; REF §8.2 — the Showstopper side argues for the minister's own district |
 | 56 | `ig-in2020-056` | Should the border open to pilgrims without a visa for one month? | `inferred` | original; REF §8.2 |
 
-### `et2040` / ideology — 20 cards
+#### `ig-in2020-057` … `ig-in2020-092` — 36 cards authored 2026-10-04, closing the deck-size gap
+
+REF §2.2 ships **108** Ideology Cards per campaign and a session consumes **52–68** of
+them, so a campaign deck below 68 *guarantees* a table seeing the same dilemma twice
+inside one game. This deck held 56. REF §2.2's own number is the target and
+`src/balance.ts`'s `IDEOLOGY_CAMPAIGN_SIZE` is 108.
+
+**Every one of these 36 is `inferred` and every one names what it drops.** The standing
+dropped-clause note on each card is: *the physical card's second printed face (REF §5.3)
+and its ideologue nameplate* — neither is representable in `{question, sides}`, and REF
+§5.1 records that the real card prints no campaign framing, no flavour text and no effect
+clause, so **no condition, no seat-relative direction and no effect clause is dropped,
+because the printed card has none**. The remaining per-card clause — which Ideologue
+argues what — is on the card itself and is not repeated here.
+
+**Every side pays exactly 3 as a 2+1 split**, matching 150 of the 152 pre-existing sides.
+The two exceptions in the shipped deck (a `funds2+trust2` and a `funds2+media2`, both
+totalling 4) were not copied.
+
+**No new card is `COMPOSITION_DOMINANT`, and none is close.** The payouts were not chosen
+by eye. All **216** legal 2+1 payout pairs were scored by exact knapsack over the shipped
+market at all **1820** reachable holdings (`src/holdings.ts`), and only pairs where BOTH
+sides win a substantial share of holdings were used. Every new card is won by one side at
+roughly 330–500 holdings and by the other at roughly 320–500 — so each one is decisive
+for a player sitting on a narrow pool and a coin-flip for a player holding a spread, which
+is the axis the brief asked for.
+
+| # | card id | question | provenance | source |
+|---|---|---|---|---|
+| 57 | `ig-in2020-057` | Is it right for the vaccine to be free at every centre? | `inferred` | original; REF §8.2 register, REF §5 tone — Capitalist on the cold chain, Supremo on the ration |
+| 58 | `ig-in2020-058` | Should the border stay shut until the neighbouring states agree? | `inferred` | original; REF §8.2/§5 — Capitalist on grain that cannot move, Supremo on sovereignty |
+| 59 | `ig-in2020-059` | Should unused hospital beds be counted as savings or as capacity? | `inferred` | original; REF §8.2/§5 — Capitalist on the bed already paid for, Supremo on the unfilled ward |
+| 60 | `ig-in2020-060` | Should the electricity waiver cover the monsoon or the summer? | `inferred` | original; REF §8.2/§5 — Capitalist on arrears becoming custom, Supremo on the named month |
+| 61 | `ig-in2020-061` | Should the ruling party pay for its campaign from the treasury? | `inferred` | original; REF §8.2/§5 — Capitalist on raising its own money, Supremo on being owned |
+| 62 | `ig-in2020-062` | Must the oxygen shortage be announced before the cylinders run out? | `inferred` | original; REF §8.2/§5 — Capitalist on scarcity clearing, Showstopper on the hour it is said |
+| 63 | `ig-in2020-063` | Can a film shot at the old site be allowed to premiere? | `inferred` | original; REF §8.2/§5 — Capitalist on the settled fee, Showstopper on who must watch |
+| 64 | `ig-in2020-064` | Do you agree a paper should print the letters rejecting it? | `inferred` | original; REF §8.2/§5 — Capitalist on the cover price, Showstopper on a noticeboard |
+| 65 | `ig-in2020-065` | Is showing the empty seats a good idea? | `inferred` | original; REF §8.2/§5 — Capitalist on lighting, Showstopper on where the camera points |
+| 66 | `ig-in2020-066` | Should the exam centre move for the candidate who cannot travel? | `inferred` | original; REF §8.2/§5 — Capitalist on the precedent, Showstopper on the notice |
+| 67 | `ig-in2020-067` | Should the school meal continue for the children sent home? | `inferred` | original; REF §8.2/§5 — Capitalist on the closed register, Idealist on feeding where they are |
+| 68 | `ig-in2020-068` | Must the fuel surcharge be absorbed by the seller? | `inferred` | original; REF §8.2/§5 — Capitalist on passing it to the burner, Idealist on the old price |
+| 69 | `ig-in2020-069` | Should the free ration continue for those who can now afford it? | `inferred` | original; REF §8.2/§5 — Capitalist on a withdrawable subsidy, Idealist on restarting a list |
+| 70 | `ig-in2020-070` | Must the scholarship follow the college rather than the student? | `inferred` | original; REF §8.2/§5 — Capitalist on what is measurable, Idealist on the seat |
+| 71 | `ig-in2020-071` | Should the forest rules apply to the village older than the rules? | `inferred` | original; REF §8.2/§5 — Capitalist on the timber value, Idealist on knowledge older than paper |
+| 72 | `ig-in2020-072` | Must the army camp move away from the city wall? | `inferred` | original; REF §8.2/§5 — Supremo on the fort, Showstopper on a televised parade |
+| 73 | `ig-in2020-073` | Is cancelling the visit right once a flood is announced? | `inferred` | original; REF §8.2/§5 — Supremo on the presence being the policy, Showstopper on the bulletins |
+| 74 | `ig-in2020-074` | Should the press be allowed inside the counting hall? | `inferred` | original; REF §8.2/§5 — Supremo on the sovereign act, Showstopper on the queue policing it |
+| 75 | `ig-in2020-075` | Do you support lifting the curfew an hour earlier for the market? | `inferred` | original; REF §8.2/§5 — Supremo on the margin, Showstopper on the street filling |
+| 76 | `ig-in2020-076` | Should the network be cut during the examination season? | `inferred` | original; REF §8.2/§5 — Supremo on order preceding papers, Showstopper on the overnight story |
+| 77 | `ig-in2020-077` | Do you agree the state should keep a list of market visitors? | `inferred` | original; REF §8.2/§5 — Supremo on the account to correct, Idealist on the one morning it is read |
+| 78 | `ig-in2020-078` | Should the sentence be served in the prisoner's own village? | `inferred` | original; REF §8.2/§5 — Supremo on distance as the sentence, Idealist on the visiting family |
+| 79 | `ig-in2020-079` | Must the budget be published before the house approves it? | `inferred` | original; REF §8.2/§5 — Supremo on a budget defeated early, Idealist on daylight arithmetic |
+| 80 | `ig-in2020-080` | Should the army build the road instead of the contractor? | `inferred` | original; REF §8.2/§5 — Supremo on slowness as the arrangement, Idealist on idle hands |
+| 81 | `ig-in2020-081` | Do you agree the death penalty should stay for murder? | `inferred` | original; REF §8.2/§5 — Supremo on a law kept to be cited, Idealist on a law only quoted |
+| 82 | `ig-in2020-082` | Is printing the speech in full beforehand a good idea? | `inferred` | original; REF §8.2/§5 — Showstopper on the argument starting first, Idealist on the room's answer |
+| 83 | `ig-in2020-083` | Should the broadcaster's archive be deleted or kept? | `inferred` | original; REF §8.2/§5 — Showstopper on ammunition that keeps, Idealist on dating what was true |
+| 84 | `ig-in2020-084` | Must the spending be published while it is being spent? | `inferred` | original; REF §8.2/§5 — Showstopper on the donor as participant, Idealist on teaching the country to wait |
+| 85 | `ig-in2020-085` | Should the smallest party get the debate slot at its own hour? | `inferred` | original; REF §8.2/§5 — Showstopper on curiosity, Idealist on nobody being obliged to watch |
+| 86 | `ig-in2020-086` | Should the meeting be filmed in the language the objections came in? | `inferred` | original; REF §8.2/§5 — Showstopper on the translator as story, Idealist on better-made objections |
+| 87 | `ig-in2020-087` | Should the ward pay the private tanker or dig its own well? | `inferred` | original; REF §8.2/§5 — Capitalist on the invoiced tanker, Supremo on rented sovereignty |
+| 88 | `ig-in2020-088` | Should the streetlight be repaired first or the road? | `inferred` | original; REF §8.2/§5 — Capitalist on the night shift, Showstopper on the road noticing its own light |
+| 89 | `ig-in2020-089` | Should the public toilet keep running or be fenced? | `inferred` | original; REF §8.2/§5 — Capitalist on an unmeasurable return, Idealist on fencing away the unpaid |
+| 90 | `ig-in2020-090` | Should the night patrol be doubled or the street lit? | `inferred` | original; REF §8.2/§5 — Supremo on somebody answering for the dark, Showstopper on a lit room |
+| 91 | `ig-in2020-091` | Should the ration shop stay open past the closing hour? | `inferred` | original; REF §8.2/§5 — Supremo on the rule the post holds, Idealist on the queue as real hours |
+| 92 | `ig-in2020-092` | Should the school bus wait for the child who always runs late? | `inferred` | original; REF §8.2/§5 — Showstopper on forty children taught lateness, Idealist on the timetable |
+
+### `et2040` / ideology — 42 cards
 
 Entirely authored. REF §2.4 recovered **zero** ordinary question Ideology Cards from any
 campaign, so the Earth 2040 deck has no recovered material of any kind.
@@ -190,6 +256,41 @@ campaign, so the Earth 2040 deck has no recovered material of any kind.
 | 18 | `ig-et2040-018` | Should the state of emergency be renewed by default? | `inferred` |
 | 19 | `ig-et2040-019` | Should the seawall be named after the engineer or the town? | `inferred` |
 | 20 | `ig-et2040-020` | Should the climate curriculum be taught in every school? | `inferred` |
+
+#### `ig-et2040-021` … `ig-et2040-042` — 22 cards authored 2026-10-04
+
+Same construction and the same dropped-clause note as the India batch above: **the second
+printed face (REF §5.3) and the ideologue nameplate**, and no condition or effect clause
+because REF §5.1 prints none. All 22 are `inferred`; none is close to
+`COMPOSITION_DOMINANT`; every side pays exactly 3 as 2+1. The register is deliberately
+kept distinct from the India deck — the subject is planetary and the sentences are
+flatter, with no administrative noun doing the work that a ward tanker or a ration shop
+does in `in2020`.
+
+| # | card id | question | provenance |
+|---|---|---|---|
+| 21 | `ig-et2040-021` | Is selling the seabed licence to the highest bidder a good idea? | `inferred` |
+| 22 | `ig-et2040-022` | Should the lunar landing rights be auctioned by the kilo? | `inferred` |
+| 23 | `ig-et2040-023` | Should carbon be bought by the tonne or taxed by the tonne? | `inferred` |
+| 24 | `ig-et2040-024` | Should traffic in orbit be priced per tonne of lift? | `inferred` |
+| 25 | `ig-et2040-025` | Should the flood footage be released before the water recedes? | `inferred` |
+| 26 | `ig-et2040-026` | Must the water market stay shut while the taps are dry? | `inferred` |
+| 27 | `ig-et2040-027` | Should the summit be broadcast in one language or in every language? | `inferred` |
+| 28 | `ig-et2040-028` | Should the retirement age rise with the life expectancy it bought? | `inferred` |
+| 29 | `ig-et2040-029` | Should the machine decide when the appeal cannot be funded? | `inferred` |
+| 30 | `ig-et2040-030` | Should the model weights be closed when public money trained them? | `inferred` |
+| 31 | `ig-et2040-031` | Should the edited seed be released to the growers for nothing? | `inferred` |
+| 32 | `ig-et2040-032` | Should the longevity cure be rationed by age or by contribution? | `inferred` |
+| 33 | `ig-et2040-033` | Should the satellite that watches the ice also watch the border? | `inferred` |
+| 34 | `ig-et2040-034` | Should the emergency session be allowed to vote on camera? | `inferred` |
+| 35 | `ig-et2040-035` | Should the restored species be released before the pen is proven? | `inferred` |
+| 36 | `ig-et2040-036` | Should the seabed cable belong to the state or the consortium? | `inferred` |
+| 37 | `ig-et2040-037` | Must population be managed by permit rather than by price? | `inferred` |
+| 38 | `ig-et2040-038` | Should the retreat be voted on before the water or after it? | `inferred` |
+| 39 | `ig-et2040-039` | Should the river be allocated before the drought is declared? | `inferred` |
+| 40 | `ig-et2040-040` | Is on-air self-explanation by the news model a good idea? | `inferred` |
+| 41 | `ig-et2040-041` | Should the extinction be narrated or left to the sound? | `inferred` |
+| 42 | `ig-et2040-042` | Should school start at four or at six? | `inferred` |
 
 ### `et2040` / conspiracy — 16 cards
 
@@ -429,7 +530,7 @@ listed; see §6.
 | §8.1 questions 1–8 | ship as `ig-in2020-001` … `ig-in2020-008`, all `adapted`. Stems recovered; **no complete card was ever recovered** — REF §2.4 and REF §10 item 1 both record zero ordinary question cards in full |
 | §8.1 item 9, aerial bombing | ships as `ig-in2020-031`, `adapted`. Stem legible, **verb occluded**; REF §8.1 says do not treat as verbatim |
 | §8.1 item 10, Kashmiri farmers | ships as `ig-in2020-032`, `adapted`. Stem legible only to "FLY"; **object occluded**; REF §8.1 says do not treat as verbatim |
-| **Everything past `ig-in2020-032`** | **44 authored cards, `inferred`, and this is the honest shape of the whole file.** REF §2.4 names the three sources that would have closed this gap (a Tabletop Simulator mod, photo reviews, or buying the deck) and records that YouTube, Reddit and BoardGameGeek were all unreachable in that session. None of them was reachable from here either, so §2.4's own instruction governs: *"Do not fabricate card text. If none of the above lands, write original cards in the recovered register and cite §8."* Every one of them cites §8.2 on its `source` field, and none is tagged anything but `inferred` |
+| **Everything past `ig-in2020-032`** | **60 authored cards, `inferred`, and this is the honest shape of the whole file.** REF §2.4 names the three sources that would have closed this gap (a Tabletop Simulator mod, photo reviews, or buying the deck) and records that YouTube, Reddit and BoardGameGeek were all unreachable in that session. None of them was reachable from here either, so §2.4's own instruction governs: *"Do not fabricate card text. If none of the above lands, write original cards in the recovered register and cite §8."* Every one of them cites §8.2 on its `source` field, and none is tagged anything but `inferred` |
 | Any printed Ideology payout | not recovered. REF §10 item 2: payouts are icon discs, not numerals, and were never published in a crawlable text source |
 
 ### 4.6.1 Three answers rewritten 2026-10-04 — the dilemma defect no balance check could see
@@ -589,16 +690,15 @@ quote numbers from an earlier pass, it quotes today's.
 
 | | before | after (measured) |
 |---|---:|---:|
-| Total cards shipped | 64 | **151** |
-| Ideology Cards | 20 | **76** — India 56, Earth 2040 20 |
+| Total cards shipped | 64 | **209** |
+| Ideology Cards | 20 | **134** — India 92, Earth 2040 42 |
 | Voter Cards | 12 | 18 |
 | Conspiracy Cards | 14 | **27** |
 | Headline Cards | 18 | **30** |
 | `verbatim` | 0 | **0** — see §1, and BLOCK/DEFLECT are why |
 | `adapted` (carries recovered material) | 19 | **41** — 31 X-cards and 10 Ideology stems |
-| `inferred` | 45 | **110** — 86 of them Ideology Cards, and **all 24 authored since `ig-in2020-032`** |
+| `inferred` | 45 | **168** — 124 of them Ideology Cards, and **all 60 authored since `ig-in2020-032`** |
 | Cards carrying recovered text | 19 | **41** |
-| Distinct recovered cards with a recovered effect | 52 *(wrong; see §4)* | **51** — 54 rows less 3 campaign-reskin pairs |
 | …shipping `adapted` | — | **31** |
 | …playable but held back on a ruling | — | **1** — LAB-GROWN EARWORM, strictly stronger than printed |
 | Recovered cards not representable | 41 | **17 rows** — each in §4; the probe reads 14 inexpressible, the two-card difference being A COWARD OR A JOURNALIST? / CARD GAMES, which KNOWN-GAPS §3.1 records as now playing |
