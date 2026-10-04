@@ -352,6 +352,17 @@ export type LobbyScreenProps = {
   readonly onStart: () => void;
   readonly onLeave: () => void;
   readonly onSpectate: () => void;
+  /**
+   * Watch a room from the OPEN ROOMS list, holding no seat in it. A different
+   * action from `onSpectate`, and deliberately available on a FULL room.
+   */
+  readonly onWatchRoom: (lobbyId: string) => void;
+  /**
+   * This connection is watching rather than seated: it holds no seat, so the
+   * seat-taking controls are not rendered at all (§5.11 — the absence is the
+   * signal). A spectator that was given a room by `lobby:spectate`.
+   */
+  readonly spectator: boolean;
 };
 
 export function LobbyScreen(props: LobbyScreenProps) {
@@ -446,12 +457,30 @@ export function LobbyScreen(props: LobbyScreenProps) {
                     >
                       JOIN
                     </button>
+                    {/* WATCH, AND WHY IT IS NEVER DISABLED.
+                        Watching takes no seat — `lobby:spectate` mints a session no
+                        write door accepts — so it has none of `JOIN`'s conditions. It
+                        is specifically the FULL room that needs it: a full room's JOIN
+                        is disabled, which left a finished-or-full table impossible to
+                        watch from the real client at all. */}
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      onClick={() => props.onWatchRoom(l.lobbyId)}
+                      data-testid="watch-room"
+                      aria-label={`Watch ${l.name} without taking a seat`}
+                    >
+                      WATCH
+                    </button>
                   </div>
                 ))
               )}
               <button type="button" className="btn btn--sm" onClick={props.onList}>
                 REFRESH
               </button>
+              <p className="panel__note panel__note--quiet">
+                WATCH takes no seat. The watcher sees the whole board and cannot act.
+              </p>
             </div>
           </>
         ) : (
@@ -489,17 +518,23 @@ export function LobbyScreen(props: LobbyScreenProps) {
             </div>
 
             <div className="row">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  const me = lobby.seats.find((s) => s.you);
-                  props.onReady(me?.ready !== true);
-                }}
-                data-testid="ready-toggle"
-              >
-                {lobby.seats.find((s) => s.you)?.ready === true ? 'READY ✓' : 'READY'}
-              </button>
+              {/* No seat means no READY. `lobby:ready` reaches `hub.setReady`, which
+                  throws `NOT_IN_LOBBY` for anybody who is not a member, so a READY on
+                  this screen could only ever earn a refusal toast — §9.10's dead
+                  control. Absence is the spectator signal (§5.11). */}
+              {props.spectator ? null : (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    const me = lobby.seats.find((s) => s.you);
+                    props.onReady(me?.ready !== true);
+                  }}
+                  data-testid="ready-toggle"
+                >
+                  {lobby.seats.find((s) => s.you)?.ready === true ? 'READY ✓' : 'READY'}
+                </button>
+              )}
               {props.isHost ? (
                 <button
                   type="button"
@@ -512,13 +547,33 @@ export function LobbyScreen(props: LobbyScreenProps) {
                   START MATCH
                 </button>
               ) : null}
-              <button type="button" className="btn" onClick={props.onSpectate}>
-                WATCH INSTEAD
-              </button>
+              {/* THE LABEL NAMES BOTH HALVES, because it now does both.
+                  This used to read `WATCH INSTEAD` and sent `lobby:spectate` alone —
+                  which orphaned the seat this connection already held and hung the
+                  table. It now RELEASES the seat first (`Connection#giveUpSeatAndWatch`),
+                  and a button that quietly gives up a seat has to say so: an
+                  unreversible "instead" is not a decision a player can make by
+                  misreading a verb. */}
+              {props.spectator ? null : (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={props.onSpectate}
+                  data-testid="give-up-seat"
+                >
+                  GIVE UP MY SEAT AND WATCH
+                </button>
+              )}
               <button type="button" className="btn" onClick={props.onLeave} data-testid="leave-lobby">
                 LEAVE
               </button>
             </div>
+            {props.spectator ? (
+              <p className="panel__note panel__note--quiet" data-testid="spectating-note">
+                You are watching this room and holding no seat. You will see every card and the
+                whole board, and nothing you do here reaches the table.
+              </p>
+            ) : null}
             {!props.isHost ? (
               <p className="panel__note panel__note--quiet">Only the host can start the match.</p>
             ) : !props.canStart ? (

@@ -234,6 +234,57 @@ export class Connection {
   leaveLobby(): void {
     this.send({ t: 'lobby:leave' });
   }
+
+  /**
+   * Watch a room WITHOUT holding a seat in it.
+   *
+   * `lobby:spectate` mints a session with `role: 'spectator'`, which no write door
+   * will ever accept — so nothing this connection does afterwards can act for a
+   * player. That is only true if the connection holds no seat, which is why the
+   * room-list `WATCH` control is the only caller of this method: you watch from
+   * outside, and a full room can be watched because this frame asks for no seat.
+   */
+  watchRoom(lobbyId: string): boolean {
+    return this.send({ t: 'lobby:spectate', lobbyId });
+  }
+
+  /**
+   * GIVE UP YOUR SEAT, THEN WATCH THE ROOM. TWO FRAMES, AND THE ORDER IS THE FIX.
+   *
+   * ── WHY THIS METHOD EXISTS AT ALL ──────────────────────────────────────────
+   *
+   * A browser audit drove the `WATCH INSTEAD` button and hung a three-seat table
+   * permanently. The sequence on the wire was one frame: `lobby:spectate`. The
+   * server's spectator branch (`packages/server/src/index.ts` `#joinLobby`) mints a
+   * spectator session, assigns it to `conn.session` and RETURNS — it never calls
+   * `hub.leaveLobby`, so the seat the connection already held stays in the lobby
+   * with no connection behind it. The host then starts a match with that ghost in
+   * the turn order, and the table waits forever for a player who cannot exist:
+   * `activePlayer` is the orphan, `awaitingAnswer` is true, `finished` is false,
+   * and no client anywhere can answer. Unrecoverable.
+   *
+   * So the client does not ask to become a spectator. It RELEASES the seat first,
+   * through the server's own door, and only then asks to watch. `lobby:leave`
+   * reaches `#leaveLobby`, which is the one function that does what is needed:
+   * `this.hub.leaveLobby(lobbyId, rec.playerId)` frees the seat and
+   * `rec.lobbyId = null` detaches it. Both handlers are synchronous and the
+   * transport preserves frame order, so by the time `lobby:spectate` is handled
+   * there is provably no seat to orphan.
+   *
+   * THE ORDER IS NOT OPTIMISATION, IT IS CORRECTNESS, and it is why this is one
+   * method rather than two calls at a call site: `lobby:spectate` FIRST is the
+   * table-killer, and a call site that can express that order is a call site that
+   * can ship the bug.
+   *
+   * IF THE LEAVE DOES NOT LAND, THE WATCH IS NOT SENT. A `lobby:spectate` that
+   * arrives while the seat is still held reproduces the original hang exactly, so
+   * a half-delivered handover is reported as a failed handover: the player keeps
+   * their seat and sees the refusal, which is recoverable.
+   */
+  giveUpSeatAndWatch(lobbyId: string): boolean {
+    if (!this.send({ t: 'lobby:leave' })) return false;
+    return this.send({ t: 'lobby:spectate', lobbyId });
+  }
   setReady(ready: boolean): void {
     this.send({ t: 'lobby:ready', ready });
   }
@@ -258,8 +309,16 @@ export class Connection {
     this.send({ t: 'match:sync' });
   }
 
-  spectate(matchId: string): void {
-    this.send({ t: 'match:spectate', matchId });
+  /**
+   * Attach as a spectator to a match that is already running. The server's
+   * `#spectate` mints a spectator session and `#attach`es this connection to the
+   * room, so every later `match:state` arrives — read-only, because the write door
+   * refuses anything that is not a seat at that table.
+   *
+   * Returns whether the frame left, like every other send that a UI button acts on.
+   */
+  spectate(matchId: string): boolean {
+    return this.send({ t: 'match:spectate', matchId });
   }
 
   ping(nonce = ''): void {

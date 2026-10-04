@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 import type { ClientStore, SeatCount } from '../net/index.ts';
 
 import { LobbyScreen } from './Panels.tsx';
-import { connection, send } from './session.ts';
+import { send } from './session.ts';
 import { useApp } from './store.ts';
 
 export type LobbyScreenHarnessProps = {
@@ -53,6 +53,33 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
   }, [lobby?.lobbyId]);
 
   const lobbyId = lobby?.lobbyId ?? null;
+
+  /**
+   * THE HANDOFF FROM "WATCHING A ROOM" TO "WATCHING THE MATCH".
+   *
+   * `lobby:spectate` puts this connection in the room as a spectator, and the room's
+   * own `lobby:state` carries the `matchId` once the table has started — for a room
+   * that is ALREADY running, that is true on arrival, which is what makes the
+   * room-list `WATCH` control a working spectator entry point today.
+   *
+   * `match:spectate` is the frame that actually attaches a connection to a live room
+   * and starts delivering `match:state` to it (`#spectate` → `#attach`). Until this
+   * ran, nothing in `packages/client/src` sent it: the feature was fully implemented
+   * server-side and had no sender at all, so the spectator view could not be
+   * constructed from the real client. One effect, keyed on the match id, is the whole
+   * of it — and it cannot loop, because the frame's reply is a `match:state`, which
+   * unmounts this harness.
+   *
+   * A PLAYER NEVER TAKES THIS BRANCH: the guard is the session role, so a seated
+   * player whose room has started is left alone and resumes through
+   * `session:resume` as before.
+   */
+  const spectateMatchId =
+    store.session?.role === 'spectator' ? (lobby?.matchId ?? null) : null;
+  useEffect(() => {
+    if (spectateMatchId === null) return;
+    send((c) => c.spectate(spectateMatchId));
+  }, [spectateMatchId]);
 
   /**
    * Who "you" are, in a room.
@@ -90,12 +117,14 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
       onLeave={() => send((c) => c.leaveLobby())}
       onSpectate={() => {
         if (lobbyId === null) return;
-        // `lobby:spectate` is a distinct wire message from `lobby:join`: it
-        // creates a spectator session, which no write door will ever accept. The
-        // alternative — joining as a player and not playing — would take a seat
-        // away from a real player.
-        connection().send({ t: 'lobby:spectate', lobbyId });
+        // RELEASES THE SEAT FIRST, then asks to watch. See
+        // `Connection#giveUpSeatAndWatch`: `lobby:spectate` on its own replaces this
+        // connection's session with a spectator one and never returns the seat, which
+        // orphaned it in the lobby and hung the table the moment the host started.
+        send((c) => c.giveUpSeatAndWatch(lobbyId));
       }}
+      onWatchRoom={(id) => send((c) => c.watchRoom(id))}
+      spectator={store.session?.role === 'spectator'}
     />
   );
 }
