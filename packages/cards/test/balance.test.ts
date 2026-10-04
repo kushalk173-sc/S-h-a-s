@@ -891,17 +891,36 @@ describe('the shipped decks leave real choices — the positive proof', () => {
     expect(SESSION_ANSWERS_MIN).toBeLessThan(SESSION_ANSWERS_MAX);
     expect(IDEOLOGY_CAMPAIGN_SIZE).toBeGreaterThan(SESSION_ANSWERS_MAX);
 
-    // The shipped decks are BOTH short, and the deck players see every turn is the one
-    // that matters. `in2020` at 56 is below the 68 a session can consume, which is why
-    // the harness saw one question at turns 51, 107 and 193 — turn 51 is the end of the
-    // draw pile. This is REPORTED by the CLI, not enforced: the fix is 52 authored cards
-    // in REF §8.2's register, and a build failure would only restate what SOURCES.md §4.6
-    // already says.
+    // THE SHORTFALL WAS CLOSED on 2026-10-04 and this ruling is the new one. What was
+    // pinned here before was the FINDING: `in2020` at 56 sat below the 68 a session can
+    // consume, so a within-game repeat was guaranteed - the harness saw one question at
+    // turns 51, 107 and 193, and turn 51 was the end of the draw pile. The fix was 52
+    // authored cards in REF §8.2's register, and this test was the tripwire that said so
+    // ("the shortfall closed - update the ruling and the CLI text").
+    //
+    // So the pin is now inverted, and it is a FLOOR rather than an exact count on
+    // purpose: an exact count is a changelog that has to be edited by every future
+    // authoring pass, which is how a deck number rots. What must not move is the
+    // property, and the property is `in2020` no longer FORCING a repeat inside one game.
+    // `npm run balance` still prints the exact per-deck shortfall on every run, so the
+    // precise figure is reported rather than restated here.
     const india = loadIdeologyDeck('in2020');
-    expect(india.length, 'the shortfall closed - update the ruling and the CLI text').toBeLessThan(
-      SESSION_ANSWERS_MAX,
-    );
-    expect(IDEOLOGY_CAMPAIGN_SIZE - india.length, 'cards still to author').toBe(52);
+    const et2040 = loadIdeologyDeck('et2040');
+    expect(
+      india.length,
+      'the deck players see every turn must hold more cards than one session can consume',
+    ).toBeGreaterThanOrEqual(SESSION_ANSWERS_MAX);
+    // The second deck is not played every session and is still short; this pins that the
+    // recycling finding was not "solved" by growing one deck and forgetting the other.
+    expect(
+      et2040.length,
+      'Earth 2040 still recycles inside one session and `npm run balance` says so',
+    ).toBeLessThan(SESSION_ANSWERS_MAX);
+    // Together the two campaigns reach the reference size from REF §2.2.
+    expect(
+      india.length + et2040.length,
+      'cards still to author across both campaigns',
+    ).toBeGreaterThanOrEqual(IDEOLOGY_CAMPAIGN_SIZE);
   });
 });
 

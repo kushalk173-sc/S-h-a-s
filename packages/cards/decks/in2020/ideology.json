@@ -1071,6 +1071,234 @@
           "pays": { "clout": 2, "trust": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-in2020-057",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: the card's second printed face (REF 5.3) and its ideologue nameplate. Capitalist on who pays for the cold chain, Supremo on the admission a ration concedes. REF 5.1 prints no condition, no seat-relative direction and no effect clause, so none is dropped here.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the vaccine be free at every centre or sold at cost?",
+      "sides": [
+        {
+          "answer": "No. Somebody has to pay for the vials and the cold chain.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. A state that rations medicine admits it has a border.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-058",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on grain that cannot move, Supremo on what trade concedes about sovereignty. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the border stay shut until the neighbouring states agree?",
+      "sides": [
+        {
+          "answer": "No. Grain that cannot move is a famine with paperwork.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Trade does not make the other side sovereign here.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-059",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the bed already paid for, Supremo on what an unfilled ward is evidence of. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should unused hospital beds be counted as savings or as capacity?",
+      "sides": [
+        {
+          "answer": "Yes. An empty bed is a bed the budget has already bought.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Book them as capacity and the ward fills by December.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-060",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on arrears becoming custom, Supremo on the state naming the month it chooses to hurt. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the electricity waiver cover the monsoon or the summer?",
+      "sides": [
+        {
+          "answer": "No. Waive one and the other quarter's arrears become custom.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Pick the month that hurts and let the state name it.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-061",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a party that raises its own money, Supremo on what a party that cannot is owned by. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the ruling party pay for its campaign from the treasury?",
+      "sides": [
+        {
+          "answer": "No. Let it raise the money like everyone else does.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 1, "media": 2 }
+        },
+        {
+          "answer": "Yes. A party that cannot pay is a party somebody owns.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-062",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on scarcity clearing, Showstopper on the hour a shortage is said at. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the oxygen shortage be announced before the cylinders run out?",
+      "sides": [
+        {
+          "answer": "No. Scarcity clears faster than a statement does.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Say it on the hour and nobody asks twice.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-063",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the settled location fee, Showstopper on who is asked to watch the premiere. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a film shot at the old site be allowed to premiere?",
+      "sides": [
+        {
+          "answer": "Yes. The location fee is paid and the invoice is closed.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Hold the premiere where nobody has to watch it.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-064",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what the cover price is buying, Showstopper on a paper reduced to a noticeboard. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the paper print the letters that reject its own reporting?",
+      "sides": [
+        {
+          "answer": "No. Readers pay for the reporting, not the rebuttal.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. A paper that only agrees is a noticeboard with a masthead.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-065",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on an empty seat as lighting, Showstopper on where the camera is pointed. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the telecast show the empty seats?",
+      "sides": [
+        {
+          "answer": "No. Empty seats are a lighting problem, not a fact.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Point the camera at the floor and the hall fills.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-066",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the precedent an exception sets, Showstopper on the notice reaching the parents. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the exam centre move for the candidate who cannot travel?",
+      "sides": [
+        {
+          "answer": "No. One exception is a precedent with a waiting room.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 1, "media": 2 }
+        },
+        {
+          "answer": "Yes. Move the centre and put the notice where parents read it.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-077",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the account a register gives him, Idealist on the single morning it is read. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the state keep a list of who visited the market?",
+      "sides": [
+        {
+          "answer": "Yes. A state with no list has no account to correct.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "No. The list is read once, on the morning after it mattered.",
+          "ideologue": "idealist",
+          "pays": { "trust": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-078",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on distance as the sentence, Idealist on the family as the visiting party. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the sentence be served in the prisoner's own village?",
+      "sides": [
+        {
+          "answer": "No. The distance is the sentence. The rest is administration.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "Yes. A prison the family can reach is still a prison.",
+          "ideologue": "idealist",
+          "pays": { "trust": 1, "funds": 2 }
+        }
+      ]
     }
   ]
 }
