@@ -809,6 +809,68 @@ export type Effect = (
       readonly to: number;
       readonly target?: EffectTarget;
     }
+  /**
+   * G1 — MOVE ONE OF THE CARD'S OWN VOTERS to an ADJACENT ZONE. GREAT LEADER, BAD
+   * ECONOMY (REF 4.2.1).
+   *
+   * *"For the rest of the game, every time you influence a 3 Voter Card, the player
+   * after you may move 1 of your non-majority voters to an adjacent zone."*
+   *
+   * ## WHY THIS IS AN OP AND NOT A `target` ON `evict`
+   *
+   * Two independent reasons, and the second is the one that decides it.
+   *
+   *  1. **`evict` has no destination.** It resolves to a POOL — the peg goes back to its
+   *     owner's mat and re-grants a voter. This card does not return anything to
+   *     anybody; it RELOCATES a peg, and a relocation needs a second area id.
+   *  2. **`evict` is the wrong VERB, and the direction is what matters.** Eviction is
+   *     something done *to* a player. This card hands the beneficiary a free relocation
+   *     of a peg that is **not theirs** — the printed effect is a gift, and the only
+   *     thing the recipient loses is their freedom of movement elsewhere. Adding a
+   *     `target` to `evict` would make a card read as though it helps when it takes.
+   *
+   * ## WHOSE PEGS, AND WHY IT IS NOT A `target` ON THE OP
+   *
+   * **The pegs are always the CARD'S ACTOR's**, and `target` is the other axis: it says
+   * *who is allowed to move them*. `applyEffect` already resolves one `target` for a
+   * whole effect list, so a card cannot also say "move a chosen opponent's voter"; the
+   * one axis it can say is the beneficiary, and GREAT LEADER's beneficiary is
+   * `'player-after'` — which `EffectTarget` already carries for exactly this card and
+   * A COWARD OR A JOURNALIST?.
+   *
+   * ## WHAT IS LEGAL, and it is checked at BOTH ends of the decision
+   *
+   * The peg must belong to the card's actor, must **not** already be a majority voter
+   * (*"non-majority voters"*, and a majority peg is the score), and must not sit in a
+   * Volatile Area — p18 makes a peg there permanent, so it cannot be moved at all. The
+   * destination must be an **empty** area in a zone adjacent to the peg's zone
+   * (`Zone.neighbours`, already on the board).
+   *
+   * ## SATISFIABILITY, and why it raises NOTHING rather than raising a dead dialog
+   *
+   * `applyEffect` raises the `'choose-peg-dest'` decision **only when at least one
+   * movable peg AND at least one empty area in an adjacent zone both exist**. A selector
+   * that resolves to nothing raises nothing — the same rule `'chosen-zone'` follows and
+   * the same reason: an unsatisfiable decision freezes its owner, and `blockedBy` refuses
+   * every other action that player could take, so an unsatisfiable choice is a dead
+   * TABLE, not a stuck dialog. Proved exhaustively over peg layouts crossed with
+   * destination areas at 2/3/4/5 seats in `packages/engine/test/choices.test.ts`.
+   *
+   * ## VISIBILITY
+   *
+   * The decision enumerates **the board**, which is nine fixed areas with every peg face
+   * up and is on every payload already. It reads no pile and no hand. **No
+   * `_`-prefixed field is added** and `packages/server/test/secret-inventory.ts` owes
+   * nothing beyond classifying the kind under `'pegs'`.
+   *
+   * ## THE SCOPE FIELDS ARE ORDINARY
+   *
+   * `when` / `until` / `condition` are read by `installLiveEffects` and `fireTriggers`
+   * one function above `applyEffect`, exactly as they are for `voters` (GROWING
+   * DISSENT) and `steal-any` (LAB-GROWN EARWORM). This op has no lifetime or trigger of
+   * its own, so `isScoped` does not carve it out.
+   */
+  | { readonly op: 'move-peg'; readonly n: Count; readonly target?: EffectTarget }
 ) &
   EffectScope;
 

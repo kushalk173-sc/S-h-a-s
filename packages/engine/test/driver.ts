@@ -130,6 +130,32 @@ export function pickFor(state: GameState, c: PendingChoice): ChoicePick | null {
       const id = c.choice.cards[0];
       return id === undefined ? null : { kind: 'card', cardId: id };
     }
+    /**
+     * G1. The FIRST movable peg with a legal adjacent destination, mirroring
+     * `movablePegIds` / `pegDestinations` in `reduce.ts` — the driver's pick is the
+     * engine's own candidate set rather than an approximation of it, which is the
+     * same discipline the `choose-zone` arm above follows.
+     *
+     * `null` when there is no such pair, and that is a driver gap only in theory:
+     * `applyEffect` raises this decision only when `pegMoveOffered` was true, so a
+     * decision in hand always has a pick. The driver's own `throw` on `null` is what
+     * turns "the offer was empty" into a failed test rather than a stuck game.
+     */
+    case 'choose-peg-dest': {
+      const owner = c.choice.source;
+      for (const z of state.zones) {
+        for (const a of z.areas) {
+          if (a.peg === null || a.peg.owner !== owner) continue;
+          if (a.peg.majority || a.volatile) continue;
+          for (const nz of state.zones) {
+            if (nz.id === z.id || !z.neighbours.includes(nz.id)) continue;
+            const spot = nz.areas.find((x) => x.peg === null);
+            if (spot) return { kind: 'peg-dest', areaId: a.id, toAreaId: spot.id };
+          }
+        }
+      }
+      return null;
+    }
   }
 }
 

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * EVERY `Choice` KIND ALWAYS HAS A LEGAL PICK.
  *
  * A pending decision freezes its owner: `blockedBy` refuses every other action
  * that player could take, and `END_TURN` is refused while any decision is open.
- * So a `Choice` that CANNOT be resolved is not a stuck dialog — it is a stuck
+ * So a `Choice` that CANNOT be resolved is not a stuck dialog â€” it is a stuck
  * TABLE, with no server-side recovery, for the rest of the match.
  *
  * The invariant is therefore structural, not per-card: for every kind, the engine
@@ -49,7 +49,7 @@ import {
 } from '../src/state';
 import { CARDS, IDEOLOGY_DECK, VOTER_DECK, CONSPIRACY_DECK, HEADLINE_DECK, fresh, makeCtx } from './helpers';
 
-/** A card that strips one resource from every opponent — the pool-shrinking lever. */
+/** A card that strips one resource from every opponent â€” the pool-shrinking lever. */
 const DRAIN: ConspiracyCard = {
   id: 'test-drain',
   name: 'Test Drain',
@@ -69,7 +69,7 @@ const plain = makeCtx();
 
 const POOL = (funds: number, clout = 0, media = 0, trust = 0): Pool => ({ funds, clout, media, trust });
 
-/** A Delta spending `n` off the largest pools first — the pick a player would make. */
+/** A Delta spending `n` off the largest pools first â€” the pick a player would make. */
 function shed(pool: Pool, n: number): Delta | null {
   const out: Delta = {};
   let left = n;
@@ -130,7 +130,7 @@ describe('lose-any is clamped to the pool as it stands when it is answered', () 
     expect(s.players.p1?.resources.funds).toBe(2);
     expect(s.choices[0]?.choice.count).toBe(3);
 
-    // The pick that now resolves is 2 — and 3 is still refused, so the player is
+    // The pick that now resolves is 2 â€” and 3 is still refused, so the player is
     // not simply handed the whole original ask back.
     expect(reduce(s, 'p1', { type: 'RESOLVE_CHOICE', choiceId: 'c1', pick: { kind: 'resources', res: { funds: 2 } } }, ctx).ok).toBe(true);
     expect(reduce(s, 'p1', { type: 'RESOLVE_CHOICE', choiceId: 'c1', pick: { kind: 'resources', res: { funds: 3 } } }, ctx).ok).toBe(false);
@@ -190,7 +190,7 @@ describe('lose-any is clamped to the pool as it stands when it is answered', () 
 
   it('the cap discard that enforceCap raises is unaffected', () => {
     // p12's real path: over cap by 2, holding 14. The ask is 2 and 2 is what is
-    // demanded — enforceCap's `excess` can never exceed what is held, so the clamp
+    // demanded â€” enforceCap's `excess` can never exceed what is held, so the clamp
     // is a no-op here and the ordinary rule stands.
     const s = withOpenChoice({ kind: 'lose-any', count: 2, reason: 'Resource cap' }, POOL(14));
     expect(poolTotal(POOL(14))).toBe(14);
@@ -312,7 +312,7 @@ describe('every kind is resolvable from the state it was raised in', () => {
   });
 });
 
-// ─────────────────────── G21: the invariant, PROVED rather than sampled ───────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ G21: the invariant, PROVED rather than sampled â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * WHY THIS BLOCK IS CONSTRUCTIVE
@@ -320,7 +320,7 @@ describe('every kind is resolvable from the state it was raised in', () => {
  * The sweep above is REACTIVE: it can only check the choices a small synthetic corpus
  * happens to raise. That is exactly how two hard locks got through. It never plays a
  * Conspiracy Card at all, so it never raises `steal-any`, `evict-voter`,
- * `discard-voter` or `convert-voter` — its own `steal-any` arm was even written with
+ * `discard-voter` or `convert-voter` â€” its own `steal-any` arm was even written with
  * `if (victim === undefined) continue;`, so the one case it could not probe was the
  * one it skipped, and a test that skips the interesting state passes on it forever.
  *
@@ -342,6 +342,7 @@ const ALL_KINDS = [
   'choose-player',
   'choose-zone',
   'choose-card',
+  'choose-peg-dest',
 ] as const;
 type Kind = (typeof ALL_KINDS)[number];
 
@@ -352,7 +353,7 @@ const ALL_SCOPES = ['own', 'others', 'any'] as const;
 const POOLS_UNDER_TEST: readonly Pool[] = [POOL(0), POOL(1), POOL(2), POOL(12, 12, 12, 12), POOL(99, 99, 99, 99)];
 
 /**
- * T3 — THE `ZoneSelector` AXIS, which the sweep was silent about while its docstring
+ * T3 â€” THE `ZoneSelector` AXIS, which the sweep was silent about while its docstring
  * claimed a cross-product.
  *
  * `null` is "the op carries no `zone` at all", which is the baseline the other three are
@@ -366,7 +367,7 @@ const POOLS_UNDER_TEST: readonly Pool[] = [POOL(0), POOL(1), POOL(2), POOL(12, 1
  * `'your-strongest'`.
  *
  * ONLY the three voter ops carry `zone` at the type level, so the axis is `[null]` for
- * every other kind — the same carve-out the `scope` axis already makes.
+ * every other kind â€” the same carve-out the `scope` axis already makes.
  */
 const ALL_ZONE_SELECTORS = [null, 'this-zone', 'your-strongest', 'chosen-zone'] as const;
 type ZoneUnderTest = (typeof ALL_ZONE_SELECTORS)[number];
@@ -375,7 +376,7 @@ type ZoneUnderTest = (typeof ALL_ZONE_SELECTORS)[number];
 const ZONED_KINDS: readonly Kind[] = ['evict-voter', 'discard-voter', 'convert-voter'];
 
 /**
- * G17 — the recycle list every state in the sweep carries.
+ * G17 â€” the recycle list every state in the sweep carries.
  *
  * Two real corpus Conspiracy Card ids, DERIVED from `CARDS` rather than typed, so the
  * pile is two cards this game actually holds and a pick can name one of them. A pile of
@@ -394,7 +395,7 @@ const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
   'convert-voter': probeCard('probe-convert-voter', [{ op: 'convert-voter', n: 2, target: 'you' }]),
   /**
    * G1. The candidate set is `turnOrder` minus the actor, so this raises a decision in
-   * every game with at least two seats and in NO game with one — and the exhaustive
+   * every game with at least two seats and in NO game with one â€” and the exhaustive
    * loop below proves the second half too, because it asserts every kind was raised at
    * least once and separately that nothing was raised without a legal pick.
    */
@@ -404,7 +405,7 @@ const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
     { op: 'discard-voter', n: 1, target: 'each-opponent', zone: 'chosen-zone' },
   ]),
   /**
-   * G17. `pick: true` over the recycle list — and the sweep needs a NON-EMPTY pile to
+   * G17. `pick: true` over the recycle list â€” and the sweep needs a NON-EMPTY pile to
    * raise it at all, so `seeded` below is given one. `n` is the card's count, so the
    * `[1, 2, 3, 5]` axis is what makes `min(n, pile.length)` the binding term and is the
    * only axis in this file that tests a cap the ENGINE chose rather than the fixture.
@@ -412,6 +413,15 @@ const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
   'choose-card': probeCard('probe-choose-card', [
     { op: 'draw-conspiracy', n: 1, from: 'discard', pick: true },
   ]),
+  /**
+   * G1 / GREAT LEADER, BAD ECONOMY. `target: 'you'` makes the chooser the card's own
+   * actor, which is the `scope: 'own'` half â€” and the sweep's `castAt` axis then
+   * re-targets it to `'each-opponent'` and `'player-after'`, which is the `'others'`
+   * half and the one the real card uses. Both halves therefore run through the sweep,
+   * and the seat-count test below covers the two-seat case where `'player-after'` and
+   * `'each-opponent'` are the same single seat.
+   */
+  'choose-peg-dest': probeCard('probe-choose-peg-dest', [{ op: 'move-peg', n: 1, target: 'you' }]),
 };
 
 function probeCard(id: string, effects: ConspiracyCard['effects']): ConspiracyCard {
@@ -432,16 +442,16 @@ const probeCtx: Ctx = { rules: RULES, cards: probeCards };
  *
  * Pegs are the ONLY thing the three voter kinds read off the board, so a board with
  * no pegs, a board of only foreign pegs, a board of only the chooser's own, and
- * a board half of each are four genuinely different states for them — and the
+ * a board half of each are four genuinely different states for them â€” and the
  * `evict-voter`-by-its-own-caster scope (`'any'`) is only distinct from `'others'` in
  * the second and third.
  *
- * ## `spread` — T3, AND IT IS WHY THE `zone` AXIS IS WORTH HAVING AT ALL
+ * ## `spread` â€” T3, AND IT IS WHY THE `zone` AXIS IS WORTH HAVING AT ALL
  *
  * Without it every peg lands in the FIRST zone, because `take()` walks
  * `zones.flatMap(...)` in order. Four pegs is four pegs in one zone, so
  * `'your-strongest'` and a `'choose-zone'` decision are never asked to discriminate
- * between two populated constituencies — the one question those two selectors exist
+ * between two populated constituencies â€” the one question those two selectors exist
  * to ask. `spread` takes the free areas round-robin across zones instead, so the same
  * counts are laid out over at least two zones and the narrowing has something to
  * narrow. It is a *separate* flag rather than a fifth count triple because "where the
@@ -457,7 +467,7 @@ function pegged(
 ): GameState {
   const areas = s.zones.flatMap((z) => z.areas);
   // Spread: take the first free area, then the first area in a DIFFERENT zone, then the
-  // next free area after each — so the first two pegs already sit in two constituencies
+  // next free area after each â€” so the first two pegs already sit in two constituencies
   // and everything after alternates. `flatMap` order is zone order, so this is
   // deterministic and needs no rng (R1: `reduce` and its fixtures read no clock).
   const all = areas.map((a) => a.id);
@@ -543,7 +553,7 @@ function candidatePicks(s: GameState, pending: PendingChoice): ReturnType<typeof
   /**
    * G1/G16 candidates, and they are deliberately OVER-GENEROUS: every seat including
    * the chooser, plus a seat that does not exist, and every constituency plus a
-   * fabricated id. The engine is supposed to refuse the chooser and the unknown ids —
+   * fabricated id. The engine is supposed to refuse the chooser and the unknown ids â€”
    * and finding nothing else is how a genuinely stranded decision shows up. So a
    * green result means the search really did find an accepted pick, not that the
    * candidate list was small.
@@ -561,7 +571,7 @@ function candidatePicks(s: GameState, pending: PendingChoice): ReturnType<typeof
   /**
    * G17 candidates, deliberately OVER-GENEROUS in the same way as the two above: every
    * card the decision offered, plus one that is not, plus a card id that does not exist.
-   * The engine is supposed to refuse the two it was not offered — and finding nothing
+   * The engine is supposed to refuse the two it was not offered â€” and finding nothing
    * else is how a genuinely stranded decision shows up. A green result means the search
    * really did find an accepted pick, not that the candidate list was one long.
    */
@@ -569,6 +579,32 @@ function candidatePicks(s: GameState, pending: PendingChoice): ReturnType<typeof
     for (const cardId of [...c.cards, 'ct-nowhere-0001']) {
       out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'card', cardId } }, probeCtx));
     }
+    return out;
+  }
+  /**
+   * G1 candidates, over the FULL (peg, destination) cross product plus three
+   * deliberately wrong pairs, because the pick has two halves and each has to be
+   * validated rather than trusted:
+   *
+   *  - every pegged area against every EMPTY area â€” the joint legal space;
+   *  - a peg against an area in the SAME zone (adjacency guard);
+   *  - a peg against a pegged area (occupancy guard);
+   *  - a peg against an area id that does not exist.
+   *
+   * `c.source` is the CARD'S ACTOR, not the answerer, so the pegs searched are that
+   * player's â€” which is the whole of GREAT LEADER's effect and the reason a search that
+   * used `me` would find nothing.
+   */
+  if (c.kind === 'choose-peg-dest') {
+    const pegs = s.zones.flatMap((z) => z.areas).filter((a) => a.peg !== null).map((a) => a.id);
+    const free = s.zones.flatMap((z) => z.areas).filter((a) => a.peg === null).map((a) => a.id);
+    for (const areaId of [...pegs, 'no-such-area']) {
+      for (const toAreaId of [...free, pegs[0] ?? 'no-such-area', areaId, 'no-such-area']) {
+        out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'peg-dest', areaId, toAreaId } }, probeCtx));
+      }
+    }
+    // And the wrong pick kind, which a stale client could send for any kind.
+    out.push(reduce(s, me, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'areas', areaIds: [] } }, probeCtx));
     return out;
   }
   const areaIds = s.zones.flatMap((z) => z.areas.filter((a) => a.peg !== null).map((a) => a.id));  const subsets: string[][] = [[]];
@@ -590,7 +626,7 @@ function combos<T>(xs: readonly T[], n: number): T[][] {
   return out;
 }
 
-describe('G21 — every kind accepts a legal pick in EVERY state it can be raised in', () => {
+describe('G21 â€” every kind accepts a legal pick in EVERY state it can be raised in', () => {
   /**
    * The exhaustive one. Raises all six kinds through `PLAY_CONSPIRACY` and, for each
    * raised decision, searches for an accepted pick.
@@ -608,7 +644,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
    *  - **and, since T3, every `ZoneSelector`, crossed with a peg layout SPREAD OVER TWO
    *    ZONES.** That last clause is the fix: the axis existed as a claim in this
    *    docstring and not as a loop, so `evict`/`discard-voter`/`convert-voter` were
-   *    never raised with a narrowing at all — and every peg landed in the first zone,
+   *    never raised with a narrowing at all â€” and every peg landed in the first zone,
    *    so even `'your-strongest'` was never asked to choose between two populated
    *    constituencies.
    */
@@ -642,7 +678,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                   spread,
                 );
                 // `'this-zone'` reads `GameState.headlineQueue[0].areaId`, and an empty
-                // queue resolves to `null` — the safe fallback, which is a real case but
+                // queue resolves to `null` â€” the safe fallback, which is a real case but
                 // not the narrowing this axis exists to test. So for that selector the
                 // queue is pointed at a PEGGED area, which makes `resolveZone` return a
                 // real `ZoneID` and the clamp below do the work it exists to do.
@@ -658,11 +694,11 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                     ? { ...seeded, headlineQueue: [{ areaId: anchored.id, by: 'p1' }] }
                     : seeded;
                 /**
-                 * G17 — A NON-EMPTY RECYCLE LIST, and TWO cards on it rather than one.
+                 * G17 â€” A NON-EMPTY RECYCLE LIST, and TWO cards on it rather than one.
                  *
                  * `pick: true` raises NOTHING for an empty pile, so without this the
-                 * ninth kind is silently unraised and `kindsRaised.size` — which is the
-                 * sweep's own non-vacuity floor — would be the only thing noticing.
+                 * ninth kind is silently unraised and `kindsRaised.size` â€” which is the
+                 * sweep's own non-vacuity floor â€” would be the only thing noticing.
                  *
                  * TWO is the length that matters: `applyEffect` raises at most
                  * `min(n, pile.length)`, so a count of 1 or 2 is satisfiable with a card
@@ -679,7 +715,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                 const playable = withHand({ ...withRecycle, phase: 'actions', activePlayer: 'p1', _pendingCard: null, choices: [] } as GameState, 'p1', [PROBE_EFFECTS[kind].id]);
 
                 // The card's printed `n` is what sets `count`, so vary it through the
-                // card rather than through the choice — a state built by hand is not
+                // card rather than through the choice â€” a state built by hand is not
                 // a state the engine can raise.
                 const card = probeCard(`probe-${kind}-${count}`, [probeEffect(kind, count, zone)]);
                 const indexed = indexCards({
@@ -695,7 +731,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                 // scope is what varies above. `you` raises it for the chooser.
                 // `'chosen-player'` raises a decision the ACTOR answers. `'player-after'`
                 // (G12) raises it for the seat one along, which is a different owner again
-                // and therefore a different `blockedBy` owner — so it belongs in the sweep
+                // and therefore a different `blockedBy` owner â€” so it belongs in the sweep
                 // rather than beside it. Both are real raise paths, so all are probed.
                 for (const castAt of ['you', 'each-opponent', 'chosen-player', 'player-after'] as const) {
                   const out = playAndRead(inHand, card.id, castAt, ctxN);
@@ -707,8 +743,8 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                       zonesRaised.add(zone);
                       // THE REAL FLOOR: a selector only narrows if there is more than one
                       // populated constituency to narrow TO. Recording how many zones the
-                      // pegs ended up spread across — not how many zones the board has,
-                      // which is always nine — is what makes "the zone axis ran" mean "a
+                      // pegs ended up spread across â€” not how many zones the board has,
+                      // which is always nine â€” is what makes "the zone axis ran" mean "a
                       // narrowing happened" rather than "a loop iterated".
                       if (populatedZones.size > 1) zonesNarrowed.add(zone);
                     }
@@ -734,7 +770,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     expect(raised, 'no decision was raised, so nothing was proved').toBeGreaterThan(0);
     expect(probed).toBe(raised);
     // T3's non-vacuity floor, and it is the whole point of the axis: without these two
-    // the loop could gain a `zone` dimension that is never actually consulted — which is
+    // the loop could gain a `zone` dimension that is never actually consulted â€” which is
     // exactly what it was before, and exactly the failure the audit found.
     expect(
       [...zonesRaised].sort(),
@@ -752,7 +788,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
    *
    * A live `steal-any` that names its victims, hooked to `on-turn-start`. On that one
    * trigger `fireTriggers` requires `fire.actor === le.owner` and applies the effect
-   * with `source = le.owner`, so the waking event and the thief are the SAME player —
+   * with `source = le.owner`, so the waking event and the thief are the SAME player â€”
    * and the old guard tested the resolved target instead of the substituted victim, so
    * the decision was raised aimed at the thief. `resolveChoice` refuses every such
    * pick ('steal from someone else'), which is a permanent freeze: `blockedBy` refuses
@@ -800,17 +836,17 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
   });
 
   /**
-   * The probe effect for one kind, with the count the card asks for and — for the three
-   * voter kinds — the `zone` narrowing it asks for.
+   * The probe effect for one kind, with the count the card asks for and â€” for the three
+   * voter kinds â€” the `zone` narrowing it asks for.
    *
    * The six pre-existing kinds are one op with a retargetable `target`. The two new
-   * ones are FIELD values on an ordinary op — `'chosen-player'` is an `EffectTarget`
-   * and `'chosen-zone'` is a `ZoneSelector` — so they are built as such here, and
+   * ones are FIELD values on an ordinary op â€” `'chosen-player'` is an `EffectTarget`
+   * and `'chosen-zone'` is a `ZoneSelector` â€” so they are built as such here, and
    * `playAndRead` must not retarget them (see its guard).
    *
    * **T3: THE `zone` PARAMETER.** Only the three voter ops have a `zone` in their
    * `Effect` arm, so `probeEffect` narrows `op` before attaching one rather than
-   * spreading a `zone` onto an arm that does not have it — a probe that could
+   * spreading a `zone` onto an arm that does not have it â€” a probe that could
    * manufacture a shape the type forbids would be proving something that cannot ship.
    * `zone: null` therefore means "no narrowing at all", which is the baseline.
    */
@@ -830,6 +866,13 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     if (kind === 'choose-card') {
       return { op: 'draw-conspiracy', n: count, from: 'discard', pick: true };
     }
+    // G1. `move-peg` carries no `zone`, so the `zone` axis is `[null]` for it and the
+    // generic branch below would throw. A literal `n` of 1 is deliberate: the pick is
+    // ONE (peg, destination) pair, and the sweep's `[1, 2, 3, 5]` count axis is the
+    // thing that proves a card asking for more is offered less rather than more.
+    if (kind === 'choose-peg-dest') {
+      return { op: 'move-peg', n: 1, target: 'you' };
+    }
     const op = opFor(kind);
     if (zone === null) return { op, n: count, target: 'each-opponent' };
     if (op !== 'evict' && op !== 'discard-voter' && op !== 'convert-voter') {
@@ -839,13 +882,13 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
   }
 
   /**
-   * G1/G16 — THE SEAT-COUNT AXIS, at 2/3/4/5, which the loop above cannot reach because
+   * G1/G16 â€” THE SEAT-COUNT AXIS, at 2/3/4/5, which the loop above cannot reach because
    * its position is fixed at three.
    *
    * This is the axis the two new kinds live or die on, and the two-seat case is the
    * one that matters: it is the smallest legal table, so `'choose-player'`'s candidate
-   * set is exactly one seat there. If that seat were filtered by anything — holdings,
-   * pegs, whether the effect would do anything to them — a two-seat game would raise a
+   * set is exactly one seat there. If that seat were filtered by anything â€” holdings,
+   * pegs, whether the effect would do anything to them â€” a two-seat game would raise a
    * decision with no legal answer, which is the dead-`gain-any` dialog and the
    * Ideology-deck bug, in a new place.
    *
@@ -911,7 +954,7 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
             if (self !== undefined && label === 'choose-player') {
               expect(
                 reduce(out.state, 'p1', { type: 'RESOLVE_CHOICE', choiceId: self.id, pick: { kind: 'player', id: 'p1' } }, probeCtx).ok,
-                `${label}: naming the actor must be refused — nobody may aim a card at themselves`,
+                `${label}: naming the actor must be refused â€” nobody may aim a card at themselves`,
               ).toBe(false);
             }
           }
@@ -926,11 +969,194 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
   });
 
   /**
-   * G12 — `'player-after'` IS satisfiable, and it raises no kind of its own.
+   * G1 / GREAT LEADER, BAD ECONOMY â€” `'choose-peg-dest'` is dischargeable, at 2/3/4/5
+   * seats, over the FULL cross product of peg layout and destination area.
+   *
+   * ## WHY THIS NEEDS ITS OWN BLOCK and cannot lean on the sweep above
+   *
+   * The sweep raises the kind through `PLAY_CONSPIRACY` with one fixed peg layout per
+   * row, and `move-peg`'s legality is a function of **two** things the sweep does not
+   * cross: which peg, and which of the board's ~90 free areas it lands in. A row where
+   * every destination is legal proves nothing about a row where every destination is
+   * illegal, and the shape that would strand a player is exactly that one â€” a board on
+   * which the peg set is non-empty and the destination set is empty. So this walks it.
+   *
+   * The three axes, all of them load-bearing:
+   *
+   *  - **seat count**, because `'player-after'` is only ever one seat and a two-seat
+   *    table is where the answerer is the actor's ONLY opponent â€” so `scope` is
+   *    `'others'` and the pegs on offer are the actor's, in a game where the actor and
+   *    the answerer are the two people at the table;
+   *  - **how many of the actor's pegs there are**, and **whether each is a majority**,
+   *    because a majority peg is the score (p20) and is exactly the peg a card must not
+   *    move;
+   *  - **Volatile-Area pegs**, because p18 makes a peg there permanent and a peg in one
+   *    is the case most likely to be silently movable in a card that says "non-majority".
+   *
+   * And the non-vacuity floor is asserted, because a proof that never raised the
+   * decision is a proof of nothing.
+   */
+  it("'choose-peg-dest' accepts a legal pair in EVERY board it is offered on, at 2/3/4/5 seats", () => {
+    const CARD = probeCard('probe-move-peg-proof', [{ op: 'move-peg', n: 1, target: 'player-after' }]);
+    const idx = indexCards({
+      ideology: Object.values(CARDS.ideology),
+      voter: Object.values(CARDS.voter),
+      conspiracy: [CARD],
+      headline: Object.values(CARDS.headline),
+    });
+    const ctxA: Ctx = { rules: RULES, cards: idx };
+    const stranded: string[] = [];
+    let raised = 0;
+    let refusedOnPurpose = 0;
+    let raisedOnAnEmptyOffer = 0;
+
+    for (const seats of [2, 3, 4, 5] as const) {
+      const ids = Array.from({ length: seats }, (_, i) => `p${i + 1}`);
+      // Three board shapes, and the third is the one this card cannot do anything with:
+      // p1 holds pegs but every one of them is already a MAJORITY voter, so
+      // `movablePegIds` is empty and the honest behaviour is to raise NOTHING.
+      const shapes: readonly { readonly label: string; readonly own: number; readonly foreign: number; readonly vol: number; readonly spread: boolean }[] = [
+        { label: 'no pegs', own: 0, foreign: 0, vol: 0, spread: false },
+        { label: 'one own peg, flat', own: 1, foreign: 1, vol: 1, spread: false },
+        { label: 'two own pegs, spread', own: 2, foreign: seats - 1, vol: 1, spread: true },
+        { label: 'one own peg, volatile', own: 0, foreign: 1, vol: 1, spread: true },
+      ];
+
+      for (const shape of shapes) {
+        const start = {
+          ...fresh(1, ids, { startResources: ids.map(() => ({})) }),
+          phase: 'actions',
+          activePlayer: 'p1',
+          _pendingCard: null,
+          choices: [],
+        } as GameState;
+        const seeded = pegged(start, 'p1', shape.own, shape.foreign, shape.vol, shape.spread);
+        const inHand = withHand(seeded, 'p1', [CARD.id]);
+        const out = reduce(inHand, 'p1', { type: 'PLAY_CONSPIRACY', cardId: CARD.id }, ctxA);
+        expect(out.ok, `move-peg at ${seats} seats / ${shape.label}: ${out.ok ? '' : out.error}`).toBe(true);
+        if (!out.ok) continue;
+
+        const pending = out.state.choices.find((c) => c.choice.kind === 'choose-peg-dest');
+        if (pending === undefined) {
+          // The unresolvable-selector rule: no movable peg, or no adjacent empty area,
+          // means the card raises NOTHING rather than a decision nobody can answer.
+          if (shape.own > 0) raisedOnAnEmptyOffer += 1;
+          continue;
+        }
+        raised += 1;
+
+        // The decision belongs to the seat AFTER the actor, and `source` is the actor.
+        expect(pending.player, `at ${seats} seats / ${shape.label}`).not.toBe('p1');
+        if (pending.choice.kind === 'choose-peg-dest') {
+          expect(pending.choice.source, `at ${seats} seats / ${shape.label}`).toBe('p1');
+          expect(pending.choice.scope, `at ${seats} seats / ${shape.label}`).toBe('others');
+        }
+
+        // THE PROOF: search the whole (pegged, empty) space, plus the wrong pairs.
+        if (!candidatePicks(out.state, pending).some((r) => r.ok)) {
+          stranded.push(`${seats} seats / ${shape.label}: ${JSON.stringify(pending.choice)}`);
+        }
+
+        // And the refusals are pinned, so "one candidate accepted" cannot quietly become
+        // "every candidate accepted" and this cannot turn into a board-wide teleport.
+        const answered = out.state.choices.find((c) => c.id === pending.id);
+        if (answered !== undefined) {
+          const areas = out.state.zones.flatMap((z) => z.areas);
+          const own = areas.find((a) => a.peg?.owner === 'p1');
+          if (own !== undefined) {
+            const sameZone = areas.find((a) => a.zone === own.zone && a.peg === null);
+            if (sameZone !== undefined) {
+              const r = reduce(out.state, pending.player, { type: 'RESOLVE_CHOICE', choiceId: answered.id, pick: { kind: 'peg-dest', areaId: own.id, toAreaId: sameZone.id } }, ctxA);
+              expect(r.ok, 'a same-zone destination is "adjacent" and must be refused').toBe(false);
+              refusedOnPurpose += 1;
+            }
+            const taken = areas.find((a) => a.peg !== null && a.peg.owner !== 'p1');
+            if (taken !== undefined) {
+              const r = reduce(out.state, pending.player, { type: 'RESOLVE_CHOICE', choiceId: answered.id, pick: { kind: 'peg-dest', areaId: own.id, toAreaId: taken.id } }, ctxA);
+              expect(r.ok, 'an occupied destination must be refused').toBe(false);
+              refusedOnPurpose += 1;
+            }
+          }
+          // A majority peg is the score, and p18 owns a Volatile one. Both are pegs the
+          // card says it may not move, and both are refused as picks.
+          const locked = areas.filter((a) => (a.peg?.owner === 'p1' && a.peg.majority) || (a.peg?.owner === 'p1' && a.volatile));
+          for (const l of locked) {
+            const far = areas.find((a) => a.peg === null && a.zone !== l.zone);
+            if (far === undefined) continue;
+            const r = reduce(out.state, pending.player, { type: 'RESOLVE_CHOICE', choiceId: answered.id, pick: { kind: 'peg-dest', areaId: l.id, toAreaId: far.id } }, ctxA);
+            expect(r.ok, 'a majority or Volatile-Area peg must not be movable').toBe(false);
+            refusedOnPurpose += 1;
+          }
+        }
+      }
+    }
+
+    expect(raised, `'choose-peg-dest' was never raised, so nothing was proved`).toBeGreaterThanOrEqual(8);
+    expect(refusedOnPurpose, 'none of the refusal shapes fired, so the refusals are unproved').toBeGreaterThanOrEqual(4);
+    expect(raisedOnAnEmptyOffer, 'a board with an actor peg but no movable one raised a decision').toBe(0);
+    expect(stranded, `${stranded.length} raised decisions had NO legal pick:\n${stranded.join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * AND IT ACTUALLY MOVES THE PEG, which is the half a satisfiability proof cannot
+   * check. A decision that is always answerable but never does anything is the
+   * `played-but-no-op` verdict `npm run playable` exists to refuse, so the state change
+   * is asserted directly rather than inferred.
+   */
+  it("'choose-peg-dest' relocates the peg to an ADJACENT empty area, and only there", () => {
+    const CARD = probeCard('probe-move-peg-act', [{ op: 'move-peg', n: 1, target: 'player-after' }]);
+    const idx = indexCards({
+      ideology: Object.values(CARDS.ideology),
+      voter: Object.values(CARDS.voter),
+      conspiracy: [CARD],
+      headline: Object.values(CARDS.headline),
+    });
+    const ctxA: Ctx = { rules: RULES, cards: idx };
+    const ids = ['p1', 'p2'];
+    const start = {
+      ...fresh(1, ids, { startResources: [{}, {}] }),
+      phase: 'actions',
+      activePlayer: 'p1',
+      _pendingCard: null,
+      choices: [],
+    } as GameState;
+    // p1's one peg lands in north_west's first area; 'north' is a neighbour of
+    // north_west on this board, and it is empty, so the move is legal.
+    const seeded = pegged(start, 'p1', 1, 1, 0, false);
+    const out = reduce(withHand(seeded, 'p1', [CARD.id]), 'p1', { type: 'PLAY_CONSPIRACY', cardId: CARD.id }, ctxA);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    const pending = out.state.choices.find((c) => c.choice.kind === 'choose-peg-dest');
+    expect(pending, 'the card raised no decision').toBeDefined();
+    if (pending === undefined) return;
+
+    const area = (s: GameState, id: string) => s.zones.flatMap((z) => z.areas).find((a) => a.id === id);
+    const from = area(out.state, 'north_west-01');
+    expect(from?.peg?.owner, "p1's peg should be in north_west-0").toBe('p1');
+    const to = area(out.state, 'north-01');
+    expect(to?.peg, 'the destination must be empty before the move').toBeNull();
+
+    const moved = reduce(out.state, pending.player, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'peg-dest', areaId: 'north_west-01', toAreaId: 'north-01' } }, ctxA);
+    expect(moved.ok, moved.ok ? '' : moved.error).toBe(true);
+    if (!moved.ok) return;
+    expect(area(moved.state, 'north_west-01')?.peg, 'the origin is vacated').toBeNull();
+    // The peg KEEPS ITS OWNER. This card gives the beneficiary a relocation, not a
+    // conversion: `convert-voter` is the verb that changes an owner and it is a
+    // different op with a different scope rule.
+    expect(area(moved.state, 'north-01')?.peg?.owner, "the peg is still p1's").toBe('p1');
+    expect(moved.state.choices.find((c) => c.id === pending.id), 'the decision is spent').toBeUndefined();
+    expect(
+      moved.events.some((e) => e.type === 'gerrymandered' && e.from === 'north_west-01' && e.to === 'north-01'),
+      'the move is announced, so a client sees the board change',
+    ).toBe(true);
+  });
+
+  /**
+   * G12 â€” `'player-after'` IS satisfiable, and it raises no kind of its own.
    *
    * The property is weaker than the two above and therefore easier to get wrong in a
    * way that hides: `'player-after'` is a fixed seat, so there is no candidate set to
-   * be empty and no `Choice` to be unsatisfiable. What can go wrong is the OPPOSITE —
+   * be empty and no `Choice` to be unsatisfiable. What can go wrong is the OPPOSITE â€”
    * the value resolving to nobody, which is a card that reads as though it hits the
    * player on your left and hits nobody at all, and is silent.
    *
@@ -1076,17 +1302,17 @@ describe('gain-any imposes no affordability, by design', () => {
   });
 });
 
-describe('G-new — a self-targeted discard reaches the chooser\'s OWN pegs', () => {
+describe('G-new â€” a self-targeted discard reaches the chooser\'s OWN pegs', () => {
   // Known-Gaps G-new, found by the honesty test rather than predicted by the gap
   // analysis: `targetableCount` skipped the chooser's own pegs and `resolveChoice`
-  // rejected them, so *"Discard 2 of your own voters"* — which REF 4.3 records as
-  // AIN'T NO CURE FOR LOVE's first branch — was not expressible, and three shipped
+  // rejected them, so *"Discard 2 of your own voters"* â€” which REF 4.3 records as
+  // AIN'T NO CURE FOR LOVE's first branch â€” was not expressible, and three shipped
   // cards were telling the player one thing while doing another.
   //
   // THE FIX IS THE RAW `target` FIELD, and it is deliberately narrow. `applyEffect`
   // defaults an absent `target` to `'you'`, so by the time the three voter cases ran
   // their `raiseVoterDecision` an absent field and an explicit `target: 'you'` were
-  // the same value — and they are not the same card. RED BLOODED says *"You must
+  // the same value â€” and they are not the same card. RED BLOODED says *"You must
   // discard any 2 voters"* and AIN'T NO CURE FOR LOVE says *"Discard 2 of your own
   // voters"*; both land on `discard-voter`. Passing the raw field lets `voterScope`
   // tell them apart without changing what any existing card does.
@@ -1168,7 +1394,7 @@ describe('G-new — a self-targeted discard reaches the chooser\'s OWN pegs', ()
 
   it('and with NO target the default is UNCHANGED: opponents only', () => {
     // The regression half. Three shipped cards state the opponents' reading in their
-    // own `text`, and `others` is what they have always performed — so this is the
+    // own `text`, and `others` is what they have always performed â€” so this is the
     // assertion that keeps the fix from being a behaviour change in disguise.
     const { s, mine } = board();
     const after = playCard(s, DISCARD_OPPONENTS.id);

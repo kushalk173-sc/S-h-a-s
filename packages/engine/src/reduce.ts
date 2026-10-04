@@ -10,7 +10,7 @@
  */
 
 import type { Action, ChoicePick, GameEvent, Result } from './actions';
-import { allMajoritiesFormed, boardFull, recount, scores, winners } from './board';
+import { allMajoritiesFormed, areNeighbours, boardFull, recount, scores, winners } from './board';
 import type {
   CardIndex,
   ComputedCount,
@@ -1235,6 +1235,93 @@ function voterKindOf(op: Effect['op']): 'evict-voter' | 'discard-voter' | 'conve
   return 'discard-voter';
 }
 
+/**
+ * G1 — `move-peg`'s FIRST candidate set: the voters `owner` may have relocated.
+ *
+ * GREAT LEADER, BAD ECONOMY (REF 4.2.1): *"the player after you may move 1 of **your**
+ * non-majority voters to an adjacent zone."* Four conditions, and each is the printed
+ * word rather than a narrowing chosen for convenience:
+ *
+ *  - **the card's actor's** peg, because *"your"* is measured from the card and not
+ *    from the answerer. The beneficiary moving a peg that is not theirs is the whole
+ *    point of the card.
+ *  - **not already a majority voter**, because a majority peg *is* the score (p20) and
+ *    relocating one would move points rather than position.
+ *  - **not in a Volatile Area**, because p18 makes a peg there permanent. This is a
+ *    rules exclusion rather than an engine one and it is why the card silently cannot
+ *    move such a peg — named on the card, not approximated.
+ *  - and the peg must exist at all.
+ *
+ * **It reads only PUBLIC state.** Every peg on every area is face up on every payload,
+ * so this is not a hidden-set read and it is not a §2bis question.
+ */
+function movablePegIds(state: GameState, owner: PlayerID): readonly AreaID[] {
+  const out: AreaID[] = [];
+  for (const z of state.zones) {
+    for (const a of z.areas) {
+      if (a.peg === null || a.peg.owner !== owner) continue;
+      if (a.peg.majority) continue;
+      if (a.volatile) continue;
+      out.push(a.id);
+    }
+  }
+  return out;
+}
+
+/**
+ * G1 — `move-peg`'s SECOND candidate set: where the peg in `areaId` may land.
+ *
+ * An **empty** area, in a zone **adjacent** to the peg's own. `Zone.neighbours` is on
+ * the board already (`freshZones` copies it out of `BOARD`), so adjacency is a read and
+ * not a new field — the same reason `'player-after'` needed no `GameState` change in
+ * §3.1.
+ *
+ * **THE SAME ZONE IS REFUSED, and that is what "adjacent" means.** p16 lets a player
+ * gerrymander a voter only to a constituency they hold rights in, but this is not a
+ * gerrymander: nobody's rights are consulted, because the card gives the move away.
+ * Within-zone relocation would be a no-op on the board's own terms (a peg lifted and put
+ * back in the same constituency changes nothing), so refusing it also means the decision
+ * can never offer a move that does nothing — which is the `played-but-no-op` verdict
+ * `npm run playable` refuses to print.
+ */
+function pegDestinations(state: GameState, areaId: AreaID): readonly AreaID[] {
+  const from = findArea(state, areaId);
+  if (from === undefined) return [];
+  const out: AreaID[] = [];
+  for (const z of state.zones) {
+    if (z.id === from.zone) continue;
+    if (!areNeighbours(from.zone, z.id)) continue;
+    for (const a of z.areas) if (a.peg === null) out.push(a.id);
+  }
+  return out;
+}
+
+/**
+ * G1 — whether a `'choose-peg-dest'` decision is OFFERED at all, and why the answer is
+ * a boolean rather than a decision with an empty pick space.
+ *
+ * **THE UNSATISFIABLE-CHOICE RULE, and it is the one this file has been bitten by three
+ * times.** A pending decision freezes its owner: `blockedBy` refuses every other action
+ * that player could take and `END_TURN` is refused while any decision is open, so a
+ * decision with no acceptable answer is a dead TABLE with no server-side recovery. So a
+ * card whose two candidate sets cannot both be non-empty raises NOTHING — which is the
+ * honest reading, because "you may move one of your voters to an adjacent zone" is not
+ * an instruction a player who has no such voter can carry out, and `'chosen-zone'`
+ * already sets this precedent for an unresolvable selector.
+ *
+ * `chooser` is accepted and deliberately UNUSED in the offer test, which is the point:
+ * the offer depends only on the BOARD and on whose voter it is, never on who is being
+ * asked. Filtering the offer by what the answerer holds is the leak `EffectTarget`'s
+ * doc refuses for `'chosen-player'`, and it is the same mistake a narrower question
+ * invites here. A player with nothing to move with is not offered a move; a player who
+ * could move but chooses not to is not offered a "decline" flag, and that clause is
+ * named on the card rather than invented here.
+ */
+function pegMoveOffered(state: GameState, owner: PlayerID, chooser: PlayerID): boolean {
+  void chooser;
+  return movablePegIds(state, owner).some((id) => pegDestinations(state, id).length > 0);
+}
+
 function applyEffect(
   state: GameState,
   source: PlayerID,
@@ -1771,6 +1858,46 @@ function applyEffect(
           },
         });
         s = enforceCap(s, p, ctx.rules);
+      }
+      return s;
+    }
+
+    case 'move-peg': {
+      // G1 — GREAT LEADER, BAD ECONOMY. See the `move-peg` arm in cards.ts for why this
+      // is an op rather than a `target` on `evict`, and `Choice`'s `'choose-peg-dest'`
+      // arm for the visibility and satisfiability arguments. The three things that have
+      // to be branches rather than comments, because a comment does not fail a test:
+      //
+      // 1. THE OFFER IS A BOOLEAN. `pegMoveOffered` is false whenever the board cannot
+      //    satisfy both halves of the pick, and then this raises NOTHING rather than a
+      //    decision whose pick space is empty. That is the unsatisfiable-choice rule the
+      //    rest of this file argues everywhere else, and it is the whole of this case's
+      //    deadlock argument.
+      // 2. `scope` IS DESCRIPTIVE. `'own'` when the answerer IS the card's actor,
+      //    `'others'` when they are a different seat — which is GREAT LEADER, whose
+      //    answerer is `'player-after'` and whose voter is therefore NOT the answerer's.
+      //    `resolveChoice` decides on `peg.owner === c.source`, one expression, and never
+      //    on this field; publishing it is what lets a dialog describe the offer without
+      //    naming the card's owner.
+      // 3. `count` IS 1, ALWAYS, because the pick carries ONE (peg, destination) pair.
+      //    A card asking for more would be offered fewer than it says, so `n` is READ
+      //    here and a resolved ask below one raises nothing; the corpus validator is what
+      //    refuses a `move-peg` whose `n` is not 1, so a shipped card cannot get here.
+      for (const p of resolveTargets(s, source, target, forced)) {
+        const wanted = resolveCount(s, p, effect.n, ctx);
+        if (wanted < 1) continue;
+        if (!pegMoveOffered(s, source, p)) continue;
+        s = pushChoice(
+          s,
+          {
+            kind: 'choose-peg-dest',
+            count: 1,
+            scope: p === source ? 'own' : 'others',
+            source,
+            reason: 'Card effect',
+          },
+          p,
+        );
       }
       return s;
     }
@@ -3410,6 +3537,70 @@ function resolveChoice(
         s = applyEffect(s, c.source, effect, ctx, NO_FIRE, null, c.source, null, pick.cardId);
       }
       return { ok: true, state: s, events: [] };
+    }
+
+    /**
+     * G1 — the answerer named ONE of the card's actor's voters AND where it goes.
+     *
+     * ## THE VALIDATION IS THE BOARD AS IT STANDS, and both halves are re-derived here
+     *
+     * `movablePegIds(state, c.source)` and `pegDestinations(state, pick.areaId)` are the
+     * same two expressions `applyEffect` offered from, re-read at ANSWER time. That is
+     * the `lose-any` clamp argument (`choices.test.ts`'s header: *the pool is not frozen
+     * while the decision is open*) applied to the board: between the raise and the
+     * answer a majority can form, a peg can be gerrymandered away, and a destination
+     * area can be filled — so the pick the dialog was showing can become illegal.
+     *
+     * **THE DANGEROUS DIRECTION IS WHY THE OFFER IS A BOOLEAN AND NOT A CLAMP.** For
+     * `lose-any` the ask shrinks to what the player holds, so the decision always has an
+     * answer. Here there is nothing to shrink to: a peg that has become a majority voter
+     * is simply no longer movable, and the right answer is to REFUSE the stale pick —
+     * which is safe precisely because `pegMoveOffered` guaranteed at raise time that at
+     * least ONE legal (peg, destination) pair existed, and every one of this function's
+     * guards is checked against a live board, so a player holding a stale dialog still
+     * has a legal pick to make. The exhaustive sweep in `test/choices.test.ts` proves
+     * that over every peg layout crossed with every destination area.
+     *
+     * **`playerId !== pending.player` is the G21 self-redirect guard**, and it is
+     * checked FIRST: a beneficiary who could answer somebody else's relocation would be
+     * moving a voter the card's owner never offered them. `c.source` names the card's
+     * ACTOR, which is why it is a different field from the answerer — that is what makes
+     * `'others'` mean anything at all.
+     *
+     * **THE MOVE ITSELF IS TWO `setArea` CALLS**, so both constituencies are recounted
+     * and both raise `on-majority-formed` for free, and a peg landing in a Volatile Area
+     * draws its Headline attributed to the peg's OWNER — the same attribution rule
+     * `setArea` already documents (D6).
+     */
+    case 'choose-peg-dest': {
+      if (pick.kind !== 'peg-dest') return fail('choose a voter and where it goes');
+      if (playerId !== pending.player) return fail('that decision is not yours');
+      if (!movablePegIds(state, c.source).includes(pick.areaId)) {
+        return fail('that voter may not be moved');
+      }
+      if (!pegDestinations(state, pick.areaId).includes(pick.toAreaId)) {
+        return fail('that is not an empty area in an adjacent zone');
+      }
+      const from = findArea(state, pick.areaId);
+      if (from === undefined || from.peg === null) return fail('there is no voter there');
+      const owner = from.peg.owner;
+      let s = setArea(state, { ...from, peg: null }, ctx).state;
+      const to = findArea(s, pick.toAreaId);
+      if (to === undefined || to.peg !== null) return fail('that area is taken');
+      const moved = setArea(s, { ...to, peg: { owner, majority: false } }, ctx);
+      s = log(moved.state, { player: playerId, text: `${owner} moves a voter.`, kind: 'card' });
+      // The event is `gerrymandered` because it IS one in the only sense the engine has:
+      // a voter went from area A to area B. `player` is the MOVER, matching `GERRYMANDER`,
+      // and `majority-formed` / `majority-broken` for both constituencies ride in
+      // `moved.events`, so a client sees the board change in the same breath.
+      return {
+        ok: true,
+        state: drop(s),
+        events: [
+          ...moved.events,
+          { type: 'gerrymandered', player: playerId, from: pick.areaId, to: pick.toAreaId },
+        ],
+      };
     }
   }
 }

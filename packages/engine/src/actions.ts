@@ -113,7 +113,28 @@ export type ChoicePick =
    * merely ignored: `resolveChoice` is the only authority on the candidate set, and a
    * silent ignore is how a player is shown they succeeded when they did not.
    */
-  | { readonly kind: 'card'; readonly cardId: CardID };
+  | { readonly kind: 'card'; readonly cardId: CardID }
+  /**
+   * G1 - answer a `'choose-peg-dest'` decision by naming BOTH halves of one move.
+   *
+   * `areaId` is the voter to move and `toAreaId` is where it lands. They are ONE pick
+   * rather than two ids on one action because the printed card is one action
+   * ("may move 1 of your non-majority voters to an adjacent zone") and because a two-step
+   * dialog would ask its satisfiability question twice: once over the pegs and again
+   * over the destinations, after the board had already moved under the first answer.
+   *
+   * `areaId` names an area rather than a `ZoneID`, because a zone has many areas and
+   * only one of them is the peg; `toAreaId` is the empty area itself rather than the
+   * destination zone, because the destination is where the peg LANDS and p10 places a
+   * group in a named area, not in a constituency.
+   *
+   * A pick whose pair is not jointly legal — a majority peg, a Volatile-Area peg,
+   * somebody else's peg, a destination that is occupied, or a destination not adjacent
+   * to the source — is REFUSED by `reduce`, not merely ignored, for the reason
+   * `choose-card` records: `resolveChoice` is the only authority on the candidate set,
+   * and a silent ignore is how a player is shown they succeeded when they did not.
+   */
+  | { readonly kind: 'peg-dest'; readonly areaId: AreaID; readonly toAreaId: AreaID };
 
 export type GameEvent =
   | { readonly type: 'answered'; readonly player: PlayerID; readonly cardId: CardID; readonly side: 0 | 1 }

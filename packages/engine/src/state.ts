@@ -618,6 +618,85 @@ export type Choice =
       /** The chooser: the resolved recipient, not necessarily the card's actor. */
       readonly source: PlayerID;
       readonly reason: string;
+    }
+  /**
+   * G1 — MOVE ONE OF THE CARD'S OWN VOTERS TO AN ADJACENT ZONE. `{ op: 'move-peg' }`.
+   *
+   * GREAT LEADER, BAD ECONOMY (REF 4.2.1): *"For the rest of the game, every time you
+   * influence a 3 Voter Card, the player after you may move 1 of your non-majority
+   * voters to an adjacent zone."*
+   *
+   * ## WHY IT IS ONE KIND AND NOT TWO
+   *
+   * Every existing kind answers *"which of these things?"* — resources, a pool, pegs, a
+   * seat, a constituency, a card. This one answers **"which peg, and to WHERE?"**, and
+   * the *where* is the half nothing else carries: `evict` / `discard-voter` /
+   * `convert-voter` all resolve to a pool or a mat and none of them has a destination.
+   * Splitting it into a `'choose-peg'` then a `'choose-zone'` would be two dialogs for
+   * one printed sentence, two ids for one action, and — worse — TWO satisfiability
+   * problems where one would do, because the second would be asked after the first has
+   * already been answered and the board has moved under it.
+   *
+   * ## `evict` IS ALSO THE WRONG VERB, and the direction matters
+   *
+   * This card *helps* the beneficiary: it hands them a free relocation of a peg they do
+   * not own. `evict` removes a peg to its owner's mat and re-grants a voter, so it is
+   * the opposite of the printed effect on both counts. That is why this is a new op and
+   * not a new `target` on `evict`.
+   *
+   * ## THE TWO CANDIDATE SETS, and the satisfiability argument
+   *
+   * `applyEffect` raises this **only when BOTH sets are non-empty**:
+   *
+   *  - a peg that is the CARD'S ACTOR's, not already a majority voter, and not in a
+   *    Volatile Area (p18 makes a peg there permanent, so it cannot be moved at all);
+   *  - a destination: an EMPTY area in a zone adjacent to that peg's zone
+   *    (`Zone.neighbours`, already on the board).
+   *
+   * That is the `'chosen-zone'` unresolvable-selector argument verbatim — a selector
+   * that resolves to nothing raises NOTHING rather than raising a decision nobody can
+   * answer — and it is the reason a player can never be frozen by this card. Asserted
+   * EXHAUSTIVELY over every peg layout crossed with every destination area at 2/3/4/5
+   * seats in `test/choices.test.ts`, not sampled.
+   *
+   * ## THE RESOLVER'S RULE IS ONE EXPRESSION, and `scope` is descriptive
+   *
+   * `resolveChoice` accepts a pick whose peg `owner === c.source`. `scope` says how that
+   * relates to the ANSWERER — `'own'` when the answerer is the card's actor, `'others'`
+   * when they are a different player — and it is published because it is what lets a
+   * dialog say "one of another player's voters" without naming the card's owner, which
+   * the answerer has no business knowing from the decision alone. It is NOT the rule the
+   * resolver leans on, and a client that counts the offer from `scope` will over-count
+   * it: `'others'` excludes the answerer's own pegs but not a third player's. The
+   * engine is the authority, exactly as it is for every other kind, and that is a named
+   * client ask rather than a divergence hidden in a field.
+   *
+   * ## `source` IS THE CARD'S ACTOR, and that is not the answerer
+   *
+   * GREAT LEADER's answerer is *"the player after you"*, so `PendingChoice.player` is
+   * that seat and `source` is the player whose voter may be moved. Keeping them apart is
+   * what makes `'others'` meaningful, and it is why `resolveChoice` refuses a pick
+   * answered by anybody but `PendingChoice.player` — the same guard `'choose-player'`
+   * and `'choose-card'` use, and the same reason: the actor is the only player with
+   * standing to say whose voter this is.
+   *
+   * ## VISIBILITY: PUBLIC, and it leaks nothing at all
+   *
+   * It enumerates **the board** — nine fixed areas, every peg face up, on every payload
+   * already. There is no version of this decision that could touch a hidden hand, a
+   * hidden pile or a `_`-prefixed field. **No `_`-prefixed field is added**, so
+   * `packages/server/test/secret-inventory.ts` owes nothing beyond classifying the kind
+   * under `'pegs'` — which is one of the categories it already permits.
+   */
+  | {
+      readonly kind: 'choose-peg-dest';
+      /** How many pegs to move. `1` for every recovered card. */
+      readonly count: number;
+      /** Whose voters are on offer, relative to the ANSWERER. Descriptive; see above. */
+      readonly scope: ChoiceScope;
+      /** The card's actor — whose voter may be moved. NOT the answerer. */
+      readonly source: PlayerID;
+      readonly reason: string;
     };
 
 /** Whose decision it is. Headlines can penalise a player who is not the active one. */
