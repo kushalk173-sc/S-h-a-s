@@ -480,6 +480,27 @@ async listen(): Promise<{ port: number; host: string }> {
           this.#send(target.socket, { t: 'session:granted', session: this.sessions.toWire(sess) });
           this.#sendMatchState(target, room, sess);
         }
+        // THE ROOM'S OWN VIEW IS BROADCAST, OR A SPECTATOR WHO JOINED EARLY IS ORPHANED.
+        //
+        // The loop above reaches SEATS, and only seats: a connection whose session role
+        // is `spectator` is `continue`d past, because a spectator gets no credential and
+        // no seat. So the one thing that tells a spectator the game has begun — the
+        // `matchId` this broadcast carries on `LobbyHub#startMatch`'s member loop — was
+        // never sent to anybody who was watching rather than playing.
+        //
+        // The client's half is already correct and was already covered: `Lobby.tsx` keys
+        // an effect on `lobby.matchId` and sends `match:spectate`, which is the frame that
+        // actually attaches (`#spectate` → `#attach` → `match:state`). For a room that
+        // was ALREADY running that fires on arrival, because the arrival snapshot already
+        // carries a match id. For a room that had not started, nothing ever produced the
+        // match id, so the effect never fired and the spectator sat in a waiting room for
+        // a game already in progress — the table looked hung, and no client could have
+        // found the cause because the frame was never sent.
+        //
+        // So it is broadcast to the whole room rather than to the seats: `#broadcastLobby`
+        // reaches every connection whose session still names this lobby, which is a
+        // superset of the seats, and the seats are about to receive a far richer frame.
+        this.#broadcastLobby(lobby.lobbyId);
         return room.persistSeats();
       })
       .catch((err: unknown) => {
