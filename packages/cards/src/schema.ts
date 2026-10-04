@@ -236,6 +236,7 @@ const EFFECT_OP_ORDER: Readonly<Record<string, number>> = {
   discount: 13,
   'move-card': 14,
   'borrow-power': 15,
+  'set-cap': 16,
 };
 
 /**

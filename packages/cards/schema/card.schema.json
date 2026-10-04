@@ -526,6 +526,20 @@
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
           }
+        },
+        {
+          "$comment": "G15. `set-cap` is THE BIG FREEZE's \"Reduce your resource cap to 10\". It is an op rather than a `restrict` kind because a cap is not a GATE: every `RestrictionKind` is consulted where an action is allowed or refused, while a cap is a NUMBER that `enforceCap` and `overCap` compare a pool against. Writing it as a restriction would make `applyEffect` a cap resolver and put a lookup in every pool comparison. It is read off `PlayerState.capOverride`, which is PUBLIC and optional — the cap is printed on the mat and a tax somebody else must predict before acting is a different game.\n\nDEADLOCK, and this is why the gap's earlier refusal was wrong. `enforceCap` raises `count = overCap(pool, cap) = max(0, total - cap)`, so `excess <= total` always: the ask can never exceed what the player holds, discarding it leaves `total - excess = min(total, cap) >= 0` so the target state is REACHABLE, and `lose-any` is additionally clamped to the chooser's pool at ANSWER time so a pool that drains in between lowers the ask rather than stranding it. The `convert-voter` soft-lock was a decision with NO acceptable answer; this is a decision whose answer is always affordable. `enforceCap` runs in the same breath as the write, which is p12's \"if at any time you cross your resource cap\" read literally.\n\n`to` can only ever make the cap MORE restrictive (`min` against both the existing reduction and the printed cap), and `until` is the DEADLINE OF THE REDUCTION rather than a hook's lifetime — which is why `isScoped` carves the op out, exactly as it does `restrict` and `borrow-power`. See packages/cards/KNOWN-GAPS.md G15.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "to"],
+          "properties": {
+            "op": { "const": "set-cap" },
+            "to": { "type": "integer", "minimum": 0 },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
+          }
         }
       ]
     },

@@ -252,6 +252,9 @@ describe('schema: the effect union', () => {
       'move-card': { op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'you' },
       // G14a. `target` is required and single-valued, so this is the whole op.
       'borrow-power': { op: 'borrow-power', target: 'chosen-player', until: 'this-turn' },
+      // G15. `to` is required and is the whole op; `until` is its deadline rather than a
+      // hook's lifetime, exactly as it is for `restrict`.
+      'set-cap': { op: 'set-cap', to: 10, until: 'rest-of-game' },
     };
     for (const op of EFFECT_OP_SET) {
       expect(validateEffect(FILE, samples[op], EFFECT_OP_SET), op).toEqual([]);

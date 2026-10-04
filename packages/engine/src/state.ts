@@ -308,6 +308,65 @@ export type PlayerState = {
    * quietly becomes load-bearing.
    */
   readonly restrictions?: readonly Restriction[];
+  /**
+   * G15 — a cap LOWERED for this player, which every resource rule must read instead of
+   * `rules.resourceCap`. THE BIG FREEZE: *"Reduce your resource cap to 10."*
+   *
+   * ## WHY IT IS A `PlayerState` FIELD AND NOT A `Restriction`
+   *
+   * `Restriction` is a rule other ACTIONS consult at a gate — a purchase is refused, a
+   * power is unavailable. A cap is not a gate, it is a NUMBER that half a dozen rules
+   * read arithmetically, and `enforceCap` / `overCap` / the balance checker all compare a
+   * pool against it. Putting a cap in `restrictions` would mean `applyEffect` becoming a
+   * cap resolver and every pool comparison growing a lookup.
+   *
+   * ## THE DEADLOCK RULING, and it is the whole reason this is safe
+   *
+   * THE REFUSAL ON THIS GAP — *"lowering a cap under an already-over player is the
+   * `convert-voter` soft-lock shape"* — **does not hold, and the reason is arithmetic
+   * rather than a mitigation.** `enforceCap` raises `count = overCap(pool, cap) =
+   * max(0, total - cap)`, and since `total >= 0` and `cap >= 0` that ask satisfies
+   * `excess <= total`, i.e. **the ask can never exceed what the player holds.** Discarding
+   * it leaves `total - excess = min(total, cap) >= 0`, so the target state is REACHABLE,
+   * not merely approached. And `lose-any` is additionally clamped to the chooser's pool as
+   * it stands when the decision is ANSWERED (`packages/engine/test/choices.test.ts` pins
+   * this for the ordinary p12 crossing), so a pool that drains in between lowers the ask
+   * rather than stranding it.
+   *
+   * So the defect the refusal feared — a decision whose ACCEPTABLE ANSWERS are empty, which
+   * is the `convert-voter` bug and is a permanent freeze — cannot arise: every pick that
+   * removes `excess` is legal, and there are always enough resources to make one. What the
+   * cap drop changes is the TIMING of a discard p12 already demands, not whether it can be
+   * made. `tests` assert the arithmetic directly at 2/3/4/5 seats.
+   *
+   * ## STACKING TAKES THE MINIMUM, and that is the safe direction
+   *
+   * Two overlapping `set-cap` effects write one field, so the second overwrites the first
+   * and expiry cannot restore independently. Rather than a list, `reduce()` keeps the MORE
+   * restrictive of the two — `min(existing, to)` — and `expireCapOverrides` at the turn
+   * boundary lifts it back to `rules.resourceCap` when nothing is holding it. A cap can
+   * therefore only ever go DOWN from the printed value and back, never above it, which is
+   * also the only behaviour the balance checker could reason about.
+   *
+   * ## `expiresTurn` IS NOT RE-CHECKED ON READ, deliberately
+   *
+   * `capOverrideOf` takes a `PlayerState`, not a `GameState`, so it cannot see the turn;
+   * re-deriving the deadline here would be a SECOND definition of the same expiry, which is
+   * how a rule lives one turn too long in one place and not another — the same ruling
+   * `usesLeft` follows for `Restriction.expiresTurn`. `expireCapOverrides` in
+   * `advanceTurn` is the only thing that retires it, on the same clock that resets
+   * `powerUses`.
+   *
+   * ## PUBLIC, and why it owes the server nothing
+   *
+   * Unprefixed, and the argument is p12's own: the cap is printed on the player's mat and a
+   * tax somebody else must predict before they act is a different game — the same argument
+   * as `restrictions`. It is also **optional** for the same reason `restrictions` is (a
+   * required field breaks hand-built `PlayerState` literals in packages this one may not
+   * edit); `undefined` therefore means "no reduction in force", which is exactly the
+   * printed state.
+   */
+  readonly capOverride?: { readonly to: number; readonly expiresTurn: number | null };
   readonly isBot: boolean;
 };
 

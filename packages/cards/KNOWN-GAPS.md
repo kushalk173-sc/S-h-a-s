@@ -1196,22 +1196,107 @@ changes — `describeEffect`'s `switch` has a `default`, `derive.ts` does not en
 targets, and no `Choice` kind is involved, so `npm run typecheck` in `packages/client` is
 red on that one line until it lands.
 
-### 3.2 WHAT IS STILL BLOCKED, AND ON WHAT, AFTER THIS ITERATION
+### 3.2 THE BIG FREEZE'S CAP FIELD — **LANDED, AND THE REFUSAL WAS WRONG**
+
+**`{ op: 'set-cap', to: 10 }` on `PlayerState.capOverride`, and `playable` 39 → 40 of 54
+with zero no-ops.** The reduction is THE BIG FREEZE's whole first clause — REF 4.3,
+*"Reduce your resource cap to 10."* — and nothing else, because the printed card's second
+clause (*"[OR] Pick an opponent **every turn** and donate any 1 resource to them"*) is a
+recurring donation to a chosen opponent, which is G5 plus G9 and is a **different card**
+rather than a smaller one.
+
+**THE VERDICT ON THE REFUSAL: it was wrong, and the reason is arithmetic rather than a
+gate.** The gap was refused as *"lowering a cap under an already-over player is the exact
+`convert-voter` soft-lock shape, and it would have to be gated."* The first clause is
+right — a cap drop under an already-over player really does raise a discard — and the
+conclusion does not follow, because the two shapes are not the same shape:
+
+| | `convert-voter` (the real bug) | a lowered cap |
+|---|---|---|
+| the decision raised | `convert-voter` over the whole board | `lose-any` for `max(0, total - cap)` |
+| acceptable answers | **EMPTY** — the resolver refuses every pick | **EVERY** pick that removes the ask |
+| is the ask affordable | irrelevant, there is nothing to pick | **always**: `excess = max(0, total - cap) <= total` because `total >= 0` and `cap >= 0` |
+| is the target reachable | no — the owner is frozen for the match | **yes**: `total - excess = min(total, cap) >= 0` |
+
+So the *only* property that made `convert-voter` a soft-lock — a decision with no
+acceptable answer, hence `blockedBy` freezing its owner with no server-side recovery — is
+provably absent here. `lose-any` is additionally clamped to the chooser's pool **as it
+stands when the decision is answered** (`choices.test.ts`, G21), so a pool that drains in
+between lowers the ask rather than stranding it. **No gate was needed.**
+
+**`packages/engine/test/cap-override.test.ts` (8 tests) is the evidence, not the argument:**
+the invariant is checked exhaustively over every pool total 0–24 × every cap 0–24 (625
+pairs) rather than reasoned about, because the check costs a millisecond and being wrong
+costs a table that cannot finish; the dischargeability of the raised decision is walked at
+**2/3/4/5 seats × every pool 0–12**; and a driven game at all four seat counts asserts at
+every step that *some* action succeeds — **with the probe actually resolving at least
+once**, because a "a legal move always exists" test that passes without the card ever
+resolving proves nothing.
+
+**Three rulings the field forces, all asserted:**
+1. **STACKING TAKES THE MINIMUM** of the existing reduction, the incoming `to`, and
+   `rules.resourceCap` — so two reductions compose to the more restrictive, and a `to`
+   above the printed cap is a **no-op rather than an increase**. A card can only ever make
+   the cap more restrictive; `expireCapOverrides` lifts it back to the printed value.
+2. **`until` IS THE REDUCTION'S DEADLINE, not a hook's lifetime** — which is why
+   `isScoped` carves the op out beside `restrict` and `borrow-power`. Installed as a hook
+   it would (a) never reduce anything, because a scoped effect is not applied, and (b)
+   re-reduce on every event with **no way to retire it**, since a live effect's expiry only
+   stops it RE-APPENDING and never lifts what is already in force.
+3. **`expiresTurn` IS NOT RE-CHECKED ON READ.** `capOverrideOf` takes a `PlayerState`, not
+   a `GameState`, so it cannot see the turn, and a second definition of the same deadline is
+   how a rule lives one turn too long in one place and not another. Same arrangement, and
+   the same reasoning, as `Restriction.expiresTurn` and `usesLeft`.
+
+**No new `Choice` kind, so `packages/server/test/secret-inventory.ts` `CHOICE_KINDS` owes
+nothing.** The field is `capOverride`, unprefixed and public on p12's own argument (the cap
+is printed on the mat, and a tax somebody else must predict before acting is a different
+game), and optional for the reason `restrictions` is — a required field breaks hand-built
+`PlayerState` literals in packages this one may not edit.
+
+**WHAT IT STILL DOES NOT DO, stated rather than left implied:** the client does not render
+the reduced cap as a number on the mat, so a player is told they are over the cap by a
+dialog whose ceiling they cannot see. The engine enforces it and the enforcement is
+correct; the display is the client's. **That is a client ask, not an engine gap.**
+
+### 3.3 WHAT IS STILL BLOCKED, AND ON WHAT, AFTER THIS ITERATION
 
 | card | blocked on | owner |
 |---|---|---|
 | A COWARD OR A JOURNALIST?, CARD GAMES | **CLOSED — G12's target half landed (§3.1)**. Still blocked on the in-flight-queue half, which buys nothing without this | — |
 | 404, BRAVE NEW WORLDS | a card-level `answerPhase` read by `reduce`'s `answer` branch — `BRAVE NEW WORLDS`'s *"will not receive any resources"* half is already shipped as `no-income`, and its first sentence is the part that moves no state | engine, large |
-| THE BIG FREEZE | a `PlayerState` cap field read by `canAfford` / `enforceCap` / `overCap` / `poolTotal` / the balance checker. **Warned, not merely sized:** lowering a cap under a player who is already over it is the exact `convert-voter` soft-lock shape, and it would have to be gated | engine, large, deadlock risk |
+| THE BIG FREEZE | **CLOSED on the cap (§3.2).** The *"[OR] … every turn … donate"* branch is G5 + G9 and would make it a different card | — |
 | QUANTUM WRISTBAND, A CALL FROM KARACHI, NEXT BILLION DATA POINTS | **RULED OUT** — auction, vote. See §2 G13b/c. Do not rebuild | — |
 | FUELLING THE NEWS | a Headline draw pile, which does not exist: headlines are a QUEUE (`headlineQueue`), not a hand or a market | engine, large |
 | BLESSINGS OF PARENTS PAST | the ONE pile §2bis allows a `choose-card` to enumerate (the public market), so this is blocked on the **client wire format** rather than on the leak, plus "keep 1 and donate the other" | client |
 | CULT-IVATING OBEDIENCE, ON THE "HIGH" SEAS | G11: a board-resident object that outlives its resolution | engine, large |
 | HIGGS MORON | G10 (a token counter on a card) *and* the in-flight half of G12, which `'player-after'` did not close | engine, large |
-| GREAT LEADER, BAD ECONOMY | a `move-peg` op: *"may move 1 of your non-majority voters to an adjacent zone"* needs a move to an adjacent zone, and `evict`/`discard-voter` are the wrong verb — the card HELPS the beneficiary. **The `'player-after'` half is now DONE** | engine |
+| GREAT LEADER, BAD ECONOMY | a `move-peg` op: *"may move 1 of your non-majority voters to an adjacent zone"* needs a move to an adjacent zone, and `evict`/`discard-voter` are the wrong verb — the card HELPS the beneficiary. **The `'player-after'` half is now DONE.** **AND IT IS NOW KNOWN TO NEED A NEW `Choice` KIND**, which is a server-blocked change: "which of my pegs, to which adjacent area" is one pick and no existing kind carries a destination. See §3.4 | engine + server |
 | THOUGHTS AND PRAYERS | the `read`-vs-`target` split on a computed `n`. `chosen-player` makes it *worse*, not better | engine |
 | DOSTI BANI RAHE | a turn trigger on a seat OTHER than the owner: `installLiveEffects` re-applies a standing effect at the top of the **owner's** turns, and this card's whole content is somebody else's turn | engine |
 | CHAI-PAANI | **NOT A GAP AND NOT FIXABLE.** Only a re-application clause was recovered; the base effect was never recovered, and inventing a card is forbidden. See §7 | — |
+
+### 3.4 A NEW `Choice` KIND IS NOW SERVER-BLOCKED, and this is worth knowing before planning the rest
+
+`packages/server/test/secret-state.test.ts:1780` asserts
+`Object.keys(CHOICE_KINDS).sort()` equals the engine's `Choice` kinds **exactly**. So
+**any new `Choice` kind turns `packages/server` red on the first run**, and that file is
+not this package's to edit. Three of the remaining cards need one each, and they are named
+so the server owner can price the change in one decision rather than three:
+
+| card | the kind it needs | why no existing kind fits |
+|---|---|---|
+| GREAT LEADER, BAD ECONOMY | a pick that is **(peg, destination area)** | `evict` / `discard-voter` / `convert-voter` all resolve to a pool or a mat; none of them has a destination, and `evict` is the WRONG VERB for this card — it helps the beneficiary |
+| BLESSINGS OF PARENTS PAST | a pick over **face-up public Voter Cards** | §2bis permits this — the market is the one pile whose set is public to every client — so it is a wire-format cost and **not** a secrecy cost |
+| SELECTIVE ACCESS MEMORY | a pick over a pile whose ORDER is information | **permanently refused**; §2bis is the ruling and it is not the client's to overturn |
+
+The same file pins `PUBLIC_BY_DESIGN` to exactly `['liveEffects', 'restrictions']`
+(`public-payload.test.ts:443`), which is a list of fields a client is expected to **act
+on**. `PlayerState.capOverride` is deliberately NOT added to it: the discard p12 raises is
+a `lose-any` the client already renders, so the cap is felt rather than displayed, and
+adding it would make that assertion red for a field that carries no action of its own.
+**That is a judgement the server owner may want to overrule** — if they would rather the
+cap be shown, it belongs in `PUBLIC_BY_DESIGN` and the client gains a render.
 
 
 ---

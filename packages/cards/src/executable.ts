@@ -93,6 +93,15 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
    * `EXECUTABLE_DURATIONS` before it ever looks at this table.
    */
   'borrow-power': ['target'],
+  /**
+   * G15. `to` is the number and `target` is who is held to it, and both are read. `until`
+   * is a scope field read in this case exactly as `restrict`'s is — it is the DEADLINE OF
+   * THE REDUCTION rather than a hook's lifetime, which is why `isScoped` carves the op out
+   * — and it is absent here for the same reason it is absent from `restrict` and
+   * `borrow-power`: `unexecutedEffectProblems` checks `until` against
+   * `EXECUTABLE_DURATIONS` before it ever consults this table.
+   */
+  'set-cap': ['to', 'target'],
 };
 
 

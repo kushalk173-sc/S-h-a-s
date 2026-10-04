@@ -139,13 +139,30 @@ function pushChoice(state: GameState, choice: PendingChoice['choice'], player: P
 function enforceCap(state: GameState, id: PlayerID, rules: Rules): GameState {
   const p = state.players[id];
   if (!p) return state;
-  const excess = overCap(p.resources, rules.resourceCap);
+  const excess = overCap(p.resources, capOf(p, rules));
   if (excess <= 0) return state;
   const already = state.choices.some(
     (c) => c.player === id && c.choice.kind === 'lose-any' && c.choice.reason === 'Resource cap',
   );
   if (already) return state;
   return pushChoice(state, { kind: 'lose-any', count: excess, reason: 'Resource cap' }, id);
+}
+
+/**
+ * G15 — THE CAP THIS PLAYER IS ACTUALLY HELD TO.
+ *
+ * The printed `rules.resourceCap`, unless `PlayerState.capOverride` holds a LOWER one
+ * (THE BIG FREEZE). Read through this helper at every cap comparison rather than off
+ * `rules` directly, which is what makes a reduction reach `enforceCap` instead of being a
+ * number on a mat that nothing enforces — and a cap nothing enforces is not a rule.
+ *
+ * `min`, never `max`: a card can only make the cap more restrictive. The full argument,
+ * the stacking ruling and the deadlock arithmetic are on the field.
+ */
+function capOf(player: PlayerState, rules: Rules): number {
+  const over = player.capOverride?.to;
+  if (over === undefined) return rules.resourceCap;
+  return Math.min(rules.resourceCap, over);
 }
 
 function blockedBy(state: GameState, id: PlayerID): PendingChoice | undefined {
@@ -932,6 +949,42 @@ function expireRestrictions(state: GameState): GameState {
   return s;
 }
 
+/**
+ * G15 — the reduced cap this player is being held to, or `undefined` when none is.
+ *
+ * A helper rather than `player.capOverride?.to` at each site, so the stacking `min` that
+ * `set-cap` writes is also the value a reader sees, and so absent has exactly one meaning.
+ * `expiresTurn` is deliberately NOT consulted here: this is a `PlayerState`, not a
+ * `GameState`, so it cannot see the turn, and a second definition of the same deadline is
+ * how a rule lives one turn too long in one place and not another. `expireCapOverrides`
+ * is the only thing that retires it — the same arrangement as `Restriction.expiresTurn`
+ * and `usesLeft`.
+ */
+function capOverrideOf(player: PlayerState): number | undefined {
+  return player.capOverride === undefined ? undefined : Math.max(0, player.capOverride.to);
+}
+
+/**
+ * G15 — retire a cap reduction whose deadline has passed, at the turn boundary.
+ *
+ * Runs on the same clock as `expireRestrictions` and the `powerUses` reset, and for the
+ * same reason: expiry that is checked in two places is expiry that disagrees in two
+ * places. Absent field means "no reduction", which is the printed state, so the removal
+ * restores p12 exactly rather than setting anything.
+ */
+function expireCapOverrides(state: GameState): GameState {
+  let s = state;
+  for (const p of state.turnOrder) {
+    const player = s.players[p];
+    if (player?.capOverride === undefined) continue;
+    const { expiresTurn } = player.capOverride;
+    if (expiresTurn === null || expiresTurn > state.turn) continue;
+    const { capOverride: _retired, ...rest } = player;
+    s = { ...s, players: { ...s.players, [p]: rest as PlayerState } };
+  }
+  return s;
+}
+
 
 /**
  * G16 — resolve a `ZoneSelector` against the board, or `null` when it names nothing.
@@ -1412,6 +1465,38 @@ function applyEffect(
         sourceCardId: cardId ?? 'unknown',
       });
     }
+    case 'set-cap': {
+      // G15. THE BIG FREEZE: *"Reduce your resource cap to 10."* See the `set-cap` arm in
+      // cards.ts for the full argument; the three rulings that live HERE are the ones that
+      // have to be branches rather than comments, because a comment does not fail a test.
+      //
+      // 1. STACK TAKES THE MINIMUM, never the incoming value and never the printed cap as
+      //    a floor. Two overlapping reductions then compose to the more restrictive of the
+      //    two rather than fighting, and a `to` above the printed cap is a no-op.
+      // 2. `until` is THIS RULE'S DEADLINE and is read here — which is why `isScoped`
+      //    carves the op out. Installed as a hook it would re-impose the reduction on
+      //    every event and never retire it.
+      // 3. `enforceCap` RUNS IMMEDIATELY, in the same breath as the write. p12 reads
+      //    "if at any time you cross your resource cap you must choose and discard any
+      //    excess"; a reduction that waits for the next cap check is a card that reads as
+      //    though it bites and does not. This is also the step that carries the whole
+      //    deadlock argument: the ask it raises is `max(0, total - cap) <= total`, so it is
+      //    always affordable and always dischargeable.
+      for (const p of resolveTargets(s, source, target, forced)) {
+        const player = s.players[p];
+        if (!player) continue;
+        const expiresTurn = durationExpiry(s, source, effect.until ?? 'rest-of-game');
+        const current = capOverrideOf(player);
+        s = withPlayer(s, p, {
+          capOverride: {
+            to: Math.min(current === undefined ? effect.to : Math.min(current, effect.to), ctx.rules.resourceCap),
+            expiresTurn,
+          },
+        });
+        s = enforceCap(s, p, ctx.rules);
+      }
+      return s;
+    }
   }
 }
 
@@ -1455,6 +1540,12 @@ function isScoped(effect: Effect): boolean {
   // state.ts for why it is one list rather than two — so it means the same thing by
   // `until` and gets the same answer. Asserted in borrowed-powers.test.ts.
   if (effect.op === 'borrow-power') return false;
+  // G15. `set-cap` writes a rule the same way and means the same thing by `until`: the
+  // cap is reduced NOW and simply stops being reduced at the deadline. Installed as a hook
+  // it would (a) never reduce anything, because a scoped effect is not applied, and (b) if
+  // it were, re-reduce on every event with no way to retire it, since a live effect's
+  // expiry only stops it RE-APPENDING.
+  if (effect.op === 'set-cap') return false;
   return effect.when !== undefined || effect.until !== undefined || effect.condition !== undefined;
 }
 
@@ -1624,6 +1715,11 @@ function tickLiveEffects(state: GameState, ctx: Ctx): GameState {
   // are relative to the turn the card resolved on, and a restriction is not a
   // standing effect, so it acts on the resolver's own clock rather than its owner's.
   s = expireRestrictions(s);
+  // G15: same boundary, same "expire first" ordering, and same reason — THE BIG FREEZE's
+  // cap reduction is a rule on the resolver's own clock, not a standing effect, so it is
+  // retired here rather than by a live effect's expiry (which would only stop it
+  // RE-APPENDING and never lift the reduction already in force).
+  s = expireCapOverrides(s);
   for (const le of s.liveEffects) {
     if (le.trigger !== null || le.owner !== s.activePlayer) continue;
     if (!isInForce(le, s.turn)) continue;

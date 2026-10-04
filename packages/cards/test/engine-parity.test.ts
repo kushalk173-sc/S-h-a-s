@@ -97,6 +97,14 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
           // something.
           expect(effect.target).toBe('chosen-player');
           break;
+        case 'set-cap':
+          // G15. `to` must be a WHOLE number of zero or more, because it is compared
+          // directly against a pool total and `overCap` is `max(0, total - cap)`: a
+          // fractional or negative cap would make the discard p12 demands either
+          // unreachable or negative, and the first of those is a stuck table.
+          expect(Number.isInteger(effect.to)).toBe(true);
+          expect(effect.to).toBeGreaterThanOrEqual(0);
+          break;
         default: {
           const never: never = effect;
           throw new Error(`unhandled Effect variant: ${JSON.stringify(never)}`);

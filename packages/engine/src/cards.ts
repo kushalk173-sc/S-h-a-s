@@ -670,6 +670,50 @@ export type Effect = (
    * one function, and the Level 5 ones are not all there.
    */
   | { readonly op: 'borrow-power'; readonly target: 'chosen-player' }
+  /**
+   * G15 — LOWER a player's resource cap. THE BIG FREEZE: *"Reduce your resource cap
+   * to 10."*
+   *
+   * ## WHY IT IS AN OP AND NOT A `restrict` WITH A KIND
+   *
+   * Because a cap is not a gate. Every `RestrictionKind` is consulted at a decision point
+   * where an action is either allowed or refused; a cap is a NUMBER that `enforceCap` and
+   * `overCap` compare a pool against. Writing it as a restriction would mean `applyEffect`
+   * becoming a cap resolver and every pool comparison growing a lookup — the argument is
+   * the long way round on `PlayerState.capOverride`.
+   *
+   * `until` (from `EffectScope`) is the lifetime and is read HERE rather than by
+   * `installLiveEffects`, for the reason `restrict` reads it there and the reason
+   * `isScoped` carves those ops out: a cap reduction is a rule imposed now with a deadline,
+   * not a hook that has nothing to stand up on. See `isScoped`'s carve-out.
+   *
+   * ## IT CAN NEVER RAISE A CAP, and that is a Ruling rather than an omission
+   *
+   * `reduce()` keeps `min(existing, to)` and never the printed `rules.resourceCap` as a
+   * floor it can climb back to, so a card can only ever make the cap MORE restrictive, and
+   * `expireCapOverrides` lifts it back to the printed value at the turn boundary. A
+   * `set-cap` above the printed cap is therefore a no-op rather than an error: refusing it
+   * would mean a validator rule about the RULES object, which is not a card property.
+   *
+   * ## DEADLOCK, which is why this is safe and the earlier refusal was wrong
+   *
+   * The gap was refused as *"lowering a cap under an already-over player is the
+   * `convert-voter` soft-lock shape"*. **It is not**, and the reason is arithmetic.
+   * `enforceCap` raises `count = overCap(pool, cap) = max(0, total - cap)`, so
+   * `excess <= total` always — the ask can never exceed what the player holds — and
+   * discarding it leaves `total - excess = min(total, cap) >= 0`, so the target state is
+   * REACHABLE. `lose-any` is additionally clamped to the chooser's pool at ANSWER time, so
+   * a pool that drains in between lowers the ask rather than stranding it. The `convert-voter`
+   * bug was a decision with NO acceptable answer; this is a decision whose answer is always
+   * affordable. `reduce()` calls `enforceCap` immediately after writing the field, which is
+   * p12's *"if at any time you cross your resource cap"* taken literally.
+   */
+  | {
+      readonly op: 'set-cap';
+      /** The reduced cap. Above the printed cap this is a no-op; see the ruling above. */
+      readonly to: number;
+      readonly target?: EffectTarget;
+    }
 ) &
   EffectScope;
 

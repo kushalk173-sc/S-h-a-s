@@ -154,7 +154,7 @@ const PROBES: readonly Probe[] = [
   { name: 'New Face Who Dis', ref: '4.3', kind: 'headline', reduction: [{ op: 'gerrymander', n: 1, target: 'everyone' }], gap: 'G5/G9', note: 'the Volatile-Area ban is dropped; same card as SUBMERGED' },
   { name: 'Red Blooded', ref: '4.3', kind: 'headline', reduction: [{ op: 'discard-voter', n: 1, target: 'each-opponent' }], gap: 'G4/G-new' },
   { name: 'Snoop B-O-Double-T', ref: '4.3', kind: 'headline', reduction: [{ op: 'restrict', kind: 'surcharge', value: 1, target: 'you', until: 'rest-of-game' }], gap: 'G5', note: 'the same card as PYTHONPOST, per REF 4.3; not double-counted as two mechanisms' },
-  { name: 'The Big Freeze', ref: '4.3', kind: 'headline', reduction: null, gap: 'G5/G9/G15/G22', note: 'four gaps at once' },
+  { name: 'The Big Freeze', ref: '4.3', kind: 'headline', reduction: [{ op: 'set-cap', to: 10, until: 'rest-of-game' }], gap: 'G15', note: 'CLOSES G15 AND OVERTURNS THE REFUSAL. REF 4.3 reads *"Reduce your resource cap to 10."* and that is the whole of what ships, via `set-cap` reading `PlayerState.capOverride` — which is a `PlayerState` FIELD rather than a `restrict` kind because a cap is a NUMBER every pool comparison reads, not a gate an action is refused at. THE DEADLOCK ARGUMENT, which is the reason the earlier refusal ("lowering a cap under an already-over player is the convert-voter soft-lock shape") was wrong: enforceCap raises count = overCap(pool, cap) = max(0, total - cap), so excess <= total ALWAYS -- the ask can never exceed what the player holds -- and discarding it lands at min(total, cap) >= 0, so the target state is REACHABLE rather than merely approached. `lose-any` is additionally clamped to the chooser\'s pool at ANSWER time, so a pool that drains in between lowers the ask instead of stranding it. convert-voter\'s bug was a decision with NO acceptable answer; this is a decision whose answer is always affordable. No gate is needed, and the exhaustive proof is in packages/engine/test/cap-override.test.ts at 2/3/4/5 seats. enforceCap runs in the same breath as the write, which is p12\'s "if at any time you cross your resource cap" read literally. DROPPED, both named: the "[OR] Pick an opponent EVERY TURN and donate any 1 resource to them" branch, which is a recurring donation to a chosen opponent (G5 + G9) and is a DIFFERENT card rather than a smaller one; and the resource cap being player-visible as a number on the mat, which the engine enforces but the client does not yet render' },
   { name: 'The Four Horsemen', ref: '4.3', kind: 'headline', reduction: [{ op: 'lose-any', n: 2 }], gap: 'G5', note: 'the purchase lock is dropped' },
   { name: 'Why The Long Face?', ref: '4.3', kind: 'headline', reduction: [{ op: 'voters', n: 1, target: 'chosen-player', when: 'on-voter-influenced', until: 'next-turn' }], gap: 'G14', note: 'SHIPS as hl-et2040-019 and is now WHOLE: G1 names the opponent, G14 fires the hook, G22 is the lifetime, and the printed 1 voter NOT card parenthetical is honoured because voters grants a group rather than drawing. ONE CLAUSE IS DROPPED AND IT MAKES THE CARD STRONGER, which is why it is named rather than approximated: condition byOwner is left OFF, so the hook fires on ANY influence including an opponents, where the printed card says every Voter Card YOU influence' },
 ];
@@ -538,6 +538,14 @@ function fingerprint(s: GameState, base?: GameState): string {
     // SNOOP B-O-DOUBLE-T and DON'T KISS THE BABIES would all report "played, NO-OP"
     // even though the tax they impose is live from this moment on.
     restrictions: s.turnOrder.map((id) => s.players[id]?.restrictions),
+    // G15, and the SAME argument as `restrictions` above, for THE BIG FREEZE: `set-cap`
+    // writes a rule rather than moving anything, and the rule is consulted later by
+    // `enforceCap` on a different action. Without it here the card reports "played,
+    // NO-OP" in any position where the caster is not ALREADY over the reduced cap — which
+    // is not "the card does nothing", it is "the card has nothing to bite on yet", and the
+    // two must not share a verdict. The exhaustive proof that the rule really bites, and
+    // that it cannot strand anybody, is in packages/engine/test/cap-override.test.ts.
+    caps: s.turnOrder.map((id) => s.players[id]?.capOverride ?? null),
     // G13: a response window holds a card's effects un-applied, and the window's
     // existence is part of what the mechanic changed.
     interrupt: s.interrupt,
