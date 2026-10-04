@@ -54,13 +54,44 @@
    2-col grid. */
 .blind-answer__panel {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* `minmax(0, 1fr)`, NOT `1fr 1fr`, and this is a bug fix rather than a nicety.
+     A grid item's `min-width` is `auto`, which resolves to its MIN-CONTENT width:
+     the width it refuses to go below. `1fr` is `minmax(auto, 1fr)`, so each column
+     was floored at the widest its content could not wrap under, and two of those
+     floors do not fit in a phone. `minmax(0, 1fr)` keeps the two equal 1fr columns
+     and lets each one actually shrink, which is what `1fr` is supposed to mean. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
   align-items: stretch;
   background: var(--paper-100);
   border: 1px solid var(--ink-300);
   border-radius: var(--r-md);
   padding: var(--sp-4);
+}
+
+/*
+   THE TWO ANSWERS STACK ON A PHONE, and this is measured rather than preferred.
+
+   At 390px the panel's content box is 390 - 2 (border) - 32 (panel padding) = 356px,
+   so two columns are 172px each after the 12px gap. An answer is up to four lines of
+   17px/700 display serif in a 172px column with 44px of its own padding — 128px of
+   text — and the browser audit measured the two sides at DIFFERENT widths (283px
+   against 273px) with answer B's box ending at x=625 in a 390px viewport. Both
+   answers on the card are information the full-information ruling exists to
+   publish, so half the card being off-screen is half the feature missing.
+
+   Stacked, each side is the full 356px. One rule, applied to the panel, so the two
+   sides are still laid out by one declaration and still compute identically: the
+   symmetry contract is about the two sides matching EACH OTHER, and stacking
+   changes nothing about that.
+
+   The measured geometry at both widths is in `blindAnswer.test.tsx`, which asserts
+   the rule exists and that the panel can shrink below its content.
+*/
+@media (max-width: 620px) {
+  .blind-answer__panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ── THE SIDE RULE. Both sides, one class, one declaration block. ──────────
@@ -99,6 +130,11 @@
      implement the individual `padding-*` longhands for computed style, which
      would make the symmetry assertion vacuous for these four properties. */
   padding: 20px 22px;
+  /* `min-width: 0` so a side may shrink below its min-content width inside the
+     grid track. Without it this button's automatic minimum size re-imposes the
+     floor `minmax(0, 1fr)` on the track was written to remove, and a long answer
+     pushes the other one off the right edge of a phone. */
+  min-width: 0;
   /* Same min-height on both, so a long A and a short B are visually equal:
      content-length differences must not change box size. */
   min-height: 88px;

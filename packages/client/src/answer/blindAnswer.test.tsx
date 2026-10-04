@@ -865,3 +865,75 @@ describe('the stylesheet itself contains no side-differentiating rule', () => {
     }
   });
 });
+
+/**
+ * BOTH ANSWERS FIT THE VIEWPORT — the rule that keeps the published half of the card
+ * on the screen.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * THE DEFECT, and why it is a source-level assertion rather than a jsdom one.
+ * ═════════════════════════════════════════════════════════════════════════════
+ *
+ * The audit measured, at 390px in real Chrome: side 0 at x 53→336, side 1 at
+ * x 352→**625**. Answer B ran 235px past the right edge of a 390px viewport, with
+ * `documentElement.scrollWidth === innerWidth` — so there was no scroll to reach it
+ * and no element wider than the viewport to blame. The `.scrim` was clipping. On a
+ * phone, one of the two answers was simply not there.
+ *
+ * TWO CAUSES, and the first is the one everybody gets wrong:
+ *
+ *   1. `grid-template-columns: 1fr 1fr` is `minmax(auto, 1fr)`, and a grid item's
+ *      automatic minimum size is its MIN-CONTENT width. So each column was floored
+ *      at the width its content refused to wrap under. `minmax(0, 1fr)` is what
+ *      `1fr` is usually assumed to mean and is not.
+ *   2. `.blind-answer__side` is a `<button>`, and a button has the same automatic
+ *      minimum size. `min-width: 0` on the side removes the floor from the item as
+ *      well as from the track.
+ *
+ * And with two columns even shrinkable, 390px leaves each answer ~172px — so below
+ * 620px the panel collapses to ONE column and each answer takes the full width.
+ *
+ * jsdom performs no layout, so nothing here can measure a box; these assertions
+ * are on the stylesheet SOURCE, which is what would have to change for the defect
+ * to come back. The measured proof that both answers are inside a 390px viewport
+ * is a browser measurement, and it is recorded in the commit that landed this.
+ */
+describe('both answers fit the viewport, at every width', () => {
+  it('the panel grid can shrink below its content — minmax(0, 1fr), never bare 1fr', () => {
+    const decls = [...CSS_RULES.matchAll(/grid-template-columns:\s*([^;]+);/g)].map((m) => m[1] ?? '');
+    expect(decls.length, 'the panel declares its tracks').toBeGreaterThan(0);
+    for (const value of decls) {
+      // Delete every EXPLICITLY shrinkable track, then nothing may be left that
+      // carries an automatic minimum: a bare `1fr` or an `auto` is `minmax(auto, …)`
+      // wearing a hat, and both are the floor this whole fix is about.
+      const rest = value.replace(/minmax\(\s*0\s*,\s*1fr\s*\)/g, '');
+      expect(rest, `"${value}" contains a track that cannot shrink`).not.toMatch(/\b1fr\b/);
+      expect(rest, `"${value}" contains an automatic minimum`).not.toMatch(/\bauto\b/);
+    }
+    // Spelled out, because the failure is easy to reintroduce by tidying.
+    expect(CSS_RULES).not.toMatch(/grid-template-columns:\s*1fr\s+1fr/);
+  });
+
+  it('a side may shrink below its own min-content width', () => {
+    const start = CSS_RULES.indexOf('.blind-answer__side {');
+    const base = CSS_RULES.slice(start, CSS_RULES.indexOf('}', start));
+    expect(base).toContain('min-width: 0;');
+  });
+
+  it('below 620px the two answers stack, so each gets the full width', () => {
+    const at = CSS_RULES.indexOf('@media (max-width: 620px)');
+    expect(at, 'the narrow-viewport rule exists').toBeGreaterThan(-1);
+    // The INNER block: the first `{` after the media query's own is the rule's.
+    const open = CSS_RULES.indexOf('{', at);
+    const block = CSS_RULES.slice(open, CSS_RULES.indexOf('}', open));
+    expect(block).toContain('.blind-answer__panel');
+    // ONE shrinkable track, spelled out. Two tracks would be a comma OUTSIDE the
+    // `minmax()`, and `auto` anywhere would reinstate the min-content floor this fix
+    // exists to remove — in either form the phone goes back to two 172px columns and
+    // answer B goes off the edge.
+    const decl = /grid-template-columns:\s*([^;]+);/.exec(block);
+    expect(decl, 'the narrow rule sets grid-template-columns').not.toBeNull();
+    expect((decl?.[1] ?? '').trim()).toBe('minmax(0, 1fr)');
+    expect(decl?.[1] ?? '').not.toContain('auto');
+  });
+});
