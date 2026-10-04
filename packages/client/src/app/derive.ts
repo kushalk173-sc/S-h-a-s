@@ -234,6 +234,109 @@ export function deltaText(d: Delta): string {
   return parts.length === 0 ? 'nothing' : parts.join(' · ');
 }
 
+// ─────────────────── THE LOCKOUT, AND WHY IT IS A DESIGN FAILURE ───────────────────
+
+/**
+ * THE STATE A PLAYER CANNOT SEE IS A LOCKOUT: NOTHING ON THE HQ MAT IS AFFORDABLE.
+ *
+ * ## WHAT IT LOOKED LIKE
+ *
+ * A tester read off the DOM, on a board with **32-44 free slots** and two of three
+ * seats unable to act:
+ *
+ *     0 funds 0 clout 12 media 12 trust — "12/12 held"
+ *
+ * and correctly concluded the game was over and the table was stuck. That reading
+ * is the design failure, not a misreading: `12/12 held` says FULL, and full is
+ * indistinguishable from WINNING on this mat. Every number on it was true. The
+ * mat reported the resource COUNT and the player needs the resource KIND.
+ *
+ * ## WHY IT IS A HARD LOCK AND NOT A BAD HAND
+ *
+ * The pool is 24 resources and the cap is 12, so `12/12 held` with nothing
+ * affordable is not "unlucky" — it is a state with **no legal purchase at all**,
+ * and it does not resolve by itself:
+ *
+ *   - 10 of the 18 Voter Cards cost Funds and 7 cost Clout, so a pool of
+ *     Media and Trust cannot reach most of the market. Neither denomination is
+ *     interchangeable; a resource is a key to specific cards and nothing else.
+ *   - the only income is `ANSWER` (p13's payout for your Ideology Card) and the
+ *     powers, so relief is a turn away at best;
+ *   - and taking anything makes `enforceCap` raise a discard, because the pool is
+ *     already over the cap. **At the cap, the first resource you take has to be
+ *     given straight back.** That is the sentence the mat was missing and it is
+ *     the whole of the endgame: a player at 12/12 is not well stocked, they are
+ *     holding the wrong 12.
+ *
+ * ## WHAT IT IS NOT
+ *
+ * It is not a bug in `afford`, which is right: `canAfford` per resource is
+ * `state.ts`'s own rule. It is the ABSENCE of a sentence where a player looks.
+ * So the sentence goes where the player looks — the market panel, beside the three
+ * cards they cannot press — and it names the cheapest card and the exact shortfall,
+ * because "you cannot buy anything" is a shrug and "3 Funds short of the cheapest
+ * card here" is a plan.
+ *
+ * ## WHY THE CHEAPEST, AND WHY ITS SHORTFALL
+ *
+ * Not "the first card" (arbitrary, and the three slots refuffle constantly) and not
+ * a list of every card's shortfall (a wall of numbers with no bottom). The cheapest
+ * is the one nearest within reach, so its shortfall is the smallest thing that has
+ * to change — which makes it the honest answer to "what would let me buy
+ * something".
+ */
+export type MarketLockout = {
+  /** Total cost of the cheapest slot on the mat. */
+  readonly cheapest: Delta;
+  /** How much of THAT cost the player is short, per denomination. */
+  readonly short: Delta;
+  /** The sentence, ready to print. */
+  readonly sentence: string;
+  /** True when the pool is over the cap, so the next gain raises a discard. */
+  readonly overCap: boolean;
+  readonly cap: number;
+};
+
+export function marketLockout(state: ClientState, player: PlayerID): MarketLockout | null {
+  const me = state.players[player];
+  if (me === undefined || state.market.length === 0) return null;
+  // Anything affordable and there is no lockout to explain. This is the whole
+  // predicate: the panel stays silent whenever a purchase exists.
+  for (const slot of state.market) {
+    if (canAfford(me.resources, slot.cost)) return null;
+  }
+
+  // "Cheapest" by TOTAL cost, because a player comparing three cards is comparing
+  // what they would have to earn, not which denominations happen to suit them. Ties
+  // keep mat order, which is stable enough to read.
+  let cheapest = state.market[0] as MarketSlot;
+  for (const slot of state.market) {
+    if (deltaTotal(slot.cost) < deltaTotal(cheapest.cost)) cheapest = slot;
+  }
+
+  const short = shortfall(me.resources, cheapest.cost);
+  const cap = effectiveCap(me);
+  const aboveCap = overCap(me.resources, cap) > 0;
+  const shortText = deltaText(short);
+  // ONE TEMPLATE, not four pushed clauses. Assembled by concatenation it reads
+  // "…and you are 2 funds · 1 media short . You are also over…" — a space before the
+  // full stop, on a sentence whose entire job is to be read. (A test caught this.)
+  const lead =
+    shortText === 'nothing'
+      ? `Nothing on the HQ Mat is affordable. The cheapest card here costs ${deltaText(cheapest.cost)}.`
+      : `Nothing on the HQ Mat is affordable. The cheapest card here costs ${deltaText(cheapest.cost)} and you are ${shortText} short.`;
+  const tail = aboveCap
+    ? ` You are also over your cap of ${cap}, so the next resource you take comes straight back as a discard.`
+    : '';
+  return {
+    cheapest: cheapest.cost,
+    short,
+    sentence: `${lead}${tail} Resources come from answering your Ideology Card, or from a power.`,
+    overCap: aboveCap,
+    cap,
+  };
+}
+
 // ─────────────────────────── the board projection ───────────────────────────
 
 /** What the board needs to know about the interaction it is currently in. */

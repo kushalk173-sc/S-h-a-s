@@ -35,6 +35,7 @@ import {
   UI_RULES,
   effectiveCap,
   manifestoCells,
+  marketLockout,
   poolTotal,
   freeSlotsIn,
 } from './derive.ts';
@@ -57,6 +58,15 @@ export type YourMatProps = {
    * there is no greyed-out "spectator" styling, because absence is the treatment.
    */
   readonly showControls: boolean;
+  /**
+   * WHY every control on this mat is dead, or `null` when they are live.
+   *
+   * Four causes, one appearance, and the player cannot tell them apart — see the
+   * `YourMat` body. Supplied by `GameScreen` because it alone knows all four: this
+   * prop's own `link` and `isMyTurn` are two of them and the response window is the
+   * third, which is only visible above this component.
+   */
+  readonly inertReason: string | null;
   /** The ONE region allowed a `SEAL` frame at a time (§5.0). */
   readonly framed: boolean;
   readonly onSelectGroup: (groupId: string) => void;
@@ -103,6 +113,33 @@ export function ResourceStrip({
   // being asked to discard.
   const reduced = cap < UI_RULES.resourceCap;
   const overSoon = total >= cap - 2;
+  /*
+   * `12/12 held` IS NOT A NEUTRAL FRACTION, and reading it as one is the endgame
+   * failure this caption exists to prevent.
+   *
+   * A player holding `0 funds 0 clout 12 media 12 trust` at a cap of 12 is FULL, and
+   * "full" here does not mean "well stocked": 10 of the 18 Voter Cards cost Funds
+   * and 7 cost Clout, so a pool of Media and Trust cannot buy ANY of them, and the
+   * next resource taken comes straight back as a discard. A tester read that mat as
+   * healthy and as a lock at the same time, because the only words on it were a
+   * fraction and a threat.
+   *
+   * So the three states get three sentences, and the AT-cap one says the true thing
+   * rather than the reassuring one: you are full, and full is a constraint. It
+   * deliberately does NOT claim to know why nothing is affordable — the KIND of
+   * resources is not on this widget, and the market panel is where the player's eye
+   * goes when a purchase is what they wanted. `derive.ts:marketLockout` is that
+   * sentence.
+   */
+  const caption = reduced
+    ? `Held to ${cap} by a card, not ${UI_RULES.resourceCap}`
+    : total > cap
+      ? `OVER your cap of ${cap} — discard ${total - cap} down to it`
+      : total === cap
+        ? `AT your cap of ${cap} — full; the next resource you take comes back as a discard`
+        : overSoon
+          ? `Over your cap of ${cap} after your next gain — you must discard`
+          : `Cap ${cap} combined`;
   return (
     <div>
       <div className="res">
@@ -128,19 +165,11 @@ export function ResourceStrip({
               style={{ width: `${Math.min(100, (total / cap) * 100)}%` }}
             />
           </div>
-          <p className="meter__caption">
+          <p className="meter__caption" data-testid="meter-caption">
             <span>
               {total}/{cap} held
             </span>
-            <span>
-              {/* A warning, not a block: the discard is only FORCED on crossing the
-                  cap, so the meter says so rather than refusing to move. */}
-              {reduced
-                ? `Held to ${cap} by a card, not ${UI_RULES.resourceCap}`
-                : overSoon
-                  ? `Over your cap of ${cap} after your next gain — you must discard`
-                  : `Cap ${cap} combined`}
-            </span>
+            <span>{caption}</span>
           </p>
         </>
       ) : null}
@@ -231,11 +260,23 @@ export function PowersTray({
   state,
   you,
   disabled,
+  disabledReason,
   onPower,
 }: {
   state: ClientState;
   you: PlayerID;
   disabled: boolean;
+  /**
+   * WHY the tray is inert, or `null` when it is live — the same §9.2 contract as
+   * `MarketPanelProps.disabledReason`, and for the same reason.
+   *
+   * It matters MORE here, because the reported symptom was "powers were unlocked,
+   * had uses left, and were untappable", which is a player describing a tray that
+   * says `3 of 3 left` and refuses every press. A tray in that state is
+   * indistinguishable from a bug in the unlock, and the player cannot see which
+   * powers are theirs, which are spent, and which are simply not their turn.
+   */
+  disabledReason: string | null;
   onPower: (power: string) => void;
 }) {
   const p = state.players[you];
@@ -304,8 +345,26 @@ export function PowersTray({
 
   return (
     <div className="powers">
+      {disabled && disabledReason !== null ? (
+        <p className="panel__note panel__note--quiet" data-testid="powers-inert">
+          {disabledReason}
+        </p>
+      ) : null}
       {rows.map((r) => {
         const left = r.unlocked ? Math.max(0, r.max - r.uses) : 0;
+        /*
+         * THE LOCKED AND SPENT STATES GET DIFFERENT WORDS, and both are visible
+         * reasons rather than a faded button. A locked power names the requirement
+         * ("Unlocks at Capitalist 5") because it is a target to aim at; a spent one
+         * names when it returns. Neither is `disabled` for want of the player's turn,
+         * and the tray's own `disabledReason` above covers that case — so a player
+         * can always tell "not mine yet" from "not now" from "not ever again".
+         */
+        const why = !r.unlocked
+          ? `Unlocks at ${r.need}`
+          : left <= 0
+            ? 'USED — resets next turn'
+            : `${left} of ${r.max} left`;
         return (
           <button
             key={r.id}
@@ -317,13 +376,7 @@ export function PowersTray({
             data-testid={`power-${r.id}`}
           >
             <span>{r.name}</span>
-            <span className="power__uses">
-              {r.unlocked
-                ? left <= 0
-                  ? 'USED — resets next turn'
-                  : `${left} of ${r.max} left`
-                : `Unlocks at ${r.need}`}
-            </span>
+            <span className="power__uses">{why}</span>
           </button>
         );
       })}
@@ -336,11 +389,23 @@ export function MarketStrip({
   state,
   you,
   disabled,
+  disabledReason,
   onBuy,
 }: {
   state: ClientState;
   you: PlayerID;
   disabled: boolean;
+  /**
+   * WHY the strip is inert, in a sentence, or `null` when it is live.
+   *
+   * §9.2, and the second half of item 2's defect: the strip used to render three
+   * grey-ish buttons on every seat but the active one and say nothing at all. A
+   * player watching a card they cannot press has no way to tell "not my turn" from
+   * "I cannot afford this" from "the connection is down", and those three have
+   * nothing in common — one passes in a moment, one needs resources, one needs a
+   * reconnect. The caller knows which, because it is the one that decided.
+   */
+  disabledReason: string | null;
   onBuy: (index: number) => void;
 }) {
   const p = state.players[you];
@@ -352,13 +417,20 @@ export function MarketStrip({
         const miss = RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > p.resources[r]).map(
           (r) => `${slot.cost[r]! - p.resources[r]} ${r} short`,
         );
+        /*
+         * `mkt--unavail` IS THE LOOK OF "YOU CANNOT PRESS THIS", and it used to be
+         * gated on `!afford` alone — so a card that was unaffordable looked exactly
+         * like a card that was merely someone else's turn. Both are disabled; both
+         * now look disabled; and both say which they are.
+         */
+        const unavailable = disabled || !afford;
         return (
           <button
             key={`${slot.cardId}-${i}`}
             type="button"
-            className={`mkt ${afford ? '' : 'mkt--unavail'}`}
-            disabled={disabled || !afford}
-            aria-disabled={disabled || !afford}
+            className={`mkt ${unavailable ? 'mkt--unavail' : ''}`}
+            disabled={unavailable}
+            aria-disabled={unavailable}
             onClick={() => onBuy(i)}
             data-testid="market-card"
           >
@@ -368,8 +440,14 @@ export function MarketStrip({
                 .join(' · ') || 'free'}
             </span>
             <span className="mkt__voters">◈ {slot.voters}</span>
-            {/* §9.2: the shortfall is stated, next to the control, in a colour
-                that is still readable, so the player can plan around it. */}
+            {/* §9.2: the reason is stated, next to the control, in a colour
+                that is still readable, so the player can plan around it. The
+                NOT-MY-TURN reason is stated too, for the reason above. */}
+            {disabled && disabledReason !== null ? (
+              <span className="mkt__short" data-testid="market-inert">
+                {disabledReason}
+              </span>
+            ) : null}
             {miss.length > 0 ? <span className="mkt__short">{miss.join(' · ')}</span> : null}
           </button>
         );
@@ -384,6 +462,23 @@ export function YourMat(props: YourMatProps) {
   const me = state.players[you];
   if (me === undefined) return null;
   const actionable = showControls && props.isMyTurn && props.link === 'live';
+  /*
+   * WHY THE MAT IS INERT, NAMED ON THE MAT.
+   *
+   * Four different causes produce the same dead powers tray, the same dead
+   * GERRYMANDER button and the same dead market, and a player cannot tell them
+   * apart: not your turn (a moment), a card is being answered (this instant), the
+   * link is down (a reconnect), or you are not on this seat at all (forever, and
+   * nothing is coming). §9.2 is "never a dead control without an adjacent reason",
+   * and "not your turn" is both the commonest of them and the one that most looks
+   * like a bug — it is what a tester logged as "powers were unlocked, had uses
+   * left, and were untappable".
+   *
+   * COMPUTED BY THE CALLER, not here, because `YourMat` knows only `link` and
+   * `isMyTurn` and cannot see the response window — and the window is one of the
+   * four. `GameScreen` is the only component that holds all of them.
+   */
+  const inertReason = actionable ? null : props.inertReason;
 
   return (
     <section
@@ -418,7 +513,13 @@ export function YourMat(props: YourMatProps) {
           <h3 className="panel__title" style={{ marginTop: 'var(--sp-3)' }}>
             POWERS
           </h3>
-          <PowersTray state={state} you={you} disabled={!actionable} onPower={props.onPower} />
+          <PowersTray
+            state={state}
+            you={you}
+            disabled={!actionable}
+            disabledReason={inertReason}
+            onPower={props.onPower}
+          />
 
           {/* §5.7: a trade is with a NAMED person. One button per opponent, and a
               spectator or a solo player gets the reason rather than no buttons. */}
@@ -489,6 +590,15 @@ export type MarketPanelProps = {
   readonly state: ClientState;
   readonly you: PlayerID;
   readonly disabled: boolean;
+  /**
+   * WHY `disabled`, in a sentence — or `null` when the panel is live.
+   *
+   * The caller is the only party that knows, because the caller is the one that
+   * decided: `GameScreen` combines a response window, the turn, and the link.
+   * Passed as a string rather than a boolean set so the three cases stay
+   * distinguishable at the surface, which is the whole of §9.2.
+   */
+  readonly disabledReason: string | null;
   readonly onBuy: (index: number) => void;
   readonly onBuyConspiracy: () => void;
   /**
@@ -526,6 +636,7 @@ export function MarketPanel({
   state,
   you,
   disabled,
+  disabledReason,
   onBuy,
   onBuyConspiracy,
   playableConspiracies,
@@ -535,10 +646,37 @@ export function MarketPanel({
   const me = state.players[you];
   if (me === undefined) return null;
   const canPlay = playableConspiracies.length > 0;
+  /*
+   * THE LOCKOUT SENTENCE, AND IT LIVES HERE BECAUSE THIS IS WHERE THE PLAYER LOOKS.
+   *
+   * `0 funds 0 clout 12 media 12 trust` reads on the mat as `12/12 held` — full, and
+   * indistinguishable from winning. 32-44 free slots on the board, two of three
+   * seats unable to act, and nothing anywhere saying why. The card the player wants
+   * is three feet from this sentence, so the sentence goes here, and it names the
+   * cheapest card and the exact shortfall rather than restating "you cannot buy
+   * anything" — which is the shrug that produced the report. See
+   * `derive.ts:marketLockout` for why it is a hard lock and not a bad hand.
+   */
+  const lockout = marketLockout(state, you);
   return (
     <section className="panel" aria-label="HQ market" data-testid="market-panel">
       <h2 className="panel__title">HQ MAT · MARKET</h2>
-      <MarketStrip state={state} you={you} disabled={disabled} onBuy={onBuy} />
+      <MarketStrip
+        state={state}
+        you={you}
+        disabled={disabled}
+        disabledReason={disabledReason}
+        onBuy={onBuy}
+      />
+      {lockout === null ? null : (
+        <p
+          className="panel__note market__lockout"
+          role="status"
+          data-testid="market-lockout"
+        >
+          {lockout.sentence}
+        </p>
+      )}
       <p className="panel__note panel__note--quiet">
         {state.conspiracyTopCost === null
           ? 'No Conspiracy Card is purchasable.'

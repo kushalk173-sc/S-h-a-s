@@ -141,6 +141,7 @@ describe('exactly one redraw control exists, and it is the one that explains its
         isMyTurn
         link="live"
         showControls
+        inertReason={null}
         framed={false}
         onSelectGroup={noop}
         onGerry={noop}
@@ -193,6 +194,7 @@ describe('exactly one redraw control exists, and it is the one that explains its
         isMyTurn
         link="live"
         showControls
+        inertReason={null}
         framed={false}
         onSelectGroup={noop}
         onGerry={noop}

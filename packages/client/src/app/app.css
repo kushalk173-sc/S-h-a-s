@@ -610,6 +610,32 @@
   color: var(--negative);
 }
 
+/*
+   THE LOCKOUT SENTENCE — the endgame, made legible.
+
+   A player holding `0 funds 0 clout 12 media 12 trust` at a cap of 12 reads their
+   mat as `12/12 held`, which is FULL and is indistinguishable from winning. Ten of
+   the eighteen Voter Cards cost Funds and seven cost Clout, so a pool of Media and
+   Trust cannot buy any of them, and the board still has 32-44 free slots — a state
+   that looks like a finished game and is not one.
+
+   So the market panel says it, and it is styled as a state rather than as an error:
+   `attention` ink, not `negative`. Nothing has gone WRONG here — the player is
+   holding the wrong twelve resources, which is a strategic position, and the
+   sentence's job is to name it so they can play around it. Painting it red teaches
+   them that red means broken.
+
+   It is `role="status"` in the markup, so it is announced when it appears, and it
+   sits directly under the three cards it explains rather than in a toast that
+   expires before it has been read.
+ */
+.market__lockout {
+  color: var(--warn-volatile);
+  border-left: 3px solid var(--warn-volatile);
+  padding-left: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+}
+
 /* ── The log rail ───────────────────────────────────────────────────────────
    §5.12 and §9.11: a SENTENCE, at TYPE_LOG in INK_700, with a 4px seat spine.
    Never an icon-delta feed — players learn this game by reading the log. */

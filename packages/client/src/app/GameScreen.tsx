@@ -601,6 +601,7 @@ export function GameScreen({ store }: GameScreenProps) {
 
   const live = app.link === 'live';
 
+
   // ─────────────────────────── the payout frame (§9.3) ───────────────────────────
   //
   // ONE frame, then it is gone. It is driven by the PUBLIC LOG, not by the
@@ -695,6 +696,31 @@ export function GameScreen({ store }: GameScreenProps) {
       />
     );
   }
+
+  /*
+     ONE SENTENCE PER CAUSE OF INERTNESS, COMPUTED HERE BECAUSE THIS IS THE ONLY
+     COMPONENT THAT KNOWS ALL FOUR.
+
+     The powers tray, the market and GERRYMANDER were all disabled by the same
+     boolean and all said nothing, so a player watching `Land Grab 3 of 3 left` sit
+     there refusing every press had no way to tell "not my turn" from "a card is
+     being answered" from "the connection dropped" � a moment, this instant, and a
+     reconnect respectively. That is what item 3's "unlocked, had uses left, and
+     were untappable" turned out to be, and �9.2's rule is that the reason is
+     adjacent to the control.
+
+     Ordered so the most transient cause wins: a window open right now is a better
+     explanation than the turn, which is a better explanation than the link, which is
+     a better explanation than the seat. Each clause is a fact about state that is
+     already computed above, so none of it can go stale.
+  */
+  const inertReason = !isMyTurn
+    ? `Waiting for ${state.players[state.activePlayer]?.name ?? 'the table'} � your powers and the HQ Mat come alive on your turn.`
+    : windowOpen
+      ? 'A card is being answered � answer it or decline first.'
+      : app.link !== 'live'
+        ? 'Not connected to the table yet.'
+        : null;
 
   const boardState = toBoardState(state, interaction);
   const placingGroup =
@@ -868,6 +894,7 @@ export function GameScreen({ store }: GameScreenProps) {
               link={app.link}
               framed={isMyTurn && state.phase === 'actions'}
               showControls={role === 'player' && you !== null && !windowOpen}
+              inertReason={inertReason}
               onSelectGroup={(id) => beginPlacement(id)}
               onTradeWith={(other) => openTrade(other)}
               onGerry={() => {
@@ -902,6 +929,7 @@ export function GameScreen({ store }: GameScreenProps) {
                 state={state}
                 you={you}
                 disabled={windowOpen || !isMyTurn || app.link !== 'live'}
+                disabledReason={inertReason}
                 onBuy={(index) => buyMarketCard(state, you, index, app, dispatch)}
                 onBuyConspiracy={() => {
                   const cost = state.conspiracyTopCost;
