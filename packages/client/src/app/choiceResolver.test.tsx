@@ -100,10 +100,12 @@ import { ResourcePicker } from './ResourcePicker.tsx';
 // same, and for the same reason: jsdom has no hit tester).
 import appCss from './app.css?raw';
 import {
+  assertNever,
   choosableZones,
   requiredPicks,
   targetableAreas,
   targetableCount,
+  type VoterDecision,
 } from './derive.ts';
 
 // ─────────────────────────── the board, by hand ───────────────────────────
@@ -272,13 +274,20 @@ const seat = (p: PlayerID, pool: Pool, pegs?: readonly PegSpec[]): SeatSpec =>
   pegs === undefined ? { player: p, pool } : { player: p, pool, pegs };
 
 /**
- * The three board-targeting kinds, as a TYPE GUARD, because `Choice` is a
- * six-way union and `scope` only exists on three of the members. Mirrors
- * `ChoiceResolver`'s `isAreaShaped`.
+ * The three board-targeting area-LIST kinds, as a type guard.
+ *
+ * Typed with the client's OWN `VoterChoiceKind` rather than
+ * `Extract<Choice, { scope: ChoiceScope }>`: G1's `'choose-peg-dest'` carries a
+ * `scope` too, so that `Extract` silently grew a fourth member whose `zoneId` does
+ * not exist — a guard whose type says `true` about a member its body rejects. This
+ * suite was the second place to fail the build on it, which is the point of it being
+ * written against the shared type rather than a second guess at the union.
+ *
+ * `'choose-peg-dest'` is deliberately NOT here. It is board-resolved, but it is a
+ * two-place pick rather than a list, so it has no count to assert here; its coverage
+ * is `choiceInvariant.test.tsx`, which drives the real `BoardSvg`.
  */
-function areaShapedKind(
-  choice: Choice,
-): choice is Extract<Choice, { readonly scope: ChoiceScope }> {
+function areaShapedKind(choice: Choice): choice is VoterDecision {
   return (
     choice.kind === 'evict-voter' ||
     choice.kind === 'discard-voter' ||
@@ -366,6 +375,12 @@ function Harness({
     onResolveResources: (_id, pick) => onResolved({ kind: 'resources', res: pick }),
     onResolveSteal: (_id, from, pick) => onResolved({ kind: 'steal', from, res: pick }),
     onResolveAreas: (_id, areaIds) => onResolved({ kind: 'areas', areaIds }),
+    // G1. Routed through the same seam as every other kind, so a move pick is held
+    // to the engine's own refusal strings here too. No scenario in THIS file raises
+    // one — see the guard's doc — so the arm exists to keep the harness a complete
+    // stand-in for `GameScreen` rather than for the dialog.
+    onResolvePegDest: (_id, areaId, toAreaId) =>
+      onResolved({ kind: 'peg-dest', areaId, toAreaId }),
     // G1/G16. Routed through the SAME `onResolved` seam as the other three, so a
     // regression in either new resolver fails the same engine-side assertions the
     // area and theft picks are held to below rather than a weaker local check.
@@ -663,6 +678,20 @@ function assertEngineWouldAccept(sc: Scenario, pick: ChoicePick): void {
   }
 
   // `areas`
+  if (pick.kind === 'peg-dest') {
+    /* G1. No scenario in THIS file raises a move, so this arm exists to keep the
+       dispatching union TOTAL rather than to assert anything about one: a pick kind
+       falling through to the `areas` assertions below is the defect this suite's
+       sibling found as four compile errors. The move's own coverage is
+       `choiceInvariant.test.tsx`, which drives the real `BoardSvg` through both
+       stages. */
+    expect(sc.choice.kind, `${sc.name}: a peg-dest pick with no move scenario`).toBe(
+      'choose-peg-dest',
+    );
+    return;
+  }
+  // `areas`
+  if (pick.kind !== 'areas') return assertNeverPick(pick);
   expect(areaShapedKind(sc.choice), `${sc.name}: expected a voter decision`).toBe(true);
   if (!areaShapedKind(sc.choice)) return;
   const want = Math.min(
@@ -697,6 +726,17 @@ function assertEngineWouldAccept(sc: Scenario, pick: ChoicePick): void {
       ).toBe(false);
     }
   }
+}
+
+/*
+ * AND THE LAST PICK KIND, so `pick` is `never` here rather than "whatever is left".
+ * G1's `'peg-dest'` is what proved this line has to exist: without it the union's
+ * tenth member fell through to the `areas` assertions as `pick.areaIds`, which is
+ * four compile errors and the same silent-lie shape as an unhandled `Choice` kind.
+ * `assertNever` is `derive.ts`'s, and its own throw is unreachable by construction.
+ */
+function assertNeverPick(pick: never): never {
+  return assertNever(pick);
 }
 
 // ─────────────────────────── gain-any ───────────────────────────

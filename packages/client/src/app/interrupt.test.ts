@@ -453,17 +453,22 @@ const ONE_PER_OP: Readonly<Record<string, Effect>> = {
   'set-cap': { op: 'set-cap', to: 10 },
   'move-card': { op: 'move-card', from: 'draw', to: 'hand', n: 1 },
   'borrow-power': { op: 'borrow-power', target: 'chosen-player' },
+  // G1. `n` is a `Count` and the corpus validator refuses a `move-peg` whose `n` is
+  // not 1, so the representative is the one that ships — which is what makes the
+  // singular/plural branch in `describeEffect` covered by this table.
+  'move-peg': { op: 'move-peg', n: 1 },
 };
 
 describe('every op in the engine Effect union has its own sentence', () => {
   it('the op list was actually derived — non-vacuity', () => {
-    // Seventeen, asserted rather than assumed: a slice that silently matched nothing
+    // Eighteen, asserted rather than assumed: a slice that silently matched nothing
     // would make every other assertion in this block pass for the wrong reason,
     // which is the exact failure mode this file exists to prevent.
-    expect(ENGINE_OPS.size).toBe(17);
+    expect(ENGINE_OPS.size).toBe(18);
     // And the slice really is the `Effect` union rather than the whole file:
-    // `block` is an `Interrupt` op outside it, `set-cap` is the seventeenth.
+    // `block` is an `Interrupt` op outside it, `move-peg` is the eighteenth.
     expect(ENGINE_OPS.has('set-cap')).toBe(true);
+    expect(ENGINE_OPS.has('move-peg')).toBe(true);
     expect(ENGINE_OPS.has('block')).toBe(false);
   });
 
@@ -502,6 +507,47 @@ describe('every op in the engine Effect union has its own sentence', () => {
     expect(describeEffect({ op: 'borrow-power', target: 'chosen-player' })).toContain(
       'Level 3 Ideologue Power',
     );
+  });
+
+  it('the move names BOTH halves, because the window is read before it happens', () => {
+    // G1. `'move-peg'` reached the `default` and printed "an effect this client has no
+    // words for" — honest, and useless: the panel's whole job is to let a table read
+    // what is about to happen to it, and a relocation between two areas of the board
+    // is not the same fact as a resource moving. Both halves are named, and a target
+    // clause still rides along because `move-peg` carries one.
+    expect(describeEffect({ op: 'move-peg', n: 1 })).toBe(
+      'Move 1 voter to an empty area in an adjacent constituency',
+    );
+    // The plural is real rather than decorative: `n` is a `Count` here, not a literal.
+    expect(describeEffect({ op: 'move-peg', n: 2 })).toContain('voters');
+    expect(describeEffect({ op: 'move-peg', n: 1, target: 'each-opponent' })).toBe(
+      'Move 1 voter to an empty area in an adjacent constituency · each opponent',
+    );
+  });
+
+  it('no EffectTarget grew with the op — and that is recorded, not assumed', () => {
+    // `TARGET_TEXT` is a `Record<EffectTarget, string>`, so this suite cannot see a
+    // new target the way it can see a new op: the language fails the build. What it
+    // CAN do is say out loud that the union is six members long, so a seventh is a
+    // diff in this file rather than a silence.
+    const start = CARDS_SOURCE.indexOf('export type EffectTarget =');
+    expect(start, 'EffectTarget is gone from cards.ts').toBeGreaterThan(-1);
+    /* Member LINES, not a text window: the union has a five-line doc comment between
+       two of its members, and slicing to the first `;` or to the next `export type`
+       both cut it short — the first at a semicolon inside a comment, the second at
+       the wrong declaration. A member line is `| 'x'`, the last one ends in `;`, and
+       that semicolon is where the walk stops. */
+    const MEMBERS: string[] = [];
+    for (const line of CARDS_SOURCE.slice(start).split('\n')) {
+      const member = /^\s*\|\s*'([a-z-]+)'\s*;?\s*$/.exec(line);
+      if (member === null) continue;
+      MEMBERS.push(member[1] as string);
+      if (line.trimEnd().endsWith(';')) break;
+    }
+    expect(
+      MEMBERS,
+      'EffectTarget grew: TARGET_TEXT needs the new member or the build fails',
+    ).toEqual(['you', 'each-opponent', 'everyone', 'leader', 'chosen-player', 'player-after']);
   });
 });
 

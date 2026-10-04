@@ -96,10 +96,14 @@ import { ChoiceResolver, type ChoiceResolverProps } from './ChoiceResolver.tsx';
 import {
   choiceBoardInteraction,
   isVoterDecision,
+  pegMoveOptions,
+  pegMovePick,
   requiredPicks,
   targetableAreas,
   targetableCount,
   toBoardState,
+  VOTER_KINDS,
+  type VoterChoiceKind,
 } from './derive.ts';
 
 // ─────────────────────────── the fixture ───────────────────────────
@@ -255,6 +259,10 @@ function Harness({ sc, onResolved }: { sc: Scenario; onResolved: (p: ChoicePick)
     onResolveResources: (_id, res) => onResolved({ kind: 'resources', res }),
     onResolveSteal: (_id, from, res) => onResolved({ kind: 'steal', from, res }),
     onResolveAreas: (_id, areaIds) => onResolved({ kind: 'areas', areaIds }),
+    // G1. One pick carrying BOTH halves, in the engine's own field order, so the
+    // transcriptions below are checking the same object the resolver would read.
+    onResolvePegDest: (_id, areaId, toAreaId) =>
+      onResolved({ kind: 'peg-dest', areaId, toAreaId }),
     onResolvePlayer: (_id, id) => onResolved({ kind: 'player', id }),
     onResolveZone: (_id, zoneId) => onResolved({ kind: 'zone', zoneId: zoneId as ZoneID }),
     onResolveCard: (_id, cardId) => onResolved({ kind: 'card', cardId }),
@@ -264,7 +272,24 @@ function Harness({ sc, onResolved }: { sc: Scenario; onResolved: (p: ChoicePick)
   };
 
   const onSlotActivate = (areaId: string): void => {
-    if (owed === null || !isVoterDecision(owed)) return;
+    if (owed === null) return;
+    /*
+       G1 — THE TWO-PLACE PICK, THROUGH THE SAME EXPRESSION `GameScreen` CALLS.
+       `pegMovePick` is one function for the stage transition and the legal set, so
+       this harness cannot accept a slot the dialog would refuse (Defect A) nor refuse
+       one it offers. It is a REFUSAL LIST rather than a throw because the whole point
+       of assertion (4b) below is that this list stays empty.
+     */
+    if (owed.kind === 'choose-peg-dest') {
+      const step = pegMovePick(state, owed, picks, areaId);
+      if (!step.ok) {
+        setRefusals((cur) => [...cur, { areaId, reason: step.reason }]);
+        return;
+      }
+      setPicks(step.picks);
+      return;
+    }
+    if (!isVoterDecision(owed)) return;
     const legal = targetableAreas(state, sc.you, owed.kind, owed.scope, owed.zoneId);
     if (!legal.has(areaId)) {
       setRefusals((cur) => [...cur, { areaId, reason: 'not in targetableAreas' }]);
@@ -306,7 +331,8 @@ const enabled = (el: Element | null): el is HTMLElement =>
 function confirmOf(root: HTMLElement): HTMLElement | null {
   return (
     root.querySelector('[data-testid=picker-confirm]') ??
-    root.querySelector('[data-testid=area-choice-confirm]')
+    root.querySelector('[data-testid=area-choice-confirm]') ??
+    root.querySelector('[data-testid=peg-dest-confirm]')
   );
 }
 
@@ -487,9 +513,60 @@ function assertEngineAccepts(sc: Scenario, pick: ChoicePick): void {
     return;
   }
 
+  /*
+     G1 — `'peg-dest'`, transcribed from `reduce.ts:resolveChoice`'s arm with its own
+     refusal strings, in the order the arm checks them. Every clause is one the engine
+     enforces against a LIVE board, which is why this is asserted after the picks were
+     made rather than against the offer: a majority can form and a hole can fill
+     between the raise and the answer, and the engine's answer to that is to REFUSE the
+     stale pair rather than clamp it.
+  */
+  if (pick.kind === 'peg-dest') {
+    expect(c.kind, `${sc.name}: expected a choose-peg-dest`).toBe('choose-peg-dest');
+    if (c.kind !== 'choose-peg-dest') return;
+    expect(pick.areaId, `${sc.name}: "choose a voter and where it goes" — no voter`).toBeTruthy();
+    expect(pick.toAreaId, `${sc.name}: "choose a voter and where it goes" — no place`).toBeTruthy();
+    expect(pick.areaId, `${sc.name}: a voter cannot land on itself`).not.toBe(pick.toAreaId);
+
+    const from = areaOf(state, pick.areaId);
+    expect(from, `${sc.name}: "there is no voter there" — ${pick.areaId}`).toBeDefined();
+    // `movablePegIds`: the card's ACTOR's peg, not a majority, not in a Volatile Area.
+    expect(
+      ownerOf(state, pick.areaId),
+      `${sc.name}: "that voter may not be moved" — ${pick.areaId} is not ${c.source}'s`,
+    ).toBe(c.source);
+    expect(
+      from?.peg?.majority,
+      `${sc.name}: "that voter may not be moved" — ${pick.areaId} is a majority voter`,
+    ).not.toBe(true);
+    expect(
+      from?.volatile,
+      `${sc.name}: "that voter may not be moved" — ${pick.areaId} is in a Volatile Area`,
+    ).not.toBe(true);
+
+    // `pegDestinations`: EMPTY, in an adjacent constituency, never the same one.
+    const to = areaOf(state, pick.toAreaId);
+    expect(
+      to?.peg,
+      `${sc.name}: "that area is taken" — ${pick.toAreaId} is occupied`,
+    ).toBeNull();
+    expect(
+      from?.zone === to?.zone,
+      `${sc.name}: a move inside one constituency is a no-op, and the engine offers none`,
+    ).toBe(false);
+    const zone = state.zones.find((z) => z.id === from?.zone);
+    expect(
+      zone?.neighbours.includes(to?.zone ?? ('' as ZoneID)),
+      `${sc.name}: "that is not an empty area in an adjacent zone" — ${pick.toAreaId}`,
+    ).toBe(true);
+    return;
+  }
+
   // `areas`
   expect(isVoterDecision(c), `${sc.name}: expected a voter decision`).toBe(true);
   if (!isVoterDecision(c)) return;
+  expect(pick.kind, `${sc.name}: an areas pick for a non-area decision`).toBe('areas');
+  if (pick.kind !== 'areas') return;
   const want = Math.min(c.count, targetableCount(state, sc.you, c.kind, c.scope, c.zoneId));
   expect(pick.areaIds.length, `${sc.name}: "choose exactly ${want}"`).toBe(want);
   expect(new Set(pick.areaIds).size, `${sc.name}: "duplicate area"`).toBe(pick.areaIds.length);
@@ -567,6 +644,65 @@ function assertResolvable(sc: Scenario): ChoicePick {
       }
     }
 
+    /*
+       (4c) G1 — THE SAME ASSERTION FOR A TWO-PLACE PICK, PLUS THE ONE THAT ONLY IT
+       NEEDS: the legal set CHANGES with the stage, so a board that offered every peg
+       and every empty area at once would pass a stage-blind test and fail in play. The
+       stage is read off `choiceBoardInteraction` — the same function `GameScreen`
+       calls — and the sets it is compared against are the engine's own two
+       expressions, `movablePegIds` and `pegDestinations`, reached through the single
+       `pegMovePick` transition the click handler uses.
+     */
+    // `=== undefined`, not `!== true`: the `engineHasNoAnswer === true` branch above
+    // has already narrowed the field to `false | undefined`, and spelling the other
+    // way round is a comparison the compiler refuses.
+    if (sc.choice.kind === 'choose-peg-dest' && sc.engineHasNoAnswer === undefined) {
+      const state = buildState(sc);
+      // STAGE ONE: the only legal targets are OCCUPIED, movable, the actor's own slots.
+      const stage1 = pegMoveOptions(state, sc.choice);
+      expect(stage1.size, `${sc.name}: nothing on the board can move`).toBeGreaterThan(0);
+      const first = boardTargets(r.container).map((g) => g.getAttribute('data-area-id') ?? '');
+      expect(
+        first.sort(),
+        `${sc.name}: stage one must offer exactly the movable voters, nothing else`,
+      ).toEqual([...stage1.keys()].sort());
+      for (const g of boardTargets(r.container)) {
+        const id = g.getAttribute('data-area-id') ?? '';
+        expect(
+          ownerOf(state, id),
+          `${sc.name}: ${id} is offered to be moved and is not the card actor's voter`,
+        ).toBe(sc.choice.source);
+        expect(
+          (g.getAttribute('aria-label') ?? '').includes(', empty.'),
+          `${sc.name}: ${id} is offered as the SOURCE of a move and holds no voter`,
+        ).toBe(false);
+      }
+
+      // STAGE TWO, by pressing the one peg the driver would: the legal set must have
+      // become that peg's destinations and nothing else, and every one of them must be
+      // EMPTY and in another constituency.
+      const peg = [...stage1.keys()][0] as string;
+      fireEvent.click(allSlots(r.container).find((g) => g.getAttribute('data-area-id') === peg) as HTMLElement);
+      const stage2 = stage1.get(peg) ?? new Set<string>();
+      const second = boardTargets(r.container).map((g) => g.getAttribute('data-area-id') ?? '');
+      expect(
+        second.sort(),
+        `${sc.name}: stage two must offer exactly the empty areas adjacent to ${peg}`,
+      ).toEqual([...stage2].sort());
+      for (const id of second) {
+        expect(areaOf(state, id)?.peg, `${sc.name}: ${id} is offered as a landing and is occupied`).toBeNull();
+        expect(areaOf(state, id)?.zone, `${sc.name}: ${id} is offered as a landing and is in the peg's own constituency`).not.toBe(
+          areaOf(state, peg)?.zone,
+        );
+      }
+      // AND THE CHOSEN PEG IS SAYING SO, in its own accessible name (§8.5): a keyboard
+      // player has to be able to tell what they are holding.
+      expect(
+        allSlots(r.container).find((g) => g.getAttribute('data-area-id') === peg)?.getAttribute('aria-label') ?? '',
+        `${sc.name}: the picked voter does not say it is being moved`,
+      ).toContain('the voter you picked up to move');
+    }
+
     // (3) A RESOLUTION IS REACHABLE.
     const drive = driveToResolution(r);
     expect(drive.done, `${sc.name}: no reachable resolution — ${drive.why}`).toBe(true);
@@ -601,7 +737,7 @@ const OVER_CAP = (count: number, held: Pool): Scenario => ({
 });
 
 const VOTER = (
-  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  kind: VoterChoiceKind,
   count: number,
   scope: 'any' | 'own' | 'others',
   seats: readonly SeatSpec[],
@@ -611,6 +747,49 @@ const VOTER = (
   choice: { kind, count, scope, reason: 'Card effect', ...extra },
   seats,
   you: P1,
+});
+
+/** Every area id in a constituency, read off the real board so none is invented. */
+function zoneAreaIds(zoneId: string): readonly string[] {
+  const z = makeZones().find((x) => x.id === zoneId);
+  if (z === undefined) throw new Error(`no zone ${zoneId}`);
+  return z.areas.map((a) => a.id);
+}
+
+/** Peg specs filling a whole constituency — for "no ADJACENT area is empty". */
+function fill(zoneId: string, owner: PlayerID): readonly PegSpec[] {
+  return zoneAreaIds(zoneId).map((areaId) => ({ areaId, owner }));
+}
+
+/**
+ * G1 — the two-place pick. `VOTER` cannot build one: it is a helper for the three
+ * area-LIST kinds, and `peg-dest` shares nothing with them but the fact that the board
+ * is open. So it gets its own constructor, which is the point — the kinds are kept
+ * apart rather than merged into one shape that fits all ten and describes none.
+ */
+const PEG_DEST = (
+  name: string,
+  source: PlayerID,
+  you: PlayerID,
+  seats: readonly SeatSpec[],
+  engineHasNoAnswer?: boolean,
+): Scenario => ({
+  name,
+  choice: {
+    kind: 'choose-peg-dest',
+    count: 1,
+    // `scope` is DESCRIPTIVE — `resolveChoice` decides on `peg.owner === c.source` —
+    // so it is stated the way the engine states it: `'own'` when the answerer is the
+    // card's actor, `'others'` when they are not.
+    scope: you === source ? 'own' : 'others',
+    source,
+    reason: 'Card effect',
+  },
+  seats,
+  you,
+  ...(engineHasNoAnswer === true
+    ? { engineHasNoAnswer: true, statedBy: 'peg-dest-nothing' }
+    : {}),
 });
 
 /**
@@ -733,6 +912,66 @@ const SCENARIOS: readonly Scenario[] = [
     you: P1,
   },
 
+  // ── G1, choose-peg-dest: the TENTH kind, and the only TWO-PLACE pick.
+  //
+  // A source peg AND an adjacent empty destination is the whole offer; the two
+  // candidate sets are computed by `pegMoveOptions`, which is `pegMoveOffered`
+  // computed rather than assumed. So the table below is a table of peg layouts.
+
+  /* THE SHIPPED SHAPE. GREAT LEADER's answerer is "the player after you", so `you` is
+     NOT `source` and `scope` is `'others'` — which is exactly the case a client that
+     filters on `scope` gets wrong: the peg offered belongs to the card's actor, not to
+     the seat answering. One peg in Central, an empty board around it, and the answer
+     has to reach it. */
+  PEG_DEST(
+    'choose-peg-dest · the actor’s voter, answered by another seat (scope others)',
+    P2,
+    P1,
+    [seat(P1, EMPTY), seat(P2, EMPTY, [{ areaId: A.c1, owner: P2 }])],
+  ),
+  /* The other side of the same coin, which is a DIFFERENT case and not a duplicate:
+     `you === source` means `scope: 'own'`, and the dialog must offer the answerer's
+     own peg rather than refusing it as "not yours". */
+  PEG_DEST(
+    'choose-peg-dest · answered by the actor themselves (scope own)',
+    P1,
+    P1,
+    [seat(P1, EMPTY, [{ areaId: A.c1, owner: P1 }]), seat(P2, EMPTY)],
+  ),
+  /* A MAJORITY voter is never offered. Six pegs in Central, where the majority is 5:
+     `recount` flips five of them, so exactly one is left mobile and the dialog must
+     offer that ONE — five illegal slots and one legal, or the mirror image of it. */
+  PEG_DEST(
+    'choose-peg-dest · five majority voters are immovable, the sixth is not',
+    P2,
+    P1,
+    [
+      seat(P1, EMPTY),
+      seat(P2, EMPTY, [
+        { areaId: A.c1, owner: P2 },
+        { areaId: A.c2, owner: P2 },
+        { areaId: 'central-03', owner: P2 },
+        { areaId: 'central-04', owner: P2 },
+        { areaId: 'central-05', owner: P2 },
+        { areaId: 'central-06', owner: P2 },
+      ]),
+    ],
+  ),
+  /* p18: a peg in a Volatile Area is PERMANENT, so it cannot move at all. The peg
+     beside it can, and the dialog must offer that one only. */
+  PEG_DEST(
+    'choose-peg-dest · a voter in a Volatile Area is permanent',
+    P2,
+    P1,
+    [
+      seat(P1, EMPTY),
+      seat(P2, EMPTY, [
+        { areaId: A.nwVol, owner: P2 },
+        { areaId: A.n1, owner: P2 },
+      ]),
+    ],
+  ),
+
   // ── THE THREE STATES THE ENGINE ITSELF CANNOT ANSWER. `applyEffect` raises
   // none of them, so they are unreachable — and each must STATE itself on the
   // frame rather than present an empty sheet with nothing on it. ──
@@ -773,6 +1012,50 @@ const SCENARIOS: readonly Scenario[] = [
     engineHasNoAnswer: true,
     statedBy: 'card-choice-empty',
   },
+  /*
+     G1, THE OFFER TEST'S TWO FAILURES, and they fail for OPPOSITE reasons — which is
+     why they are two cases and not one.
+
+     `pegMoveOffered` is `movablePegIds(...).some(id => pegDestinations(...).length > 0)`,
+     so there are exactly two ways to get nothing, and a client that only handled one of
+     them would be half right:
+
+       1. NO SOURCE — the actor holds nothing that can move. Here the only peg is in a
+          Volatile Area, so it is permanent and the set is empty before adjacency is
+          even consulted.
+       2. NO DESTINATION — a movable peg whose every ADJACENT constituency is full. Every
+          neighbour of Central is filled here (21 + 17 + 17 + 21 areas), which also makes
+          this the assertion that WITHIN-ZONE relocation is not offered: Central still
+          has eight empty slots, a move "to another slot right there" would be a no-op on
+          the board's own terms, and the engine offers none.
+  */
+  PEG_DEST(
+    'choose-peg-dest with NO MOVABLE voter (the actor’s only peg is permanent)',
+    P1,
+    P1,
+    [seat(P1, EMPTY, [{ areaId: A.nwVol, owner: P1 }]), seat(P2, EMPTY)],
+    true,
+  ),
+  PEG_DEST(
+    'choose-peg-dest with a movable voter and NO ADJACENT EMPTY AREA — its own slots are not a destination',
+    P1,
+    P1,
+    [
+      seat(
+        P1,
+        EMPTY,
+        [
+          { areaId: A.c1, owner: P1 },
+          ...fill('north', P2),
+          ...fill('west', P2),
+          ...fill('east', P2),
+          ...fill('south', P2),
+        ],
+      ),
+      seat(P2, EMPTY),
+    ],
+    true,
+  ),
 ];
 
 describe('EVERY Choice kind, in EVERY degenerate state, is answerable', () => {
@@ -782,7 +1065,7 @@ describe('EVERY Choice kind, in EVERY degenerate state, is answerable', () => {
     });
   }
 
-  it(`covers all nine kinds — ${SCENARIOS.length} scenarios`, () => {
+  it(`covers all ten kinds — ${SCENARIOS.length} scenarios`, () => {
     // THE CASE COUNT, and the kinds list. `Choice` is the engine's union, so this
     // hand-copy of it is the thing that goes stale; the number is the assertion
     // that makes the staleness loud. `derive.ts assertNever` is the other half of
@@ -791,6 +1074,7 @@ describe('EVERY Choice kind, in EVERY degenerate state, is answerable', () => {
     const kinds = new Set(SCENARIOS.map((s) => s.choice.kind));
     expect([...kinds].sort()).toEqual([
       'choose-card',
+      'choose-peg-dest',
       'choose-player',
       'choose-zone',
       'convert-voter',
@@ -800,16 +1084,56 @@ describe('EVERY Choice kind, in EVERY degenerate state, is answerable', () => {
       'lose-any',
       'steal-any',
     ]);
-    expect(SCENARIOS.length, 'the scenario table shrank — every case is a promise').toBe(36);
+    expect(SCENARIOS.length, 'the scenario table shrank — every case is a promise').toBe(42);
     // And each of the three board-resolved kinds is present with at least one
     // SATISFIABLE case, not only the degenerate ones: a suite that only ever
     // tested "nothing to do" would pass on a board that highlights nothing.
-    for (const kind of ['evict-voter', 'discard-voter', 'convert-voter'] as const) {
+    // `'choose-peg-dest'` is in that list for the same reason — it is board-resolved,
+    // and three of its six cases are the unreachable half.
+    for (const kind of [
+      'evict-voter',
+      'discard-voter',
+      'convert-voter',
+      'choose-peg-dest',
+    ] as const) {
       const satisfiable = SCENARIOS.filter(
         (s) => s.choice.kind === kind && s.engineHasNoAnswer !== true,
       );
       expect(satisfiable.length, `${kind} has no satisfiable case`).toBeGreaterThan(0);
     }
+    // …and G1's two unreachable halves are BOTH present, because they fail the offer
+    // test for opposite reasons and a client that only handled one would be half right.
+    const pegDest = SCENARIOS.filter((s) => s.choice.kind === 'choose-peg-dest');
+    expect(
+      pegDest.filter((s) => s.engineHasNoAnswer === true).length,
+      'choose-peg-dest must cover both ways pegMoveOffered can be false',
+    ).toBe(2);
+  });
+
+  it('the area-LIST guard names exactly the three list kinds, and the engine agrees', () => {
+    // G1. `isVoterDecision` was typed `Extract<Choice, { scope: ChoiceScope }>`, and
+    // the tenth kind carries a `scope` too — so the guard's TYPE claimed a member its
+    // BODY rejects. This is the runtime half of that proof: the three names are the
+    // client's own, and every one of them is really an area-shaped `Choice`. A fourth
+    // board-resolved kind that is NOT a list would be added to `VOTER_KINDS` and
+    // caught here, rather than inheriting a `zoneId` it does not have.
+    for (const kind of VOTER_KINDS) {
+      expect(
+        isVoterDecision({ kind, count: 1, scope: 'any', reason: 'test' } as Choice),
+        `${kind} should be a voter decision`,
+      ).toBe(true);
+    }
+    // The peg move is board-resolved and is NOT this kind of decision.
+    expect(
+      isVoterDecision({
+        kind: 'choose-peg-dest',
+        count: 1,
+        scope: 'own',
+        source: P1,
+        reason: 'test',
+      }),
+      'a two-place pick is not a list of pegs',
+    ).toBe(false);
   });
 });
 
@@ -946,7 +1270,7 @@ describe('every dialog can be left, and the way out is honest', () => {
     // exit because there is nothing behind it, so a Cancel here would be a button
     // that lies; the honest way out of every one of these is a pick the engine
     // accepts, and `assertResolvable` asserts exactly that for all of them.
-    expect(RESOLVABLE.length).toBe(33);
+    expect(RESOLVABLE.length).toBe(37);
     for (const sc of RESOLVABLE) assertResolvable(sc);
   });
 
@@ -989,9 +1313,212 @@ describe('every dialog can be left, and the way out is honest', () => {
   });
 });
 
-// ─────────────────────────── the mirrors, pinned to the engine's own text ───────────────────────────
+// ─────────────────── G1: the two-place pick, on its own ───────────────────
+
+describe('G1 — a move is two presses, and the dialog says which half it wants', () => {
+  const SHIPPED = PEG_DEST(
+    'the actor’s voter, answered by another seat',
+    P2,
+    P1,
+    [seat(P1, EMPTY), seat(P2, EMPTY, [{ areaId: A.c1, owner: P2 }])],
+  );
+
+  it('the first ask names the SOURCE, and the second names the pair', () => {
+    const r = render(<Harness sc={SHIPPED} onResolved={() => undefined} />);
+    // Stage one: the pegs, counted, and the rule stated — not "Choose a voter" with no
+    // indication that a destination is coming.
+    const stage1 = r.container.querySelector('[data-testid=peg-dest-progress]')?.textContent ?? '';
+    expect(stage1).toContain('Choose which voter to move');
+    expect(stage1).toContain('1 can go');
+    expect(stage1).toContain('adjacent constituency');
+    // CONFIRM is NOT live yet: half a move is not a move, and a live CONFIRM here would
+    // dispatch an empty half — the dead-dialog bug's mirror image.
+    expect(enabled(confirmOf(r.container))).toBe(false);
+
+    fireEvent.click(allSlots(r.container).find((g) => g.getAttribute('data-area-id') === A.c1) as HTMLElement);
+    const stage2 = r.container.querySelector('[data-testid=peg-dest-progress]')?.textContent ?? '';
+    expect(stage2).toContain('Moving Central, slot 1');
+    expect(stage2).toContain('Choose where it lands');
+    r.unmount();
+  });
+
+  it('a move dialog never renders the resource picker it would fall through to', () => {
+    // THE FAILURE THIS KIND WOULD HAVE SHIPPED WITH. `choose-peg-dest` had no branch,
+    // so it fell to the `<ResourcePicker>` fallback — a dialog titled "Discard exactly 1",
+    // four denomination `Add` buttons and a `TAKE 1` that sends a `Delta` the server
+    // refuses as `malformed action`. Semantic agreement: the dialog's TEXT has to match
+    // what it DOES, and a resource picker says it is a resource picker.
+    const r = render(<Harness sc={SHIPPED} onResolved={() => undefined} />);
+    expect(r.container.querySelector('[data-testid=peg-dest-choice]')).not.toBeNull();
+    for (const gone of ['picker-confirm', 'picker-status', 'picker__grid']) {
+      expect(r.container.querySelector(`[data-testid=${gone}]`), `${gone} is the wrong dialog`).toBeNull();
+    }
+    expect(r.container.textContent).not.toContain('Discard exactly');
+    expect(r.container.textContent).not.toContain('Take exactly');
+    r.unmount();
+  });
+
+  it('the board is keyboard reachable and the held voter says so in its own name', () => {
+    // §8.5: the accessible name and the visible highlight are the same fact. A spatial
+    // two-step is only operable without a mouse if you can hear what you are holding —
+    // and the board is ONE tab stop with a roving tabindex (§8.4 rule 2), so the
+    // assertion is that there is a single stop and that Enter on a slot drives the
+    // same transition a click does.
+    const r = render(<Harness sc={SHIPPED} onResolved={() => undefined} />);
+    expect(
+      allSlots(r.container).filter((g) => g.getAttribute('tabindex') === '0').length,
+      'the board is a single tab stop with a roving tabindex, not 129 of them',
+    ).toBe(1);
+    const slot = allSlots(r.container).find((g) => g.getAttribute('data-area-id') === A.c1);
+    expect(slot?.getAttribute('role')).toBe('button');
+    expect(slot?.getAttribute('aria-label') ?? '').toContain('legal target');
+
+    // KEYBOARD, not a click: Enter on the voter picks it up, exactly as a press would.
+    fireEvent.keyDown(slot as HTMLElement, { key: 'Enter' });
+    const held = allSlots(r.container).find((g) => g.getAttribute('data-area-id') === A.c1);
+    expect(held?.getAttribute('aria-label') ?? '').toContain('the voter you picked up to move');
+    // And the destination is announced as an empty slot in the second stage, which is
+    // what makes "legal" and "empty" the same sentence for a screen-reader player.
+    const dest = boardTargets(r.container)[0];
+    expect(dest?.getAttribute('aria-label') ?? '').toContain('legal target');
+    expect(dest?.getAttribute('aria-label') ?? '').toContain(', empty.');
+    fireEvent.keyDown(dest as HTMLElement, { key: 'Enter' });
+    expect(enabled(confirmOf(r.container)), 'Enter on a landing did not complete the pair').toBe(true);
+    r.unmount();
+  });
+
+  it('the scrim does not cover the board, because the board is half the answer', () => {
+    // The one that hard-locked the table twice: a full-viewport scrim with the only
+    // controls behind it. `.scrim--area` is what makes an area decision's board live,
+    // and this kind is board-resolved, so it has to be in that set.
+    const r = render(<Harness sc={SHIPPED} onResolved={() => undefined} />);
+    const scrim = r.container.querySelector('[data-testid=choice-resolver]');
+    expect(scrim?.className).toContain('scrim--area');
+    expect(
+      r.container.querySelector('[data-testid=choice-dialog]')?.getAttribute('aria-modal'),
+      'telling a screen reader the rest of the page is inert is only true while it is',
+    ).toBeNull();
+    r.unmount();
+  });
+});
+
+describe('G1 — the transition itself: two halves, four refusals, two ways back', () => {
+  const sc = PEG_DEST(
+    'the actor’s voter, answered by another seat',
+    P2,
+    P1,
+    [seat(P1, EMPTY), seat(P2, EMPTY, [{ areaId: A.c1, owner: P2 }])],
+  );
+  const state = buildState(sc);
+  const choice = sc.choice.kind === 'choose-peg-dest' ? sc.choice : null;
+  const opts = choice === null ? new Map() : pegMoveOptions(state, choice);
+
+  it('the fixture is the shape the assertions assume', () => {
+    // A vacuous block below would pass for the wrong reason, which is the failure mode
+    // the whole file is written against.
+    expect(choice).not.toBeNull();
+    expect([...opts.keys()]).toEqual([A.c1]);
+    expect(opts.get(A.c1)?.size ?? 0).toBeGreaterThan(0);
+  });
+
+  it('accepts the peg, then a destination of THAT peg, and only that peg’s', () => {
+    if (choice === null) return;
+    const dests = [...(opts.get(A.c1) ?? new Set<string>())];
+    const first = pegMovePick(state, choice, [], A.c1);
+    expect(first).toEqual({ ok: true, picks: [A.c1] });
+    const hole = dests[0] as string;
+    expect(pegMovePick(state, choice, [A.c1], hole)).toEqual({ ok: true, picks: [A.c1, hole] });
+    // An empty area that is NOT adjacent to the peg is refused by name — an adjacent-zone
+    // rule the engine enforces with "that is not an empty area in an adjacent zone".
+    const elsewhere = state.zones
+      .flatMap((z) => z.areas)
+      .find((a) => a.peg === null && !dests.includes(a.id));
+    expect(pegMovePick(state, choice, [A.c1], elsewhere?.id ?? '')).toEqual({
+      ok: false,
+      reason: 'that is not an empty area in an adjacent constituency',
+    });
+    // An OCCUPIED slot is not a destination either.
+    expect(pegMovePick(state, choice, [], A.c1).ok).toBe(true);
+  });
+
+  it('presses what is already pressed to step BACK a half, not to do nothing', () => {
+    if (choice === null) return;
+    const hole = [...(opts.get(A.c1) ?? new Set<string>())][0] as string;
+    expect(pegMovePick(state, choice, [A.c1, hole], hole)).toEqual({ ok: true, picks: [A.c1] });
+    expect(pegMovePick(state, choice, [A.c1, hole], A.c1)).toEqual({ ok: true, picks: [] });
+    // A THIRD slot, once the pair is complete, is neither half: it steps nothing back
+    // and it is not a destination, so it is refused rather than silently ignored.
+    expect(pegMovePick(state, choice, [A.c1, hole], A.nw1)).toEqual({
+      ok: false,
+      reason: 'this move is already complete',
+    });
+  });
+
+  it('refuses a first pick that is not a movable voter, and says why', () => {
+    if (choice === null) return;
+    // An empty slot: the inverse of the list kinds, and the one a stage-blind board
+    // would offer every time.
+    expect(pegMovePick(state, choice, [], A.n1)).toEqual({
+      ok: false,
+      reason: 'only a voter that can move is the source of this move',
+    });
+    // A peg belonging to somebody else — the `scope: 'others'` trap the engine warns
+    // about in its own field docs.
+    const someoneElse = buildState({
+      ...sc,
+      seats: [seat(P1, EMPTY, [{ areaId: A.n1, owner: P1 }]), seat(P2, EMPTY)],
+    });
+    expect(pegMovePick(someoneElse, choice, [], A.n1)).toEqual({
+      ok: false,
+      reason: 'only a voter that can move is the source of this move',
+    });
+    // A peg that STOPPED being movable while the dialog was open: refused by the
+    // engine's own wording rather than silently ignored.
+    expect(pegMovePick(state, choice, [A.nwVol], A.c1)).toEqual({
+      ok: false,
+      reason: 'that voter may not be moved',
+    });
+  });
+});
 
 describe('the mirrors these rules rest on are still literally in reduce.ts', () => {
+  it('the two peg-move candidate sets are still the three clauses and the adjacency read', () => {
+    // G1's half of the pinning, and the reason `pegMoveOptions` is worth having: the
+    // client mirrors two ENGINE EXPRESSIONS, so those expressions have to still be
+    // there. `movablePegIds` is three `continue`s; `pegDestinations` is the
+    // neighbour read plus the emptiness test. A change to any of them in the engine
+    // without the mirror is a board that highlights what the resolver refuses — the
+    // exact bug class this file exists for, and the one Defect A could not see.
+    for (const clause of [
+      'if (a.peg === null || a.peg.owner !== owner) continue;',
+      'if (a.peg.majority) continue;',
+      'if (a.volatile) continue;',
+      'if (a.peg === null) out.push(a.id);',
+      "if (z.id === from.zone) continue;",
+      'if (!areNeighbours(from.zone, z.id)) continue;',
+    ]) {
+      expect(engineReduceSource, `reduce.ts no longer reads: ${clause}`).toContain(clause);
+    }
+  });
+
+  it('the OFFER is still a boolean, and the resolver still refuses a stale pair', () => {
+    // The deadlock argument, in the engine's own two lines. `pegMoveOffered` false means
+    // the card raises NOTHING — which is what makes an empty pick space unreachable
+    // rather than a locked table — and the resolver's guards are re-read against a live
+    // board, so a player holding a stale dialog still has a legal pick to make. The
+    // transcriptions above are only sound while these are the rules.
+    expect(engineReduceSource).toContain(
+      'return movablePegIds(state, owner).some((id) => pegDestinations(state, id).length > 0);',
+    );
+    for (const refusal of [
+      "if (pick.kind !== 'peg-dest') return fail('choose a voter and where it goes');",
+      "if (!movablePegIds(state, c.source).includes(pick.areaId)) {",
+      "if (!pegDestinations(state, pick.areaId).includes(pick.toAreaId)) {",
+    ]) {
+      expect(engineReduceSource, `reduce.ts no longer refuses with: ${refusal}`).toContain(refusal);
+    }
+  });
+
   /** The body of `function targetableCount(` up to its closing brace at column 0. */
   const targetableCountBody = (): string => {
     const at = engineReduceSource.indexOf('function targetableCount(');
