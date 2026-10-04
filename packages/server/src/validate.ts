@@ -355,8 +355,30 @@ export function decodeAction(value: unknown): Action | null {
       // different types and the field is added by key, never assigned.
       const at = value['at'];
       if (at === undefined) return { type, cardId };
-      if (typeof at !== 'string' || at.length === 0 || at.length > MAX_ID) return null;
-      return { type, cardId, at };
+      // THE BOUND, and it used to be missing its second half.
+      //
+      // The audit read this arm as "bounded to 64 chars and control-character-free by
+      // `validate.ts:358`" and the second clause was wrong: the check below was written
+      // out by hand instead of going through `str`, so it bounded the LENGTH and
+      // nothing else. `str` is where the control-character rule lives (`c < 0x20 ||
+      // c === 0x7f` → refuse), and a hand-written length check silently opts out of it.
+      //
+      // It matters more here than anywhere else in this file, because `at` is the ONE
+      // field the engine INTERPOLATES into a client-visible string: `reduce` answers
+      // `fail('unknown player ' + action.at)` and `#dispatch` forwards the engine's
+      // words verbatim. Every other id in this file is compared against something and
+      // never reaches a human; this one ends up in an error toast. Under full
+      // information the attacker already knows their own input, so this is hardening
+      // and not a vulnerability — but a name that can carry a newline and an escape
+      // into a rendered string is a control character away from a log-injection bug,
+      // and the whole cost of closing it is one function call.
+      //
+      // `str` is also exactly the right check rather than a stricter one: `at` is a
+      // `PlayerID`, and every other `PlayerID` on this wire (`choicePick`'s `player`
+      // arm, `lobbyId`, `matchId`) already goes through it.
+      const checked = str(at, MAX_ID);
+      if (checked === null) return null;
+      return { type, cardId, at: checked };
     }
 
     case 'PASS_INTERRUPT':

@@ -106,6 +106,48 @@ describe('the decoder rejects malformed frames', () => {
     expect(decodeMessage({ t: 'session:resume', resumeToken: '' }).ok).toBe(false);
     expect(decodeMessage({ t: 'session:resume', resumeToken: 'a'.repeat(200) }).ok).toBe(false);
   });
+
+  /**
+   * S3 — `RESPOND_INTERRUPT`'s `at`, the one field the engine REFLECTS.
+   *
+   * The audit read this arm as bounded in both length AND characters, and the second
+   * clause was wrong: the check was hand-written rather than delegating to `str`, so it
+   * bounded the length and let every control character through. That matters more here
+   * than anywhere else in the decoder because `at` is the only field the engine
+   * interpolates into a client-visible string — `reduce` answers
+   * `fail('unknown player ' + action.at)` and `#dispatch` forwards the engine's words
+   * verbatim — so this is the one id in the file that ends up in a rendered error.
+   *
+   * Under full information the attacker already knows what they sent, so this is
+   * hardening rather than a vulnerability. It is still worth closing, and the cost of
+   * closing it is that it is now the same `str` every other id on this wire goes
+   * through — which is the only way the next `PlayerID` added here inherits the rule
+   * instead of reimplementing half of it.
+   */
+  it('bounds RESPOND_INTERRUPT`s reflected `at` in BOTH length and characters', () => {
+    const action = (at: unknown): ReturnType<typeof decodeAction> =>
+      decodeAction({ type: 'RESPOND_INTERRUPT', cardId: 'c1', at });
+
+    // ABSENT is still legal and still distinct from `undefined` under
+    // `exactOptionalPropertyTypes` — a BLOCK carries no target.
+    const block = decodeAction({ type: 'RESPOND_INTERRUPT', cardId: 'c1' });
+    expect(block, 'a BLOCK with no target was rejected').not.toBeNull();
+    if (block !== null && block.type === 'RESPOND_INTERRUPT') expect('at' in block, 'an absent `at` became a key').toBe(false);
+
+    // The characters the audit believed were refused and were not.
+    for (const bad of ['a\nb', 'a\rb', 'a\tb', 'a\u0000b', 'a\u0007b', 'a\u001bb', 'a\u007fb']) {
+      expect(action(bad), `a control character reached the wire: ${JSON.stringify(bad)}`).toBeNull();
+    }
+    // …and the length, which the old check DID get right and must not regress.
+    expect(action(''), 'an empty `at` was accepted').toBeNull();
+    expect(action('a'.repeat(65)), 'a 65-character `at` was accepted').toBeNull();
+    expect(action(7), 'a numeric `at` was accepted').toBeNull();
+    expect(action({ to: 'p1' }), 'an object `at` was accepted').toBeNull();
+
+    // And a well-formed one still gets through, so the tightening is not a blanket ban.
+    expect(action('p_1'), 'a legitimate PlayerID was rejected').not.toBeNull();
+    expect(action('a'.repeat(64)), 'a 64-character id was rejected').not.toBeNull();
+  });
 });
 
 describe('the decoder rejects malformed actions', () => {
@@ -235,7 +277,7 @@ let bob: TestClient;
 let matchId: string;
 
 beforeAll(async () => {
-  harness = await startHarness({ dispatchRate: 200 });
+  harness = await startHarness({ dispatchRate: 200, messageRate: 200 });
   alice = await TestClient.connect(harness.url);
   alice.send({ t: 'lobby:create', name: 'Host', maxPlayers: 2, isPrivate: false });
   const created = await alice.expect(alice.is('lobby:state'), 'lobby:state');
@@ -325,6 +367,40 @@ describe('a live room survives everything sent at it', () => {
     const err = await bob.expect(bob.is('error'), 'out of turn');
     expect(err.code).toBe('ILLEGAL_ACTION');
     expect(err.message).toBe('not your turn');
+  });
+
+  it('a DEFLECT target carrying a control character never reaches the reflected error', async () => {
+    // The socket half of the `at` finding, and the reason the decoder-level test is not
+    // enough on its own. `at` is the one field the engine INTERPOLATES into a
+    // client-visible string — `reduce` answers `fail('unknown player ' + action.at)`
+    // and `#dispatch` forwards the engine's words verbatim — so "the decoder refuses it"
+    // and "nothing is ever reflected" are the same claim only if the refusal happens
+    // BEFORE `reduce`. It does: `decodeFrame` runs in `#onFrame`, above the handler, so
+    // a control character is refused as a malformed frame and never becomes an error
+    // string at all.
+    bob.clear();
+    bob.sendRaw(
+      JSON.stringify({ t: 'match:action', action: { type: 'RESPOND_INTERRUPT', cardId: 'c1', at: 'p_1\nforged' } }),
+    );
+    const err = await bob.expect(bob.is('error'), 'the deflect with a control character');
+    expect(err.code, 'a control character reached the reducer').toBe('BAD_MESSAGE');
+    expect(err.message.includes('\n'), 'the refusal itself carried a newline').toBe(false);
+
+    // …and a well-formed `at` IS accepted by the decoder and handed to the engine, which
+    // is where the reflection actually lives. What it refuses depends on the room's
+    // phase — with no window open the engine never reaches the player lookup — so what
+    // is asserted here is the SHAPE of the answer rather than which refusal fired: a
+    // fixed-literal server string or a bounded reflection of an id the attacker already
+    // knows, and never a control character in either.
+    bob.clear();
+    bob.sendRaw(JSON.stringify({ t: 'match:action', action: { type: 'RESPOND_INTERRUPT', cardId: 'c1', at: 'p_not_a_seat' } }));
+    const reflected = await bob.expect(bob.is('error'), 'the deflect naming nobody');
+    expect(reflected.code, 'a well-formed deflect was refused by the DECODER').not.toBe('BAD_MESSAGE');
+    expect(reflected.message.length, 'the reflected string is unbounded').toBeLessThanOrEqual(200);
+    expect(/[\u0000-\u001f\u007f]/.test(reflected.message), `a control character reached the error string: ${JSON.stringify(reflected.message)}`).toBe(
+      false,
+    );
+    expect(bob.closed, 'a reflected string cost the attacker their connection').toBe(false);
   });
 
   it('refuses an action for a match the session is not in', async () => {
