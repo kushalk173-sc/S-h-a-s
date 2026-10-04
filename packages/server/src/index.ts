@@ -4,7 +4,7 @@
  * Three HTTP routes and nothing else: `GET /healthz`, the `/ws` upgrade, and static
  * client assets in dev. No admin route, no debug route, no `/state`. The trade is
  * no production introspection; the action log is strictly better than a log line
- * for debugging, because it is authoritative and replayable — a bug report is a
+ * for debugging, because it is authoritative and replayable â€” a bug report is a
  * `matchId`, and an operator replays it offline with the same seed.
  *
  * Every frame is handled inside a try/catch. An exception escaping a message
@@ -44,7 +44,7 @@ import { InMemoryMatchStore, sha, type MatchStore } from './store.ts';
 import { decodeFrame, isSeatCount, MAX_PAYLOAD_BYTES } from './validate.ts';
 import type { ClientMessage, ErrorCode, Lobby, ServerMessage, SeatCount } from './protocol.ts';
 
-// ─────────────────────────── boot ───────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Build the `CardIndex` from the in-repo JSON corpus. Called once, at boot. */
 export function loadCards(): CardIndex {
@@ -81,6 +81,24 @@ export type ServerConfig = {
 export const DEFAULT_DISPATCH_RATE = 4;
 export const DEFAULT_GRACE_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * THE MESSAGES THAT EXCHANGE A CREDENTIAL â€” the complete list of the ways a
+ * connection's `conn.session` can be replaced by something the client asked for.
+ *
+ * It is a `Set` of four `ClientMessage['t']`s rather than a flag on `Conn`, because
+ * the property that matters is not "is this connection a session holder" but "does
+ * handling this message overwrite the credential this connection is holding". Those
+ * are different questions and only the second one is the bug. `session:resume` is
+ * deliberately NOT in this set: it is the one message that is *supposed* to move a
+ * seat, because it is the only one that proves it may â€” see `#adoptSession`.
+ */
+const MINTING: ReadonlySet<ClientMessage['t']> = new Set<ClientMessage['t']>([
+  'lobby:create',
+  'lobby:join',
+  'lobby:spectate',
+  'match:spectate',
+]);
+
 type Conn = {
   readonly socket: WebSocket;
   session: SessionRecord | null;
@@ -107,9 +125,9 @@ export class ShasnServer {
   readonly #http: Server;
   readonly #wss: WebSocketServer;
   readonly #conns = new Map<WebSocket, Conn>();
-  /** matchId → the sockets currently watching it. */
+  /** matchId â†’ the sockets currently watching it. */
   readonly #watchers = new Map<string, Set<Conn>>();
-  /** matchId → unsubscribe, so a finished room stops broadcasting. */
+  /** matchId â†’ unsubscribe, so a finished room stops broadcasting. */
   readonly #roomUnsubs = new Map<string, () => void>();
   #closed = false;
 
@@ -145,11 +163,11 @@ export class ShasnServer {
     });
   }
 
-  // ─────────────────────────── lifecycle ───────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async listen(): Promise<{ port: number; host: string }> {
     // The configured port, not a hardcoded 0. Port 0 means "any free port", which
-    // is exactly what a test wants and exactly what a deployment does not — it
+    // is exactly what a test wants and exactly what a deployment does not â€” it
     // silently binds somewhere nobody is proxying to, and the symptom is a server
     // that starts cleanly and is unreachable.
     const port = this.#cfg.port;
@@ -203,7 +221,7 @@ async listen(): Promise<{ port: number; host: string }> {
     });
   }
 
-  // ─────────────────────────── HTTP ───────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ HTTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async #onHttp(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
@@ -253,7 +271,7 @@ async listen(): Promise<{ port: number; host: string }> {
     }
   }
 
-  // ─────────────────────────── WebSocket ───────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ WebSocket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   #onUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -337,6 +355,12 @@ async listen(): Promise<{ port: number; host: string }> {
    * sits in the auth story.
    */
   #handle(conn: Conn, msg: ClientMessage): void {
+    // THE SEAT SEAL, checked before the switch rather than inside the four cases,
+    // because it is one rule about four messages and a rule written four times is a
+    // rule that is three times missing. `MINTING` is the set of messages whose
+    // effect is to REPLACE `conn.session`; every one of them is refused for a
+    // connection that is seated at a live match. See `#refuseSeatHandover`.
+    if (MINTING.has(msg.t) && this.#refuseSeatHandover(conn)) return;
     switch (msg.t) {
       case 'ping':
         this.#send(conn.socket, { t: 'pong', nonce: msg.nonce ?? '' });
@@ -389,14 +413,14 @@ async listen(): Promise<{ port: number; host: string }> {
     }
   }
 
-  // ─────────────────────────── lobby ───────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ lobby â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   #createLobby(conn: Conn, name: string, maxPlayers: SeatCount, isPrivate: boolean): void {
     const { lobby, playerId } = this.hub.createLobby({ name, maxPlayers, isPrivate, now: this.#cfg.now() });
     const rec = this.sessions.create(name);
     rec.playerId = playerId;
     rec.lobbyId = lobby.lobbyId;
-    conn.session = rec;
+    this.#adoptSession(conn, rec);
     this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
     this.#broadcastLobby(lobby.lobbyId);
   }
@@ -410,7 +434,7 @@ async listen(): Promise<{ port: number; host: string }> {
       }
       const rec = this.sessions.create(name, 'spectator');
       rec.lobbyId = lobbyId;
-      conn.session = rec;
+      this.#adoptSession(conn, rec);
       this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
       this.#send(conn.socket, { t: 'lobby:state', lobby: this.hub.lobbyView(lobby, null) });
       return;
@@ -420,7 +444,7 @@ async listen(): Promise<{ port: number; host: string }> {
       const rec = this.sessions.create(name);
       rec.playerId = playerId;
       rec.lobbyId = lobby.lobbyId;
-      conn.session = rec;
+      this.#adoptSession(conn, rec);
       this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
       this.#broadcastLobby(lobby.lobbyId);
     } catch (err) {
@@ -484,17 +508,17 @@ async listen(): Promise<{ port: number; host: string }> {
         //
         // The loop above reaches SEATS, and only seats: a connection whose session role
         // is `spectator` is `continue`d past, because a spectator gets no credential and
-        // no seat. So the one thing that tells a spectator the game has begun — the
-        // `matchId` this broadcast carries on `LobbyHub#startMatch`'s member loop — was
+        // no seat. So the one thing that tells a spectator the game has begun â€” the
+        // `matchId` this broadcast carries on `LobbyHub#startMatch`'s member loop â€” was
         // never sent to anybody who was watching rather than playing.
         //
         // The client's half is already correct and was already covered: `Lobby.tsx` keys
         // an effect on `lobby.matchId` and sends `match:spectate`, which is the frame that
-        // actually attaches (`#spectate` → `#attach` → `match:state`). For a room that
+        // actually attaches (`#spectate` â†’ `#attach` â†’ `match:state`). For a room that
         // was ALREADY running that fires on arrival, because the arrival snapshot already
         // carries a match id. For a room that had not started, nothing ever produced the
         // match id, so the effect never fired and the spectator sat in a waiting room for
-        // a game already in progress — the table looked hung, and no client could have
+        // a game already in progress â€” the table looked hung, and no client could have
         // found the cause because the frame was never sent.
         //
         // So it is broadcast to the whole room rather than to the seats: `#broadcastLobby`
@@ -513,7 +537,7 @@ async listen(): Promise<{ port: number; host: string }> {
       });
   }
 
-  // ─────────────────────────── match ───────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ match â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /**
    * Reclaim a session from a resume token.
@@ -522,13 +546,13 @@ async listen(): Promise<{ port: number; host: string }> {
    *
    * The in-memory index is a cache of which token belongs to which live session.
    * It is empty on a freshly booted process, so on its own it would make resume
-   * impossible after a deploy — which is the exact scenario the whole action-log
+   * impossible after a deploy â€” which is the exact scenario the whole action-log
    * design exists to survive. A player who was mid-answer when the deploy happened
    * would be locked out of a 4-hour game whose state came back perfectly.
    *
    * So the fallback is the DURABLE one: every seat's token hash is written to the
    * store, and `findByResumeHash` scans for it. That lookup also binds the token to
-   * ONE match, which is why a token cannot be pointed at a different room — the
+   * ONE match, which is why a token cannot be pointed at a different room â€” the
    * client never names a room in a resume at all.
    *
    * The order that matters afterwards: what happens to a player who reconnects
@@ -566,13 +590,13 @@ async listen(): Promise<{ port: number; host: string }> {
         return;
       }
       // Rotate BEFORE replying. A leaked token is then single-use: whoever
-      // presents it first consumes it and the other is locked out. Deliberate —
+      // presents it first consumes it and the other is locked out. Deliberate â€”
       // the alternative is a token that lives forever in a shared browser.
       const fresh = this.sessions.rotate(rec);
       room.setTokenHash(rec.playerId, sha(fresh));
       room.setConnected(rec.playerId, true, now);
       void room.persistSeats().catch(() => undefined);
-      conn.session = rec;
+      this.#adoptSession(conn, rec);
       this.#attach(conn, matchId);
       this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
       this.#sendMatchState(conn, room, rec);
@@ -591,7 +615,7 @@ async listen(): Promise<{ port: number; host: string }> {
       }
       this.sessions.rotate(rec);
       this.hub.setConnected(lobbyId, rec.playerId, true);
-      conn.session = rec;
+      this.#adoptSession(conn, rec);
       this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
       this.#send(conn.socket, { t: 'lobby:state', lobby: this.hub.lobbyView(lobby, rec.playerId) });
       return;
@@ -609,23 +633,23 @@ async listen(): Promise<{ port: number; host: string }> {
    * projections leak.
    *
    * A spectator gets a `playerId` that is in no room's seat table, so every write
-   * door rejects it. Spectators cannot dispatch, full stop — there is no flag to
+   * door rejects it. Spectators cannot dispatch, full stop â€” there is no flag to
    * forget to check.
    */
   /**
-   * Find the session a resume token belongs to — in memory, or on disk.
+   * Find the session a resume token belongs to â€” in memory, or on disk.
    *
    * TWO LOOKUPS, AND THE SECOND ONE IS THE IMPORTANT ONE.
    *
    * The in-memory index says which token belongs to which live session. It is
    * empty on a freshly booted process, so on its own it would make resume
-   * impossible after a deploy — which is the exact scenario the action-log design
+   * impossible after a deploy â€” which is the exact scenario the action-log design
    * exists to survive. A player mid-answer when the deploy happened would be locked
    * out of a 4-hour game whose state came back perfectly.
    *
    * So the fallback is the DURABLE one: each seat's token hash is written to the
    * store, and `findByResumeHash` finds it. That lookup also binds the token to ONE
-   * match, which is why a token cannot be pointed at a different room — a resume
+   * match, which is why a token cannot be pointed at a different room â€” a resume
    * message never names a room at all, so there is nothing to point it at.
    *
    * A `null` return is deliberately undifferentiated: "no such token" and "that
@@ -646,8 +670,8 @@ async listen(): Promise<{ port: number; host: string }> {
     // so a stale or tampered index cannot grant a seat.
     if (!room.verifyToken(found.playerId, token)) return null;
     // Adopt it: re-index the token in memory and bind the session to the match the
-    // store says it belongs to, so every later step — the constant-time check, the
-    // grace window, the rotation — behaves identically whether the process
+    // store says it belongs to, so every later step â€” the constant-time check, the
+    // grace window, the rotation â€” behaves identically whether the process
     // restarted a second ago or has been up for a week.
     return this.sessions.adopt(token, seat.name, found.playerId, found.matchId, null);
   }
@@ -661,7 +685,7 @@ async listen(): Promise<{ port: number; host: string }> {
     const rec = this.sessions.create('Spectator', 'spectator');
     rec.matchId = matchId;
     rec.playerId = newPlayerId();
-    conn.session = rec;
+    this.#adoptSession(conn, rec);
     this.#attach(conn, matchId);
     this.#send(conn.socket, { t: 'session:granted', session: this.sessions.toWire(rec) });
     this.#sendMatchState(conn, room, rec);
@@ -713,7 +737,7 @@ async listen(): Promise<{ port: number; host: string }> {
       const result = room.dispatch(rec.playerId, action, this.#cfg.now());
       if (!result.ok) {
         // The engine's own words. It writes them for humans, and no engine error
-        // interpolates card data, a deck position or a seed — audited, because
+        // interpolates card data, a deck position or a seed â€” audited, because
         // this line is the one place a leak would reach every client.
         this.#fail(conn, 'ILLEGAL_ACTION', result.error);
       }
@@ -739,7 +763,7 @@ async listen(): Promise<{ port: number; host: string }> {
     return true;
   }
 
-  // ─────────────────────────── the fan-out ───────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ the fan-out â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   #watchRoom(room: Room): void {
     const existing = this.#roomUnsubs.get(room.matchId);
@@ -786,6 +810,111 @@ async listen(): Promise<{ port: number; host: string }> {
       if (conn.session?.playerId === playerId) return conn;
     }
     return undefined;
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ the seat seal (C-SESSION) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  /**
+   * REFUSE TO LET A SEATED CONNECTION EXCHANGE ITS CREDENTIAL. Returns true when it
+   * refused, and the caller stops.
+   *
+   * â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   * WHY THIS EXISTS: THE SEAT-ORPHAN BUG, AND WHY IT WAS A HANG RATHER THAN A GLITCH
+   * â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   *
+   * Four messages mint a fresh `SessionRecord` and write it over `conn.session`.
+   * Before this check, a connection SEATED at a live match could send any of them and
+   * be ACCEPTED WITH NO ERROR OF ANY KIND. The record it displaced was left in
+   * `SessionStore` â€” no `end`, so its resume token still resolved â€” and the room's
+   * seat table was never told anything, so the seat stayed `connected`.
+   *
+   * The result, reproduced over a real socket and pinned by
+   * `test/session-overwrite.test.ts`:
+   *
+   *   - the new session names a LOBBY (or a different match), not the one the seat is
+   *     in, so `#dispatch` answers every `match:action` with `NOT_IN_LOBBY` before the
+   *     room is even consulted;
+   *   - the seat is still in `room.seats`, still marked `connected`, still holding its
+   *     token hash â€” so `allSeatsExpired` is false and NOTHING TIMES OUT;
+   *   - the turn simply stops arriving for that seat, and the only escape is
+   *     `session:resume` from a DIFFERENT socket.
+   *
+   * That last pair is what makes it a hang rather than a lost game: a disconnect is
+   * the only thing that marks a seat absent, and this socket never disconnected. It
+   * works precisely BECAUSE the displaced record was never ended.
+   *
+   * â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   * WHY THE RULE IS ABOUT THE SEAT AND NOT ABOUT SPECTATING
+   * â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   *
+   * Spectating is not the problem and the check is not "you may not spectate". A
+   * client with NO seat may spectate any match it can name, unauthenticated, as often
+   * as it likes â€” that is the design, and S1 bounds the cost rather than closing the
+   * door. The problem is narrower and sharper: **a connection holding a live seat may
+   * not stop holding it by asking for something else.** Losing a seat is what
+   * `session:resume` is for, and it is the only path that proves the asker may: it
+   * carries the seat's own token.
+   *
+   * So the rule reads: a connection's credential changes only by PROOF, never by
+   * REQUEST. That is one sentence, it covers all four messages, and it has no
+   * exception to forget â€” which is the property `room.ts`'s own header asks for when
+   * it says spectators are stopped by "no flag to forget to check".
+   *
+   * WHY `ILLEGAL_ACTION`. `ErrorCode` is a closed union mirrored in the client's own
+   * copy of the protocol and checked for mutual assignability by
+   * `test/protocol-parity.test.ts`, so the honest code for a refusal cannot be added
+   * here without a client-side change this change does not own. Of the existing
+   * codes this is the one that already means "the server refuses this", and the
+   * message is a fixed literal â€” no interpolation, so this adds no reflected-input
+   * surface (see the note on `#dispatch`).
+   */
+  #refuseSeatHandover(conn: Conn): boolean {
+    const rec = conn.session;
+    if (rec === null || rec.matchId === null) return false;
+    this.#fail(conn, 'ILLEGAL_ACTION', 'you are seated in a match; resume your session to change seats');
+    return true;
+  }
+
+  /**
+   * GIVE THIS CONNECTION A NEW SESSION, AND RELEASE THE ONE IT WAS HOLDING.
+   *
+   * `#refuseSeatHandover` is the fix; this is the backstop that makes the fix
+   * structural rather than a rule four call sites have to remember. Two things happen
+   * here that no assignment ever did:
+   *
+   *  1. **The displaced record is ENDED.** `SessionStore#end` drops it from
+   *     `#bySession` and from the token index, so the old resume token stops
+   *     resolving the instant it is displaced. One socket, one live credential â€” which
+   *     is what the store's own `#byHash` index is a single-entry-per-session
+   *     structure for.
+   *  2. **A displaced LIVE SEAT is marked disconnected.** If the record being replaced
+   *     named a match this connection is not staying in, the room is told the seat is
+   *     no longer being driven. The seat is NOT released and nothing is skipped â€”
+   *     that is `#onClose`'s long-standing rule and it is unchanged â€” but the room
+   *     stops reporting a player as present on a socket that has left, so the grace
+   *     window can do its job instead of the seat sitting `connected` forever.
+   *
+   * The same `sessionId` is not ended, because that is `#resume` finding the record
+   * it was already holding: a reconnect on the same socket rotates the token IN PLACE
+   * and must not destroy itself.
+   *
+   * `session:ended` is sent, before the caller's `session:granted`, and that ordering
+   * is the point rather than an accident: the client's store treats `session:ended`
+   * as "the credential is gone and everything derived from it is meaningless", so
+   * sending it second would wipe the session the same frame is about to grant. It also
+   * gives `session:ended` â€” declared in `protocol.ts` and previously produced by
+   * nothing â€” its first producer, which is why the message exists at all.
+   */
+  #adoptSession(conn: Conn, rec: SessionRecord): void {
+    const prev = conn.session;
+    conn.session = rec;
+    if (prev === null || prev.sessionId === rec.sessionId) return;
+
+    if (prev.matchId !== null && prev.matchId !== rec.matchId) {
+      this.hub.rooms.get(prev.matchId)?.setConnected(prev.playerId, false, this.#cfg.now());
+    }
+    const ended = this.sessions.end(prev.sessionId, 'replaced by a new session on this connection');
+    if (ended !== null) this.#send(conn.socket, ended);
   }
 
   #requireSession(conn: Conn): SessionRecord | null {
@@ -862,7 +991,7 @@ async listen(): Promise<{ port: number; host: string }> {
 
 type LobbyRecordView = NonNullable<ReturnType<LobbyHub['getLobby']>>;
 
-// ─────────────────────────── helpers ───────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function toRaw(data: unknown): string | null {
   if (typeof data === 'string') return data;
@@ -896,7 +1025,7 @@ function contentType(path: string): string {
   return CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream';
 }
 
-// ─────────────────────────── re-exports ───────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ re-exports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export { Room, RoomError, LobbyHub, LobbyError, isSeatCount, InMemoryMatchStore };
 export type { ClientMessage, ServerMessage, Session, Lobby, LobbySummary, SeatCount } from './protocol.ts';

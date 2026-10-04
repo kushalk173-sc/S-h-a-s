@@ -1,47 +1,47 @@
 /**
- * THE RESIDUAL: `conn.session` is overwritten without ending the record it held, and a
- * seated client can orphan its own live seat.
+ * THE SEAT SEAL — a connection's credential changes by PROOF, never by REQUEST.
  *
- * WHAT WAS FLAGGED, AND WHERE
+ * WHAT USED TO BE HERE, AND WHY THIS FILE IS THE REPLACEMENT RATHER THAN A NEW ONE
  *
- * Two places in `packages/server/src/index.ts` replace a connection's session by
- * assignment and never call `SessionStore#end` on the record they displace:
+ * The previous version of this file was four CHARACTERISATION tests asserting that the
+ * hole was OPEN, and its header said so: "They assert what the server DOES today, not
+ * what it should do; `src/` is not this file's to change." The last engineer left it
+ * that way on purpose, because the client half of the fix had landed and the server
+ * half had not, and a suite that goes red when half a fix lands is a suite nobody can
+ * merge around.
  *
- *  - **`#spectate`, index.ts:655-668.** It mints a fresh spectator session with
- *    `this.sessions.create('Spectator', 'spectator')`, sets `rec.matchId = matchId`,
- *    mints a NEW `playerId`, then writes `conn.session = rec` at line 664. A PLAYER's
- *    record — if that connection was seated — is still in `SessionStore.#bySession` and
- *    still in `#byHash`, so its resume token still resolves.
- *  - **`#joinLobby`'s spectator branch, index.ts:404-417.** The same shape for
- *    `lobby:spectate`: `conn.session = rec` at line 413, no end of the old record, and
- *    — this is the part that matters — **no check on what the connection was holding**.
- *    A client SEATED in a running match can send `lobby:spectate` and the server accepts
- *    it with no error of any kind.
+ * The server half has now landed, so the characterisation is over and these are
+ * ordinary assertions of ordinary behaviour. The bug, in one paragraph, because the
+ * shape is worth remembering:
  *
- * `SessionStore#end` exists (session.ts:182) and is the release-what-it-held discipline
- * every other path uses. Those two are the paths that do not call it.
+ *   Four messages in `packages/server/src/index.ts` minted a fresh `SessionRecord`
+ *   and wrote it over `conn.session`: `#createLobby`, `#joinLobby` (both branches)
+ *   and `#spectate`. Not one of them ended the record it displaced, and not one of
+ *   them asked what the connection was holding. So a SEATED client could send
+ *   `lobby:spectate` and be ACCEPTED WITH NO ERROR, and would then be holding a
+ *   credential naming a lobby rather than the match its seat was in — every
+ *   `match:action` refused `NOT_IN_LOBBY`, while `room.seats` still listed the seat
+ *   as `connected`, so `allSeatsExpired` was false and nothing timed out. The turn
+ *   simply stopped arriving. The only escape was `session:resume` from a different
+ *   socket, and it worked *because* the displaced record had never been ended.
  *
- * ## WHAT THIS FILE CLAIMS, AND WHAT IT DELIBERATELY DOES NOT
+ * THE FIX, IN TWO PARTS, AND BOTH ARE HERE
  *
- * These are **characterisation tests of the current behaviour of `src/`**, named as
- * such, written so the day someone fixes the hole they fail with a message naming the
- * fix. They assert what the server DOES today, not what it should do; `src/` is not this
- * file's to change.
+ *  1. **`#refuseSeatHandover`, in `#handle`.** Every message in `MINTING` — the four
+ *     that exchange a credential — is refused outright for a connection whose session
+ *     names a live match. Not "you may not spectate": a connection holding a seat may
+ *     not stop holding it by ASKING. Losing a seat is what `session:resume` is for,
+ *     because it is the only path that carries the seat's own token.
+ *  2. **`#adoptSession`, at every one of the four assignment sites.** The displaced
+ *     record is `end`ed (so its token stops resolving the instant it is displaced),
+ *     and a displaced LIVE SEAT is marked disconnected, so the room stops reporting a
+ *     player as present on a socket that has left. Part 1 is the fix; part 2 is what
+ *     makes it structural rather than a rule four call sites have to remember.
  *
- * The verdict, which is in the console output at the bottom: **the hole is real and
- * reproducible, and it is worse than "two records for one socket".** A seated player who
- * sends one frame the client no longer sends ends up holding a credential for a room it
- * can no longer address, while the room still marks the seat connected. That is a
- * permanent orphan on that socket, and the ONLY escape is `session:resume` from a
- * different one.
- *
- * The last test is the contrast that keeps the finding honest: `lobby:join` overwrites
- * `conn.session` the same way and also does not end the old record, and that is FINE,
- * because the record it displaced named a lobby membership rather than a live seat. The
- * difference between the harmless case and the harmful one is exactly whether the
- * displaced record pointed at a running match — which is the thing a fix has to test,
- * and the reason "just call `sessions.end` on the old record" is not obviously the whole
- * fix.
+ * Every test below drives real sockets against the real server. Section A is the
+ * regression the bug report was about, section B is the backstop, and section C pins
+ * the two things the fix must NOT do — a legitimate handover has to keep working, and
+ * an ended record has to actually stop resolving.
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -68,7 +68,7 @@ afterEach(async () => {
 type Seat = { client: TestClient; playerId: string };
 type Live = { h: Harness; matchId: string; seats: readonly Seat[] };
 
-/** A running two-seat match over a real socket, with every credential in hand. */
+/** A running two-seat match over real sockets, with every credential in hand. */
 async function liveMatch(): Promise<Live> {
   const h = await boot();
   const host = await TestClient.connect(h.url);
@@ -97,11 +97,11 @@ async function liveMatch(): Promise<Live> {
 /**
  * The error code the server answers a `match:action` with, or `null` if it accepted it.
  *
- * `END_TURN` is used because it is a no-op-ish action that the reducer will refuse for a
- * phase reason from a seat that is not on move — which is what makes "refused with
- * ILLEGAL_ACTION" the healthy reading. `NOT_IN_LOBBY` is produced by `#dispatch` BEFORE
- * the room is consulted, so it means the connection's own credential no longer names the
- * room, which is the thing under test.
+ * `END_TURN` is used because it is a no-op-ish action the reducer refuses from a seat
+ * that is not on move, so "refused with ILLEGAL_ACTION" is the healthy reading.
+ * `NOT_IN_LOBBY` is produced by `#dispatch` BEFORE the room is consulted, so it means
+ * the connection's own credential no longer names the room — which was the signature
+ * of the orphan.
  */
 async function refusalCode(c: TestClient): Promise<string | null> {
   c.clear();
@@ -114,10 +114,9 @@ async function refusalCode(c: TestClient): Promise<string | null> {
 /**
  * The lobby id the connection's own last credential carries.
  *
- * `LobbyHub#startMatch` deletes the lobby once the match exists, so the id cannot be read
- * off the hub afterwards — which is exactly why a stale client still has it and a
- * current one does not. Captured from `session:granted`, which is what the client under
- * test would be holding.
+ * `LobbyHub#startMatch` deletes the lobby once the match exists, so the id cannot be
+ * read off the hub afterwards — which is exactly why a stale client still has it. This
+ * is the frame the orphaned client sent.
  */
 function lobbyIdOn(seat: Seat): string {
   const all = seat.client.ever('session:granted');
@@ -126,207 +125,257 @@ function lobbyIdOn(seat: Seat): string {
   return id;
 }
 
-// ───────────────── the overwrite itself, with no orphaning ─────────────────
+// ─────────────── A. the regression: a seated client cannot give its seat away ───────────────
 
-describe('CHARACTERISATION: #spectate overwrites conn.session and leaves the displaced record alive', () => {
-  it('a seated connection that sends match:spectate ends up with TWO live session records and two working tokens', async () => {
-    const { h, matchId, seats } = await liveMatch();
-    const host = seats[0];
-    if (host === undefined) throw new Error('no host');
-    const seatSessionId = host.client.latestSession().sessionId;
-    const seatResumeToken = host.client.tokenFor(matchId);
-    const before = h.server.sessions.all().length;
-
-    // The overwrite. A seated, connected player asks to become a spectator of its own
-    // match. The server does not check what the connection was holding.
-    host.client.clear();
-    host.client.send({ t: 'match:spectate', matchId });
-    const granted = await host.client.expect(host.client.is('session:granted'), 'a session after match:spectate');
-    expect(granted.session.role, 'the connection was not downgraded to a spectator').toBe('spectator');
-    expect(granted.session.sessionId, 'the SAME record was reused — this test is about a NEW record displacing the old').not.toBe(
-      seatSessionId,
-    );
-
-    // THE RESIDUAL. Two records for one socket: the displaced player session is still in
-    // the store and `SessionStore#end` was never called on it. When the hole is closed
-    // this assertion is the one that fires, and its message says so.
-    const after = h.server.sessions.all();
-    expect(
-      after.filter((r) => r.sessionId === seatSessionId),
-      'the displaced player session WAS ended — #spectate now releases what it holds, so the rest of this test describes a fixed server',
-    ).toHaveLength(1);
-    expect(after.length, 'the overwrite created no extra record').toBe(before + 1);
-    const displaced = after.find((r) => r.sessionId === seatSessionId);
-    expect(displaced?.matchId, 'the displaced record no longer names the match it was seated in').toBe(matchId);
-    expect(displaced?.role, 'the displaced record is no longer a player session').toBe('player');
-
-    // …and its resume token STILL resolves. That is what makes this more than a leak:
-    // two credentials for one human, and the older one is the seat's.
-    const stale = h.server.sessions.find(seatResumeToken);
-    expect(stale, "the displaced player's resume token stopped resolving").toBeDefined();
-    expect(stale?.sessionId).toBe(seatSessionId);
-
-    // THE CONSEQUENCE ON THE ROOM. The seat is untouched and still connected, so the table
-    // is waiting on a player its own connection can no longer act for.
-    const room = h.server.hub.rooms.get(matchId);
-    const seat = room?.seat(host.playerId);
-    expect(seat, 'the seat was released').toBeDefined();
-    expect(seat?.connected, 'the room thinks the orphaned seat went away — it did not').toBe(true);
-    expect(seat?.resumeHash, 'the seat lost its token hash').not.toBe('');
-
-    // And the connection really is locked out of its own table now.
-    expect(await refusalCode(host.client), 'a spectatorised seat can still dispatch').toBe('NOT_A_PLAYER');
-
-    console.log(
-      `SESSION OVERWRITE (match:spectate): one socket now holds 2 live records; ` +
-        `the displaced player session ${seatSessionId} is still in the store and its resume token still resolves; ` +
-        `the seat is still in the table marked connected; the connection can no longer dispatch (NOT_A_PLAYER).`,
-    );
-  });
-});
-
-// ───────────────── the real hole: orphaning a live seat ─────────────────
-
-describe('CHARACTERISATION: a seated client CAN orphan its own live seat with lobby:spectate', () => {
-  it('the server ACCEPTS the frame, the seat can then never act again, and the room is never told', async () => {
-    // THE REAL HOLE, and the one the flag was about. `#joinLobby`'s spectator branch has
-    // no check on what the connection held. The client no longer sends this — the
-    // `WATCH INSTEAD` bug was fixed there — but the SERVER still permits it, and nothing
-    // in the protocol tells the client what it has just done.
+describe('a SEATED client cannot spectate its own seat away', () => {
+  /**
+   * `lobby:spectate` from a seated connection — the exact frame that hung the table.
+   *
+   * The whole test is the negative, because the bug had no error to assert on: the
+   * server ACCEPTED it. So the assertions are (a) it is refused, (b) the connection's
+   * credential is byte-for-byte the one it already had, and (c) the seat is still
+   * drivable by the socket that holds it.
+   */
+  it('lobby:spectate from a seated connection is REFUSED and the seat keeps working', async () => {
     const { h, matchId, seats } = await liveMatch();
     const host = seats[0];
     if (host === undefined) throw new Error('no host');
     const room = h.server.hub.rooms.get(matchId);
     if (room === undefined) throw new Error('no room');
-    expect(room.seat(host.playerId), 'no seat for the host').toBeDefined();
+
+    // 0. IT COULD ACT A MOMENT AGO. Stated so "it can still act afterwards" is a
+    //    property of the fix rather than of the fixture.
+    expect(await refusalCode(host.client), 'the host was already locked out of its own table').not.toBe('NOT_IN_LOBBY');
+    const seatSessionId = host.client.latestSession().sessionId;
+    const seatToken = host.client.tokenFor(matchId);
     const viewIdBefore = room.viewId;
+    const recordsBefore = h.server.sessions.all().length;
 
-    // 0. IT COULD ACT A MOMENT AGO. Stated so "it cannot act afterwards" is a change and
-    //    not a property of the fixture.
-    const before = await refusalCode(host.client);
-    expect(before, 'the host was already locked out of its own table before the orphan').not.toBe('NOT_IN_LOBBY');
-
-    // 1. THE SERVER ACCEPTS IT. No `LOBBY_CLOSED`, no `NOT_IN_LOBBY`, no refusal of any
-    //    kind — this is the finding, and the assertion's failure message says the hole
-    //    is closed when it stops holding.
-    const lobbyId = lobbyIdOn(host);
+    // 1. REFUSED. An `error`, no new credential, no room view.
     host.client.clear();
-    host.client.send({ t: 'lobby:spectate', lobbyId });
-    const arrived = await host.client.expect(host.client.is('lobby:state'), 'the orphaned seat got a room view');
-    expect(arrived.lobby.seats, 'the orphan took a seat').toHaveLength(2);
-    expect(
-      host.client.all('error'),
-      'the server REFUSED lobby:spectate from a seated connection — the seat-orphan hole is closed',
-    ).toEqual([]);
-
-    // 2. AND NOW IT CAN NEVER PLAY AGAIN. The new session names the lobby and not the
-    //    match, so `#dispatch` refuses with `NOT_IN_LOBBY` before the room is consulted.
-    expect(await refusalCode(host.client), 'the orphaned seat can still act — the hole is closed').toBe('NOT_IN_LOBBY');
-
-    // 3. …WHILE THE ROOM STILL BELIEVES IT IS PLAYING. The seat is untouched and still
-    //    connected. This is the hang: an active seat no connection can drive, which no
-    //    timeout releases, because a DISCONNECT is the only thing that marks a seat
-    //    absent and this socket never disconnected. The turn simply stops arriving.
-    const seatAfter = room.seat(host.playerId);
-    expect(seatAfter, 'the orphaned seat was removed from the table').toBeDefined();
-    expect(seatAfter?.connected, 'the room thinks the orphaned seat is still here').toBe(true);
-    expect(room.viewId, 'the orphan advanced the room').toBe(viewIdBefore);
-    expect(room.state.finished, 'the orphan finished the game').toBe(false);
-    expect(room.state.activePlayer, 'the orphan changed whose turn it was').toBe(room.state.activePlayer);
-
-    // 4. AND THE OTHER SEAT IS STILL WAITING ON IT. The displaced record is alive, so
-    //    the seat is not released — this is asserted so the fix cannot be "release the
-    //    seat", which would hand the game away instead of telling the player what
-    //    happened.
-    expect(
-      h.server.sessions.all().filter((r) => r.matchId === matchId && r.role === 'player'),
-      'the seat\'s player record was ended as well',
-    ).toHaveLength(2);
-
-    console.log(
-      `SESSION ORPHAN (lobby:spectate from a seated client): ACCEPTED with no error. ` +
-        `The connection now names lobby ${lobbyId} and not match ${matchId}, so every match:action is refused ` +
-        `NOT_IN_LOBBY. The seat stays in room.seats marked connected at viewId ${room.viewId}, and the turn ` +
-        `stops arriving for it. Unrecoverable on this socket.`,
+    host.client.send({ t: 'lobby:spectate', lobbyId: lobbyIdOn(host) });
+    const refused = await host.client.expect(host.client.is('error'), 'the seat handover to be refused');
+    expect(refused.code, 'the refusal used a code that does not mean "the server refuses this"').toBe('ILLEGAL_ACTION');
+    expect(refused.message, 'the refusal text is not a fixed literal').toBe(
+      'you are seated in a match; resume your session to change seats',
     );
+    expect(host.client.all('session:granted'), 'the connection was handed a NEW credential anyway').toEqual([]);
+    expect(host.client.all('lobby:state'), 'the connection was moved into a room view anyway').toEqual([]);
+
+    // 2. THE CREDENTIAL IS UNCHANGED. Same record, and the token it carries is still
+    //    the seat's — which is the thing the old code silently broke.
+    expect(host.client.latestSession().sessionId, 'the session record was replaced').toBe(seatSessionId);
+    expect(host.client.tokenFor(matchId), 'the seat token rotated under a refused frame').toBe(seatToken);
+    expect(h.server.sessions.all().length, 'the refused frame minted a session record').toBe(recordsBefore);
+
+    // 3. THE SEAT IS STILL THE SEAT'S, AND STILL DRIVABLE. This is the whole point:
+    //    no credential for a room the connection can no longer address, and no room
+    //    that thinks a player is present on a socket that has left.
+    const seatAfter = room.seat(host.playerId);
+    expect(seatAfter, 'the seat was released').toBeDefined();
+    expect(seatAfter?.connected, 'the room thinks the seat went away — it did not').toBe(true);
+    expect(seatAfter?.resumeHash, 'the seat lost its token hash').not.toBe('');
+    expect(room.viewId, 'the refused frame advanced the room').toBe(viewIdBefore);
+    expect(await refusalCode(host.client), 'the seat can no longer act at its own table').not.toBe('NOT_IN_LOBBY');
   });
 
-  it('the seat IS recoverable by session:resume from another socket — the only escape', async () => {
-    // …which is what stops the above from being an unbreakable table lock, and it is
-    // worth pinning. If a future fix DOES end the displaced record, this fails, and the
-    // fix then has to answer a POLICY question — what happens to a player who orphans
-    // their own seat — rather than a mechanical one.
+  /**
+   * The other three messages in `MINTING`, in one table.
+   *
+   * `lobby:spectate` was the reported frame and the other three are the same defect
+   * with a different disguise, so they are asserted together rather than one at a time:
+   * a table is the honest shape of "these four are one rule", and a future fifth
+   * message that replaces a credential has to be added here as well as to `MINTING`.
+   */
+  it('every message that replaces a credential is refused for a seated connection', async () => {
+    for (const frame of [
+      { t: 'lobby:spectate', lobbyId: '' },
+      { t: 'match:spectate', matchId: '' },
+      { t: 'lobby:create', name: 'Ada', maxPlayers: 2 as const, isPrivate: false },
+      { t: 'lobby:join', lobbyId: 'l_nope', name: 'Ada' },
+    ]) {
+      const { h, matchId, seats } = await liveMatch();
+      const host = seats[0];
+      if (host === undefined) throw new Error('no host');
+      const lobbyId = lobbyIdOn(host);
+      const before = host.client.latestSession().sessionId;
+
+      host.client.clear();
+      // The ids are filled in per-iteration so each frame is otherwise well formed and
+      // the refusal can only be the seat seal and not a decoder's complaint about a
+      // missing field.
+      const payload =
+        frame.t === 'lobby:spectate' ? { ...frame, lobbyId } : frame.t === 'match:spectate' ? { ...frame, matchId } : frame;
+      host.client.send(payload);
+
+      const err = await host.client.expect(host.client.is('error'), `${frame.t} to be refused`);
+      expect(err.message, `${frame.t} was refused for the wrong reason: ${err.message}`).toBe(
+        'you are seated in a match; resume your session to change seats',
+      );
+      expect(host.client.latestSession().sessionId, `${frame.t} replaced the credential`).toBe(before);
+      expect(h.server.hub.rooms.get(matchId)?.seat(host.playerId)?.connected, `${frame.t} disconnected the seat`).toBe(
+        true,
+      );
+
+      await h.close();
+      harness = null;
+    }
+  });
+
+  it('session:resume still moves a seat — the refusal is not "no seat may ever change"', async () => {
+    // The negative control, and it matters because the fix could have been written as
+    // "refuse every session replacement", which would have closed the seat-orphan hole
+    // by making reconnects impossible. `session:resume` is the ONE path that carries
+    // proof, so it is the one path that still works.
     const { h, matchId, seats } = await liveMatch();
     const host = seats[0];
     if (host === undefined) throw new Error('no host');
     const token = host.client.tokenFor(matchId);
 
-    host.client.clear();
-    host.client.send({ t: 'lobby:spectate', lobbyId: lobbyIdOn(host) });
-    await host.client.expect(host.client.is('lobby:state'), 'the orphaned seat got a room view');
-    expect(await refusalCode(host.client), 'the orphan did not take effect').toBe('NOT_IN_LOBBY');
-
-    const rescue = await TestClient.connect(h.url);
-    clients.push(rescue);
-    rescue.send({ t: 'session:resume', resumeToken: token });
-    const granted = await rescue.expect(rescue.is('session:granted'), 'the rescue session');
-    expect(granted.session.role, 'the rescue did not come back as a player').toBe('player');
-    expect(granted.session.matchId, 'the rescue was not put back in the match').toBe(matchId);
-    expect(granted.session.playerId, 'the rescue came back as a different seat').toBe(host.playerId);
-    expect(h.server.hub.rooms.get(matchId)?.seat(host.playerId)?.connected, 'the seat is not connected after the rescue').toBe(
+    // A DIFFERENT socket, which is what a refresh actually is.
+    const reopened = await TestClient.connect(h.url);
+    clients.push(reopened);
+    reopened.send({ t: 'session:resume', resumeToken: token });
+    const granted = await reopened.expect(reopened.is('session:granted'), 'the seat came back');
+    expect(granted.session.role, 'the resume did not come back as a player').toBe('player');
+    expect(granted.session.playerId, 'the resume came back as a different seat').toBe(host.playerId);
+    expect(granted.session.matchId, 'the resume is not in the match').toBe(matchId);
+    expect(h.server.hub.rooms.get(matchId)?.seat(host.playerId)?.connected, 'the seat is not connected after the resume').toBe(
       true,
     );
-    expect(await refusalCode(rescue), 'the rescued seat still cannot act').not.toBe('NOT_IN_LOBBY');
+    expect(await refusalCode(reopened), 'the resumed seat cannot act').not.toBe('NOT_IN_LOBBY');
+
+    // …and on the SAME socket, which is the re-rotate path: the record is found in
+    // memory, so `#adoptSession` must NOT end it. If it did, the resume would destroy
+    // the very credential it just verified.
+    reopened.clear();
+    reopened.send({ t: 'session:resume', resumeToken: reopened.latestSession().resumeToken });
+    const again = await reopened.expect(reopened.is('session:granted'), 'the same-socket resume');
+    expect(again.session.sessionId, 'a same-socket resume replaced its own record').toBe(granted.session.sessionId);
+    expect(await refusalCode(reopened), 'the seat lost itself by resuming twice').not.toBe('NOT_IN_LOBBY');
   });
 });
 
-// ───────────────── the contrast that keeps the finding honest ─────────────────
+// ─────────────── B. the backstop: no replacement leaks a record ───────────────
 
-describe('CHARACTERISATION: the same overwrite in a LOBBY membership is harmless', () => {
-  it('lobby:join also displaces a session without ending it, and nothing is orphaned', async () => {
-    // So the two findings above are read as defects in TWO SPECIFIC paths rather than as
-    // "the server never releases sessions". `#joinLobby`'s player branch overwrites
-    // `conn.session` at index.ts:423 with no `end` call, exactly like the spectator
-    // branch — and the displaced record survives. It is fine, because the record it
-    // displaced named a lobby membership rather than a live seat, and the room it named
-    // still exists.
+describe('no session replacement leaks the record it displaced', () => {
+  it('an UNSEATED connection replacing its credential ends the old record and its token', async () => {
+    // Part 1 of the fix is a rule; part 2 is the structure. This is part 2, on the one
+    // path a legitimate user takes: give up a waiting-room seat, join another room.
     //
-    // The difference between the harmless case and the harmful one is therefore exactly
-    // one thing: whether the displaced record pointed at a RUNNING MATCH. That is the
-    // predicate a fix needs, and it is why "call `sessions.end` on the old record" is
-    // necessary but not obviously sufficient.
+    // `lobby:join` over a LOBBY membership is the contrast the old file ended on. It
+    // displaced a record without ending it too — that was never the harmful case,
+    // because the record named a room that still existed and held no match — but it
+    // was still two live credentials for one socket, and now it is one.
     const h = await boot();
     const a = await TestClient.connect(h.url);
     clients.push(a);
     a.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 5, isPrivate: false });
     const created = await a.expect(a.is('lobby:state'), 'the lobby');
-    const firstLobby = a.latestSession().lobbyId;
-    if (firstLobby === null) throw new Error('the created lobby named no lobby on the session — fixture is wrong');
-    expect(firstLobby).toBe(created.lobby.lobbyId);
+    const firstSessionId = a.latestSession().sessionId;
+    const firstToken = a.latestSession().resumeToken;
+    expect(a.latestSession().lobbyId, 'the created lobby named no lobby on the session').toBe(created.lobby.lobbyId);
 
     const b = await TestClient.connect(h.url);
     clients.push(b);
     b.send({ t: 'lobby:create', name: 'Cy', maxPlayers: 5, isPrivate: false });
     await b.expect(b.is('lobby:state'), 'the other lobby');
     const otherLobby = b.latestSession().lobbyId;
-    if (otherLobby === null) throw new Error('the second lobby named no lobby on the session — fixture is wrong');
+    if (otherLobby === null) throw new Error('the second lobby named no lobby — fixture is wrong');
 
+    const recordsBefore = h.server.sessions.all().length;
     a.clear();
     a.send({ t: 'lobby:join', lobbyId: otherLobby, name: 'Ada' });
     await a.expect(a.is('lobby:state'), 'a joined the other room');
-    expect(a.latestSession().lobbyId, 'the join did not take effect').toBe(otherLobby);
 
-    const survivors = h.server.sessions.all().filter((r) => r.lobbyId === firstLobby && r.role === 'player');
+    // THE RECORD IS GONE. One socket, one live credential — the property the whole
+    // file is about, asserted on the store rather than on the socket.
+    const after = h.server.sessions.all();
     expect(
-      survivors.length,
-      'the pre-join record WAS ended, so this file no longer describes the current code — re-read the contrast above',
-    ).toBe(1);
-    const survivor = survivors[0];
-    // …and nothing about it is dangerous: it names a lobby that still exists and still
-    // lists this connection's original player id as a member, and it holds no match.
-    const room = h.server.hub.getLobby(firstLobby);
-    expect(room, 'the first lobby vanished').toBeDefined();
-    expect(room?.members.has(survivor?.playerId ?? ''), 'the displaced record names a seat that left').toBe(true);
-    expect(survivor?.matchId, 'a lobby-membership record named a match — that would be the harmful shape').toBeNull();
+      after.filter((r) => r.sessionId === firstSessionId),
+      'the displaced lobby record survived: a second live credential for one socket',
+    ).toEqual([]);
+    expect(after.length, 'the join created an extra record instead of replacing one').toBe(recordsBefore);
+    expect(
+      h.server.sessions.find(firstToken),
+      'the displaced record\'s resume token still resolves — one socket, two credentials',
+    ).toBeUndefined();
+
+    // AND THE CLIENT IS TOLD, in the order that makes the sequence mean something:
+    // `session:ended` (the old credential is gone, everything derived from it is
+    // meaningless) BEFORE `session:granted` (here is the new one). The reverse order
+    // would wipe the session the same exchange is granting.
+    expect(a.ever('session:ended'), 'the client was never told its credential was replaced').toHaveLength(1);
+    expect(
+      a.ever('session:ended')[0]?.reason,
+      'the ended message carries no reason, so the client cannot tell it from a kick',
+    ).toBe('replaced by a new session on this connection');
+    expect(
+      a.received.map((m) => m.t),
+      'the sequence did not run ended-then-granted',
+    ).toEqual(['session:ended', 'session:granted', 'lobby:state']);
+    expect(a.latestSession().lobbyId, 'the join did not take effect').toBe(otherLobby);
+  });
+
+  it('a displaced LIVE seat is marked disconnected, so the room stops reporting a ghost', async () => {
+    // The structural half of the backstop, and the one that only matters if a future
+    // path gets past `#refuseSeatHandover`. A seat left `connected` by a socket that
+    // has left is the hang itself: `allSeatsExpired` cannot fire, so nothing is ever
+    // released.
+    //
+    // `session:resume` onto a DIFFERENT match is the one handover the seal still
+    // permits, because it carries a token — and it is therefore the only way a live
+    // seat can be displaced at all, which is worth pinning: the seal means this branch
+    // is now a BACKSTOP rather than the primary defence.
+    const h = await boot();
+    const seatIn = async (): Promise<{ token: string; playerId: string; matchId: string }> => {
+      const host = await TestClient.connect(h.url);
+      clients.push(host);
+      host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+      const created = await host.expect(host.is('lobby:state'), 'a lobby');
+      const guest = await TestClient.connect(h.url);
+      clients.push(guest);
+      guest.send({ t: 'lobby:join', lobbyId: created.lobby.lobbyId, name: 'Bo' });
+      await guest.expect(guest.is('lobby:state'), 'the second player joined');
+      host.send({ t: 'lobby:start' });
+      const started = await host.expect(host.is('match:state'), 'the match started');
+      await guest.expect(guest.is('match:state'), 'the guest is seated');
+      return { token: host.tokenFor(started.matchId), playerId: host.latestSession().playerId, matchId: started.matchId };
+    };
+
+    const first = await seatIn();
+    const second = await seatIn();
+    expect(h.server.hub.rooms.get(first.matchId)?.seat(first.playerId)?.connected, 'the first seat was never connected').toBe(
+      true,
+    );
+
+    // One socket holding the first seat's credential, then that same socket reclaiming
+    // the SECOND seat. The first room is left behind.
+    const wanderer = await TestClient.connect(h.url);
+    clients.push(wanderer);
+    wanderer.send({ t: 'session:resume', resumeToken: first.token });
+    const arrived = await wanderer.expect(wanderer.is('session:granted'), 'the first seat was reclaimed');
+    expect(arrived.session.matchId, 'the first token did not address the first match').toBe(first.matchId);
+
+    wanderer.clear();
+    wanderer.send({ t: 'session:resume', resumeToken: second.token });
+    const moved = await wanderer.expect(wanderer.is('session:granted'), 'the second seat was reclaimed');
+    expect(moved.session.matchId, 'the second token did not address the second match').toBe(second.matchId);
+
+    // THE GHOST IS GONE FROM THE ROOM'S ACCOUNTING, but the seat is NOT released and
+    // its credential is not thrown away: a game that is still being played keeps its
+    // turn waiting for a player who closed a tab, which is the rule `#onClose` has
+    // always followed.
+    const seat = h.server.hub.rooms.get(first.matchId)?.seat(first.playerId);
+    expect(seat, 'the seat was RELEASED, which is a different fix and the wrong one').toBeDefined();
+    expect(seat?.connected, 'the room still reports a player on a socket that has left it').toBe(false);
+    expect(seat?.resumeHash, 'the seat lost its token hash, so the game could not be resumed at all').not.toBe('');
+
+    // …and the credential the socket walked away from is dead, which is what makes
+    // "one socket, one live credential" true rather than aspirational.
+    expect(h.server.sessions.find(first.token), 'the displaced seat\'s token still resolves').toBeUndefined();
+    expect(h.server.sessions.all().filter((r) => r.playerId === first.playerId), 'the displaced record is still in the store').toEqual(
+      [],
+    );
   });
 });
