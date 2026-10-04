@@ -111,6 +111,55 @@
           "until": "rest-of-game"
         }
       ]
+    },
+    {
+      "id": "hl-in2020-030",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for A CALL FROM KARACHI (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its auction needs `PlayerState.debts`, a CAP RULING on bidding resources you do not hold, negative-resource support in the pool reads, four new Actions and a second window protocol - and its first sentence needs a `reveal` set, a server + client change. Same JOB: it deals Conspiracy Cards off the top of the pile to the whole table, which is the shape a real player's 'draw the top 3' makes at a table.",
+      "provenance": "inferred",
+      "name": "Call from the Editor's Desk",
+      "text": "Every player, including you, receives 1 Conspiracy Card from the draw pile.",
+      "effects": [
+        {
+          "op": "draw-conspiracy",
+          "n": 1,
+          "target": "everyone"
+        }
+      ]
+    },
+    {
+      "id": "hl-in2020-031",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for NEXT BILLION DATA POINTS (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its ballot needs a no-self-vote rule and a re-vote-on-tie loop, which is the unbounded-cascade class section 4 refuses ('two opponents who always tie is a table that never finishes'), and its payoff - the next Conspiracy Card handed to a chosen player - is G20 plus G17, so the ballot alone buys nothing. This card does the same JOB: table-wide CONTENTION with a known owner, which is what a vote is for once the machinery is gone.",
+      "provenance": "inferred",
+      "name": "The People's Vote",
+      "text": "Take 2 resources of your choice from the player who currently holds the most majority voters.",
+      "effects": [
+        {
+          "op": "steal-any",
+          "n": 2,
+          "target": "leader"
+        }
+      ]
+    },
+    {
+      "id": "hl-in2020-032",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for DOSTI BANI RAHE (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its grant must land on SOMEBODY ELSE'S turn, and both installLiveEffects and fireTriggers require fire.actor === le.owner for on-turn-start, so there is no event to hook - a new EffectTrigger member plus a re-derivation of the trigger registry would buy no card. This card does the same JOB, giving OTHER people the benefit, with a lifetime the engine can actually bound.",
+      "provenance": "inferred",
+      "name": "Open Mic",
+      "text": "Every opponent receives 1 voter, and may use one Helping Hands discount on each purchase until the start of your next turn.",
+      "effects": [
+        {
+          "op": "voters",
+          "n": 1,
+          "target": "each-opponent"
+        },
+        {
+          "op": "discount",
+          "n": 1,
+          "target": "each-opponent",
+          "when": "on-turn-start",
+          "until": "next-turn"
+        }
+      ]
     }
   ]
 }

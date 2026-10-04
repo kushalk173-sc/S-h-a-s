@@ -340,6 +340,50 @@
           "until": "round"
         }
       ]
+    },
+    {
+      "id": "hl-et2040-024",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for HIGGS MORON (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3: its counter that outlives its resolution is G10 (`GameState.counters`, an `add-tokens` op and a `when: 'tokens-reach'` trigger) and `pass-card` has NO REFERENT - G12's in-flight queue and G20's `move-card` are both missing, and reassigning Ideology Cards breaks the blind-answer invariant. Same JOB: a card the whole table has to keep paying while it sits in somebody else's hands.",
+      "provenance": "inferred",
+      "name": "Hot Potato",
+      "text": "For the rest of the game, every purchase an opponent makes costs 1 extra Funds — Conspiracy Cards and Voter Cards alike. It stacks on top of a Helping Hands discount and with any other Pythonpost.",
+      "effects": [
+        {
+          "op": "restrict",
+          "kind": "surcharge",
+          "value": 1,
+          "target": "each-opponent",
+          "until": "rest-of-game"
+        }
+      ]
+    },
+    {
+      "id": "hl-et2040-025",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for ON THE \"HIGH\" SEAS (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: a hostage is a board-resident object holding pegs and ransomable repeatedly, and `PendingVoters` is the WRONG container because it is discarded at the end of that player's turn, so it needs a `Hostage` type with its own lifetime and its own reset. Same JOB: taking YOUR OWN voters off the board - the half of the printed card that does not come back.",
+      "provenance": "inferred",
+      "name": "Dead Weight",
+      "text": "Discard 2 of your own voters - they leave the board permanently. Voters in Volatile Areas cannot be discarded.",
+      "effects": [
+        {
+          "op": "discard-voter",
+          "n": 2,
+          "target": "you"
+        }
+      ]
+    },
+    {
+      "id": "hl-et2040-026",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for FUELLING THE NEWS (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3: headlines are dealt from a QUEUE (`GameState.headlineQueue`) and there is no Headline hand and no Headline draw pile, so 'draw 3' has no referent and 'choose the order in which to resolve these Headlines' needs a resolution-order queue as well. Same JOB: a headline that lands on everybody at once, which is what handing out headlines actually feels like.",
+      "provenance": "inferred",
+      "name": "The Front Page",
+      "text": "Every player discards 1 resource of their choice to the Public Reserve.",
+      "effects": [
+        {
+          "op": "lose-any",
+          "n": 1,
+          "target": "everyone"
+        }
+      ]
     }
   ]
 }

@@ -43,6 +43,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { loadCorpus, toEngineConspiracyCard, toEngineHeadlineCard, toEngineIdeologyCard, toEngineVoterCard } from '../src/corpus.js';
 import { RULES, RESOURCES, deltaTotal, type CardID, type CardIndex, type ConspiracyCard, type Effect, type PlayerID } from '../src/engine.js';
@@ -546,6 +548,35 @@ function clauseEffect(whole: GameState, without: GameState, caster: PlayerID): C
 }
 
 const ANY = <T>(m: ReadonlyMap<PlayerID, T>, f: (v: T) => boolean): boolean => [...m.values()].some(f);
+
+/**
+ * The ops whose `until` is the DEADLINE OF A RULE WRITTEN NOW rather than a hook's
+ * lifetime, re-derived from `reduce.ts isScoped`'s own `if (effect.op === '…') return false`
+ * lines rather than typed here.
+ *
+ * **WHY IT IS DERIVED AND NOT TYPED.** `isScoped` is the single authority on whether an
+ * effect is installed or applied, and a fourth op carving itself out there would change
+ * what every `until` on that op means. A hand-written list in this file would go stale
+ * silently and this checker would keep asserting "a lasting clause installed no live
+ * effect" about a card that is working perfectly — which is the false negative that costs
+ * a real bug and hides a fake one. Slicing the reducer is the same technique
+ * `reducer-parity.test.ts` runs on `applyEffect` and `fireTriggers`, and for the same
+ * reason: the registry is only worth anything if it is derived from the thing it describes.
+ *
+ * `set-cap` is in the set and ships on no card today, which is why nothing caught this
+ * before THE QUIET ROOM did. That is the argument for deriving rather than for testing
+ * each case.
+ */
+const DEADLINE_OPS: ReadonlySet<string> = new Set(
+  ((): string[] => {
+    const src = readFileSync(fileURLToPath(new URL('../../engine/src/reduce.ts', import.meta.url)), 'utf8');
+    const start = src.indexOf('function isScoped(');
+    expect(start, 'reduce.ts no longer declares isScoped where this reader expects it').toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf('\nfunction applyEffects', start));
+    return [...body.matchAll(/if \(effect\.op === '([^']+)'\) return false;/g)].map((m) => m[1] as string);
+  })(),
+);
+
 const ANY_SEAT_BUT = <T>(m: ReadonlyMap<PlayerID, T>, except: PlayerID, f: (v: T) => boolean): boolean =>
   [...m.entries()].some(([k, v]) => k !== except && f(v));
 
@@ -818,7 +849,15 @@ export function disagreements(card: ShippedCard, position: GameState): readonly 
     // `ct-et2040-019` is the fixture that forces this: POWER TRIP hooks
     // `on-voter-influenced` and does nothing on the turn it resolves.
     const scoped = effect.when !== undefined || effect.until !== undefined || effect.condition !== undefined;
-    if (scoped) {
+    // …AND THE CARVE-OUT, which is `isScoped`'s own and is re-derived from the reducer's
+    // own source rather than typed here. Three ops carry `until` WITHOUT being scoped:
+    // `restrict` and `borrow-power` write a `Restriction` and `set-cap` writes a cap, and on
+    // all three `until` is the DEADLINE OF THE RULE BEING WRITTEN NOW rather than a hook's
+    // lifetime. `reduce.ts isScoped` argues that separately for each of the three. Without
+    // the carve-out this block asserts a falsehood about every lasting `restrict` in the
+    // corpus — and it surfaced only when THE QUIET ROOM shipped one, which is the usual
+    // way a checker's blind spot is found.
+    if (scoped && !DEADLINE_OPS.has(effect.op)) {
       if (settled.liveEffectDelta <= 0 && raw.liveEffectDelta <= 0) {
         bad.push(`${card.id} clause ${i} (${effect.op}) — a lasting clause — installed NO live effect`);
       }
@@ -883,7 +922,9 @@ describe('semantic agreement — every clause of every shipped card does what it
     // `move-peg` is in that position too — GREAT LEADER, BAD ECONOMY is a Headline
     // (REF 4.1) — and it is not merely LISTED here: the clause checker above walks every
     // shipped effect, headline included, through `OBLIGATIONS` and fails on one that does
-    // not hold, so an obligation nothing checks is still a hole.
+    // not hold, so an obligation nothing checks is still a hole. `gain-any` LEFT this list
+    // when FEED THE TICKER shipped as `ct-et2040-020`, which is the assertion working: an
+    // op that used to have no Conspiracy Card at all now has one, and the list says so.
     const used = new Set<Effect['op']>();
     for (const card of SHIPPED) {
       if (card.kind !== 'conspiracy') continue;
@@ -891,7 +932,7 @@ describe('semantic agreement — every clause of every shipped card does what it
     }
     expect([...used].filter((op) => !(op in OBLIGATIONS)), 'a Conspiracy Card uses an op with no obligation').toEqual([]);
     // …and the obligations that no Conspiracy Card reaches are exactly those named.
-    expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual(['borrow-power', 'convert-voter', 'gerrymander', 'move-peg', 'restrict', 'set-cap']);
+    expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual(['borrow-power', 'convert-voter', 'gerrymander', 'move-peg', 'set-cap']);
   });
 
   it('and a card printing a RESTRICTION names the kind it actually imposes', () => {

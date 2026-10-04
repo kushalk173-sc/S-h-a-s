@@ -288,5 +288,17 @@
         }
       ]
     }
-  ]
+,
+
+    {
+      "id": "ct-et2040-020",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for QUANTUM WRISTBAND (REF 4.2.1), RULED OUT in KNOWN-GAPS.md 8.3: its auction is the same cost as A CALL FROM KARACHI's, AND headlines are a QUEUE rather than a pile, so there is no _headlineDraw to search and no top-of-pile to take - meaning even the first branch cannot be a choose-card, and the printed OR leaves the card no honest reduced form. Same JOB: a Volatile Area that pays the player who took the risk.",
+      "provenance": "inferred",
+      "name": "Feed the Ticker",
+      "cost": 4,
+      "text": "For the rest of the game, each time you place a voter in a Volatile Area you receive 1 resource of your choice. It does not fire when an opponent places one.",
+      "effects": [
+        { "op": "gain-any", "n": 1, "target": "you", "when": "on-volatile-placement", "until": "rest-of-game", "condition": { "byOwner": true } }
+      ]
+    }  ]
 }

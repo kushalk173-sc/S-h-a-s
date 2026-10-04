@@ -104,5 +104,28 @@
       "cost": 5,
       "effects": [{ "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "you" }]
     }
-  ]
+,
+
+    {
+      "id": "ct-in2020-012",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for CULT-IVATING OBEDIENCE (REF 4.2.2), RULED OUT in KNOWN-GAPS.md 8.3 - and its gap label is wrong twice over: the card itself is the object that is captured, so it is G11 and NOT G20, because no move-card reaches it. A capture also needs the protected majority to SURVIVE it, so it is a persisted per-zone protection plus a transfer, and the engine has no per-zone flag. Same JOB, the half that survives: protection the table can feel. The 'somebody may buy it' half is DROPPED and named.",
+      "provenance": "inferred",
+      "name": "The Quiet Room",
+      "cost": 5,
+      "text": "For the rest of this round, no opponent may use an unlocked Ideologue Power.",
+      "effects": [
+        { "op": "restrict", "kind": "no-power", "value": 0, "target": "each-opponent", "until": "round" }
+      ]
+    },
+    {
+      "id": "ct-in2020-013",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for CHAI-PAANI, which KNOWN-GAPS.md section 7 rules is NOT A GAP AT ALL: only a re-application clause was recovered ('A second Chai-Paani card can be applied on the same player. The first one will get deactivated'), the base effect was never recovered, and inventing one is forbidden. Same JOB - one protection at a time, the newest replacing the oldest - expressed as a rule with a deadline rather than as persistent state.",
+      "provenance": "inferred",
+      "name": "Second Helping",
+      "cost": 4,
+      "text": "Until the end of your turn, no opponent receives any resources for answering an Ideology Card - neither the answer's resources nor their passive bonus. Their answer still succeeds.",
+      "effects": [
+        { "op": "restrict", "kind": "no-income", "value": 0, "target": "each-opponent", "until": "this-turn" }
+      ]
+    }  ]
 }

@@ -1097,11 +1097,16 @@ export function xCardMagnitude(card: XCardLike, perVoter: number): number | null
         total += literal(effect.n) * CONSPIRACY_MIN_COST;
         break;
       // Board effects are not resources: evicting, discarding, converting,
-      // gerrymandering and refreshing the market move pegs and cards, not discs.
+      // gerrymandering, relocating a peg and refreshing the market move pegs and cards,
+      // not discs. `move-peg` (G1) is listed rather than left to fall out of a switch
+      // with no `default`, because an op that scores 0 by being ABSENT is a different
+      // claim from one that scores 0 by being a board effect — and the difference is
+      // invisible in the number.
       case 'evict':
       case 'discard-voter':
       case 'convert-voter':
       case 'gerrymander':
+      case 'move-peg':
       case 'refresh-market':
         break;
     }
