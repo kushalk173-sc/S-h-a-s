@@ -44,6 +44,7 @@ import {
   ownerNextTurn,
   pegsOf,
   poolTotal,
+  revealedCardsOf,
   roundEndTurn,
   tally,
   type Area,
@@ -805,6 +806,20 @@ function computedValue(
       return totalGerrymanderAllowance(state, player, ctx.rules);
     case 'ideologue-level':
       return ideologueLevel(state, player, ctx.rules);
+    case 'revealed-card':
+      // HOW MANY OF THE PLAYER'S OWN CARDS ARE FACE UP RIGHT NOW, which is a count of
+      // the table rather than of a pile: every id in the list was turned over by a
+      // `reveal`, so this value discloses nothing a client cannot already see by
+      // looking. `revealedCardsOf` rather than `state.revealedCards[player] ?? []` so
+      // the read is the SAME expression the write in `case 'reveal'` used, and an
+      // empty reveal and an un-updated fixture are one thing to the reducer.
+      //
+      // The empty-set case is `0`, which is the honest answer: a player who has
+      // revealed nothing has nothing to count. It is the same number the pre-execution
+      // stub returned, and it is now reachable only through that route — a card with
+      // this source and no reveal in front of it — rather than being the fallback for
+      // every player in the game.
+      return revealedCardsOf(state, player).length;
   }
 }
 
@@ -1904,14 +1919,60 @@ function applyEffect(
       // you played it.
       const n = resolveCount(s, source, effect.n, ctx);
       if (n <= 0) return s;
-      // `from: 'draw'` is the only source the type allows, and it is the only honest
-      // one: a card in the Ideology DISCARD pile has been ANSWERED, which p13 makes
-      // face up under its owner's mat, so handing one to a player blind would publish
-      // the answer they are about to give. See the `move-card` arm in cards.ts, which
-      // is the long version of why, and which also explains why the drain in
+
+      // `from: 'revealed'` — THE PUBLIC HALF OF THE SAME OP. A revealed card has been
+      // turned face up in front of the whole table, so taking one discloses nothing at
+      // all; this is the *"a card the whole table can already see"* clause where
+      // `'draw'` below is the *"the top of a pile nobody can see"* one, and neither
+      // touches the half §2bis refuses. There is no `from` in this union that
+      // enumerates a pile: one member each, taken by position.
+      //
+      // THE CARD LEAVES THE REVEALED SET, and that is not bookkeeping. The invariant on
+      // `GameState.revealedCards` is that it holds what the table can currently SEE; a
+      // card moved into a hidden hand is a card nobody can see any more, and leaving it
+      // listed would publish its identity after it has been hidden again — the
+      // `choose-card` refusal over `_ideologyDraw`, arriving by a different route. Read
+      // through `revealedCardsOf`, so the take and the removal are one expression.
+      //
+      // STILL SILENT, on the `move-card` arm's own reasoning: no `log(...)`, no
+      // `GameEvent`, for either `to`. The log is read the same way for every card, and a
+      // line that appeared for face-up cards and not for draw-pile cards would itself
+      // report which source was used.
+      if (effect.from === 'revealed') {
+        for (const p of resolveTargets(s, source, target, forced)) {
+          for (let i = 0; i < n; i += 1) {
+            const revealed = revealedCardsOf(s, p);
+            const id = revealed[0];
+            // An empty revealed list is a SAFE NO-OP, not a failure: a card can name a
+            // take from a set that a previous clause, a target that resolved to nobody,
+            // or a shorter pile left empty. Same shape as the draw path's `break`.
+            if (id === undefined) break;
+            if (effect.to === 'hand') {
+              const player = s.players[p];
+              if (!player) break;
+              // Checked BEFORE the card leaves the revealed set, for the reason the
+              // draw path checks it before the card leaves the pile: a refused take must
+              // leave the world exactly as it was.
+              if (ideologyHandOf(player).length >= IDEOLOGY_HAND_MAX) break;
+              s = withPlayer(s, p, { ideologyCards: [...ideologyHandOf(player), id] });
+            }
+            // `to: 'destroy'` falls through to here and does nothing else, which is the
+            // only way this op shrinks the Ideology card count — the same conservation
+            // property the `'draw'` destroy branch below is the sole other exception to.
+            s = { ...s, revealedCards: { ...s.revealedCards, [p]: revealed.slice(1) } };
+          }
+        }
+        return s;
+      }
+
+      // `from: 'draw'` is the other of the two sources the type allows, and the
+      // draw-pile one: a card in the Ideology DISCARD pile has been ANSWERED, which p13
+      // makes face up under its owner's mat, so handing one to a player blind would
+      // publish the answer they are about to give. See the `move-card` arm in cards.ts,
+      // which is the long version of why, and which also explains why the drain in
       // `advanceTurn` taking a card INSTEAD OF a draw is what makes the deck count fall
       // by exactly one per turn.
-      if (effect.from === 'draw' && s._ideologyDraw.length === 0) return s;
+      if (s._ideologyDraw.length === 0) return s;
 
       // "The top of the draw pile" is the end `draw()` takes from — `pile[0]` — and not
       // the end `discardTo` pushes onto. Using the other end would be a second,
@@ -1945,6 +2006,56 @@ function applyEffect(
         }
       }
       return s;
+    }
+    case 'reveal': {
+      // G-new. The whole contract is on `Effect`'s `reveal` arm in cards.ts and on
+      // `GameState.revealedCards` in state.ts; what is left here is the three things
+      // that arm asks this function to guarantee, and each is a branch rather than a
+      // comment because a comment does not fail a test.
+      const n = resolveCount(s, source, effect.n, ctx);
+      if (n <= 0) return s;
+      for (const p of resolveTargets(s, source, target, forced)) {
+        for (let i = 0; i < n; i += 1) {
+          // COMMIT FIRST. `pile[0]` is the end `draw()` takes from and the end
+          // `move-card { from: 'draw' }` takes from, so the member is chosen by
+          // POSITION and not by anything a client can observe, and the choice is made
+          // before the write. There is no `pick` flag on this op because a search over
+          // the pile is the other mechanism — the one §2bis refuses — and an `n` is a
+          // bound, not a search.
+          const pile = s[DRAW[effect.kind]];
+          const id = pile[0];
+          // A SHORT PILE REVEALS WHAT IT HAS, and this is the whole termination
+          // argument: each pass removes one card from a shared pile that is finite and
+          // monotonically shrinking, so the loop runs at most `pile.length` times per
+          // resolved target and cannot append to a structure that grows on its own. A
+          // partially-applied reveal is correct, not a bug — two reveals in one
+          // resolution compete for the same pile, exactly as two `to: 'hand'` moves do.
+          if (id === undefined) break;
+          // MOVE, NEVER COPY. The card leaves the `_` pile in the same write that puts
+          // it on the public list, so the deck count falls by exactly the number
+          // revealed and no id is on two lists at once — which is the refusal that
+          // keeps `to: 'discard'` off `_conspiracyDraw` from being reached by another
+          // route. Written as two spreads so the pile write and the list write are one
+          // expression each and neither can be dropped by accident.
+          s = { ...s, [DRAW[effect.kind]]: pile.slice(1) };
+          s = {
+            ...s,
+            revealedCards: { ...s.revealedCards, [p]: [...revealedCardsOf(s, p), id] },
+          };
+        }
+      }
+      // NO LOG LINE AND NO EVENT, on the `move-card` arm's own reasoning: the
+      // publication here is the face-up card itself, the field is public and
+      // unprefixed, and nothing about the REST of the pile has become knowable — which
+      // is the tell, because `draw-conspiracy`'s `announcedPick` is LOUD for exactly the
+      // opposite reason (it removes a NAMED card from a pile the table already holds).
+      //
+      // `_conspiracyDraw` is the one pile whose LENGTH is on the wire
+      // (`conspiracyRemaining`), so a reveal off it re-syncs the two derived public
+      // counters `syncConspiracyTop` owns — the same call `draw-conspiracy` ends with.
+      // A stale count is a public field reporting a number the engine no longer
+      // believes.
+      return effect.kind === 'conspiracy' ? syncConspiracyTop(s, ctx) : s;
     }
     case 'borrow-power': {
       // G14a. DEEP THOUGHTS: *"Select an opponent and use all their Level 3 Ideologue
@@ -2520,7 +2631,51 @@ function endOfGame(state: GameState, events: GameEvent[] = []): Result {
   };
 }
 
+/**
+ * THE TURN BOUNDARY, plus the one thing it clears that nothing else does.
+ *
+ * `turnBoundary` is the body that used to be `advanceTurn` verbatim, and it is a
+ * separate function for one reason: `revealedCards` is cleared HERE, on the RESULT, and
+ * `turnBoundary` has THREE returns that are not its last one — both `endOfGame`
+ * endings and R10's exhausted-Ideology ending all return from the middle. Clearing in
+ * the body would mean remembering the write at four exits, and the exit somebody
+ * forgets is a public field carrying a card nobody is looking at any more. Wrapping is
+ * the `reduce` / `reduceStep` shape this file already uses for exactly that reason:
+ * a post-pass over the returned state is a property of the RESULT rather than of any
+ * one exit.
+ *
+ * ## WHY THE BOUNDARY IS WHERE A RESOLUTION ENDS
+ *
+ * The ruling on `GameState.revealedCards` in state.ts: EMPTY IN EVERY STATE OUTSIDE A
+ * RESOLUTION. A card's resolution is not one action — it is everything from the play
+ * until the next player's turn starts, because a resolution PAUSES: any effect can
+ * raise a decision, and the state that pauses at one is a state the server keeps and
+ * re-serves. A reveal placed before that decision has to still be there when the
+ * decision is answered, or a card's own second clause (`'revealed-card'`) counts zero
+ * and its third (`move-card { from: 'revealed' }`) takes nothing. So the set has to
+ * outlive the action that raised it, and the turn boundary is the first instant at
+ * which no clause of that resolution can still run.
+ *
+ * That is the same clock `tickLiveEffects`, `expireRestrictions` and
+ * `expireCapOverrides` run on, and the same discipline: whatever a resolution was doing
+ * on the way out, the next player inherits none of it. It is written HERE, after
+ * `tickLiveEffects` rather than before it, so a hook that reveals on turn start is
+ * cleared by the same boundary that fired it — a reveal whose whole lifetime is one
+ * function is a card doing nothing, which is what such a card should do.
+ *
+ * ## WHY NOT IN `resolveChoice` OR `closeInterrupt`, where `interrupt` and `choices` go
+ *
+ * Both of those clear at the point of CLOSURE, and neither is this boundary: a decision
+ * can be answered and the resolution carry straight on, and an interrupt window closes
+ * mid-action with the turn boundary still ahead. Clearing here covers all three exits
+ * at once and cannot be routed around.
+ */
 function advanceTurn(state: GameState, ctx: Ctx): Result {
+  const r = turnBoundary(state, ctx);
+  return r.ok ? { ...r, state: { ...r.state, revealedCards: {} } } : r;
+}
+
+function turnBoundary(state: GameState, ctx: Ctx): Result {
   let s = state;
   const events: GameEvent[] = [{ type: 'turn-ended', player: s.activePlayer }];
 

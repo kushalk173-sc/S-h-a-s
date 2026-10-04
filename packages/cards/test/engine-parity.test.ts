@@ -58,6 +58,10 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
       { op: 'refresh-market' },
       { op: 'restrict', kind: 'no-purchases', value: 0, owed: 4 },
       { op: 'discount', n: 1 },
+      { op: 'move-card', from: 'draw', to: 'hand', n: 1 },
+      { op: 'move-card', from: 'revealed', to: 'hand', n: 1 },
+      { op: 'reveal', kind: 'ideology', n: 1 },
+      { op: 'reveal', kind: 'conspiracy', n: 2, target: 'each-opponent' },
     ];
     for (const effect of samples) {
       switch (effect.op) {
@@ -87,8 +91,23 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
           // values and not merely as present: `from` must never be 'discard' (a
           // discarded Ideology Card has been answered, and p13 makes that public), and
           // `to` must be one of the two things the ruling allows a card to become.
-          expect(effect.from).toBe('draw');
+          //
+          // `'revealed'` is the second legal `from` and it is checked here for the same
+          // reason `'draw'` is: it names a SET, and the set has to be one whose members
+          // the whole table can already see. A third spelling is a compile error, which
+          // is the point — a card naming a pile reduce() cannot reach must not compile.
+          expect(['draw', 'revealed']).toContain(effect.from);
           expect(['hand', 'destroy']).toContain(effect.to);
+          break;
+        case 'reveal':
+          // G-new. `kind` NAMES A PILE and the four are interchangeable here only
+          // because the operation is identical for each — take one member, publish that
+          // one member. There is no `'discard'`, and that omission is the ruling:
+          // `_ideologyDiscard` holds ANSWERED cards that p13 has already made face up
+          // under their owner's mat, so listing them would publish a blind answer.
+          // Asserted as a set so a fifth value cannot be added without this failing.
+          expect(['ideology', 'voter', 'conspiracy', 'headline']).toContain(effect.kind);
+          expect(effect.n).toBeGreaterThan(0);
           break;
         case 'borrow-power':
           // G14a. `target` is a single required value rather than a set, so it is

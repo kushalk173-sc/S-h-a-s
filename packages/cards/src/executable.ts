@@ -111,6 +111,31 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
    */
   'move-card': ['from', 'to', 'n', 'target'],
   /**
+   * G-new. All three of its fields are read by the case, and the registry says so
+   * because the parity test re-derives it by slicing `applyEffect`'s own source text —
+   * so an entry that over- or under-claimed here would fail `reducer-parity` rather
+   * than mislead a card author.
+   *
+   * - `kind` is read as `s[DRAW[effect.kind]]`, the same `DRAW` table `draw()` and
+   *   `move-card { from: 'draw' }` take from, so `kind` names a PILE and naming one is
+   *   a request to read it. All four values are honest here because the operation is
+   *   identical for each: take one member, publish that one member. It would stop
+   *   being honest the moment `kind` gained a value naming a set rather than a pile —
+   *   `_ideologyDiscard` in particular, whose contents are ANSWERED cards that p13 has
+   *   already made face up under a mat. Four values, no `'discard'`, and the omission
+   *   is the ruling.
+   * - `n` is the loop bound, resolved through `resolveCount` so a computed `n` works.
+   * - `target` is the consumed local, resolved through the same `resolveTargets` loop
+   *   every other targetable op uses; the cards land on the resolved seat's entry in
+   *   `GameState.revealedCards`.
+   *
+   * There is deliberately NO `pick` field on this op, and the reason is the security
+   * one rather than an omission: `pick` is how `draw-conspiracy` turns a blind take into
+   * a search, and a search over a hidden pile publishes that pile's contents as an
+   * option list. A reveal publishes the top of the pile and nothing else, forever.
+   */
+  reveal: ['kind', 'n', 'target'],
+  /**
    * G14a. `target` and nothing else, and both are the honest minimum: `target` is the
    * single legal value (`'chosen-player'`), so the case reads it as a guard rather than
    * as a set of victims; `until` is a scope field and is read in this case exactly as
@@ -335,6 +360,7 @@ export const EXECUTABLE_COMPUTED_SOURCES: ReadonlySet<string> = new Set([
   'your-gerrymander-rights',
   'volatile-voters',
   'held-of-each-resource',
+  'revealed-card',
 ]);
 
 export const COMPUTED_SOURCE_FIX =

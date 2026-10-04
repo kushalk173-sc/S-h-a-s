@@ -201,6 +201,11 @@ export function setup(opts: SetupOptions): GameState {
     // G13: no card is being answered. PUBLIC for the same reason, and for the same
     // per-field argument, as `liveEffects` above — see `InterruptWindow` in state.ts.
     interrupt: null,
+    // Nothing has been revealed: the set is EMPTY in every state outside a resolution,
+    // and a resolution is not running yet. PUBLIC by the ruling on
+    // `GameState.revealedCards` in state.ts — a card only reaches this map by being
+    // turned face up — which is why this line is above the server-only block.
+    revealedCards: {},
     finalRoundFrom: null,
     log: [],
 

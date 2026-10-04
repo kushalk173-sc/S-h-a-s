@@ -250,6 +250,10 @@ describe('schema: the effect union', () => {
       restrict: { op: 'restrict', kind: 'surcharge', value: 1, target: 'each-opponent', until: 'rest-of-game' },
       discount: { op: 'discount', n: 1 },
       'move-card': { op: 'move-card', from: 'draw', to: 'hand', n: 1, target: 'you' },
+      // G-new. `op`, `kind` and `n` are the three required fields and there is no fourth:
+      // `target` is optional here because the op raises no decision, and there is no
+      // `pick`, which is the whole security argument in the schema's `$comment`.
+      reveal: { op: 'reveal', kind: 'headline', n: 1 },
       // G14a. `target` is required and single-valued, so this is the whole op.
       'borrow-power': { op: 'borrow-power', target: 'chosen-player', until: 'this-turn' },
       // G15. `to` is required and is the whole op; `until` is its deadline rather than a

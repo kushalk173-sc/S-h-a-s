@@ -1310,6 +1310,83 @@ export type GameState = {
   readonly interrupt: InterruptWindow | null;
 
   /**
+   * CARDS REVEALED FACE UP during the current resolution, keyed by the player whose
+   * reveal it was, in reveal order. PUBLIC and UNPREFIXED, on the `LiveEffect.sourceCardId`
+   * precedent, and the reason is not tidiness: **a card on this list has been turned face
+   * up**, which is the whole of what makes it publishable.
+   *
+   * ## THE RULE, quoted, and it is the whole of the ruling
+   *
+   * *"you may choose a card the whole table can already see, or the top of a pile nobody
+   * can see; you may never be shown what is in a pile."* (§2bis, quoted at length on
+   * `Choice`'s `'choose-card'` arm.) This field is on the **first** of those two clauses
+   * and the design keeps it there, which is a different thing from being on the second.
+   *
+   * ## WHY A DETERMINISTIC READ IS SAFE AND AN ENUMERATION IS THE LEAK
+   *
+   * The precise rule this field has to obey, stated so the execution agent can check
+   * their own work: **a mechanism may READ a hidden set only by committing to one member
+   * of it before anything is published, and may never place that set's CONTENTS in any
+   * value that reaches a client.** Two shapes satisfy it and one does not:
+   *
+   *  - **COMMIT-THEN-PUBLISH, which is this field.** `reveal` takes the top of a draw
+   *    pile — one member, decided before the write — and publishes that one card because
+   *    the rule of the card is to turn it face up. The other cards on the pile are still
+   *    nobody's business and still live in their `_` field. Precedents for the safe
+   *    shape are `draw-conspiracy`'s `onlyIfEmpty` and `move-card { from: 'draw' }`: both
+   *    take the top of a hidden pile and **emit no log line and no event**, because the
+   *    publication here is the face-up card itself and nothing about the pile needs saying.
+   *  - **ENUMERATE, which is the leak.** Building an OPTION LIST over a hidden pile is
+   *    as revealing as publishing its value, which is why `'choose-card'` exists for
+   *    exactly one set (`conspiracyRecycle`) and why `PRIVATE_PLAYER_KEYS`, the four draw
+   *    piles, `_ideologyDiscard` and `_headlineDraw` are all refused there. **No
+   *    `Choice` kind and no `revealed`-flavoured target is added by this field**, and if a
+   *    future card wants one it has to name a pile whose contents are already public —
+   *    which after this field means one of these, because they are face up.
+   *
+   * So the field is public **because** the engine turned each card over, and not
+   * because it would be convenient: strip the prefixes out of these ids and you have a
+   * list of cards nobody had any business knowing, which is precisely the state this
+   * design must never publish.
+   *
+   * ## THE TWO INVARIANTS THE EXECUTION AGENT OWES, both falsifiable
+   *
+   *  1. **EMPTY IN EVERY STATE OUTSIDE A RESOLUTION.** `setup()` writes `{}` and the
+   *     resolution that raised a reveal clears it when that resolution ends — the same
+   *     discipline `advanceTurn` applies to live effects, restrictions and cap overrides,
+   *     on the same clock. A stale entry is not a cosmetic bug: it is a card sitting in
+   *     the public list that no longer belongs there, and `move-card { from: 'revealed' }`
+   *     would move a card nobody can see is being moved.
+   *  2. **EVERY ENTRY IS A CARD THE GAME LEGITIMATELY DREW.** A reveal moves the card
+   *     OFF its `_` pile and ONTO this list in one write. It must never be a copy: a
+   *     revealed card still sitting in `_ideologyDraw` would be a second copy of pile
+   *     contents on the wire by another route, which is the exact failure `to: 'discard'`
+   *     is refused over `_conspiracyDraw` for. And the deck count therefore falls by
+   *     exactly the number of cards revealed, monotonically — the same conservation
+   *     property `move-card`'s `'draw'` half is argued for.
+   *
+   * ## `ServerOnlyKeys` IS AT ELEVEN AND THIS FIELD DOES NOT TOUCH IT
+   *
+   * `playerView.ts` strips `_`-prefixed keys, and its list is pinned to exactly eleven
+   * by a file in a package this one may not edit. A `_`-prefixed field here would have
+   * needed a coordinated change to that list and to
+   * `packages/server/test/secret-inventory.ts`; being unprefixed, **it needs neither**,
+   * which is a second and independent reason it is not `_` beyond the visibility
+   * argument above.
+   *
+   * ## OWES AN INVENTORY ENTRY, and it is a public-by-DESIGN one
+   *
+   * `packages/server/test/public-payload.test.ts` keeps a hand-curated `PUBLIC_BY_DESIGN`
+   * list of the public fields a client is expected to act on, and its own comment says
+   * *"a public-but-load-bearing field is added to the engine and not recorded"* is the
+   * failure it exists to catch. A revealed card is something a client MUST render face
+   * up, so this field belongs in that list. That file is not this package's to change and
+   * the omission is flagged here so it cannot read as an oversight. It is additive: the
+   * field is public by the ruling above, and the entry is the record of it.
+   */
+  readonly revealedCards: Readonly<Record<PlayerID, readonly CardID[]>>;
+
+  /**
    * Set when the board fills before every majority forms (p20). Everyone gets one
    * more turn, starting with whoever filled the last area.
    */
@@ -1391,6 +1468,37 @@ export const EMPTY_POOL: Pool = { funds: 0, clout: 0, media: 0, trust: 0 };
  */
 export function ideologyHandOf(player: PlayerState | undefined): readonly CardID[] {
   return player?.ideologyCards ?? [];
+}
+
+/**
+ * The cards a player has REVEALED face up this resolution. Empty when they revealed
+ * nothing, or revealed nothing yet.
+ *
+ * One accessor rather than `state.revealedCards[pid] ?? []` at every call site, and for
+ * the SAME reason `ideologyHandOf` exists: an empty reveal and an un-updated fixture have
+ * to be one thing to the reducer, so the `?? []` lives in exactly one place and the
+ * invariant it is serving — EMPTY IN EVERY STATE OUTSIDE A RESOLUTION — is stated on
+ * `GameState.revealedCards` rather than re-derived at four call sites.
+ *
+ * ## IT TAKES A `GameState` AND A SEAT, unlike `ideologyHandOf`, and that is the shape
+ *
+ * `ideologyCards` lives ON the player, so one `PlayerState` is the whole input. A reveal
+ * is a property of the TABLE at the moment a resolution runs — several players can have
+ * one open in the same effect list — so it lives on the state, keyed by seat. Reading it
+ * therefore cannot be done from a player's own record, which is the same separation that
+ * keeps `pendingCard` a pointer rather than a copy.
+ *
+ * ## PUBLIC READ, and it is only sound because of what is IN the list
+ *
+ * This helper is the only sanctioned way to reach the set, and the list it returns is
+ * published whole by `playerView`. **Every id in it is a card that has been turned face
+ * up**, so publishing it publishes the table rather than a pile. The returned array is
+ * the stored one and is not copied: it is `readonly CardID[]`, it is consumed as a count
+ * (`revealed-card`, `move-card { from: 'revealed' }`) or as an answer, and a defensive
+ * copy on every read would be a second representation of the same set to keep in step.
+ */
+export function revealedCardsOf(state: GameState, player: PlayerID): readonly CardID[] {
+  return state.revealedCards[player] ?? [];
 }
 
 export function poolTotal(p: Pool): number {

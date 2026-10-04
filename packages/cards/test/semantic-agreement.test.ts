@@ -430,7 +430,18 @@ type Snapshot = {
   readonly market: readonly string[];
   readonly conspiracyHands: ReadonlyMap<PlayerID, number>;
   readonly ideologyHands: ReadonlyMap<PlayerID, number>;
-  readonly draws: { readonly voter: number; readonly conspiracy: number; readonly ideology: number };
+  readonly draws: { readonly voter: number; readonly conspiracy: number; readonly ideology: number; readonly headline: number };
+  /**
+   * How many cards each seat has REVEALED face up, summed over the whole public map.
+   *
+   * This is the ONLY observation in this file that reads a `_`-field's contents, and
+   * the shape of it is worth being explicit about: the harness holds the whole
+   * `GameState` because it is a TEST, so counting the revealed set here discloses
+   * nothing to anybody. In the shipped engine the same set is public for the opposite
+   * reason — every id in it has already been turned face up — and this file has no
+   * business being the thing that made that true.
+   */
+  readonly revealedTotal: number;
   readonly pendingChoices: number;
 };
 
@@ -475,7 +486,17 @@ function snapshot(s: GameState): Snapshot {
     market: s.market.map((m) => m.cardId),
     conspiracyHands,
     ideologyHands,
-    draws: { voter: s._voterDraw.length, conspiracy: s._conspiracyDraw.length, ideology: s._ideologyDraw.length },
+    draws: {
+      voter: s._voterDraw.length,
+      conspiracy: s._conspiracyDraw.length,
+      ideology: s._ideologyDraw.length,
+      // `_headlineDraw` is the fourth pile, and `reveal`'s obligation has to be
+      // expressible over all four of `kind`'s values rather than over the three the
+      // corpus happens to need. An obligation that can only be written for three of
+      // the four branches of an enum is an obligation with a hole in it.
+      headline: s._headlineDraw.length,
+    },
+    revealedTotal: Object.values(s.revealedCards).reduce((n, ids) => n + ids.length, 0),
     pendingChoices: s.choices.length,
   };
 }
@@ -519,7 +540,20 @@ type ClauseEffect = {
   readonly marketChanged: boolean;
   readonly conspiracyHandDelta: ReadonlyMap<PlayerID, number>;
   readonly ideologyHandDelta: ReadonlyMap<PlayerID, number>;
-  readonly drawDelta: { readonly voter: number; readonly conspiracy: number; readonly ideology: number };
+  readonly drawDelta: {
+    readonly voter: number;
+    readonly conspiracy: number;
+    readonly ideology: number;
+    readonly headline: number;
+  };
+  /**
+   * Cards that became face up this clause, summed over every seat.
+   *
+   * Separate from `drawDelta` because the two halves of `reveal`'s printed sentence
+   * are different claims and an obligation that only checked one would be satisfiable
+   * by a card that moved a card and never turned it over.
+   */
+  readonly revealedDelta: number;
   /** decisions raised by this clause and not by the rest of the card. */
   readonly choiceDelta: number;
 };
@@ -559,7 +593,9 @@ function clauseEffect(whole: GameState, without: GameState, caster: PlayerID): C
       voter: a.draws.voter - b.draws.voter,
       conspiracy: a.draws.conspiracy - b.draws.conspiracy,
       ideology: a.draws.ideology - b.draws.ideology,
+      headline: a.draws.headline - b.draws.headline,
     },
+    revealedDelta: a.revealedTotal - b.revealedTotal,
     choiceDelta: a.pendingChoices - b.pendingChoices,
   };
 }
@@ -606,7 +642,18 @@ const ANY_SEAT_BUT = <T>(m: ReadonlyMap<PlayerID, T>, except: PlayerID, f: (v: T
  */
 type Obligation = {
   readonly because: string;
-  readonly holds: (e: ClauseEffect) => boolean;
+  /**
+   * `e` is what the clause DID and `clause` is what it SAID. Most verbs need only the
+   * first, because "a pool rose" is the whole of "you gain N". `reveal` needs both: it
+   * prints WHICH pile, and an obligation that accepted any pile shrinking would be
+   * satisfiable by a card that revealed off `_headlineDraw` while shrinking
+   * `_ideologyDraw` — which is a card doing something other than what it printed.
+   *
+   * The split is also what keeps `ClauseEffect` pure observation. Putting the card's
+   * own declaration on the measurement would let an obligation be satisfied by a field
+   * the card wrote rather than by a change the engine made.
+   */
+  readonly holds: (e: ClauseEffect, clause: Effect) => boolean;
 };
 
 const someSeatGained = (e: ClauseEffect): boolean => ANY(e.poolDelta, (d) => d > 0);
@@ -719,6 +766,45 @@ const OBLIGATIONS: Readonly<Record<Effect['op'], Obligation>> = {
   'move-card': {
     because: '"this is an extra Ideology Card" / "take N cards"',
     holds: (e) => e.drawDelta.ideology < 0 || ANY(e.ideologyHandDelta, (d) => d > 0),
+  },
+  reveal: {
+    because: '"reveal the top of the draw pile, face up"',
+    // TWO CLAIMS ANDED, and both of them are the printed sentence. "Turn the top of a
+    // pile face up" says a card LEFT a pile (`drawDelta[kind] < 0`) and that it is now
+    // VISIBLE (`revealedDelta > 0`) — and the second half is the one that separates
+    // this from `move-card`, whose obligation above is satisfied by the same pile
+    // shrinking. A `reveal` that quietly filed the card into a hand would satisfy the
+    // first and fail the second, which is exactly the card that lies.
+    //
+    // It reads `kind` off the clause rather than accepting any pile, so the obligation
+    // is per-deck: a card revealing off `_headlineDraw` has to shrink THAT pile, and a
+    // clause that shrank a different one does not count as having revealed anything.
+    // The four are one `|`-joined key because `drawDelta` is keyed that way and a plain
+    // object lookup keeps the mapping between `kind` and pile readable at the call site.
+    holds: (e, clause) => {
+      // The narrowing is spelled out rather than inferred: `Obligation` is keyed by
+      // `Effect['op']` but its `holds` takes the WHOLE union, so TypeScript cannot tie the
+      // record key to the clause argument the way it would inside a `switch`. `Extract`
+      // is the honest cast — it is the `reveal` arm and nothing else — and if a future
+      // `reveal` dropped `kind` this stops compiling rather than reading `undefined`.
+      const kind = (clause as Extract<Effect, { op: 'reveal' }>).kind;
+      const before = e.drawDelta;
+      const named =
+        kind === 'ideology'
+          ? before.ideology
+          : kind === 'voter'
+            ? before.voter
+            : kind === 'conspiracy'
+              ? before.conspiracy
+              : kind === 'headline'
+                ? before.headline
+                : 0;
+      // The `: 0` fallback is not reachable — `kind` is a required field on the op —
+      // but it is the honest default: a `reveal` naming a pile this file cannot measure
+      // has NOT been shown to have revealed anything, and an obligation that defaulted
+      // to "some pile shrank" would pass it.
+      return named < 0 && e.revealedDelta > 0;
+    },
   },
   'borrow-power': {
     because: '"use all their Level 3 Ideologue Powers this turn"',
@@ -967,7 +1053,7 @@ export function disagreements(card: ShippedCard, position: GameState): readonly 
       continue;
     }
     const obligation = OBLIGATIONS[effect.op];
-    if (!obligation.holds(settled) && !obligation.holds(raw)) {
+    if (!obligation.holds(settled, effect) && !obligation.holds(raw, effect)) {
       bad.push(`${card.id} clause ${i} (${effect.op}) — ${obligation.because} — settled: ${explain(settled)} | offered: ${explain(raw)}`);
     }
   }
@@ -1045,7 +1131,21 @@ describe('semantic agreement — every clause of every shipped card does what it
     }
     expect([...used].filter((op) => !(op in OBLIGATIONS)), 'a Conspiracy Card uses an op with no obligation').toEqual([]);
     // …and the obligations that no Conspiracy Card reaches are exactly those named.
-    expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual(['borrow-power', 'convert-voter', 'gerrymander', 'move-peg', 'set-cap']);
+    // `reveal` is the sixth: no shipped card uses it, because it is an author-facing
+    // primitive and adding a card to use it is a design decision rather than part of
+    // landing the op. What stops that from making its obligation decorative is the
+    // behavioural probe in the `reveal` block below, which drives a real `reveal` card
+    // through the same `clauseEffect` measurement the corpus sweep uses — the same
+    // arrangement `move-peg` has, and for the same reason: an obligation nothing runs
+    // is a claim, and a claim nothing checks is what this whole file exists to prevent.
+    expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual([
+      'borrow-power',
+      'convert-voter',
+      'gerrymander',
+      'move-peg',
+      'reveal',
+      'set-cap',
+    ]);
   });
 
   it('and a card printing a RESTRICTION names the kind it actually imposes', () => {
@@ -1258,6 +1358,110 @@ describe('move-peg is EXECUTED, which is the only thing a per-clause sweep canno
     // …which is `applyEffect`'s arm being reachable at all, so the two engine sites are named
     // here rather than left as a claim in a docstring.
     expect(settle(installed.raw).zones.flatMap((z) => z.areas).find((a) => a.id === 'north_west-01')?.peg, 'answering the unscoped offer did not relocate the peg').toBeNull();
+  });
+});
+
+// ─────────────────────────── `reveal`: the probe for an op no card ships ───────────────────────────
+
+/**
+ * `reveal` is on the reached-by-nobody list, and the list is a list of NAMES — the same
+ * instrument-validity problem `move-peg` had. So this block runs the obligation against a
+ * real reduction rather than letting the table entry stand as the evidence.
+ *
+ * ## WHY IT NEEDS ONE AND `move-peg` NEEDED ONE FOR A DIFFERENT REASON
+ *
+ * `move-peg`'s probe exists because its obligation is about an OFFER that a headline
+ * resolution never makes. `reveal`'s exists for the blunter reason: **no shipped card uses
+ * the op at all**, so the corpus sweep at the top of this file walks zero clauses through
+ * it and would pass against a `holds` that was `() => true`.
+ *
+ * ## AND IT ARMS BOTH HALVES OF THE OBLIGATION, which is the part that matters
+ *
+ * The obligation is `namedPileShrank && revealedDelta > 0` — a card left the pile it
+ * printed AND is now face up. The second half is checked here against the state's own
+ * public field rather than trusted, and the first half is checked against the pile the
+ * card NAMED. An obligation that accepted "some pile got shorter" would be satisfied by
+ * `move-card { from: 'draw' }` wearing the word "reveal", and that is precisely the card
+ * that prints one thing and does another.
+ */
+describe('reveal is EXECUTED and its obligation is armed, which no shipped card can show', () => {
+  /** A card that prints exactly what the op promises, and nothing else. */
+  const REVEAL_ONE: Playable = {
+    id: 'sa-reveal-1',
+    name: 'OPEN THE TOP',
+    text: 'Reveal the top of the Ideology draw pile, face up.',
+    effects: [{ op: 'reveal', kind: 'ideology', n: 1 }],
+  };
+
+  it('the clause sweep finds NO disagreement: the op does what its text says', () => {
+    // `disagreements` is the same function the corpus sweep uses, so this is the corpus
+    // sweep pointed at one card. A synthetic card, because adding a shipped card is a
+    // design decision and this is a checker decision.
+    expect(disagreements({ ...REVEAL_ONE, kind: 'conspiracy' }, game())).toEqual([]);
+  });
+
+  it('and both halves of the obligation are load-bearing, checked against the real state', () => {
+    const r = play(game(), REVEAL_ONE);
+    expect('error' in r, `the probe card was refused: ${'error' in r ? r.error : ''}`).toBe(false);
+    if ('error' in r) return;
+
+    // HALF ONE, the pile the card NAMED. Read off the state rather than off the
+    // obligation, so a `holds` that ignored `kind` would be caught here and not only by
+    // the probe's own arithmetic.
+    const named = r.settled._ideologyDraw.length - game()._ideologyDraw.length;
+    expect(named, 'the named pile did not lose a card').toBeLessThan(0);
+    // …and NOT another pile. This is the anti-`move-card` half: the same pile shrinking
+    // is the whole of what `move-card`'s obligation checks, so without this a `reveal`
+    // that filed its card into a hand would satisfy a pile-only obligation.
+    expect(r.settled.revealedCards.p1?.length ?? 0, 'nothing is face up').toBeGreaterThan(0);
+
+    // HALF TWO, arming the `holds` itself against the vacuity this whole block is about.
+    const untouched = clauseEffect(game(), game(), 'p1');
+    expect(
+      OBLIGATIONS.reveal.holds(untouched, { op: 'reveal', kind: 'ideology', n: 1 }),
+      'the obligation is satisfied by a clause that did nothing',
+    ).toBe(false);
+    // …and against a clause that shrank a pile but revealed nothing, which is the shape a
+    // `reveal` implemented as a `move-card` would have.
+    const movedOnly: ClauseEffect = { ...untouched, drawDelta: { voter: 0, conspiracy: 0, ideology: -1, headline: 0 } };
+    expect(
+      OBLIGATIONS.reveal.holds(movedOnly, { op: 'reveal', kind: 'ideology', n: 1 }),
+      'the obligation is satisfied by a card that moved a card and never turned it over',
+    ).toBe(false);
+  });
+
+  it('and the obligation is PER-KIND, so a card cannot shrink one pile and print another', () => {
+    // The teeth case for the second argument to `holds`, and it is deliberately a unit
+    // assertion rather than a `disagreements` one.
+    //
+    // WHAT THIS IS NOT: it is not a claim that `disagreements` can catch a card whose TEXT
+    // says "Ideology draw pile" while its effect says `kind: 'headline'`. It cannot, and
+    // pretending otherwise is the mistake this file already made once — the sweep measures
+    // a clause's BEHAVIOUR against the clause's own DECLARATION, so a card whose text and
+    // effect disagree is caught by the corpus-level shape arms (`SHAPE_CLAIMS` and the
+    // print-a-verb match), which need a shipped card to fire and correctly report
+    // "armed 0" on a corpus with none.
+    //
+    // WHAT THIS IS: the obligation reads `kind` off the clause, so a measurement in which
+    // some OTHER pile shrank is not accepted as this card having revealed anything. That
+    // is the property that would be lost by an obligation written as "a pile got shorter",
+    // and it is asserted directly because it is the obligation's whole content beyond the
+    // pile-shrank half that `move-card` already had.
+    const shrunkHeadline: ClauseEffect = {
+      ...clauseEffect(game(), game(), 'p1'),
+      drawDelta: { voter: 0, conspiracy: 0, ideology: 0, headline: -1 },
+      revealedDelta: 1,
+    };
+    expect(
+      OBLIGATIONS.reveal.holds(shrunkHeadline, { op: 'reveal', kind: 'ideology', n: 1 }),
+      'a reveal off the Ideology pile was satisfied by the HEADLINE pile shrinking',
+    ).toBe(false);
+    // …and the positive half of the same mapping, so the assertion above is a narrowing
+    // rather than the obligation simply refusing everything.
+    expect(
+      OBLIGATIONS.reveal.holds(shrunkHeadline, { op: 'reveal', kind: 'headline', n: 1 }),
+      'the obligation refuses the pile the card actually named',
+    ).toBe(true);
   });
 });
 

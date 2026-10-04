@@ -255,7 +255,33 @@ export type ComputedSource =
    * count of that resource, is a doubling. The cap still applies afterwards, which
    * is the card's own second sentence.
    */
-  | 'held-of-each-resource';
+  | 'held-of-each-resource'
+  /**
+   * How many cards the player has REVEALED face up in the current resolution. Reads
+   * `GameState.revealedCards` for the player the effect resolves FOR.
+   *
+   * ## WHY THIS MEMBER IS SAFE AND EVERY OTHER HIDDEN SET IS NOT IN THIS UNION
+   *
+   * §2bis, quoted on `GameState.revealedCards`: *"you may choose a card the whole table
+   * can already see, or the top of a pile nobody can see; you may never be shown what is
+   * in a pile."* **Every id this counts has been turned face up**, so the count is a
+   * count of public information and the union needs nothing else to say about secrecy.
+   * The two piles and two discard lists that would make an equivalent source a leak are
+   * absent on purpose: they are `_`-prefixed, and a `ComputedSource` is read by
+   * `computedValue` before anything is resolved, so an entry naming one would be a
+   * `n` or a `per` multiplier whose value is a function of a hidden set — the
+   * enumeration the rule refuses, wearing a number as a disguise.
+   *
+   * ## WHY IT IS A COUNT AND NOT A `choose-card`, restated because it is the trap
+   *
+   * A count discloses how many cards are face up, which is a thing every client can see
+   * by looking at the table. The set's CONTENTS are disclosed too, and that is sound
+   * only because each one is face up — which is why this source can only ever name
+   * `revealedCards` and not a pile. **A card that wanted a player to CHOOSE among
+   * revealed cards has nothing to write**: it already has `choose-card`, whose candidate
+   * set is a set every viewer already holds, and revealed cards are now such a set.
+   */
+  | 'revealed-card';
 
 export type ComputedCount = { readonly of: ComputedSource };
 
@@ -614,6 +640,104 @@ export type Effect = (
        */
       readonly onlyIfEmpty?: boolean;
     }
+  /**
+   * REVEAL the top of a draw pile, face up, to the players it is aimed at. G-new.
+   *
+   * ## WHAT IT IS, and why it is not `move-card` with a different verb
+   *
+   * `move-card` puts a card somewhere it must be found again later — a hidden hand, or
+   * gone. This op leaves the card ON THE TABLE with its faces showing, attached to a seat,
+   * so that a later clause can count it (`'revealed-card'`) or take it
+   * (`move-card { from: 'revealed' }`). **There is no destination, and that is the whole
+   * difference**: `revealedCards` is not a fourth place a card can be filed, it is a
+   * window, and the invariant on `GameState.revealedCards` — EMPTY outside a resolution —
+   * is what stops it becoming one.
+   *
+   * ## THE SECURITY ARGUMENT, because this is the op the rule is about
+   *
+   * §2bis, verbatim: *"you may choose a card the whole table can already see, or the top
+   * of a pile nobody can see; you may never be shown what is in a pile."* Stated
+   * mechanically, which is the form an implementer can be held to: **a mechanism may READ
+   * a hidden set only by committing to one member of it before anything is published, and
+   * may never place that set's CONTENTS in any value that reaches a client.**
+   *
+   * This op is COMMIT-THEN-PUBLISH and is therefore on the right side of the rule:
+   *
+   *  - **COMMIT FIRST.** The member is `_pile[0]`, the same end `draw()` takes from, so
+   *    the choice is made by position and not by anything a client can observe. It is
+   *    decided before the write and it is ONE card — `n` is a bound, not a search, and
+   *    there is no `pick` flag on this op because a search is the other mechanism.
+   *  - **THEN PUBLISH, AND PUBLISH ONLY THE CARD.** What reaches a client is one face-up
+   *    card that the card's whole printed text is about. The rest of the pile stays in its
+   *    `_` field and stays unpublished.
+   *  - **THE PRECEDENTS FOR THE SAFE SHAPE ARE ALREADY IN THIS FILE.** `onlyIfEmpty` reads
+   *    the recipient's hidden hand, and `move-card { from: 'draw' }` reads a draw pile —
+   *    both take the top deterministically, and BOTH EMIT NO LOG LINE AND NO EVENT. That
+   *    silence is the tell: a deterministic read needs no announcement because nothing
+   *    about the pile has become knowable. This op is silent for the same reason, and it
+   *    is the sharp contrast with `draw-conspiracy`'s `announcedPick`, which is LOUD
+   *    because it removes a NAMED card from a pile the table can already see.
+   *  - **THE LEAK IS THE ENUMERATION, and it is refused structurally.** Every list a
+   *    decision may name is checked against being already-public — that is what
+   *    `'choose-card'` and `PRIVATE_PLAYER_KEYS` are for, and the reason `pick` is
+   *    REFUSED over `_conspiracyDraw` rather than merely undocumented. **So this op has no
+   *    `pick`, and no `target` value on it may ever be answered by choosing a card out of
+   *    the pile it reveals.** A reveal publishes the top and nothing else, forever.
+   *
+   * ## `kind` NAMES THE PILE, and the four are interchangeable HERE in a way they are
+   * not elsewhere
+   *
+   * The draw piles are the four `_`-prefixed fields, and naming one on an op is a request
+   * to read it. It is honest for all four because the operation is identical: take one
+   * member, publish that member. **It would stop being honest the moment `kind` gained a
+   * value that names a set rather than a pile** — `_ideologyDiscard` in particular, whose
+   * contents are ANSWERED cards that p13 has already made face up under a mat, so listing
+   * it would publish a blind answer (see `Choice`'s `'choose-card'` arm, which refuses it
+   * for exactly that reason). Four values, no `'discard'`, and the omission is the ruling.
+   *
+   * ## `target` SAYS WHOSE REVEALED SET, and it is the same axis as everywhere else
+   *
+   * The cards land on the resolved recipient's entry in `GameState.revealedCards`, which is
+   * what `revealed-card` counts and what `move-card { from: 'revealed' }` takes from — read
+   * through `revealedCardsOf`, one accessor, so the write and the read are the same
+   * expression. Absent `target` means the card's own player, and `'each-opponent'` means
+   * one reveal per opponent, resolved by the same `resolveTargets` loop every other op
+   * uses. A reveal is announced to EVERYONE regardless of who it belongs to: the field is
+   * public and unprefixed, so there is no viewer-scoped branch and no
+   * `(pid === viewer)` case — adding one would be the R1 bug in a plausible-looking form.
+   *
+   * ## SATISFIABILITY AND TERMINATION, and both are the deck's own bounds
+   *
+   * A short pile reveals what it has: `n` is an upper bound and a partially-applied
+   * reveal is correct, not a bug, exactly as a partially-applied `move-card` is — two
+   * reveals in one resolution compete for the same shared pile. **The op cannot be
+   * unsatisfiable because it raises no decision at all**: there is no dialog, so there is
+   * no frozen player and no `blockedBy` deadlock, which is the failure class this codebase
+   * has been bitten by three times. And the reveal count is bounded by the pile, which is
+   * bounded by the deck, so it cannot append to a structure that grows on its own.
+   *
+   * ## INERT UNTIL THE REDUCER HAS A CASE FOR IT, and the compiler says so out loud
+   *
+   * Declaring the op is half of the contract and this file is the half an author reads.
+   * `packages/cards/src/validate.ts` will reject any corpus card using it until
+   * `applyEffect` grows a `case 'reveal'` and `EXECUTED_OPS` grows the matching entry —
+   * finding code `EFFECT_NOT_EXECUTED`. That is the gate working, not a defect: **a card
+   * must not ship using behaviour the engine does not perform**, and this op is written
+   * down so the execution agent has a contract to satisfy rather than a shape to invent.
+   */
+  | {
+      readonly op: 'reveal';
+      /**
+       * Which draw pile to take the top of. Four values and no `'discard'` — see the
+       * section above; `_ideologyDiscard`'s contents are answered cards and listing them
+       * would publish a blind answer.
+       */
+      readonly kind: 'ideology' | 'voter' | 'conspiracy' | 'headline';
+      /** How many cards off the top, face up, onto each resolved player's revealed set. */
+      readonly n: Count;
+      /** Whose revealed set they land on. Defaults to the card's own player. */
+      readonly target?: EffectTarget;
+    }
   /** Discard all face-up Voter Cards and deal fresh ones. */
   | { readonly op: 'refresh-market' }
   /**
@@ -769,11 +893,43 @@ export type Effect = (
    * a Conspiracy Card is bought and held, never answered face up, so recycling one out
    * of ITS discard pile discloses nothing. The same source is honest for one deck and a
    * leak for the other, and the difference is entirely p13.
+   *
+   * ## `from: 'revealed'` — THE STRONGEST FORM OF §2bis's FIRST CLAUSE
+   *
+   * A revealed card has been turned face up in front of the whole table, so taking one
+   * discloses nothing at all: this is the *"a card the whole table can already see"* half
+   * of the rule, where `'draw'` is the *"the top of a pile nobody can see"* half. Neither
+   * touches the half the rule refuses, because **there is no `from` here that enumerates
+   * a pile** — the union names exactly two sources, one member each, and a fourth
+   * spelling (`'pending'`, `'hand'`, `'discard'`) is refused above for reasons that do not
+   * change with this addition.
+   *
+   * **IT MUST TAKE THE CARD OUT OF THE RESOLVED SEAT'S `revealedCards`, and that is not
+   * bookkeeping.** The invariant on `GameState.revealedCards` is that it holds cards the
+   * table can currently SEE; a card moved to a hidden hand is a card the table can no
+   * longer see, and leaving it listed would publish a card's identity after it has been
+   * hidden again — the `choose-card` refusal over `_ideologyDraw`, arriving by a
+   * different route. The read side is `revealedCardsOf(state, seat)`, one accessor, so the
+   * take and the removal are the same expression and cannot drift.
+   *
+   * ## AND IT DOES NOT WIDEN `to`
+   *
+   * `to` is untouched, so `to: 'destroy'` off a revealed card still writes no log line
+   * and no event, for the same reason the whole op is silent — and a card that IS face up
+   * would in principle be safe to announce. Silence is kept anyway because the log is
+   * read the same way for every card and a line that appears for face-up cards and not
+   * for draw-pile cards is a line whose ABSENCE reports which source was used. The
+   * published `revealedCards` map already says it.
    */
   | {
       readonly op: 'move-card';
-      /** The top of the Ideology draw pile - a card that has never been answered. */
-      readonly from: 'draw';
+      /**
+       * The top of the Ideology draw pile - a card that has never been answered. Or, for
+       * `'revealed'`, the top of the resolved seat's revealed set - a card the whole table
+       * has already seen face up. See the two sections above: one member taken blind, one
+       * member already public. There is no third spelling and no pile enumeration.
+       */
+      readonly from: 'draw' | 'revealed';
       readonly to: 'hand' | 'destroy';
       readonly n: Count;
       /**

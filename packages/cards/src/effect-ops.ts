@@ -26,6 +26,7 @@ export const EFFECT_OPS = [
   'restrict',
   'discount',
   'move-card',
+  'reveal',
   'borrow-power',
   'set-cap',
   'move-peg',
