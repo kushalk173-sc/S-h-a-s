@@ -1822,3 +1822,118 @@ describe('Defect C — an over-cap ask is DISCHARGEABLE, across a broadcast on e
     ).not.toContain("openPicker({ forKind: 'redraw', total: 0, pick: next })");
   });
 });
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * DEFECT C, SECOND HALF — THE ASK IS ENTERED BY DENOMINATION, NOT BY RESOURCE
+ * ═════════════════════════════════════════════════════════════════════════════
+ *
+ * Defect C had two halves and only one of them was the wipe. The other is that a
+ * cap discard is the ONE unbounded ask in the game: p12 makes it `held - cap`, and
+ * nothing returns resources except card payouts (max 4), so a seat that crosses
+ * and cannot discharge climbs every turn. `lean-4.json` ends at 83 held against a
+ * cap of 12 — an ask of 71 — and the widget moved the draft by ONE per press.
+ *
+ * Seventy-one presses is not a hard lock (the draft now survives broadcasts, so
+ * they all land), but it is the difference between a rule a player obeys and a
+ * rule a player abandons, and an abandoned p12 discard is the original bug with
+ * extra steps. So each denomination carries an `ALL` that moves it by everything
+ * the decision still needs.
+ *
+ * The property asserted is NOT "the button exists". It is that **`ALL` never puts
+ * the draft in a state CONFIRM cannot leave**, because a bulk control that
+ * overshoots is the same dead dialog in a new place: "47 of 41 chosen", and the
+ * only way out is `−` on each of four columns.
+ */
+describe('Defect C, second half — a bulk adder never overshoots the ask', () => {
+  /** Press `ALL` on each denomination in turn, until CONFIRM is live or nothing moves. */
+  function pressAll(r: RenderResult): void {
+    for (let round = 0; round < 8; round += 1) {
+      if (enabled(confirmOf(r.container))) return;
+      const before = pickerProgress(r.container).chosen;
+      for (const r2 of RES) {
+        const all = r.container.querySelector<HTMLElement>(`[data-testid=picker-max-${r2}]`);
+        if (all !== null && enabled(all)) fireEvent.click(all);
+      }
+      expect(
+        pickerProgress(r.container).chosen,
+        'ALL is enabled but moved nothing — a button that cannot act',
+      ).toBeGreaterThan(before);
+      expect(
+        pickerProgress(r.container).chosen,
+        'ALL overshot the ask, which CONFIRM can never accept',
+      ).toBeLessThanOrEqual(pickerProgress(r.container).need);
+    }
+  }
+
+  it('discharges the recorded 83-held / cap-12 ask of 71 in four presses', () => {
+    const sc = OVER_CAP(71, { funds: 21, clout: 15, media: 33, trust: 14 });
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    pressAll(r);
+    const presses = new Set(
+      [...r.container.querySelectorAll<HTMLElement>('[data-testid^=picker-max-]')].map(
+        (b) => b.getAttribute('data-testid'),
+      ),
+    );
+    expect(pickerProgress(r.container)).toEqual({ chosen: 71, need: 71 });
+    // Four denominations, and the whole ask went without naming a single `+`.
+    expect(presses.size, 'the bulk control must be reachable on every denomination').toBe(4);
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+    expect(seen).toHaveLength(1);
+    assertEngineAccepts(sc, seen[0] as ChoicePick);
+    expect(total(resOf(seen[0] as ChoicePick))).toBe(71);
+  });
+
+  it('stops exactly at the ask when one denomination holds more than is left to choose', () => {
+    // funds 21, and the ask is 12: `ALL` on funds must take TWELVE, not twenty-one,
+    // because `chosen > total` is the state CONFIRM cannot be talked out of.
+    const sc = OVER_CAP(12, { funds: 21, clout: 0, media: 0, trust: 0 });
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    fireEvent.click(r.container.querySelector<HTMLElement>('[data-testid=picker-max-funds]') as HTMLElement);
+    expect(pickerProgress(r.container), 'ALL took more than the whole ask').toEqual({
+      chosen: 12,
+      need: 12,
+    });
+    expect(
+      (r.container.querySelector('[data-testid=picker-confirm]')?.hasAttribute('disabled') ?? true),
+      'the bulk adder left CONFIRM disabled',
+    ).toBe(false);
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+    expect(seen).toHaveLength(1);
+    assertEngineAccepts(sc, seen[0] as ChoicePick);
+  });
+
+  it('never claims more than is HELD, on a cost — the canAfford half of the engine rule', () => {
+    // `canAfford` is the other of `resolveChoice`'s two checks on a `lose-any`. A
+    // bulk control that ignored the ceiling would produce a pick that totals the
+    // right number and still gets `you do not hold those`.
+    const sc = OVER_CAP(9, { funds: 3, clout: 3, media: 3, trust: 3 });
+    const seen: ChoicePick[] = [];
+    const r = render(<Harness sc={sc} onResolved={(p) => seen.push(p)} />);
+    pressAll(r);
+    fireEvent.click(confirmOf(r.container) as HTMLElement);
+    expect(seen).toHaveLength(1);
+    assertEngineAccepts(sc, seen[0] as ChoicePick);
+    for (const r2 of RES) {
+      expect(
+        (resOf(seen[0] as ChoicePick)[r2] ?? 0) <= 3,
+        `ALL claimed ${resOf(seen[0] as ChoicePick)[r2] ?? 0} ${r2} of a pool holding 3`,
+      ).toBe(true);
+    }
+  });
+
+  it('is inert once the ask is met, rather than an enabled control that does nothing', () => {
+    // §9.10. `want >= total` disables it, so a player holding a complete draft is
+    // never offered a control that cannot act — the failure `ResourcePicker`'s own
+    // header records for the `+` cell before it was given the same treatment.
+    const sc = OVER_CAP(2, { funds: 4, clout: 0, media: 0, trust: 0 });
+    const r = render(<Harness sc={sc} onResolved={() => undefined} />);
+    const all = (): HTMLElement => r.container.querySelector<HTMLElement>('[data-testid=picker-max-funds]') as HTMLElement;
+    expect(enabled(all()), 'ALL must be live while the ask is unmet').toBe(true);
+    fireEvent.click(all());
+    expect(enabled(all()), 'ALL must be dead once the ask is met').toBe(false);
+    expect(pickerProgress(r.container)).toEqual({ chosen: 2, need: 2 });
+  });
+});

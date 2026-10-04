@@ -797,10 +797,24 @@ describe('gain-any — a receipt, and THE PLAYTESTED BUG', () => {
         onResolved={() => undefined}
       />,
     );
-    const adds = [
-      ...r.container.querySelectorAll<HTMLElement>('.picker__grid .row--tight button'),
-    ].filter((b) => isEnabled(b) && !b.getAttribute('aria-label')?.startsWith('Remove'));
-    expect(adds, 'every denomination must be addable on an empty pool').toHaveLength(4);
+    // The claim is about DENOMINATIONS, not about buttons: on a `gain` every one of
+    // the four must be addable from an empty pool. Counted per column, because a
+    // column now carries two adders — `+` for one and `ALL` for everything the
+    // decision still needs — and a count of buttons would go stale the next time
+    // this widget grows a control.
+    const columns = [...r.container.querySelectorAll<HTMLElement>('.picker__grid .col')];
+    expect(columns, 'the picker must render four denominations').toHaveLength(4);
+    for (const col of columns) {
+      const adds = [...col.querySelectorAll<HTMLElement>('.row--tight button')].filter(
+        (b) => isEnabled(b) && !b.getAttribute('aria-label')?.startsWith('Remove'),
+      );
+      expect(
+        adds.length,
+        `every denomination must be addable on an empty pool: ${
+          col.querySelector('.picker__name')?.textContent ?? '?'
+        } has ${adds.length}`,
+      ).toBeGreaterThan(0);
+    }
     r.unmount();
   });
 });

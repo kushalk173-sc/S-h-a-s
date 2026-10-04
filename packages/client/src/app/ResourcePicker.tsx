@@ -156,6 +156,41 @@ export function ResourcePicker({
     onPick({ ...pick, [r]: next });
   };
 
+  /**
+   * ONE PRESS PER DENOMINATION INSTEAD OF ONE PER RESOURCE.
+   *
+   * `bump` above moves the draft by exactly one, which is right for a payment of
+   * four and catastrophic for a cap discard of seventy-one — and a cap discard is
+   * the one ask in this game whose size is UNBOUNDED. p12 makes it `held - cap`,
+   * and nothing returns resources except card payouts (max 4), so a seat that
+   * crosses and cannot discharge climbs every turn. `$TEMP/opencode/shasn-play`
+   * holds a seat at 83 against a cap of 12: an ask of 71, entered one resource at
+   * a time, which is not a task any player is going to finish.
+   *
+   * So each denomination gets a third control that moves it by everything the
+   * decision still needs:
+   *
+   *   - it is clamped to `remaining`, so it can never OVERSHOOT the ask. A control
+   *     that could take the draft past `total` would leave CONFIRM disabled with
+   *     a status reading "47 of 41 chosen" and no way back but `−` on each column,
+   *     which is the same dead-end in a new place.
+   *   - it is clamped to `maxOf(r)`, so it can never claim more than is held — the
+   *     `canAfford` half of the engine's `resolveChoice` check still holds.
+   *   - it leaves the DENOMINATION choice with the player, which p12 requires and
+   *     which a "discard down to the cap" button would quietly take. Four presses
+   *     to discharge any ask; the player still chooses which four.
+   *
+   * In `gain` mode the same arithmetic is "take as much of this as the decision
+   * is worth", `maxOf` is `total`, and both clamps are the same two. There is no
+   * separate control because there is no separate question.
+   */
+  const bumpMax = (r: Resource): void => {
+    const current = pick[r] ?? 0;
+    const next = Math.max(current, Math.min(maxOf(r), current + Math.max(0, remaining)));
+    if (next === current) return;
+    onPick({ ...pick, [r]: next });
+  };
+
   /*
    * TWO SHAPES, ONE BODY. The grid, the numerals, the status line and the
    * buttons are identical either way — only the container differs. That is the
@@ -217,6 +252,27 @@ export function ResourcePicker({
                   aria-label={isGain ? `Take one fewer ${r}` : `Remove one ${r}`}
                 >
                   −
+                </button>
+                {/* LAST in the row, deliberately. Every driver in this repository that
+                    walks the picker reads `.picker__grid .row--tight button` and takes
+                    the first enabled control whose label is not a `Remove` — so this
+                    one has to come after `+` or every one of them starts here and the
+                    suite stops testing the one-press-at-a-time path it is written
+                    against. It is still a `+`-adjacent control on the same row, and
+                    *this* control is exercised directly below. */}
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => bumpMax(r)}
+                  disabled={want >= max || want >= total}
+                  aria-label={
+                    isGain
+                      ? `Take as many ${r} as this decision is worth. You hold ${have}, ${want} of ${total} chosen.`
+                      : `Shed as many ${r} as this decision still needs. You hold ${have}, ${want} of ${total} chosen.`
+                  }
+                  data-testid={`picker-max-${r}`}
+                >
+                  ALL
                 </button>
               </div>
             </div>
