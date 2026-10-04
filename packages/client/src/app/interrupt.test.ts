@@ -30,6 +30,19 @@
 
 import { describe, expect, it } from 'vitest';
 
+/**
+ * The engine's OWN source text, read as text.
+ *
+ * `?raw` rather than `node:fs` + `import.meta.url`, because `import.meta.url` is
+ * not a `file:` URL under Vitest's jsdom environment, and because `?raw` is the
+ * route `redrawControl.test.tsx` already uses to audit a file that ships: it reads
+ * the bytes on disk, untransformed, so this pins the ENGINE's declaration rather
+ * than some build of it. It is a text read — no engine value crosses into this
+ * package, which is what the secret gate requires.
+ */
+import engineCardsSource from '../../../engine/src/cards.ts?raw';
+import engineStateSource from '../../../engine/src/state.ts?raw';
+
 import type {
   Choice,
   ClientState,
@@ -41,6 +54,7 @@ import type {
   PlayerID,
   PlayerState,
   Pool,
+  RestrictionKind,
 } from '@shasn/engine';
 
 import {
@@ -359,6 +373,9 @@ describe('the staged effects are described from the payload, never paraphrased i
     // attacker-adjacent input: a future op, or a state some other thing built,
     // arrives with an `op` this client has never seen. Guessing at it would put a
     // sentence in front of a player describing something the engine will not do.
+    //
+    // The `default` is for THAT op only. It is not a place for a KNOWN op to land,
+    // and the block below proves no op of the union ever gets there.
     const future = { op: 'teleport-everything' } as unknown as Effect;
     expect(describeEffect(future)).toBe('an effect this client has no words for');
   });
@@ -385,6 +402,227 @@ describe('the staged effects are described from the payload, never paraphrased i
       'Gain 2 voters to place',
       'Send 1 voters back to their owners',
     ]);
+  });
+});
+
+// ───────────── every op in the union, and every `restrict` kind in it ─────────────
+
+/**
+ * THE OP LIST IS READ OUT OF THE ENGINE'S SOURCE, NOT WRITTEN DOWN HERE.
+ * This is the finding that made this block: `describeEffect`'s contract is "never
+ * paraphrase a card into a lie", its `restrict` arm lied about four of five kinds,
+ * and the suite above — green the whole time — covered five ops and skipped
+ * `restrict` altogether. A `default`-fallback test cannot catch that: it proves the
+ * function is honest about an op it has never heard of, which is the easy half, and
+ * says nothing about the ops it has heard of and handled partly.
+ *
+ * So the guard is a DIFF in both directions against `packages/engine/src/cards.ts`,
+ * the technique `reducer-parity.test.ts` uses and for the same reason: a list kept
+ * by hand is a list a new engine op silently escapes. `Effect` is not
+ * value-imported — the secret gate forbids it in this package, tests included — and
+ * it does not need to be: the union is a slice of readable text.
+ */
+const CARDS_SOURCE: string = engineCardsSource;
+
+/** The `Effect` union only: from its declaration to the next top-level type. */
+const EFFECT_UNION: string = CARDS_SOURCE.slice(
+  CARDS_SOURCE.indexOf('export type Effect = ('),
+  CARDS_SOURCE.indexOf('\nexport type Count'),
+);
+
+/** Every `op` member of the engine's `Effect` union, read off its own source. */
+const ENGINE_OPS: ReadonlySet<string> = new Set(
+  [...EFFECT_UNION.matchAll(/readonly op: '([a-z-]+)'/g)].map((m) => m[1] ?? ''),
+);
+
+/** One representative effect per op. Every member is covered; none is invented. */
+const ONE_PER_OP: Readonly<Record<string, Effect>> = {
+  gain: { op: 'gain', res: { funds: 2 } },
+  lose: { op: 'lose', res: { funds: 2 } },
+  'gain-any': { op: 'gain-any', n: 3 },
+  'lose-any': { op: 'lose-any', n: 3 },
+  'steal-any': { op: 'steal-any', n: 1 },
+  voters: { op: 'voters', n: 4 },
+  evict: { op: 'evict', n: 1 },
+  'discard-voter': { op: 'discard-voter', n: 2 },
+  'convert-voter': { op: 'convert-voter', n: 2 },
+  gerrymander: { op: 'gerrymander', n: 1 },
+  'draw-conspiracy': { op: 'draw-conspiracy', n: 1 },
+  'refresh-market': { op: 'refresh-market' },
+  restrict: { op: 'restrict', kind: 'surcharge', value: 2 },
+  discount: { op: 'discount', n: 1 },
+  'set-cap': { op: 'set-cap', to: 10 },
+  'move-card': { op: 'move-card', from: 'draw', to: 'hand', n: 1 },
+  'borrow-power': { op: 'borrow-power', target: 'chosen-player' },
+};
+
+describe('every op in the engine Effect union has its own sentence', () => {
+  it('the op list was actually derived — non-vacuity', () => {
+    // Seventeen, asserted rather than assumed: a slice that silently matched nothing
+    // would make every other assertion in this block pass for the wrong reason,
+    // which is the exact failure mode this file exists to prevent.
+    expect(ENGINE_OPS.size).toBe(17);
+    // And the slice really is the `Effect` union rather than the whole file:
+    // `block` is an `Interrupt` op outside it, `set-cap` is the seventeenth.
+    expect(ENGINE_OPS.has('set-cap')).toBe(true);
+    expect(ENGINE_OPS.has('block')).toBe(false);
+  });
+
+  it('no op of the union falls through to the honest-but-silent fallback', () => {
+    // THE ASSERTION THAT WAS MISSING. Every op gets words of its own, so the window
+    // never tells a player "this client has no words for" about an effect the engine
+    // is definitely about to apply.
+    const silent = [...ENGINE_OPS].filter(
+      (op) => describeEffect(ONE_PER_OP[op] as Effect) === 'an effect this client has no words for',
+    );
+    expect(silent, 'these engine ops have no sentence of their own').toEqual([]);
+  });
+
+  it('the representative table covers the union in both directions', () => {
+    // Nothing in the table the engine does not have — an invented op would let the
+    // block above pass without describing anything.
+    expect(Object.keys(ONE_PER_OP).sort()).toEqual([...ENGINE_OPS].sort());
+    // …and nothing in the union missing from it, which would make `ONE_PER_OP[op]`
+    // undefined and describe an undefined effect.
+    for (const op of ENGINE_OPS) expect(ONE_PER_OP[op], `no representative for ${op}`).toBeDefined();
+  });
+
+  it('the three previously-silent ops now say what they do', () => {
+    // `set-cap`, `move-card` and `borrow-power` had no `case` and fell to the honest
+    // default. That was documented behaviour rather than a lie, but it meant the two
+    // newest mechanics were invisible in the one panel that announces them.
+    expect(describeEffect({ op: 'set-cap', to: 10, target: 'each-opponent' })).toBe(
+      'Their resource cap becomes 10 · each opponent',
+    );
+    expect(describeEffect({ op: 'move-card', from: 'draw', to: 'hand', n: 1 })).toBe(
+      '1 extra Ideology Card — answered in place of that player\'s next draw',
+    );
+    expect(describeEffect({ op: 'move-card', from: 'draw', to: 'destroy', n: 1 })).toContain(
+      'removed from the game',
+    );
+    expect(describeEffect({ op: 'borrow-power', target: 'chosen-player' })).toContain(
+      'Level 3 Ideologue Power',
+    );
+  });
+});
+
+describe('every restrict kind describes ITSELF, and no two kinds share a sentence', () => {
+  // The defect, verbatim. `no-power`, `no-income` and `voter-shortfall` all printed
+  // "Every purchase costs N more": a power lock-out reported as a purchase tax, in
+  // the one panel whose job is to warn the table BEFORE it happens. Each row is a
+  // different subsystem, so each row must read differently.
+  const KINDS: readonly {
+    readonly kind: RestrictionKind;
+    readonly owed?: number;
+    readonly must: RegExp;
+    readonly mustNot: RegExp;
+  }[] = [
+    {
+      kind: 'no-purchases',
+      owed: 4,
+      must: /may not purchase until they donate/,
+      mustNot: /costs \d+ more/,
+    },
+    { kind: 'surcharge', must: /Every purchase costs 3 more/, mustNot: /may not purchase/ },
+    { kind: 'no-power', must: /cannot use an Ideologue Power/, mustNot: /purchase/i },
+    { kind: 'no-income', must: /no answer payout and no passive bonus/, mustNot: /purchase/i },
+    {
+      kind: 'voter-shortfall',
+      owed: 2,
+      must: /next 2 Voter Cards they influence give 1 fewer/,
+      mustNot: /purchase/i,
+    },
+  ];
+
+  it('names every kind the RESTRICT OP can name, and knows the sixth is not one', () => {
+    // Derived from the engine's own source, for the reason the op list is derived:
+    // a hand-kept list is a list a new kind escapes, and a new kind would arrive
+    // here as the surcharge sentence all over again.
+    const at = CARDS_SOURCE.indexOf("readonly op: 'restrict';");
+    const declared = new Set(
+      [
+        ...CARDS_SOURCE.slice(at, CARDS_SOURCE.indexOf('readonly value: number;', at)).matchAll(
+          // Line-anchored, because the declaration's own doc comments QUOTE its
+          // members and name their neighbours; an unanchored match reads prose as
+          // members and passes for the wrong reason.
+          /^[ \t]*\|?[ \t]*'([a-z-]+)'/gm,
+        ),
+      ].map((m) => m[1] ?? ''),
+    );
+    expect(declared.size, 'the restrict op declares five kinds').toBe(5);
+    expect(KINDS.map((k) => k.kind).sort()).toEqual([...declared].sort());
+
+    // AND THE SIXTH, which is the distinction worth pinning down.
+    //
+    // `RestrictionKind` in `state.ts` has SIX members, not five. The two types are
+    // not the same type and the difference is load-bearing here: the sixth,
+    // `'borrowed-powers'`, is written onto a player's `restrictions` by the
+    // `borrow-power` op (`reduce.ts`) and CANNOT be named by a `restrict` effect at
+    // all. So it can never reach this function as an `Effect`, and there is
+    // correctly no branch that would try to describe it — `borrow-power` has its
+    // own sentence, asserted above.
+    //
+    // An audit read "three of five kinds" and was right about the op; it read
+    // `RestrictionKind` and would have got six. Both numbers are asserted here so
+    // the next reader does not have to choose between them.
+    const allKinds = new Set(
+      [
+        ...engineStateSource
+          .slice(
+            engineStateSource.indexOf('export type RestrictionKind'),
+            engineStateSource.indexOf('export type Restriction ='),
+          )
+          .matchAll(/^[ \t]*\|?[ \t]*'([a-z-]+)'/gm),
+      ].map((m) => m[1] ?? ''),
+    );
+    expect(allKinds.size, 'RestrictionKind is the wider type').toBe(6);
+    expect([...allKinds].filter((k) => !declared.has(k))).toEqual(['borrowed-powers']);
+  });
+
+  for (const row of KINDS) {
+    it(`'${row.kind}' is described as itself`, () => {
+      const e: Effect = {
+        op: 'restrict',
+        kind: row.kind,
+        value: row.kind === 'surcharge' ? 3 : 1,
+        ...(row.owed === undefined ? {} : { owed: row.owed }),
+        target: 'each-opponent',
+      };
+      const text = describeEffect(e);
+      expect(text).toMatch(row.must);
+      expect(text).not.toMatch(row.mustNot);
+      // And the target clause still rides along — the sentence describes the effect,
+      // it does not replace the target.
+      expect(text).toContain('each opponent');
+    });
+  }
+
+  it('no two kinds produce the same sentence', () => {
+    const texts = KINDS.map((row) =>
+      describeEffect({ op: 'restrict', kind: row.kind, value: 1, owed: 1 }),
+    );
+    expect(new Set(texts).size, 'two kinds share a sentence').toBe(KINDS.length);
+  });
+
+  it("voter-shortfall's two numbers are not interchangeable", () => {
+    // `value` is how many FEWER each of the next `owed` cards yields; `owed` is how
+    // many CARDS. Swapping them prints a true-looking sentence about the wrong rule.
+    const e: Effect = { op: 'restrict', kind: 'voter-shortfall', value: 1, owed: 3 };
+    expect(describeEffect(e)).toBe('The next 3 Voter Cards they influence give 1 fewer');
+    const swapped: Effect = { op: 'restrict', kind: 'voter-shortfall', value: 3, owed: 1 };
+    expect(describeEffect(swapped)).toBe('The next Voter Card they influence gives 3 fewer');
+    expect(describeEffect(e)).not.toBe(describeEffect(swapped));
+  });
+
+  it('a restriction kind this client has never heard of is reported, not guessed', () => {
+    // The inner `default` earns its place the same way the outer one does: the engine
+    // is closed today, and a payload is attacker-adjacent input tomorrow.
+    const future = {
+      op: 'restrict',
+      kind: 'no-telepathy',
+      value: 1,
+    } as unknown as Effect;
+    expect(describeEffect(future)).toBe('a restriction this client has no words for');
   });
 });
 

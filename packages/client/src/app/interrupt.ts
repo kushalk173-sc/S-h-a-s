@@ -65,6 +65,7 @@ import type {
   InterruptWindow,
   LogEntry,
   PlayerID,
+  RestrictionKind,
 } from '@shasn/engine';
 
 import { deltaText } from './derive.ts';
@@ -307,19 +308,73 @@ function perText(per: ComputedCount | undefined): string | null {
 }
 
 /**
+ * ONE SENTENCE PER `restrict` KIND, and this helper exists because the bug was a
+ * ternary.
+ *
+ * `Effect.op === 'restrict'` carries FIVE kinds (`packages/engine/src/cards.ts`),
+ * and they are five different rules about five different subsystems: a purchase
+ * gate, a purchase price, the Ideologue Power ladder, the answer payout and the p28
+ * passive, and the voters a later card will yield. A two-armed ternary that names
+ * one of them and sends the other four to the purchase-price sentence is not an
+ * omission — it is four FALSE sentences printed in the one panel whose entire job
+ * is to tell the table what is about to happen to them before it happens. A player
+ * deciding whether to spend a BLOCK was told a power lock-out was a purchase tax.
+ *
+ * So the shape is a `switch` over all five members, each with its own wording, and
+ * `RestrictionKind` is a closed union, so the compiler enforces that a sixth kind
+ * lands here. `interrupt.test.ts` derives the op list from the engine's own source,
+ * so a new kind also fails that suite at the level of the SENTENCE rather than only
+ * at the level of the type.
+ *
+ * `voter-shortfall` reads BOTH numbers and they are not interchangeable: `value` is
+ * how many voters EACH of the next `owed` cards yields less, and `owed` is how many
+ * CARDS that is (the engine's own field docs argue this; see `'voter-shortfall'` in
+ * `state.ts`). Printing the wrong one of the pair is the same defect as printing the
+ * surcharge for a power lock-out.
+ */
+function restrictText(
+  kind: RestrictionKind,
+  value: number,
+  owed: number | undefined,
+  target: string,
+): string {
+  switch (kind) {
+    case 'no-purchases':
+      return `The named player may not purchase until they donate${target}`;
+    case 'surcharge':
+      return `Every purchase costs ${value} more${target}`;
+    case 'no-power':
+      return `The named player cannot use an Ideologue Power${target}`;
+    case 'no-income':
+      return `The named player gains nothing: no answer payout and no passive bonus${target}`;
+    case 'voter-shortfall': {
+      const cards = owed ?? 1;
+      const clause =
+        cards === 1
+          ? 'The next Voter Card they influence gives'
+          : `The next ${cards} Voter Cards they influence give`;
+      return `${clause} ${value} fewer${target}`;
+    }
+    default:
+      return 'a restriction this client has no words for';
+  }
+}
+
+/**
  * ONE staged effect, in this client's own words.
  *
  * The printed card text is not in the wire view, so this is a description of the
  * server's STRUCTURED effect — the same numbers the engine is about to apply, from
  * the same payload, rather than from anything this client remembers or invents.
  *
- * The `default` branch is the load-bearing part. `Effect` is a closed union, so
- * TypeScript believes the switch is exhaustive, and a payload is
- * attacker-adjacent input: a future op, or a state hand-built by something other
- * than this engine, arrives with an `op` this switch has never seen. An
- * unreadable effect is then reported as unreadable. Guessing at it would put a
- * sentence in front of a player describing something the engine will do differently,
- * which is the one thing a card must never do.
+ * EVERY `Effect` OP IS HANDLED, and that is a second totality proof alongside the
+ * compiler's. `Effect` is a closed union, so TypeScript is satisfied by any switch
+ * that ends in `default` — including one that handles nothing. That is exactly the
+ * shape that shipped a `restrict` arm naming one of five kinds: the type was total,
+ * the WORDS were not. So the `default` below is reserved for an op this client has
+ * never heard of (a future engine, or a state hand-built by something else), and
+ * `interrupt.test.ts` re-derives the op list from the engine's own source and fails
+ * if any op of this union reaches it.
  */
 export function describeEffect(e: Effect): string {
   const named = effectTarget(e);
@@ -355,11 +410,27 @@ export function describeEffect(e: Effect): string {
     case 'refresh-market':
       return 'Discard every face-up Voter Card and deal three fresh ones';
     case 'restrict':
-      return e.kind === 'no-purchases'
-        ? `The named player may not purchase until they donate${target}`
-        : `Every purchase costs ${e.value} more${target}`;
+      return restrictText(e.kind, e.value, e.owed, target);
     case 'discount':
       return `${countText(e.n)} purchases cost nothing this turn${target}`;
+    case 'set-cap':
+      return `Their resource cap becomes ${e.to}${target}`;
+    case 'move-card':
+      // Copy discipline, and it is load-bearing rather than stylistic:
+      // `staleWording.test.tsx` bans "face down" in every non-test source file,
+      // because under full information a phrase about an unseen card is a stale
+      // concealment claim. A moved card IS held in a hand, so the tempting wording
+      // is exactly the banned one. What the table can actually ACT on is not the
+      // hand, it is the consequence: an extra card somebody will be asked to answer,
+      // in place of the draw they would otherwise have got (`cards.ts`, G20).
+      return e.to === 'destroy'
+        ? `${countText(e.n)} Ideology Card${e.n === 1 ? '' : 's'} removed from the game`
+        : `${countText(e.n)} extra Ideology Card${e.n === 1 ? '' : 's'} — answered in place of that player's next draw`;
+    case 'borrow-power':
+      // `target` is REQUIRED here and `'chosen-player'` is the only legal value
+      // (cards.ts), so it is stated in the sentence rather than appended: this is
+      // the one op whose target is part of what it DOES rather than who it hits.
+      return 'Use every Level 3 Ideologue Power a player you name holds, once each';
     default:
       return 'an effect this client has no words for';
   }
