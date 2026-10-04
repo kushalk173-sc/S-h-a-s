@@ -113,6 +113,18 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
    * `EXECUTABLE_DURATIONS` before it ever consults this table.
    */
   'set-cap': ['to', 'target'],
+  /**
+   * G1. `n` and `target` are the two fields the case reads, and both are listed even
+   * where a corpus card uses only one — that is what an exhaustive list is for.
+   *
+   * `when` / `until` / `condition` are absent for the same reason they are absent from
+   * `restrict`, `borrow-power` and `set-cap`: they are scope fields read by
+   * `installLiveEffects` one function above the switch, and
+   * `unexecutedEffectProblems` checks them against `EXECUTABLE_DURATIONS` before it ever
+   * consults this table. GREAT LEADER, BAD ECONOMY's lifetime and trigger are ordinary
+   * `EffectScope` fields, exactly as GROWING DISSENT's are.
+   */
+  'move-peg': ['n', 'target'],
 };
 
 

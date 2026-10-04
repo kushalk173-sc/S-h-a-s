@@ -105,6 +105,15 @@ describe('the Effect union in cards.ts and the schema op list agree', () => {
           expect(Number.isInteger(effect.to)).toBe(true);
           expect(effect.to).toBeGreaterThanOrEqual(0);
           break;
+        case 'move-peg':
+          // G1. `n` is 1 for every recovered card and MUST stay 1: the pick is one
+          // (peg, destination) pair, so a card asking for 2 would be offered one move
+          // and read as though it had made two. The schema's `maximum: 1` is the floor
+          // and this is the assertion, and the two failing together is the point — a
+          // schema that widens alone is caught here and a reducer that widens alone is
+          // caught by `EXECUTED_OPS` having no field for it.
+          expect(effect.n).toBe(1);
+          break;
         default: {
           const never: never = effect;
           throw new Error(`unhandled Effect variant: ${JSON.stringify(never)}`);

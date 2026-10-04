@@ -553,6 +553,20 @@
             "until": { "$ref": "#/$defs/effectDuration" },
             "condition": { "$ref": "#/$defs/effectCondition" }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "n"],
+          "$comment": "G1: GREAT LEADER, BAD ECONOMY. The pegs on offer are the CARD'S OWN actor's non-majority, non-Volatile voters; `target` is who may move them, and the pick carries a DESTINATION as well as a peg - which is the half no other op has. `n` is constrained to 1 because the pick is one (peg, area) pair: `reduce()` would offer a card asking for more fewer moves than it says, so the schema refuses it rather than shipping a card that quietly under-delivers. The validator repeats the check; this is the schema's own floor and the two must agree.",
+          "properties": {
+            "op": { "const": "move-peg" },
+            "n": { "type": "integer", "minimum": 1, "maximum": 1 },
+            "target": { "$ref": "#/$defs/effectTarget" },
+            "when": { "$ref": "#/$defs/effectTrigger" },
+            "until": { "$ref": "#/$defs/effectDuration" },
+            "condition": { "$ref": "#/$defs/effectCondition" }
+          }
         }
       ]
     },

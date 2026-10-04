@@ -28,6 +28,7 @@ export const EFFECT_OPS = [
   'move-card',
   'borrow-power',
   'set-cap',
+  'move-peg',
 ] as const satisfies readonly Effect['op'][];
 
 /**

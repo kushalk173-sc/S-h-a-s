@@ -237,6 +237,10 @@ const EFFECT_OP_ORDER: Readonly<Record<string, number>> = {
   'move-card': 14,
   'borrow-power': 15,
   'set-cap': 16,
+  // G1. The index is not decoration: `validateEffect` uses it to pick the `oneOf` branch
+  // out of `card.schema.json`, so the schema and this table are two lists that can drift
+  // and the drift is a thrown error at validate time rather than a silent mis-validation.
+  'move-peg': 17,
 };
 
 /**

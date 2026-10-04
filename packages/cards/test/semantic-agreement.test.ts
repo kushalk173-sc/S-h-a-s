@@ -225,6 +225,35 @@ function settle(s: GameState): GameState {
       const zone = cur.zones.find((z) => z.areas.some((a) => a.peg !== null));
       if (zone === undefined) break;
       next = reduce(cur, pending.player, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'zone', zoneId: zone.id } }, CTX);
+    } else if (c.kind === 'choose-peg-dest') {
+      // G1. A SEARCH over the (peg, adjacent empty area) pairs, mirroring
+      // `reduce.ts:movablePegIds` / `pegDestinations`. `source` is the card's ACTOR and
+      // not the answerer, which is the whole of GREAT LEADER's effect — so this must
+      // not filter by `pending.player` the way the voter branch below does. A fixed
+      // heuristic pick would be refused whenever the board has no empty area adjacent to
+      // the actor's only peg, and a refused pick means the card is measured as having done
+      // NOTHING, which is the one wrong answer this file must never give.
+      let donePeg = false;
+      for (const z of cur.zones) {
+        if (donePeg) break;
+        for (const a of z.areas) {
+          if (donePeg) break;
+          if (a.peg === null || a.peg.owner !== c.source) continue;
+          if (a.peg.majority || a.volatile) continue;
+          for (const nz of cur.zones) {
+            if (nz.id === z.id || !z.neighbours.includes(nz.id)) continue;
+            const spot = nz.areas.find((x) => x.peg === null);
+            if (spot === undefined) continue;
+            const attempt = reduce(cur, pending.player, { type: 'RESOLVE_CHOICE', choiceId: pending.id, pick: { kind: 'peg-dest', areaId: a.id, toAreaId: spot.id } }, CTX);
+            if (attempt.ok) {
+              next = attempt;
+              donePeg = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!donePeg) break;
     } else {
       // THE VOTER BRANCH IS A SEARCH, NOT A GUESS, and the reason is `voterScope`.
       // `evict`/`discard-voter`/`convert-voter` read a `ChoiceScope`, and the same op with
@@ -630,12 +659,27 @@ const OBLIGATIONS: Readonly<Record<Effect['op'], Obligation>> = {
     because: '"use all their Level 3 Ideologue Powers this turn"',
     holds: (e) => e.restrictionKindsAdded.includes('borrowed-powers') || e.choiceDelta > 0,
   },
-  'set-cap': {
+'set-cap': {
     because: '"reduce your resource cap to N"',
-    // NOT "a cap exists" — that is `hold` for the `restrict` op and it is the weaker
+    // NOT "a cap exists" - that is `hold` for the `restrict` op and it is the weaker
     // claim. This one asserts the cap actually came DOWN, because a cap raised by a card
     // that says it reduces one is a card lying in the direction that helps its owner.
     holds: (e) => ANY(e.capDelta, (d) => d > 0),
+  },
+  'move-peg': {
+    because: '"the player after you may move 1 of your non-majority voters to an adjacent zone"',
+    // THE OBLIGATION IS THE OFFER, and the reason is the same one `gain-any` gives: the
+    // printed sentence is satisfied by the DECISION existing, because the beneficiary
+    // has not chosen yet and the choice is where the sentence lives. A board on which
+    // the actor holds no movable voter raises nothing at all, and that is the
+    // unsatisfiable-choice rule rather than the card failing to work - so asserting a
+    // peg MOVED would fail on exactly the correct behaviour.
+    //
+    // `majorsDelta` is deliberately not consulted. A relocation can form or break a
+    // majority on either side of the move, and it can do neither; a peg moving at all is
+    // the only claim that is true every time, and it is what `packages/engine`'s own
+    // `choose-peg-dest` test asserts directly.
+    holds: (e) => e.choiceDelta > 0,
   },
 };
 
@@ -836,14 +880,18 @@ describe('semantic agreement — every clause of every shipped card does what it
     // ONLY, and that is stated rather than left as a silent gap: they are in
     // `RESTRICTION_KIND_CLAIMS`' shadow (a `borrowed-powers` entry and a `capOverride`
     // respectively) and `packages/cards/test/card-playback.test.ts` drives both.
+    // `move-peg` is in that position too — GREAT LEADER, BAD ECONOMY is a Headline
+    // (REF 4.1) — and it is not merely LISTED here: the clause checker above walks every
+    // shipped effect, headline included, through `OBLIGATIONS` and fails on one that does
+    // not hold, so an obligation nothing checks is still a hole.
     const used = new Set<Effect['op']>();
     for (const card of SHIPPED) {
       if (card.kind !== 'conspiracy') continue;
       for (const e of card.effects) used.add(e.op);
     }
     expect([...used].filter((op) => !(op in OBLIGATIONS)), 'a Conspiracy Card uses an op with no obligation').toEqual([]);
-    // …and the obligations that no Conspiracy Card reaches are exactly the two named.
-    expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual(['borrow-power', 'convert-voter', 'gerrymander', 'restrict', 'set-cap']);
+    // …and the obligations that no Conspiracy Card reaches are exactly those named.
+    expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual(['borrow-power', 'convert-voter', 'gerrymander', 'move-peg', 'restrict', 'set-cap']);
   });
 
   it('and a card printing a RESTRICTION names the kind it actually imposes', () => {

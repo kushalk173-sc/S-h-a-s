@@ -195,6 +195,28 @@ export function pickFor(state: GameState, c: PendingChoice): Action {
       if (cardId === undefined) throw new Error('a choose-card decision with an empty recycle list');
       return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'card', cardId } };
     }
+    /**
+     * G1. Mirrors `reduce.ts:movablePegIds` / `pegDestinations` so the pick is one the
+     * engine accepts rather than an approximation of one it would refuse.
+     * `source` is the CARD'S ACTOR, not the answerer, which is the whole of GREAT
+     * LEADER's effect — the beneficiary moves a voter that is not theirs.
+     */
+    case 'choose-peg-dest': {
+      for (const z of state.zones) {
+        for (const a of z.areas) {
+          if (a.peg === null || a.peg.owner !== c.choice.source) continue;
+          if (a.peg.majority || a.volatile) continue;
+          for (const nz of state.zones) {
+            if (nz.id === z.id || !z.neighbours.includes(nz.id)) continue;
+            const spot = nz.areas.find((x) => x.peg === null);
+            if (spot !== undefined) {
+              return { type: 'RESOLVE_CHOICE', choiceId: c.id, pick: { kind: 'peg-dest', areaId: a.id, toAreaId: spot.id } };
+            }
+          }
+        }
+      }
+      throw new Error('a choose-peg-dest decision with no legal (peg, adjacent empty area) pair');
+    }
   }
 }
 

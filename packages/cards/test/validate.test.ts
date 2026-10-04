@@ -255,10 +255,17 @@ describe('schema: the effect union', () => {
       // G15. `to` is required and is the whole op; `until` is its deadline rather than a
       // hook's lifetime, exactly as it is for `restrict`.
       'set-cap': { op: 'set-cap', to: 10, until: 'rest-of-game' },
+      // G1. `n` is pinned to 1 because the pick is one (peg, destination) pair; a card
+      // asking for 2 would be offered ONE move and read as though it had made two, so the
+      // schema refuses it at the type level rather than letting `reduce()` clamp it.
+      'move-peg': { op: 'move-peg', n: 1, target: 'player-after' },
     };
     for (const op of EFFECT_OP_SET) {
       expect(validateEffect(FILE, samples[op], EFFECT_OP_SET), op).toEqual([]);
     }
+    // …and the pin itself is asserted rather than assumed, because a `maximum` nobody
+    // tests is a `maximum` somebody raises.
+    expect(validateEffect(FILE, { op: 'move-peg', n: 2 }, EFFECT_OP_SET).length).toBeGreaterThan(0);
   });
 });
 
