@@ -20,23 +20,51 @@
  * DISTRIBUTION: 20 seeds at each of the four seat counts, and the requirement is
  * that every one of them reaches an ending rather than a lucky handful.
  *
- * THE NUMBERS, RE-MEASURED after G21 (20 seeds per seat count, shipped corpus)
+ * THE NUMBERS, RE-MEASURED 2026-10-03 (20 seeds per seat count, shipped corpus)
  *
  *   | seats | finished | nine majorities | turn min / med / max | actions      |
  *   |-------|---------:|----------------:|---------------------:|-------------:|
- *   |     2 |     20/20 |          20/20  |  36 / 51 / 59        | 210 .. 303   |
- *   |     3 |     20/20 |          20/20  |  43 / 55 / 69        | 232 .. 335   |
- *   |     4 |     20/20 |          20/20  |  45 / 66 / 80        | 235 .. 398   |
- *   |     5 |     20/20 |          20/20  |  57 / 64 / 102       | 290 .. 479   |
+ *   |     2 |     20/20 |          20/20  |  32 / 44 / 63        | 179 .. 314   |
+ *   |     3 |     20/20 |          20/20  |  39 / 48 / 62        | 229 .. 299   |
+ *   |     4 |     20/20 |          20/20  |  49 / 58 / 73        | 256 .. 350   |
+ *   |     5 |     20/20 |          20/20  |  48 / 61 / 84        | 257 .. 389   |
  *
- * 80 of 80 games reach a nine-majority finish. No seed stalls, no seat count is
- * partial, and every seat count goes PAST turn 52 — which is the whole claim, because
- * 52 Ideology Cards drawn one per turn cannot reach turn 53 at all.
+ * 80 of 80 games reach a nine-majority finish and NONE reaches a full board
+ * (`fullBoard 0/20` at every seat count, which is the placement rule holding). No seed
+ * stalls and no seat count is partial.
  *
- * These are NOT the numbers this file carried before G21, and the difference is the
- * point. The old maxima were 59 / 99 / 87 / 99 and the old 2-seat worst case spent
- * 1200 actions. Three fixes moved them, and none of them made the game shallower by
- * accident — each removed a way the DRIVER could fail to act:
+ * **THIS TABLE IS A RECORD OF ONE RUN, NOT A SPECIFICATION, and every claim in it is
+ * printed by the run that produces it.** Each test logs a `SEATS n (20 seeds, shipped
+ * corpus):` line carrying the same five numbers, so a reader who wants the current
+ * distribution does not have to trust a comment: if this table and the output ever
+ * disagree, the OUTPUT is right and this table is stale.
+ *
+ * That was written down because the previous version of this header was stale in a way
+ * that made a FALSE claim rather than merely an imprecise one. It said:
+ *
+ *   > "every seat count goes PAST turn 52 — which is the whole claim, because 52 Ideology
+ *   >  Cards drawn one per turn cannot reach turn 53 at all."
+ *
+ * The shipped Ideology deck is **76**, not 52, and a driven game ends between turn 32
+ * and turn 84. So at 2, 3 and 4 seats nothing reaches turn 77, the turn cliff is not a
+ * threshold this distribution clears, and the sentence built on it was describing a deck
+ * that does not exist. (Its own table said 52; `factsOf(ctx.cards).dealt.ideology`, which
+ * is what the assertions now use, says 76. The number somebody typed and the number the
+ * game deals had been disagreeing for a while and only the table noticed.)
+ *
+ * THE PROPERTY THAT IS ASSERTED INSTEAD, and it is corpus-size independent: the
+ * EXHAUSTION BRANCH. `advanceTurn` ends a match the moment the Ideology deck AND its
+ * discard are both empty, logging "The Ideology deck is exhausted." and scoring the
+ * board as it stands — so a finished game whose log never carries that line did not run
+ * out of cards. That is the third test in each seat count block, via
+ * `deckCliffComplaints` in `./corpus-facts.ts`.
+ *
+ * AND THE ANSWER COUNTS, which are the same claim in a form the deck size cannot hide:
+ * the deepest finished game answered 63 / 62 / 73 / 84 Ideology Cards at 2 / 3 / 4 / 5
+ * seats, against a dealt deck of 76. Each test prints its own.
+ *
+ * WHAT MOVED SINCE THE TABLE ABOVE, and none of it made the game shallower by accident —
+ * every change removed a way the DRIVER could fail to act:
  *
  *  - The driver ignored `choice.from`, so a `steal-any` whose victim the card had
  *    pinned got a redirected pick the engine refused, and it treated "the victim holds
@@ -48,15 +76,20 @@
  *    PURCHASE was available, which livelocked 2 seats, seed 18: the Mat held no
  *    1-voter card, nobody bought, and a Mat nobody buys from never refills. That seed
  *    ran to turn 363 and 1200 actions with 111 of 129 pegs and no legal ending.
+ *  - `targetZone`'s "first zone with room" fallback sent voters to zones that could never
+ *    reach a threshold; over 12 seeds x 4 seat counts, 19 of 48 games filled all 129 areas
+ *    and still ended with only 6 to 8 of 9 zones decided. Removing it took the
+ *    nine-majority rate to 48/48.
+ *  - The cap discard kept a Funds-only reserve, and eight of the shipped corpus's 18
+ *    Voter Cards are priced with no Funds at all, so it drove a player to
+ *    `{funds: 12, clout: 0, media: 0, trust: 0}` against a Mat it could not buy, and ground
+ *    to turn 398 with 12 pegs on the board. See `discardKeepingReserve` in ./driver.ts.
  *
- * The old maxima were high partly because those seeds ground. Fixing them shortened
- * the deepest games — 3 seats went 99 -> 69 — and took a hand-tuned floor down with
- * them, which is why the deck-cliff assertion now counts ANSWERS instead. See the note
- * on that test.
- *
- * THE PREVIOUS MEASUREMENT, kept because the difference is the story (2026-10-01)
+ * THE PREVIOUS MEASUREMENT, kept because the difference is the story (2026-10-01, and
+ * from before the deck turned out to be 76 cards rather than 52)
  *
  *   | seats | finished | nine majorities | turn min / med / max | actions      |
+ *   |-------|---------:|----------------:|---------------------:|-------------:|
  *   |     2 |     20/20 |          20/20  |  39 / 51 / 59        | 227 .. 292   |
  *   |     3 |     20/20 |          20/20  |  44 / 56 / 99        | 239 .. 463   |
  *   |     4 |     20/20 |          20/20  |  50 / 64 / 87        | 265 .. 415   |
@@ -66,7 +99,7 @@
  *
  * An earlier version of this driver chose the answer side by its payout, which meant
  * reading the pending card off the authoritative state. That is reading a server-only
- * field, the server's secrets gate forbids it, and — the part that matters — it is
+ * field, the server—s secrets gate forbids it, and — the part that matters — it is
  * not something a player can do. The two labels are all a client gets; the payout is
  * nothing but the seed-derived ORDER is.
  *
@@ -76,19 +109,6 @@
  * reach — now finishes with nine majorities. Peeking had been giving one seat a
  * richer income than the other, which skewed the economy; answering consistently is
  * both the honest claim and the stronger one.
- *
- * TWO OTHER DRIVER FIXES, both invisible to the synthetic corpus
- *
- * The `targetZone` that used to fall back to "first zone with room" whenever no zone
- * could be won. Against the shipped corpus that fallback was actively harmful: over 12
- * seeds x 4 seat counts, 19 of 48 games filled all 129 areas and still ended with only
- * 6 to 8 of 9 zones decided, because the voters went to zones that could never reach a
- * threshold. Removing the fallback took the nine-majority rate to 48/48.
- *
- * And the cap discard, which kept a Funds-only reserve. Eight of the shipped corpus's
- * 18 Voter Cards are priced with no Funds at all, so that rule drove a player to
- * `{funds: 12, clout: 0, media: 0, trust: 0}` against a Mat it could not buy, and ground
- * to turn 398 with 12 pegs on the board. See `discardKeepingReserve` in ./driver.ts.
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
