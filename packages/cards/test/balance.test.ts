@@ -281,10 +281,16 @@ describe('dominance: D2 TOTAL_SKEW — REPORTED, and measured to be the wrong er
   });
 
   it('EVERY shipped side pays 2+1, which is the shape the ruling depends on', () => {
-    // The ruling's factual base, pinned so it cannot rot silently. 76 of 76 cards pay
-    // equal totals and every one of the 152 sides is a 2-of-one-plus-1-of-another shape
-    // of 3 (two cards pay 4 on BOTH sides). This is the "a rule, not an accident" half of
-    // the argument, and if a future edit breaks it the ruling's premise needs revisiting.
+    // The ruling's factual base, pinned so it cannot rot silently. Every shipped card
+    // pays equal totals, and every one of its sides is a 2-of-one-plus-1-of-another
+    // shape of 3 — the single exception being `ig-in2020-006`, whose two sides are both
+    // a 2+2 of 4. This is the "a rule, not an accident" half of the argument, and if a
+    // future edit breaks it the ruling's premise needs revisiting.
+    //
+    // COUNTS ARE NOT HARDCODED. They were 76 cards / 152 sides when the ruling was
+    // written and the decks have since grown, so the numbers live in `src/balance.ts`
+    // and `src/holdings.ts` and are re-measured here rather than asserted, which is what
+    // stops them rotting into a false claim the way a literal 76 already had.
     const sides = DECK_IDS.flatMap((d) => loadIdeologyDeck(d)).flatMap((c) => c.sides);
     const shapes = new Map<string, number>();
     for (const s of sides) {
@@ -300,6 +306,24 @@ describe('dominance: D2 TOTAL_SKEW — REPORTED, and measured to be the wrong er
     );
     const bad = [...shapes.keys()].filter((k) => k !== '1+2' && k !== '2+2');
     expect(bad, `a shipped side pays a shape other than 1+2 or 2+2: ${bad.join(', ')}`).toEqual([]);
+
+    // The TOTAL every side pays, which is the other half of the header claim: 3 for a
+    // 2+1, and 4 for the one 2+2 card. Pinned as a set plus a count so that a card
+    // paying 5 — or a second card paying 4 — fails here and forces the headers to be
+    // re-measured rather than left quietly untrue.
+    const totals = new Map<number, number>();
+    for (const s of sides) {
+      const t = deltaTotal(s.pays);
+      totals.set(t, (totals.get(t) ?? 0) + 1);
+    }
+    expect(
+      [...totals.keys()].sort((a, b) => a - b),
+      `shipped sides pay totals outside 3..4: ${[...totals.keys()].sort((a, b) => a - b).join(', ')}`,
+    ).toEqual([3, 4]);
+    expect(
+      totals.get(4) ?? 0,
+      'exactly one card pays 4, on BOTH sides — the 2+2 exception the headers name',
+    ).toBe(2);
   });
 });
 
@@ -797,10 +821,10 @@ describe('the shipped decks leave real choices — the positive proof', () => {
   });
 
   it('ZERO of the shipped cards are decided by their payout', () => {
-    // THE NUMBER THE RULING RESTS ON, asserted over the corpus so it cannot rot. 76
-    // cards, 76 with a strict win for EACH side somewhere across all 1820 reachable
-    // holdings. This is what "equal totals are sufficient for the design" means when
-    // you actually check it rather than assume it.
+    // THE NUMBER THE RULING RESTS ON, asserted over the corpus so it cannot rot: every
+    // card, and every one with a strict win for EACH side somewhere across all 1820
+    // reachable holdings. This is what "equal totals are sufficient for the design" means
+    // when you actually check it rather than assume it.
     for (const b of report.bias) {
       expect(
         b.composition.decidedByPayout,

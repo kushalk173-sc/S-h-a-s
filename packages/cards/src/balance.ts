@@ -15,10 +15,10 @@
  * A harness played 940 answered Ideology Cards across four games and found **zero**
  * with different totals on the two sides - a gap histogram of `{"0": 940}`. Counted
  * directly against the shipped JSON rather than taken from the harness, the figure is
- * starker: **all 76 Ideology Cards pay equal totals, and all 152 sides pay exactly 3
- * resources, every single one of them a 2-of-one-plus-1-of-another shape.** There are
- * 13 distinct payout shapes in the corpus and all 13 sum to 3 or 4, and the only card
- * whose sides pay 4 pays 4 on BOTH sides.
+ * starker: **all 134 Ideology Cards pay equal totals, and 266 of their 268 sides pay
+ * exactly 3 resources, every single one of those a 2-of-one-plus-1-of-another shape.**
+ * There are exactly 2 distinct payout shapes in the corpus, both summing to 3 or 4, and
+ * the only card whose sides pay 4 - `ig-in2020-006` - pays 4 on BOTH sides.
  *
  * So a total-based comparison has nothing to say about any card that ships, and
  * `TOTAL_SKEW` could not fire on the deck it was written to protect. The previous
@@ -84,7 +84,7 @@
  *
  * The result is the strongest single number in this file:
  *
- * > **0 of the 76 shipped cards are decided by their payout.** Every one of them is
+ * > **0 of the 134 shipped cards are decided by their payout.** Every one of them is
  * > better on side A for some reachable position and better on side B for another.
  *
  * So the corpus's equal totals are not merely tolerated by the design - they are
@@ -147,7 +147,7 @@
  *
  * So `TOTAL_SKEW` is demoted to a warning, on measured grounds, and the real
  * enforcement moves to `COMPOSITION_DOMINANT`. That is not a loosening to let cards
- * through: the corpus has 76 of 76 at skew 0, so **no card changes status**, and the
+ * through: the corpus has 134 of 134 at skew 0, so **no card changes status**, and the
  * suite ends up refusing strictly more cards for strictly better reasons.
  *
  * ## WHAT IS AND IS NOT PINNED BY THE OLD COMMENTS BELOW
@@ -710,7 +710,7 @@ function blankIdeologues(): Record<Ideologue, number> {
  *
  * ## WHY IT NEEDS A MODEL, AND WHY THAT MATTERS
  *
- * This used to key on TOTALS, and therefore returned `null` for every one of the 76
+ * This used to key on TOTALS, and therefore returned `null` for every one of the 134
  * shipped cards — measured, `decisive: 0` on both decks. A heuristic that cannot
  * produce a verdict on the corpus it ships with is not a heuristic; it is a dead
  * branch, and it was the deck-level half of exactly the problem this file was rebuilt
@@ -817,7 +817,7 @@ export const MIN_DECISIVE_CARDS = 5;
  *
  * A card counted here has one side that converts strictly better at EVERY reachable
  * holdings position, so a player who is short of one resource never has a reason to
- * read it. The shipped decks measure **0 of 76**, so this threshold is not a target —
+ * read it. The shipped decks measure **0 of 134**, so this threshold is not a target —
  * it is the point at which the deck should be argued about rather than shipped.
  *
  * A WARNING rather than an error because the per-card `COMPOSITION_DOMINANT` error
@@ -1254,14 +1254,14 @@ export const SESSION_ANSWERS_MAX = 68;
  *  - `EMPTY_SIDE` — **KEEP, error.** Unfiring, and it must stay: a `{}` payout is
  *    schema-valid and design-dead, and REF §5.2 explicitly recommends requiring
  *    `sidePayout >= 1`. It is one line guarding a real future authoring slip.
- *  - `PURE_UPGRADE` — **KEEP, error.** Unfiring on the corpus (0 of 76). Not subsumed by
+ *  - `PURE_UPGRADE` — **KEEP, error.** Unfiring on the corpus (0 of 134). Not subsumed by
  *    `COMPOSITION_DOMINANT`: componentwise dominance is a *sufficient* condition for
  *    conversion dominance but the market can value the surplus at zero, so a pure upgrade
  *    can tie everywhere and a capacity-dominant card need not be an upgrade. Cheap,
  *    unambiguous, checked first for a reason.
  *  - `TOTAL_SKEW` — **DEMOTED error → warning**, on the measured inversion rates in the
  *    ruling. This is the one severity that changed and it is the one the user owned the
- *    mistake on. No card changes status (76 of 76 at skew 0) and the finding is still
+ *    mistake on. No card changes status (134 of 134 at skew 0) and the finding is still
  *    raised, so no information is lost.
  *  - `POWER_THRESHOLD_CLIFF` — **KEEP, error.** Unfiring on the shipped deck *by a
  *    knowable cause*: the corpus caps every side at 2 of any resource and `RULES.level3` is
@@ -1279,7 +1279,7 @@ export const SESSION_ANSWERS_MAX = 68;
  *    Provably not redundant: it is the only one of the four that sees `{clout: 6}` against
  *    `{funds: 1, clout: 2, media: 1, trust: 2}`.
  *  - `PAYOUT_DECIDED_DECK` — **NEW, warning.** The deck-level rollup, for cards that are
- *    individually defensible and collectively a solved deck. Armed and silent at 0/76.
+ *    individually defensible and collectively a solved deck. Armed and silent at 0/134.
  *  - `IDEOLOGUE_SKEW` — **KEEP, warning.** Orthogonal, and REF §2.3 measured the real
  *    campaign as skewed on purpose, so a warning is the right severity.
  *  - `VOTER_COST_NON_MONOTONIC` / `VOTER_VALUE_UNDERREPRESENTED` — **KEEP, warning, and

@@ -7,9 +7,10 @@
  * TOTALS. A harness then played 940 answered Ideology Cards across four games and
  * found the totals on the two sides were equal every single time - a gap histogram
  * of `{"0": 940}`. Measured against the shipped corpus rather than the harness, the
- * figure is starker: **all 76 Ideology Cards pay equal totals, and all 152 sides pay
- * exactly 3 resources, every side a 2-of-one-plus-1-of-another shape.** So a
- * total-based comparison has nothing to say about any card that ships, and the
+ * figure is starker: **all 134 Ideology Cards pay equal totals, and 266 of their 268
+ * sides pay exactly 3 resources as a 2-of-one-plus-1-of-another shape** — the only two
+ * exceptions being the sides of `ig-in2020-006`, which pay 4 as a 2+2 on BOTH sides.
+ * So a total-based comparison has nothing to say about any card that ships, and the
  * `TOTAL_SKEW` gate could not fire on the deck it was written to protect.
  *
  * The totals were never the interesting quantity. This file measures the one that
