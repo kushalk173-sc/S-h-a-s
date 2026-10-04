@@ -1,3 +1,4 @@
+import { standOf, type Stand } from './reach';
 import type { GameState, PlayerID } from './state';
 
 /**
@@ -98,6 +99,31 @@ export type ClientState = Omit<GameState, ServerOnlyKeys> & {
    * tells a client to render the question panel at all.
    */
   readonly awaitingAnswer: boolean;
+  /**
+   * THE STAND OF THE BOARD: can anybody still reach nine, and is anything in hand
+   * stranded. See `reach.ts` for the rule and, at length, for what it does not
+   * prove.
+   *
+   * Added because a real three-seat run sat at 490 turns with eight constituencies
+   * held, Central one vote short and its last slot right there, and nothing on any
+   * screen said so. A player cannot concede a game they do not know is over, and
+   * they cannot tell a dead table from a slow one.
+   *
+   * **PUBLIC BY CONSTRUCTION, and that is the part worth arguing.** §2bis's test
+   * is that a decision may enumerate a set only if the set is already public when
+   * the decision is raised. `Stand` enumerates `state.zones` and
+   * `players[].pending` — the board and the un-placed voter groups — and reads
+   * neither a deck, a hand, the seed nor the pointer to the card on the table.
+   * It is in fact the *least* secret thing the projection carries, which is why
+   * it is published whole rather than as one derived boolean.
+   *
+   * **IT IS NOT AN ENDING.** `reduce` never reads `stand.dead`, `finished` is
+   * never set from it, and no game ends a turn earlier because this field
+   * exists. See `reach.ts`'s header for why that non-change is the whole design:
+   * an engine that ended a game by declaring it unwinnable would pass every
+   * winnability suite in the repository while destroying the game.
+   */
+  readonly stand: Stand;
 };
 
 /**
@@ -172,6 +198,7 @@ export function playerView(state: GameState, _viewer: PlayerID): ClientState {
     headline: state._headlineDraw.length,
   };
   client['awaitingAnswer'] = state._pendingCard !== null;
+  client['stand'] = standOf(state);
 
   return client as unknown as ClientState;
 }

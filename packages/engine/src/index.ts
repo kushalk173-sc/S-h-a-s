@@ -16,6 +16,7 @@ export * from './actions';
 export * from './powers';
 export * from './resources';
 export * from './rng';
+export * from './reach';
 export * from './reduce';
 export * from './setup';
 export * from './playerView';

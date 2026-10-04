@@ -177,7 +177,11 @@ describe('playerView secret leak', () => {
 
   it('returns only fields that exist on GameState, plus the documented derived ones', () => {
     const s = freshFull(9);
-    const derived = new Set(['deckSizes', 'awaitingAnswer']);
+    // `stand` joined `deckSizes` and `awaitingAnswer` when the dead-board detector
+    // shipped. It is the third derived field and it is derived from PUBLIC state
+    // only — `reach.ts` reads `zones` and `players[].pending` and nothing else —
+    // which is why it can go on the wire whole. See `reach.ts` for the rule.
+    const derived = new Set(['deckSizes', 'awaitingAnswer', 'stand']);
     for (const key of Object.keys(playerView(s, 'p1'))) {
       if (derived.has(key)) continue;
       expect(Object.keys(s), `${key} is not a GameState field`).toContain(key);
