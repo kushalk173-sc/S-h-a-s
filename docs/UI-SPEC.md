@@ -1,7 +1,7 @@
 # Shasn — Visual & UX Design Specification
 
 **Status:** draft v0.1 · **Scope:** browser client UI/UX (M4 Board UI + M3 lobby/reconnect)
-**Companion docs:** `PLAN.md` (§2 blind answer, §3 stack, §7 M4), `docs/rules-reference.md`, `docs/ARCHITECTURE.md`
+**Companion docs:** `PLAN.md` (§2 the answer mechanic — **full information as of 2026-10-03**, §3 stack, §7 M4), `packages/server/src/FULL-INFORMATION.md` (**read before implementing the answer screen**), `docs/rules-reference.md`, `docs/ARCHITECTURE.md`
 **This document contains no application code.** It is a spec an engineer implements against.
 
 Conventions used throughout:
@@ -15,9 +15,51 @@ Conventions used throughout:
 > is normative. Items that could not be measured from the repo are marked **ASSUMED** and
 > collected in Appendix B.9.
 >
-> **Read in this order:** §2 (colour) → §1 (principles + the blind-answer symmetry contract)
+> **Read in this order:** §2 (colour) → §1 (principles + the answer-symmetry contract)
 > → §4.6 (peg matrix) → §5 (screens) → §6 (the two hard interactions). Everything else
 > supports those.
+
+---
+
+> # ⛔ PARTIALLY SUPERSEDED 2026-10-03 — the game is FULL INFORMATION
+>
+> **If you are here to build the answer screen, read this before §1.2 or §5.3.**
+>
+> This document was written for the **blind answer**: the client is sent no payout, no
+> Ideologue and no card id, and the whole screen exists so a player cannot infer the
+> payout. **That design has been deliberately reversed.** While a card is out, **every seat
+> and every spectator now sees the entire Ideology Card** — question, both answer labels,
+> **both Ideologues, and both payouts** — before anyone answers.
+>
+> **The authority is `packages/server/src/FULL-INFORMATION.md`**, which records what the
+> change retired and why. Read it before editing anything below; this block is only the
+> index.
+>
+> **The retired rules are left in place, unedited, as the audit trail for *why* the design
+> changed.** An earlier decision that turns out to be wrong is evidence, not clutter, and
+> silently rewriting it would leave the next reader unable to tell a reversal from an
+> accident. Each retired rule carries a ⛔ marker at its own location, so a reader arriving
+> mid-document hits the correction and not the premise.
+>
+> | Still current — enforce it | Retired — do not build it |
+> |---|---|
+> | **The symmetry contract** (§1.2 table) and the two-sides-render-identically gate. Unchanged, and now with teeth it did not have: see the note at §1.2. | **§1 principle 1** — *"the client must never receive a full card object"*, and the payout arriving "as one number after commitment". |
+> | **The seed-derived `order`** (§1.2, §5.3). Unchanged in mechanism. Its role went from one of four things withheld to **the only thing withheld**, and it now matters more, because the Ideologue is printed beside each answer. | **§1.2 `Payout — not sent`.** |
+> | **The one-commit-control rule.** Unchanged and more load-bearing: a player who believes they committed a side and has not believes they have banked a resource they have not. | **§1.2 "What must not exist on this screen"** — resource icons, payout numerals, the words *Funds/Clout/Media/Trust*, any `title=`/`aria-label=` naming a resource. |
+> | **UI-SPEC §9 anti-patterns 1 and 3** (count-up, card flip). Still forbidden, for a sharper reason: **there is nothing to reveal**, so a reveal animation would be theatre. The payout is in the same frame as the answer, as prose, with no icon and no `title`. | **§5.3** — *"Commit to one of two answers without knowing the payout"*, the `PLAN.md:41` payload description, and *"The payout is not shown until you commit."* |
+> | **The log records the answer by position, never by Ideologue** (§5.3 assertion 8). Still correct, for a different reason: the Ideologue is on the card, so position is all that is left to hold back. | **§8.8's framing** that the guarantee "does not depend on any animation" *because* the payout is not in the payload. The conclusion survives; the premise does not. |
+>
+> **What replaced the payout ban is not a relaxation, it is a different rule.** Because the
+> Ideologue is now printed on the card, a stylesheet that tinted a cell by its Ideologue
+> would publish which Ideologue the left-hand position holds — the A′ channel, in one CSS
+> rule. The symmetry rule is therefore **restated in its sharpest form, and this sentence is
+> the current rule: _the payout differs because the payout differs; nothing else may._**
+>
+> **The design cost, stated plainly because it is the most important consequence of the
+> change:** with the payout visible, a player *computes* the better side instead of
+> deliberating. `PLAN.md` §9 rated payout balance as risk #2 for exactly this, and that risk
+> is now permanently realised — so **a dominated card is a broken card, not a smell**, and
+> the corpus is the only mitigation left. `PLAN.md` §9 carries the rewritten entry.
 
 ---
 
@@ -29,6 +71,28 @@ below yields to this. Concretely: no design decision, hover state, tooltip, colo
 spacing, or animation may derive from, correlate with, or hint at which Ideologue a side
 belongs to. The payout arrives as one number after commitment and nowhere else. A design
 that is 5% better at everything else and leaks one bit is a failed design.
+
+> ⛔ **SUPERSEDED 2026-10-03 — this principle is retained as the record of a decision that
+> was defensible and has been deliberately reversed, not as the current rule.**
+>
+> *"The blind answer is the product"* was **a real decision, correctly reasoned, and
+> believed** — the paragraph above is its argument, and `PLAN.md` §2 built the whole
+> architecture on it. It is wrong now, for a reason stated at length in
+> `packages/server/src/FULL-INFORMATION.md` §1: the Ideology corpus is public JSON in this
+> repository, so every card's payout was already one lookup away. What the withholding
+> protected was *which* card was on the table — and full information publishes that on the
+> card itself, every turn.
+>
+> **What survives of this principle, and is now the whole of it:** no design decision may
+> derive from, correlate with, or hint at **which side of the card is which** — because the
+> Ideologue is printed beside each answer, so per-side styling is a channel. The payout is
+> *expected* on screen, and identical except for the payout itself.
+>
+> **What this cost the game**, in this document's own terms: *"A design that is 5% better at
+> everything else and leaks one bit is a failed design"* used to be the governing maxim, and
+> the game now deliberately publishes several bits per turn. The leak is not accidental; it
+> is the design. What is lost is deliberation (§9 risk #2, now permanently realised), and
+> that is a product decision, not an implementation defect.
 
 **2. The table is the interface — there is no "your screen".**
 A physical Shasn table has one shared surface, and every player looks at the same 129
@@ -95,7 +159,14 @@ compact.
 | `LogEntry.kind` has 7 values | The log is filterable by kind, and each kind has one fixed sentence template. §5.10 |
 | 4–6 hour sessions, async is "survival" (`PLAN.md:266`) | Every screen is resumable from a cold load with no client-side memory of the session. §5.2 |
 
-### 1.2 The blind answer — the rule, stated once, enforced everywhere
+### 1.2 The answer prompt — the rule, stated once, enforced everywhere
+
+> ⛔ **SUPERSEDED 2026-10-03 in three specific rows and one specific paragraph. The section
+> survives, and most of it survives verbatim, because the symmetry gate is the one rule the
+> reversal did not touch — it sharpened it.** Retired here: the `Payout — not sent` row; the
+> lead paragraph's *"so a player cannot infer the payout from styling"*; the *"What must not
+> exist"* list's resource prohibitions; and the *"Reveal"* paragraph. All four are left
+> below, marked. Authority: `packages/server/src/FULL-INFORMATION.md` §3.
 
 The answer prompt is the one screen in the product with **two surfaces that must be
 provably indistinguishable in styling**. It is designed so a player cannot infer the payout
@@ -120,6 +191,24 @@ Not "similar" — the same variable, resolved to the same value.
 | Background tint | **none** | no `--positive`, no `--negative`, no Ideologue ink |
 | Payout | **not sent** | `playerView` strips it; the client has never held the value |
 
+> ⛔ **RETIRED — the last row.** The payout **is** sent, and printed on the card, in the
+> same frame as the answer: question, both labels, **both Ideologues, both payouts**, to
+> every seat and every spectator. This row is the design this whole repository was built to
+> prevent, and `FULL-INFORMATION.md` §2 argues at length why the withholding was protecting
+> something already public.
+>
+> **The row it is replaced by — and this is a new row, not an amended one:**
+
+| Property | Both sides use | Value |
+|---|---|---|
+| Payout | **identical treatment, different value** | Printed as **prose on both cells**, in pool order (`funds, clout, media, trust`, singular: `2 Fund`, `1 Media`), as `pays <line>`. **The only permitted per-side difference in the entire subtree is the payout's own text.** |
+
+> **`payoutLine` is the shipped implementation** (`packages/client/src/answer/BlindAnswer.tsx`),
+> and its pool order is a rule rather than a detail: the Ideologue is printed separately as a
+> name — *"the Trusts' answer"* — and the pools are printed in the engine's fixed order
+> rather than sorted by amount, **so a card that pays 4 Funds cannot be told apart at a
+> glance from one that pays 1 Fund by how many words come first.**
+
 **The left/right positional bias and how it is neutralised.** A card's two answers belong to
 two *different* Ideologues, and card authors will not be balanced left-vs-right
 mechanically. So a fixed "A is on the left" would leak. Two mitigations:
@@ -131,6 +220,23 @@ mechanically. So a fixed "A is on the left" would leak. Two mitigations:
    This is the single most important line in this section.
 2. The label text is sent pre-mapped, so side identity ("the Trusts' answer") is never a
    client-side lookup keyed on `A`/`B`.
+
+> **Sharpened, 2026-10-03 — this mitigation is now the *entire* remaining mechanic, and the
+> measurement is no longer a design worry.** The old rule existed because the Ideologue was
+> hidden, so per-side styling was the only channel available. Now the Ideologue is **printed
+> beside each answer**, so the channel is not hypothetical: one CSS rule tints a cell by
+> Ideologue and the left-hand position's faction is on screen. And the deck really is
+> skewed — measured across all 76 Ideology Cards, **position 0 holds the Capitalists' answer
+> in 34 of them (45%)** and position 1 in 4, where a balanced deck would put each Ideologue
+> near 19 in each position (`FULL-INFORMATION.md` §6). The seed-derived draw is what closes
+> it, and nothing else does.
+>
+> **Two changes to what the wire carries, both asserted in `secret-state.test.ts` LAYER 3:**
+> the table's `openQuestion` and the answerer's prompt are **byte-identical apart from
+> `order`**, and `order` is present in **exactly one** of them. It is not merely omitted —
+> `PublishedOpenQuestion` **refuses** a payload carrying an `order` key at any depth, because
+> the sides arrive *already in display order* and a client that branched on `order` would be
+> branching on the very thing the mechanic protects.
 
 **What makes both sides feel inviting and equal.** Left-defaulting a *focus* ring or a
 *filled* background is the leak. Instead:
@@ -154,8 +260,38 @@ shake, or card-flip that could resolve differently per side; any `title=` or `ar
 containing a resource name; any chart, meter, or icon that correlates with value; and no
 "reveal" affordance other than the Confirm button itself.
 
+> ⛔ **RETIRED IN PART — the first, second, third and sixth prohibitions.** Resource icons,
+> payout numerals, the resource *names*, and resource-naming `title=`/`aria-label=` are now
+> **required**, not forbidden: the card does not read as a card without them, and printing
+> only a numeral would throw away the icon-disc encoding the real game uses
+> (`AUTHENTIC-SHASN-REFERENCE` §5.2, `PLAN.md` §10).
+>
+> **Still very much in force, and unchanged:** no tween, count-up, shimmer, shake or
+> card-flip that could resolve differently per side; no chart, meter, or icon that
+> correlates with value; no "reveal" affordance other than the Confirm button. And the
+> manifesto colour row stays off this screen, because a player's own Ideologue pattern is
+> itself information about how they read the card.
+>
+> **Two bans that were never in the list and are now the sharp ones.** Do not tint, weight,
+> border or badge a cell by **Ideologue** — it is printed, so the styling repeats what the
+> card says and simultaneously publishes which side is which. And do not add **any
+> affordance that expresses a comparison** — a checkmark on the larger payout, a "better
+> value" icon, a highlighted side. `FULL-INFORMATION.md` §3: *the payout differs because the
+> payout differs; nothing else may.*
+
 **Reveal.** Committing sends `"A"` or `"B"`. The response is the *payout only* — no
 comparison, no "you could have had", no bar chart, no delta for the other side. §7.3.
+
+> ⛔ **RETIRED IN PART — there is nothing to reveal.** The payout is already on screen before
+> the player presses anything, so the 300ms reveal frame is no longer a reveal; it is a
+> confirmation that the answer was accepted. **UI-SPEC §9 anti-patterns 1 (count-up) and 3
+> (card flip) remain forbidden, and now for a better reason than the one written when they
+> were written: there is nothing hidden, so a reveal animation would be theatre.**
+>
+> **What survives of "the payout only", and it is a real rule:** after committing, still no
+> side-by-side comparison and no *"you could have had"*. The player already has both payouts
+> in front of them and chose; telling them what they gave up is second-guessing. §7.3 and
+> §9.3 stand.
 
 ## 2. Colour System
 
@@ -855,24 +991,44 @@ itself, so at 1200px the board is 680px (scale 0.68) and at 1600px it is 780px (
 | **Primary action** | `REJOIN MATCH` (auto-focused). |
 | **Without scrolling** | (1) match identity + seat; (2) what phase you were in; (3) `REJOIN` + `LEAVE`. |
 
-- `playerView` resends the **stripped** view. The client must not attempt to restore a
-  blind-answer in progress from local storage — if the client reloads during `phase: 'answer'`,
-  it re-renders the prompt with the same `labelA`/`labelB` it was given (which the server
-  may have re-drawn, since `RULES.redrawCost` exists) and re-asks. **Never** cache a card.
+- `playerView` resends the **stripped** view. The client must not attempt to restore an
+  answer in progress from local storage — if the client reloads during `phase: 'answer'`,
+  it re-renders the prompt from the payload it is given (which the server may have re-drawn,
+  since `RULES.redrawCost` exists) and re-asks. **Never** cache a card. The shipped client
+  keys its pending selection on the **whole card** — question, both labels, both Ideologues
+  and both payouts — so a redraw, which swaps all of them, drops the selection rather than
+  leaving a tick on a side of a card that is no longer on the table (`AnswerScreen.tsx`).
 - Connection state lives in the topbar as a 8px dot: `POSITIVE` = live, `#C4840C` = retrying
   (never `NEGATIVE` — a red dot reads as "you are in trouble", not "the network is"), with
   the attempt count in `TYPE_LOG_META`. Non-colour: the dot is a **filled circle vs a ring**.
 
-### 5.3 Your turn — the blind answer — `answer`
+### 5.3 Your turn — the answer — `answer`
 
-**The most important screen in the product.** `PLAN.md:41` — the client receives
-`{ cardId, question, labelA, labelB }` and nothing else.
+**The most important screen in the product.**
+
+> ⛔ **SUPERSEDED 2026-10-03 — this section describes the retired blind answer and is kept
+> whole, with the retired parts marked, so the reversal is auditable. Authority:
+> `packages/server/src/FULL-INFORMATION.md` §3.** What changed: the client receives **the
+> whole card** — `{question, sides[{label, ideologue, pays}, {…}], order}` — not
+> `{cardId, question, labelA, labelB}` and nothing else; and the card is not withheld until
+> commit. The wireframe below is **updated to the current design**, and the retired copy of
+> each changed line is quoted in the note beneath it.
 
 | | |
 |---|---|
 | **Purpose** | Commit to one of two answers without knowing the payout. |
 | **Primary action** | Choose a side, then `COMMIT`. |
 | **Without scrolling** | (1) the full scenario text; (2) both answer labels at equal size; (3) the `COMMIT` button and the redraw offer. |
+
+> ⛔ **RETIRED — the Purpose row and the `PLAN.md:41` payload line above it.** The purpose is
+> now: **choose between two answers whose payouts you can both read**, which is a different
+> act — a calculation, not a bet. The payload is
+> `{question, sides[{label, ideologue, pays} × 2], order}`, and it also reaches **every other
+> seat and every spectator**, as `state.openQuestion` (§5.3.1 below).
+>
+> **Unchanged and still the reason this screen is built the way it is:** the two sides must
+> be indistinguishable in styling, and `order` must not be derivable by a client. Everything
+> else about the composition follows from those two facts and from nothing about the payout.
 
 **Composition** — a **full-viewport overlay**, not a panel. The board is not dimmed into
 irrelevance; it is *replaced*, because reading a political scenario while glancing at
@@ -889,17 +1045,38 @@ opponents' pegs is a distraction from the deliberation this game is about.
    ┌───────────────────────┐   ┌───────────────────────┐
    │  Divert the industrial │   │ Protect the factories │
    │  supply                │   │ and absorb the cost    │
-   │                        │   │                       │
-   │        ANSWER A        │   │        ANSWER B        │   ← TYPE_CARD_SIDE_LABEL 17/700
+   │  the Idealists' answer │   │ the Capitalists'       │
+   │  pays 2 Trust · 1 Fund│   │ answer                 │
+   │            ANSWER A    │   │ pays 2 Fund · 1 Trust  │   ← TYPE_CARD_SIDE_LABEL 17/700
    └───────────────────────┘   └───────────────────────┘
-        ↑ 88px min-height, 22ch max-width, identical tokens both sides
+        ↑ 88px min-height, 22ch max-width, identical tokens both sides.
+          Three lines per cell now, not one — the Ideologue and the payout are
+          part of the card. The box grows; the SYMMETRY does not.
 
    ┌──────────────────────────────────────────────────────┐
    │  [ REDRAW — 4 RESOURCES ]      [ COMMIT ANSWER ]      │
    └──────────────────────────────────────────────────────┘
-   You must choose before the turn can continue. The payout
-   is not shown until you commit.                        ← TYPE_CARD_SCENARIO, INK_500
+   You must choose before the turn can continue. Redrawing costs 4
+   resources and swaps the card for a different one — both payouts
+   are printed, so you are buying a different question rather
+   than taking a chance at this one.         ← TYPE_CARD_SCENARIO, INK_500
 ```
+
+> ⛔ **RETIRED — the old wireframe's two retired lines, quoted so the delta is exact.** The
+> cells carried **one** line each, `ANSWER A` / `ANSWER B`, and the note under the buttons
+> read: *"You must choose before the turn can continue. **The payout is not shown until you
+> commit.**"* Both are gone. The note now **states the reroll's real meaning**, which is the
+> shipped copy verbatim (`AnswerScreen.tsx`): *"Redrawing costs 4 resources and swaps the
+> card for a different one — both payouts are printed, so you are buying a different
+> question rather than taking a chance at this one."* `rules-reference.md` §7.2 step 2's
+> justification for the redraw — *"the redraw is a BET, not a decision"* — **is gone**; the
+> mechanic is kept as a priced reroll, and `FULL-INFORMATION.md` §4 records why deleting it
+> was considered and rejected.
+>
+> **Note what the example card above is doing on purpose.** The two cells carry **different
+> Ideologues and different payouts**, which is the condition a per-side CSS rule would show.
+> That is the fixture the shipped `getComputedStyle` equality test uses, and it is why the
+> gate has teeth under full information that it did not have while the Ideologue was hidden.
 
 **Hard constraints on this screen, restated from §1.2 as implementable assertions:**
 
@@ -926,6 +1103,63 @@ opponents' pegs is a distraction from the deliberation this game is about.
    `T11 · RIA answered Question 04 (B)`. After resolution the log gains the Ideologue name
    and payout — that is public per `rules-reference.md:190-191` (the card goes under the mat
    face-up once the answer is confirmed).
+
+> **Constraint 5 is the one that changed meaning, so read its second half again.** The
+> justification — *"this is the player's own pool, not the card"* — was written to explain
+> why the resource-icon ban did not reach this one modal. Under full information the card
+> **also** shows resource icons, so the distinction is now visual language rather than an
+> exception: icons on a card are printed, icons in a picker are yours to spend. Keep the
+> picker modal and keep its all-or-nothing affordance; neither changed.
+>
+> **Constraint 8 survives unchanged, and its reason is now stronger.** The Ideologue is on
+> the card, so *position* is the only thing the log can still hold back; recording the answer
+> by Ideologue would pin the position without adding a single fact a reader did not already
+> have.
+
+### 5.3.1 The card on the table — every seat except the answerer's
+
+> ⛔ **NEW SECTION, 2026-10-03.** Under the blind answer there was nothing to show a
+> non-answering seat: it received the question and the two labels, because that was all the
+> server published. **That is no longer true and the difference is the whole point of the
+> change.** The card on the table is now the *same card*, in the same display order, with the
+> same Ideologues and the same payouts — rendered by `app/TableQuestion.tsx`, which reuses
+> the `blind-answer__*` classes **verbatim** rather than getting a lookalike.
+
+| | |
+|---|---|
+| **Purpose** | Let the rest of the table read the card being answered, and know what is at stake. |
+| **Composition** | A **panel beside the board**, not a takeover. No scrim, no focus trap, no `aria-modal` — the answer window is the one moment in this game the rest of the table is still allowed to act in (p19 lets anybody play a Conspiracy immediately before an opponent answers), and a modal here would take that away from the seats this panel exists to inform. |
+| **Copy** | `ON THE TABLE` eyebrow · *"{name} is answering, and the whole card is visible to everyone."* · *"{name} is answering"* names a **player, never an id** — this panel is prose, not state. · Foot: *"The side they choose goes in the log for everyone."* |
+| **The one eyebrow word that differs** | The answerer's panel says `CHOOSE ONE`. This one says **`THE TWO ANSWERS`**, with the same eyebrow styling and the same `aria-labelledby` wiring, so a screen reader announces one group of two rather than two loose strings. |
+
+**Four rules, and they are all negative.**
+
+1. **No commit control — not even a disabled one.** A `COMMIT ANSWER` button this seat
+   cannot use is a control that looks like it works and does not, which is §9.10's named
+   prohibited case, and the whole point of the one-commit-control rule is that exactly one
+   control in the product may claim a commitment. The answering seat has it. Here the two
+   sides are not even focusable, and they render as `<p>`, not buttons.
+2. **The same classes, and that is structural rather than aspirational.** `getComputedStyle`
+   equality over both cells is asserted here too, by the same route §8.8 requires of the
+   answerer's screen — because if the table's copy of a side were a different box from the
+   answerer's copy of the same side, the thing being read aloud and the thing on screen would
+   be two objects.
+3. **`.blind-answer__side` sets `cursor: pointer`** because on the answerer's screen a side
+   *is* clickable. Here it is not, so `app.css` narrows the cursor with a descendant
+   selector — higher specificity, and in `app.css` rather than `blindAnswer.css`, whose
+   stylesheet audit fails the build on any selector that qualifies a side.
+4. **No `order`, and no way to derive one.** The sides arrive already in display order and
+   `openQuestionOf` **returns `null` for a payload carrying an `order` key at any depth**,
+   rather than omitting it. A payload that carries one has been built against a different
+   projection, and rendering it would mean rendering a card whose face order the server may
+   have intended to stay ambiguous.
+
+> **One asymmetry is deliberate and should not be "fixed":** this panel renders for every
+> seat **including spectators**, and `openQuestionFor(state, cards)` takes no player at all.
+> That is a fidelity decision, not a leak — at a physical table the card is read aloud and
+> belongs to the table (`AUTHENTIC-SHASN-REFERENCE` §7.2 step 1). The only thing that differs
+> between seats is whether the **answer prompt** — and with it the `order` draw and the
+> commit control — was sent at all.
 
 ### 5.4 Action phase — `actions`
 
@@ -1441,6 +1675,32 @@ something an opponent did to you. It should feel like a loss of ground, not an e
 
 ### 7.3 The answer reveal — 300ms, one readable moment
 
+> ⛔ **SUPERSEDED 2026-10-03 in its premise and in step 2. The prohibitions in the table
+> survive verbatim and are now sharper. Authority: `packages/server/src/FULL-INFORMATION.md`
+> §3.**
+>
+> **The premise is retired.** *"the card stays hidden until the active player confirms, and
+> the payout is only then revealed"* (`PLAN.md:36-37`, `rules-reference.md:191` as read
+> here) is no longer the design: the card, both Ideologues and both payouts are on screen
+> **before** the player commits. **The 300ms frame is therefore not a reveal at all — it is
+> a confirmation that the answer was accepted.** It is kept because the commit needs *some*
+> acknowledgement, and because a frame that paces the information is worse than one that
+> states it.
+>
+> **What changes in the mechanics below:** step 2's fade-to-zero of the scenario and both
+> options is **no longer a symmetry requirement**, because the player is not being deprived
+> of anything — they chose with all the information in front of them. It is retained as a
+> *legibility* rule (one idea per screen, §1 principle 4) and the leak argument in step 3
+> is retired with it.
+>
+> **Step 4's *"this is the first moment the Ideologue is revealable"* is retired outright.**
+> The Ideologue has been printed on both cells for the entire decision.
+>
+> **Every row of the "must not animate" table below still stands**, and one now has a much
+> stronger reason than the one written: **there is nothing hidden, so a reveal animation
+> would be theatre.** That is the current justification for anti-patterns 1 and 3, and it
+> is recorded in `FULL-INFORMATION.md` §3 as such.
+
 **This is the most important entry in §7 and the reason the answer mechanic survives
 digital translation.** `PLAN.md:36-37` and `rules-reference.md:191`: the card stays hidden
 until the active player confirms, and the payout is only then revealed.
@@ -1473,6 +1733,14 @@ until the active player confirms, and the payout is only then revealed.
    with `SEAL` framing and the discard picker opens on `CONTINUE` — the cap discard is
    *mandatory before any other action* (`rules-reference.md:140-141`), so it cannot be
    deferred behind a "got it" acknowledgement.
+
+> **One row of step 4 needs its wording fixed, not its rule.** "The counterfactual is
+> absent — no *the other side gave −1*" is still correct and still worth having: the player
+> **can** see the other side's payout, because it is on the card they just read. So this is
+> no longer a secrecy rule, it is a **don't-second-guess** rule. The player chose with full
+> information; a *"you could have had"* line adds nothing they do not already know and
+> invites them to re-read the question, which is the exact behaviour step 2 was built to
+> discourage.
 
 **What must not animate, here specifically (§9.3):**
 
@@ -1519,6 +1787,13 @@ readable way to say "these N changed". The payout reveal (§7.3) becomes the sam
 simultaneous fade and the same single-frame swap, with the panel fading in over 120ms. **The
 blind-answer guarantee does not depend on any animation, so reduced-motion users lose
 nothing.**
+
+> **Correction, 2026-10-03 — the conclusion holds, the premise does not.** The guarantee used
+> to hold *because* the payout was absent from the payload, so no arrangement of frames could
+> withhold anything. It now holds for a stronger reason: **the guarantee is the `order` draw,
+> and `order` is a server-side value the client never receives** — so there is no frame,
+> duration, or rendering a client could arrange to publish it. Reduced-motion users still lose
+> nothing, and the reduced-motion path needs no exemption for the payout.
 
 ## 8. Accessibility Checklist (WCAG 2.1 AA)
 
@@ -1655,9 +1930,10 @@ Also required:
 | Placement legal-ring pulse 180ms | pulse removed; the `⌾` ring is static and already carries the meaning |
 | Log entry slide-in 140ms | 80ms opacity |
 
-**Nothing becomes invisible, nothing becomes ambiguous, and the blind-answer symmetry is
-unaffected.** The duration floor is 80ms, never 0ms, so state changes remain perceptible as
-*changes* rather than appearing as unexplained discontinuities.
+**Nothing becomes invisible, nothing becomes ambiguous, and the answer-prompt symmetry is
+unaffected** (it was called the blind-answer symmetry when this was written; the mechanic is
+retired, the symmetry contract is not). The duration floor is 80ms, never 0ms, so state
+changes remain perceptible as *changes* rather than appearing as unexplained discontinuities.
 
 ### 8.7 Other AA checks this UI must pass
 
@@ -1675,7 +1951,7 @@ unaffected.** The duration floor is 80ms, never 0ms, so state changes remain per
 | **4.1.2** Name, Role, Value | — | Slots are `role="button"` with `aria-disabled` and a live `aria-label`; the roving tabindex exposes position. |
 | **4.1.3** Status Messages | — | The polite live region (§8.5). |
 
-### 8.8 The blind answer, as an accessibility property
+### 8.8 The answer, as an accessibility property
 
 Not a separate concern — the *same* design satisfies both, and that is worth stating
 explicitly:
@@ -1691,6 +1967,26 @@ explicitly:
   every property in the §1.2 contract table, for both sides, in both orderings, is a release
   gate.** It is the cheapest possible guard on the game's central mechanic.
 
+> ⛔ **The second bullet's premise is retired (2026-10-03); its conclusion is now enforced by
+> a different rule.** The payout **is** in the payload, and it is **printed on both cells** —
+> which is an accessibility *gain*: the Ideologue and the payout are now available as text to
+> a screen reader, where before they could not be on screen at all.
+>
+> **So the requirement inverts, and the inversion is the rule:** the answer panel's accessible
+> name must now read **both labels, both Ideologues and both payouts** — and, because the two
+> sides must be indistinguishable to assistive technology exactly as they are to the eye, the
+> two sides' accessible descriptions must be **identical in structure and differ only in
+> their own text**. A panel announced as *"side A, the Idealists' answer, pays 2 Trust"* and a
+> side B announced as *"option two"* hands a screen-reader user the position shortcut that the
+> seed-derived `order` exists to close. **That asymmetry is now the leak this gate catches**,
+> and it is why the DOM-level assertion also checks that no `data-ideologue`, `data-pays` or
+> `order` attribute exists — a `data-` attribute is a styling hook, and a styling hook is the
+> original sin.
+>
+> The first and third bullets are **unchanged**, and the third one is now a release gate over
+> a fixture whose two sides carry **different Ideologues and different payouts**, so a
+> per-side rule would actually show up.
+
 ## 9. Anti-Patterns
 
 Twelve things this UI must not do, each with the Shasn-specific reason it would damage *this
@@ -1703,6 +1999,18 @@ The instant side A is green, side B is grey, side A is on the left always, side 
 "pick the one the UI likes". This is why presentation order is randomised per card from
 `_seed` (§1.2) and why the symmetry contract names a *token* per property rather than two
 similar values. The assertion test in §8.8 is the enforcement.
+
+> ⛔ **Sharpened 2026-10-03 — and the reason it is worth reading rather than skimming.** This
+> anti-pattern was written when the Ideologue was hidden, so per-side styling was a
+> *probability* leak: it would publish which side tended to pay more. **The Ideologue is now
+> printed on the card**, so per-side styling is a *certainty* leak: a stylesheet that tints a
+> cell by its Ideologue publishes which Ideologue the left-hand position holds, and across
+> all 76 Ideology Cards position 0 holds the Capitalists' answer **45% of the time**
+> (`FULL-INFORMATION.md` §6). One CSS rule would undo the only mechanic left.
+>
+> **The rule in its current, sharpest form: _the payout differs because the payout differs;
+> nothing else may._** The shipped enforcement is `blindAnswer.css`'s selector audit, which
+> fails the build on any positional or side-identity selector in the stylesheet.
 
 **9.2 — Never make an unaffordable or illegal action "merely low-contrast".**
 Fading something to 40% is a refusal a player reads as *style*. A player must be able to
@@ -1717,6 +2025,22 @@ through duration and length, and the flip implies something was hidden *on the c
 the player might go looking for. The reveal is a **single 300ms frame**: both sides fade out
 together at the same rate, the viewport swaps in one frame, one payout appears fully formed.
 §7.3.
+
+> ⛔ **Retired premise, kept rule — 2026-10-03.** *"the flip implies something was hidden on
+> the card"* no longer describes the product: **nothing is hidden**, the payout is printed on
+> both cells and the Ideologue is printed beside each answer. The rule is **unchanged and
+> better argued**: the payout is in the same frame as the answer, as prose, with no icon and
+> no `title`, so **a reveal animation would be theatre** — decoration for a secret that no
+> longer exists. Recorded as such in `FULL-INFORMATION.md` §3.
+>
+> **The two leaks this rule prevented are still worth preventing, and one of them has grown
+> rather than shrunk.** A count-up's length is still proportional to value; a "which side
+> won" comparison is still second-guessing a player who already had both numbers. And now
+> that the payout is on screen while the player deliberates, **an animation that changes with
+> value has a second opportunity to leak**: over the 300ms the player is looking at a card
+> whose two payouts are legible, so a duration difference is an invitation to re-read the
+> question hoping the answer changes. Which is why the rule was right before and is right
+> now, for a reason that no longer needs the secrecy premise to make the case.
 
 **9.4 — Never loop, pulse, shimmer, or nag.**
 A 129-target board with pulsing legal targets is a board nobody can read. State is
@@ -1737,6 +2061,24 @@ Not in a header, not in a footer, not in a disabled background graphic, not in a
 `title=`. The player's own Ideologue pattern is itself information — if a player's manifesto
 is Capitalist-heavy, the prompt must not be styled in a way that correlates. The prompt is
 one column of prose and two identical panels in an otherwise empty viewport.
+
+> ⛔ **The first clause is retired; the rest of the rule is not — 2026-10-03.** Resource
+> tokens **and Ideologue names are now printed on both cells of the prompt**, because the
+> card is printed. That is the design, not an oversight.
+>
+> **What is still absolutely banned, and the distinction that keeps this from becoming a
+> contradiction:**
+> - **Ideologue _colour_.** The Ideologue is named in prose; it is **never** used as an ink,
+>   a wash, a border or a chip anywhere in the answer subtree. A coloured cell publishes the
+>   position of that faction (§9.1), and the deck's position skew is measured at 45%.
+> - **The player's manifesto row.** Unchanged and still load-bearing, for the reason the
+>   original gave: if your mat is Capitalist-heavy, the prompt must not be styled in a way
+>   that correlates.
+> - **Anything in a header or footer or a `title=`.** Unchanged.
+>
+> **What the prompt is now:** one column of prose and **two identical panels, each carrying
+> its own label, its own Ideologue name and its own payout**, in an otherwise empty viewport.
+> Identical is doing more work than it used to.
 
 **9.7 — Never use colour as the majority channel.**
 Solid vs hollow and a 3px vs 2px border are free. The 8% zone tint measures **1.17:1** and is
@@ -1778,6 +2120,16 @@ fits exactly one zone, no gerrymander suggestion, no trading suggestion. This is
 deliberation game; a hint that is *sometimes* right teaches players to stop thinking and wait
 for the suggestion. The `CONFIRM PLACEMENT` popover (§6.1.4) states the **consequence** the
 player chose to create — that is not a suggestion, it is a receipt.
+
+> **More load-bearing than it was, 2026-10-03.** This was written when the payout was hidden,
+> so the UI could not cheaply optimise on value even if it tried. **Now it can, and the
+> temptation is concrete: on a card whose sides differ by one resource, the better side is
+> computable from what is on screen.** This anti-pattern is now the **only** thing standing
+> between "the player computes" and "the UI computes for them", and it must be read as
+> covering the answer screen explicitly: **no badge, tint, icon, ordering, or tooltip on the
+> prompt may indicate which side pays more.** The corollary is uncomfortable and worth
+> stating: under full information the *player* is expected to compute. The UI's job is to
+> refuse to do it for them, and to do it identically for both sides.
 
 ## Appendix A — Token Reference (single sheet)
 

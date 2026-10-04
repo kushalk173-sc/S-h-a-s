@@ -449,6 +449,18 @@ npm run balance  --workspace @shasn/cards   # exits 1 on any dominance error
 npm run balance --workspace @shasn/cards -- --strict   # warnings too
 ```
 
-`validate` also prints the provenance census (currently `verbatim 0, adapted 19,
-inferred 45` over 64 cards). See `packages/cards/README.md` and
+`validate` also prints the provenance census. **⚠ The counts hard-coded here were stale as of
+2026-10-03** (`verbatim 0, adapted 19, inferred 45` over 64 cards); the corpus is now
+**151 cards — 0 `verbatim`, 41 `adapted`, 110 `inferred`**, 76 of them Ideology Cards.
+**Trust the command's own output over this sentence.** See `packages/cards/README.md`,
+`packages/cards/decks/SOURCES.md` (per-card audit trail) and
 `packages/cards/KNOWN-GAPS.md`.
+
+> **One line to add to your reading of `balance` output, 2026-10-03.** The game is now
+> **full information** — both of a card's payouts are printed on the card before anyone
+> answers (`packages/server/src/FULL-INFORMATION.md`). **A `TOTAL_SKEW` or
+> `RESOURCE_BLIND_LEAN` warning is therefore no longer cosmetic.** It used to be tolerable
+> precisely because the player could not see the difference; now they can, and
+> `PLAN.md` §9 risk #2 explains why that turns a dominated card into a broken one. **The
+> checker's severities have not been re-tuned yet, so `--strict` is currently the honest
+> setting to read this with.**

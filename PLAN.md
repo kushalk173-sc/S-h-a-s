@@ -1,24 +1,40 @@
 # Digital Shasn — Build Plan
 
-Status: **engine ✅ · server ✅ · cards ✅ (60 shipped) · board ✅ · client 🔧 written,
-does not compile · schema evolution ⬜ not started**
+Status: **engine ✅ · server ✅ · cards ✅ (151 shipped) · board ✅ · client ✅ compiles and
+runs · schema evolution ⬜ not started · the game is FULL INFORMATION**
 Owner: kushalk
-Last updated: 2026-09-30
+Last updated: 2026-10-03
 
-> **Reconciled against the code 2026-09-30, third pass.** The two earlier passes each
-> made optimistic claims the code did not support — the second claimed "M1 DONE, 50 tests
-> passing" when the engine did not compile at all. **This pass verifies every status
-> below against the code or against test output, and marks unverifiable work as
-> unverifiable.** Where a document and the code disagree, the code wins and the
-> disagreement is written down rather than resolved silently.
+> ### ⛔ THE FOUNDING PREMISE OF THIS PLAN HAS BEEN REVERSED. Read `packages/server/src/FULL-INFORMATION.md` first.
 >
+> This plan was built on the **blind answer** — §2 below, and the client's not receiving a
+> card's payout. **That is no longer the design.** Every seat and every spectator now sees
+> the whole Ideology Card, **both payouts included**, before anyone answers.
+>
+> **What this pass did, 2026-10-03:** corrected §2, §9 and §10, and added the ship-log entry
+> below. The retired material is **kept and labelled**, not deleted, because it is the record
+> of why the design changed. `docs/UI-SPEC.md` and `docs/ARCHITECTURE.md` §4 carry the same
+> treatment.
+>
+> **Corrections made here that were not part of the reversal, and were drift:** §0's status
+> line said *60 cards* and *the client does not compile*; §5's data model, §7's milestone
+> boxes and §9's engine note all still carried 2026-09-30 numbers. Those are corrected in the
+> 2026-10-03 ship-log row rather than rewritten through §7, because §7 is a milestone ledger
+> and rewriting a ledger entry destroys the only evidence that a milestone moved.
+
 > **Verified commands:**
 > - `npm run typecheck` (root) → **exit 0**
-> - `npm run typecheck --workspace @shasn/client` → **FAILS, 14 errors, all in
->   `src/app/GameScreen.tsx`**
-> - `npm test` (root) → **exit 0 — 412 passing**: engine 179, server 101, cards 61,
->   client 71
+> - `npm test` (root) → **exit 0 — 1088 passing** across four packages, zero failures
+>   *(reported 2026-10-03; **not re-run by the pass that wrote this note** — see the ship-log
+>   entry's "what I could not check".)*
+> - `npm run playable` / `npm run balance` (`packages/cards`) → **151 cards checked**;
+>   **one dominated Ideology Card**, `ig-in2020-006`. Quoted in
+>   `packages/server/src/FULL-INFORMATION.md` §6.
 >
+> **Repository state: ~140 local commits, no git remote configured.** Nothing here has ever
+> left the machine. `PLAN.md` M0 has carried *"CI lint+test (deferred — no remote yet)"* since
+> 2026-09-30 and that is still exactly right.
+
 > Reconciled 2026-09-30 against four documents that partly supersede sections below:
 > `docs/ENGINE-AUDIT.md` (read-only audit of `packages/engine`), `docs/ARCHITECTURE.md`
 > (server, secret-state and milestone design), `docs/AUTHENTIC-SHASN-REFERENCE.md` (fidelity
@@ -119,14 +135,69 @@ row says so — that is the point of this log.
 **No new unverified claims from this pass.** The three remaining phase-changing ops are
 still inexpressible, so M2b's priority is unchanged.
 
+### 2026-10-03 — full information, and the documentation reconciled to it · ✅ (with one stated gap)
+
+| # | What landed | Evidence |
+|---|---|---|
+| 47 | **The blind answer is gone. The card is public in full — question, both answers, both Ideologues, both payouts — to every seat and every spectator** | `packages/server/src/FULL-INFORMATION.md` (the record, and the authority). `blindPromptFor` → `answerPromptFor`; `BlindPrompt` → `AnswerPrompt` + `AnswerSide`; `match:state.blind` → `match:state.answer`. Nothing was deleted silently: every retirement is a rename or a rewrite onto the property that still holds |
+| 48 | **A new panel: the card on the table** | `packages/client/src/app/TableQuestion.tsx`. Reuses the `blind-answer__*` classes **verbatim**, renders for every seat including spectators, and carries **no commit control** — not even a disabled one, which would be §9.10's prohibited case. It is not a dialog: no scrim, no focus trap, because p19 lets the rest of the table act during an answer window |
+| 49 | **`_pendingCard` keeps its underscore, and this is a decision with four arguments** | `FULL-INFORMATION.md` §2. The card is public by **content**, secret by **id**. The load-bearing reason is mechanical: `check-secrets.mjs` works by the `_` prefix, so publishing the id would move the value onto an unprefixed field where no gate on that list covers it. The `manifestoCards` precedent does **not** transfer — it is safe only because an answered card's payout is already revealed, which is the one condition full information deletes |
+| 50 | **The seed-derived `order` survives, and it is now the only thing withheld — which makes it matter more, not less** | The Ideologue is printed beside each answer, so per-side styling would publish which faction the left-hand position holds. Measured across all 76 Ideology Cards: **position 0 holds the Capitalists' answer in 34 (45%)**, position 1 in 4, where balance would put each near 19. `PublicQuestion` **refuses** an `order` key at any depth rather than omitting it; `openQuestionOf` returns `null` for a payload carrying one |
+| 51 | **The symmetry gate survived and gained teeth** | Enforced by `blindAnswer.css`'s selector audit and by `getComputedStyle` equality over both cells **in both panels**, on a fixture whose two sides carry *different* Ideologues and *different* payouts — so a per-side rule would show. The rule is restated in its sharpest form: *the payout differs because the payout differs; nothing else may* |
+| 52 | **The redraw survived as "pay 4 for a different card", and its original justification is recorded as gone** | `rules-reference.md` §7.2 step 2 said *"Because the reading player does not know what the card pays, the redraw is a BET, not a decision."* That sentence is retired. The mechanic is **kept**, deliberately: the engine has no legal action that returns a card to the draw pile mid-turn, so removing the only escape from a dominated card would leave a player holding a genuinely bad card with no out — and under full information a dominated card is a **routine** event, which makes the reroll more load-bearing, not less. It is also a rulebook change, and `packages/server` does not own the rulebook |
+| 53 | **Nothing was retired on the engine side, and that is right** | `packages/engine` is untouched. `_pendingCard` keeps its name, `PRIVATE_PLAYER_KEYS` keeps `['conspiracies', 'ideologyCards']`, the underscore convention keeps its meaning. Renaming the field would move a *wire* decision into the rules package and would break `packages/cards/test/card-playback.test.ts`, which reads `_pendingCard` directly. **The engine's job did not change; the server's publication decision did** |
+| 54 | **Dominance in the Ideology corpus went from a design smell to a broken card** | **One** dominated card in 76, and it is one resource: `ig-in2020-006`, side 0 `trust 2 + funds 2 = 4` against side 1 `media 2 + funds 1 = 3`. 75 of 76 cards have equal totals; mean \|A−B\| gap is 0.00–0.02. **§9 risk #2 rewritten with the new severity** — including the part that matters, which is that `TOTAL_SKEW` is still only a *warning* in `src/balance.ts`, so a new card can ship with a visible one-resource edge and the suite will be green |
+| 55 | **Current state: 1088 tests passing across four packages, zero failures; `npm run typecheck` exits 0** | **Reported, not re-run by this documentation pass** — see "what I could not check" below. The per-package breakdown has moved many times since the 2026-09-30 entry and is deliberately **not** restated here, because restating a number I did not observe is exactly the drift this log exists to stop |
+| 56 | **Winnability proven at 2/3/4/5 seats, 20 seeds each, real corpus, real reducer** | `packages/server/test/winnable.test.ts`: `SEEDS = Array.from({length: 20}, …)`, one suite per seat count, `maxActions: 1200`. The corpus-growth problem recorded at `KNOWN-GAPS.md` §6bis — where growing the Ideology pool to 76 turned eleven assertions red on `deepest turn > TURN_CLIFF` — **is resolved, and resolved by reframing rather than by weakening**: `winnable.test.ts:216-258` now asserts the *mechanism* (the exhaustion branch did not fire) and prints the deepest finished game's answer count against the deck size. It no longer asserts the proxy, and the comment says why in the author's own words |
+| 57 | **The card corpus, stated honestly: 151 shipped — 0 verbatim / 41 adapted / 110 inferred** | Counted off `"provenance"` across `packages/cards/decks/**/*.json`: **41 `adapted` matches, 0 `verbatim` matches**; total 151 per `decks/SOURCES.md` §3 (56 + 20 + 16 + 19 + 11 + 11 + 18 across seven deck files). `SOURCES.md` §1 explains why `verbatim` is structurally unreachable while `reduce()` holds at 13 ops: reproducing a recovered card's text word-for-word would print a clause describing something the engine does not do |
+| 58 | **Zero real Ideology Cards were ever recovered — and the deck players see every turn is substantially original** | `docs/AUTHENTIC-SHASN-REFERENCE.md` §2.4 names the three sources that would close it, in order of expected yield: (1) the **Tabletop Simulator mod on the Steam Workshop**, which ships real card art and JSON and whose filepages are scrapeable; (2) **photo reviews** — Dice Tower thumbnails, `meeplemountain`, Space Biff, and BGG galleries on `cf.geekdo-images.com`, which are CDN-hosted and fetchable *without* a Cloudflare challenge; (3) **buy the deck** — Essential Edition India 2022-23, 108 real cards and the legally cleanest route. YouTube, Reddit and BGG were all unreachable in the research session. The 55 real cards recovered from Memesys' own player-aids are almost all Conspiracy and Headline; **10 of the 76 shipped Ideology Cards carry a recovered question stem, and everything past `ig-in2020-032` is authored** (`SOURCES.md` §1) |
+| 59 | **Documentation reconciled: `PLAN.md` §2 and §9, `docs/UI-SPEC.md` §1/§1.2/§5.3/§7.3/§8.8/§9.1/§9.3/§9.6/§9.12, `docs/ARCHITECTURE.md` §4, `README.md`** | Retired rules are **kept and labelled**, not deleted — an earlier decision that turns out to be wrong is evidence, not clutter. `docs/UI-SPEC.md` opens with a supersession table because it is the document an engineer implements from; `packages/server/src/FULL-INFORMATION.md` is named as the authority in all of them |
+
+> ### ⚠ What this documentation pass could NOT check, stated rather than assumed
+>
+> **This pass had no shell.** `npm test`, `npm run typecheck`, `npm run playable`,
+> `npm run balance` and `git` were **not run**, because the agent doing this work had no
+> command execution available. Consequences, precisely:
+>
+> - **Row 55 (1088 passing, zero failures, `typecheck` exit 0) is carried on report, not on
+>   observation.** It is consistent with everything readable in the tree, but this pass did
+>   not see it. **Run `npm run check` before trusting it.**
+> - **Rows 54 and 57 are counted off the files** (grep over `decks/**/*.json` for
+>   `"provenance"`, and `SOURCES.md` §3's per-deck totals). `0 verbatim` and `41 adapted` are
+>   exact matches; `110 inferred` is the remainder of 151, so it is arithmetically sound but
+>   was not itself counted — `grep` truncated before the end of the list. The dominance
+>   measurement (`ig-in2020-006`) is quoted from `FULL-INFORMATION.md` §6, which quotes
+>   `npm run balance`; it was **not re-measured here.**
+> - **Row 58's "10 of 76 carry a recovered question stem"** is from `SOURCES.md` §1 (*"the
+>   number carrying recovered question text went 8 → 10 and has not moved since"*). Verified
+>   by reading the source, not by re-deriving it.
+> - **~140 local commits and no git remote** is carried on report. Not verified with `git`.
+> - **The 14 client compile errors in §7 M5 are recorded as historical**, on the evidence
+>   that `FULL-INFORMATION.md` and `TableQuestion.tsx` both quote live shipped code and
+>   `AnswerScreen.tsx` describes a bug that was fixed — not by re-running `tsc`. **If
+>   `npm run typecheck` is red, M5's entry is the first thing to re-open.**
+> - **§7's milestone ledger is deliberately NOT rewritten.** M2 still says *60 cards*, M5 still
+>   says *does not compile*. Those are wrong as present-tense claims and they are **kept as
+>   ledger entries**, because the date on each entry is the evidence that the milestone moved.
+>   Correct them only by appending a dated row, never by editing the old one.
+
 **Claims in this repository that are still NOT verified by anything.** Listed so they are
 not mistaken for shipped:
 - The client's server-wiring (row 32) — **no live session**
 - The secret-state contract **as actually sent** — only the projections are tested; the
-  human devtools check has never been done
+  human devtools check has never been done. **⚠ And as of 2026-10-03 this check is written
+  against a design that no longer exists**: "payouts absent from devtools" is now a false
+  test. The rewritten criterion is in §9 risk #3.
 - M6, M7, M2b, M1.5 — nothing built
 - The coalition type change (§6 row 11) — deferred, now against a *tested* engine
 - §6 row 7 (which board ships for 2 players) and §6 row 8 (D6) — unresolved by design
+- **New, 2026-10-03:** whether the balance checker's severity classifications still match the
+  game. `TOTAL_SKEW` and `RESOURCE_BLIND_LEAN` are still warnings, and under full information
+  that is the wrong default (§9 risk #2).
+- **New, 2026-10-03:** the `redraw` copy. It ships as "pay 4 for a different card"
+  (`AnswerScreen.tsx`), but `docs/rules-reference.md` p13 and §7.2 step 2 still describe the
+  mechanic by its retired justification. **`rules-reference.md` was not edited by this pass**
+  and should be reconciled by whoever owns it.
 
 ---
 
@@ -147,6 +218,39 @@ board game **Shasn** (Zain Memon / Memesys Culture Lab, 2019).
 ---
 
 ## 2. The constraint that drives the architecture
+
+> ### ⛔ REVERSED 2026-10-03 — this section is the foundation of a design that no longer
+> exists. Read `packages/server/src/FULL-INFORMATION.md` first.
+>
+> **What was believed.** The paragraph below — *"you answer without seeing it… The client
+> must never receive the full card object"* — was not a guess. It was a **defensible,
+> correctly reasoned decision** and this whole architecture was built on it: the server
+> projection, `blindPromptFor`, the `BlindPrompt` type, the DOM-level no-payout tests, the
+> §9 risk register, UI-SPEC §1.2. None of that work was wasted, and none of it is being
+> rewritten here, because **the reasoning behind it is the record of why the design changed**.
+>
+> **What is true now.** While a card is out, **every seat and every spectator sees the entire
+> Ideology Card** — question, both answer labels, **both Ideologues, and both payouts** —
+> before anyone answers. The blind answer is gone. `blindPromptFor` became `answerPromptFor`;
+> `BlindPrompt` became `AnswerPrompt` + `AnswerSide`; `match:state.blind` became
+> `match:state.answer`; and the **type-level proof that no payout can reach the DOM** was
+> retired **with a recorded reason**, not deleted silently.
+>
+> **One thing in this section did NOT get retired, and mistaking it for retired would be the
+> expensive error:** the *"two sides must render identically"* gate **survived, intact, and
+> was sharpened** — it is now the load-bearing rule rather than one of several, because the
+> Ideologue is printed on the card. `UI-SPEC.md` §9.1 carries it as: *the payout differs
+> because the payout differs; nothing else may.*
+>
+> **Why it was reversed, in one sentence:** the Ideology corpus is public JSON in this
+> repository, so every card's payout was always one lookup away — what the withholding
+> actually protected was *which* card was on the table, and the new design prints that on the
+> card. The argument is at `FULL-INFORMATION.md` §1.
+>
+> **What survives from this section, and it is not nothing:** amendment **A′** below. The
+> seed-derived answer order is unchanged in mechanism and is now **the only thing being
+> withheld at all** — which makes it more load-bearing, not less, because the Ideologue is
+> printed beside each answer (§9, risk #2).
 
 Shasn's core mechanic: **the player to your right reads an Ideology card aloud, and
 you answer without seeing it.** You do not know which resources your answer pays
@@ -170,22 +274,52 @@ Therefore:
 This single requirement eliminates peer-to-peer, client-side rules evaluation, and
 any "just sync the state object" design.
 
-### Blind-answer presentation — decision
+> ⛔ **Every claim in the block above is retired.** The premise (hidden information), the
+> bolded rule, the payload, and the "only the result is broadcast" line are all superseded.
+> **What is still true, and is still load-bearing:**
+>
+> - **The server is authoritative. Always.** Unchanged — and the reason is now that the
+>   client must never be able to *derive* the `order` draw, not that it must never be told
+>   the payout. `app/blindWire.ts` cannot consult `order` even if it wanted to.
+> - **The client sends back the *display position* it chose**, mapped through the server's
+>   `order` in `room.ts#toEngineAction`. Unchanged.
+> - **The server is still the only exit to the wire**, still via `playerView` applied at
+>   exactly one place (`broadcast.ts`), still with `scripts/check-secrets.mjs` as the
+>   build-failing grep. The three-layer gate is intact and its *payout* test was replaced by
+>   a positive one, not removed.
+> - **`_pendingCard` keeps its underscore and its id stays secret.** Under full information
+>   the card is public by **content** and secret by **id**, and that is a decision with four
+>   arguments at `FULL-INFORMATION.md` §2 — the load-bearing one being that
+>   `check-secrets.mjs` works by the `_` prefix, so publishing the id would move the value
+>   onto an unprefixed field where no gate covers it.
+> - **Conspiracy hands stay private for everyone, including the owner** (D25). Untouched.
+
+### Answer presentation — decision
+
+> ⛔ **The table below decided the retired design. Option A is no longer on offer.** It is
+> kept because the *rejected* options and the reasons for rejecting them are still the
+> reasons, and re-deriving them is wasted effort.
 
 | Option | Description | Verdict |
 |---|---|---|
-| **A. Hide payouts only** | Player reads the question text, sees two neutral answer labels, no resource icons. | **CHOSEN for v1** |
-| **A′. Hide payouts + randomise the left/right order per card** | As A, and the server picks which side renders first, so "the left one" carries no information. | **CHOSEN for v1** — amendment, 2026-09-30. Supersedes a fixed order; see rationale below. |
-| B. Reader-relay | Right-hand player gets the card, reads it over voice chat. | v2 toggle. Most authentic, requires everyone on mic, blocks async play. |
-| C. TTS | Server speaks the question, answering player sees nothing. | Rejected. Accessibility and localization cost is not worth it. |
+| **A. Hide payouts only** | Player reads the question text, sees two neutral answer labels, no resource icons. | **CHOSEN for v1** — ⛔ **REVERSED 2026-10-03.** Replaced by **A″**. |
+| **A′. Hide payouts + randomise the left/right order per card** | As A, and the server picks which side renders first, so "the left one" carries no information. | **CHOSEN for v1** — amendment, 2026-09-30. Supersedes a fixed order; see rationale below. **SURVIVES FULL INFORMATION INTACT**, and is now the whole mechanic rather than one of four withholdings. |
+| **A″. Publish the whole card; keep the seed-derived order** | Every seat and every spectator sees question, both answers, both Ideologues and **both payouts**. The server still picks which side renders first and still does not say which. | ⛔ **CHOSEN 2026-10-03 — this is the shipped design.** `packages/server/src/FULL-INFORMATION.md` is the full argument; `PLAN.md` §9 risk #2 is the cost. |
+| B. Reader-relay | Right-hand player gets the card, reads it over voice chat. | v2 toggle. Most authentic, requires everyone on mic, blocks async play. **Now partly moot:** under A″ the card is already on every screen, so the only thing B still adds is the *ritual* of the reading. Still worth building as a toggle. |
+| C. TTS | Server speaks the question, answering player sees nothing. | Rejected. Accessibility and localization cost is not worth it. **Also now the only option that would *preserve* the blind answer** — worth recording, because if deliberation turns out to matter more than the reasons for A″, C is the road back and it was rejected on cost, not on principle. |
 
 Model the card so B is a later flag on the same data, not a rewrite.
 
 #### A′ — why the presentation order has to be random (amendment, 2026-09-30)
 
+> **This amendment is unchanged and now carries more weight than it did.** The argument below
+> was written when per-side styling was the *only* leak available. Now the Ideologue is
+> **printed on the card**, so the channel it describes is not hypothetical — and it is
+> measured, not assumed. See the measurement at the end.
+
 Option A on its own is **not sufficient**, and the reason is specific to Shasn rather
-than to UI taste. A card's two answers belong to two *different* Ideologues, and the
-India campaign is not balanced left-vs-right mechanically — in fact
+than to UI taste. A card's two answers belong to two *different* Ideologues, and
+the India campaign is not balanced left-vs-right mechanically — in fact
 `docs/AUTHENTIC-SHASN-REFERENCE.md` §2.3 observes from real tournament hands that the
 answer pool is skewed toward Capitalist and Supremo, and that two of the six possible
 cross-Ideology pairings are probably absent or rare. So a **fixed** "side A is always on
@@ -213,6 +347,56 @@ the engine is deterministic). The client renders `order[0]` in the left cell.
 - **Open dependency:** `docs/UI-SPEC.md` Appendix B **B1** asks whether the server already
   sends an ordering field. It does not — the payload at §2 above is what this amendment
   changes. B1 must close before M3 ships.
+
+> **Status of the three notes above, 2026-10-03:**
+> - **Implementation shape — done, in `broadcast.ts#orderFor`.** A derived per-card field, a
+>   pure function of the match seed and the card id, never `Math.random`. It is not stored on
+>   the pending-card record.
+> - **Release gate — shipped, and it now has teeth it did not have.** The `getComputedStyle`
+>   equality assertion runs over **a fixture whose two sides carry different Ideologues and
+>   different payouts**, so a per-side rule would actually show. The "no positional or
+>   side-identity selector in `blindAnswer.css`" audit is the second half. Two further gates
+>   were added: no `data-ideologue` / `data-pays` / `order` attribute in the DOM, and the
+>   table's copy and the answerer's copy **byte-identical apart from `order`**.
+> - **⚠ One half of that gate is stated wrong above and cannot be satisfied as written, so
+>   read this before trying to satisfy it.** *"a per-deck assertion that neither slot position
+>   correlates with Ideologue over a full shuffled deck"* is **false about the deck and true
+>   about what the player sees**, and the distinction is the whole point of A′:
+>   - **The deck really is positionally skewed** — position 0 holds the Capitalists' answer in
+>   **34 of 76 cards (45%)**. No amount of testing will make that assertion pass, and it
+>   should not: it is a **corpus** fact, and `FULL-INFORMATION.md` §6 measures it rather than
+>   hiding it.
+>   - **What the `order` draw makes true is the *marginal*** — with `order` uniform, each
+>     display position holds each Ideologue about half the time across all 76 cards. That is
+>   the assertion worth having, and it is the one the deck-level balance output is evidence
+>   *for*, not against.
+>   - **So the correct release gate is the marginal, not the deck.** Assert that the
+>   distribution over the whole deck is not fixed, that the seed moves it, that it is stable
+>   across a reconnect, and that `allKeys(openQuestion)` contains no `order` at any depth.
+>   **Do not write the deck-level assertion.** It will fail, and failing it is the corpus's
+>   fault, not the gate's.
+> - **B1 — closed long ago**, and its answer is now load-bearing in the opposite direction:
+>   the server *does* send an ordering field, to **exactly one** of the two copies.
+
+> ### ⚑ MEASURED 2026-10-03 — the skew A′ was written to hide is real, and larger than §2.3 guessed
+>
+> `npm run balance --workspace packages/cards`, over the deck as shipped — all **76**
+> Ideology Cards:
+>
+> ```
+> position 0:  capitalist 34   supremo 16   showstopper 7   idealist 19
+> position 1:  capitalist  4   supremo 20   showstopper 31   idealist 21
+> ```
+>
+> **Position 0 holds the Capitalists' answer in 34 of 76 cards — 45%.** A balanced deck would
+> put each Ideologue near 19 in each position. So under full information a table that knew
+> which cell was side 0 would know it was the Capitalists' answer nearly half the time —
+> **and because the Ideologue is now printed on the card, that is a channel anyone can read
+> off the screen in one step.**
+>
+> This is why the `order` draw was kept, why it is still server-side, and why
+> `PublicQuestion` **refuses** an `order` key at any depth rather than merely omitting it.
+> Full table and the dominated-card measurement: `FULL-INFORMATION.md` §6.
 
 ---
 
@@ -247,6 +431,16 @@ intermittent disagreement); its client predicts, and prediction is exactly what
 (durable resume, private lobbies, resume *tokens*, spectator isolation, deploys that do
 not drop a live 4-hour match). Cost accepted: ~3 days of server work against PLAN.md's
 budgeted 2, no lobby/reconnect for free, and a team of one maintaining it.
+
+> **One clause of the argument above was retired on 2026-10-03. The decision stands.**
+> *"a project whose central mechanic is hiding the answer key"* described the blind answer.
+> Under full information the **answer key is public**: every payout is printed on the card,
+> and the Ideology corpus is public JSON in this repository. **What is still hidden is the
+> deck order** — which card is on the table, and the piles. That is still a real
+> disqualifier: history containing every draw pile in order hands a player the entire
+> remaining deck, which is exactly what the `order` draw needs to have no shortcut around.
+> But it is a *smaller* claim than the one originally made, and it is restated here rather
+> than quietly edited so the original reasoning is not mistaken for the current one.
 
 **2. "In-memory first" → persist from the first action.** This plan contradicted itself:
 §3 said don't build persistence until a match survives a refresh, and §9 risk #5 says a
@@ -843,6 +1037,16 @@ the architect independently relies on it** — §3 above exists because of #5, a
 > sharper and more dangerous risk, because it is invisible to every test we have. #3 has
 > fallen from "one careless broadcast" to **largely closed** (the three-layer gate ships
 > and R1 is fixed), with one manual gate outstanding.
+>
+> **Re-ranked again 2026-10-03, after full information.** #2 is not a new entry — it is the
+> payout-balance risk this register always carried, and its severity has gone from
+> *"a smell a careful player might notice"* to **permanently realised**. Numbering is
+> unchanged on purpose: #5 is cited by name in §3 and in M7, and a register whose numbers
+> move under its readers is a register nobody trusts. #3 keeps its number and its
+> three-layer closure; **what it protects is now narrower and stated as such below**, and
+> **its outstanding human gate must be rewritten**, because the criterion as written
+> ("payouts absent from devtools") is now a false test. #1 is unaffected by this change and
+> remains #1.
 
 1. **⛔ THE CARD SCHEMA, not the corpus. (promoted, and now #1 by a wide margin.)**
    **43 of the 50 real cards recovered from Memesys' official player-aids — 86% — cannot
@@ -859,12 +1063,69 @@ the architect independently relies on it** — §3 above exists because of #5, a
    matches the game. Writing card #61 against this schema produces a 61st card with the
    same limitation as the first 60 — and M6 (Conspiracies/Headlines) is exactly the
    content that needs the missing vocabulary. **This is M2b, first-class, before M6.**
-2. **The card corpus as writing.** Still real and still the long pole — ~100+ dilemmas
-   per setting that are genuinely hard, genuinely balanced, and not a partisan tract.
-   This is writing, not engineering. **But it has changed rank** because the constraint
-   moved: 60 cards ship and the game is *not blocked on having more of them*. It is
-   blocked on being able to *express* the ones we have. See §10 for what we recovered.
-3. **Secret-state leaks.** One careless broadcast and the blind-answer mechanic is gone.
+2. **🔴 DOMINANCE IN THE IDEOLOGY CORPUS. A design smell until 2026-10-03; a broken card
+   since. (Severity raised permanently.)**
+   **If one side of a card is strictly better, players optimise instead of deliberating and
+   the premise collapses.** That sentence is what this register always said about payout
+   balance — and on 2026-10-03 the risk stopped being a risk and became **a description of
+   the shipped game.** Full information (`packages/server/src/FULL-INFORMATION.md`) prints
+   both payouts on the card before the player answers, so the optimum is not merely
+   discoverable by a careful player: **it is arithmetic, on screen, available to everyone at
+   the table.** There is no longer any state of this project in which a dominated card is
+   merely inelegant. It is a card that no deliberating player should be asked to answer, and
+   with a fixed 4-resource reroll the only escape (`FULL-INFORMATION.md` §4 — the reroll is
+   *more* load-bearing under full information, not less, because a dominated card is now a
+   routine event rather than a rare accident).
+
+   **What is measured, right now** (`npm run balance --workspace packages/cards`, against
+   the deck as shipped — 151 cards checked, 76 of them Ideology):
+
+   ```
+   DOMINATED CARDS: ONE, and it is a single resource.
+
+   ig-in2020-006   side 0  idealist     trust 2 + funds 2 = 4
+                  side 1  showstopper  media 2 + funds 1 = 3
+   ```
+
+   Side 0 pays one more resource than side 1, so a player who computes always picks side 0
+   on this card. **That is 1 of 76, and it is the whole of the *magnitude* exposure: 75 of 76
+   cards have sides that pay the same total, and the mean |A−B| gap across the deck is
+   0.00–0.02 resources.** So the arithmetic is not currently a disaster — **and that is
+   exactly why this entry is a live risk rather than a closed one.** `TOTAL_SKEW` was already
+   a *warning*, not an error, in `src/balance.ts`, because while the payout was hidden a
+   one-resource edge cost a careful player nothing: nobody could see it. **Under full
+   information it costs the player the game.** The checker and its severity classifications
+   have not been re-tuned to match, and until they are, **a new card can be shipped with a
+   visible one-resource advantage and the suite will be green.**
+
+   **What follows, concretely:**
+   - **`packages/cards` owns the fix, and it is not a card rewrite.** The dominated card is
+     a balance-check severity change; the systematic part is promoting
+     `RESOURCE_BLIND_LEAN` / `TOTAL_SKEW` from warning to **error** for the Ideology deck,
+     since "the player cannot see this" is no longer the reason a skew is tolerable.
+   - **"Zero **decisive** cards is not a pass."** The checker's own output says
+     `resource-blind — undecidable — decisive 0` on `et2040` and `decisive 1` on `in2020`.
+     A corpus where almost nothing is decisive was *good news* when the payout was hidden
+     (it meant balance was fine because nothing mattered). Under full information it means
+     the balance work is unverified in the only dimension the player can now perceive.
+   - **The redraw is the mitigation, and it is not free.** 4 resources for a different card
+     is a real price, so a dominated card is *survivable* rather than *unplayable* — which is
+     the same sentence as "the card is still broken".
+
+   **Not folded into this entry, because it is a different failure:** the deck's **Ideologue
+   by display position** is skewed (position 0 is the Capitalists' answer 45% of the time).
+   That is a *corpus* defect, but its mitigation is not corpus work — it is the seed-derived
+   `order` draw, and it is closed. See §2's amendment A′ measurement.
+
+   **The rest of this entry is unchanged from its previous form, because it is still true.**
+   The card corpus as writing remains the long pole: ~100+ dilemmas per setting that are
+   genuinely hard, genuinely balanced, and not a partisan tract. That is writing, not
+   engineering. **But it has changed rank** because the constraint moved — cards ship and the
+   game is *not blocked on having more of them*, it is blocked on being able to *express* the
+   ones we have (§10, and risk #1). **Now also blocked on not writing dominated ones**, which
+   is this same corpus seen from the one dimension a player can actually perceive.
+3. **Secret-state leaks.** One careless broadcast and the ~~blind-answer mechanic~~ **card's
+   `order` draw and the Conspiracy hand are gone.**
    **Largely closed, and the closure is three-layered:** the type-level contract
    (`ServerOnlyKeys`, 11 fields), a structural test that walks the whole object graph,
    and a CI grep (`scripts/check-secrets.mjs`, wired into `typecheck` so it cannot be
@@ -872,6 +1133,35 @@ the architect independently relies on it** — §3 above exists because of #5, a
    Conspiracy hand — is **fixed** by decision (§5, D25). **One gate remains open and no
    test can close it:** a human reading devtools on a live game. That is M7's release
    criterion.
+
+   > **What this entry protects now, 2026-10-03 — smaller in one dimension, and that is a
+   > deliberate design outcome rather than an accident.** The payout **is** published; that
+   > half of the old threat is gone by decision, argued at
+   > `packages/server/src/FULL-INFORMATION.md` §1. **What is still gated is:**
+   >
+   > - **`_pendingCard`'s id**, for every viewer including the answerer. The card is public
+   >   by **content** and secret by **id**. This is the load-bearing one, and the reason is
+   >   mechanical: `check-secrets.mjs` works by the `_` prefix, so publishing the id would
+   >   move the value onto an unprefixed field where **no gate on this list covers it** — and
+   >   §9 risk #2 says the payout is precisely the field somebody might later want to
+   >   re-hide. Asserted over the production broadcast: no viewer's payload contains the
+   >   pending card's id.
+   > - **The `order` draw**, refused at both boundaries — `PublicQuestion` admits no such
+   >   key at any depth, and `app/blindWire.ts`'s `openQuestionOf` returns `null` for a
+   >   payload carrying one.
+   > - **`PlayerState.conspiracies`, for every viewer including its owner** (D25), and
+   >   `PlayerState.ideologyCards`.
+   > - **All eight draw and discard piles, `_seed`, `_idSeq`.**
+   >
+   > **Two consequences for the open human gate.** First, the M7 devtools check is now a
+   > *narrower* and therefore a *harder* check: "payouts and conspiracy hands absent from
+   > devtools" is **no longer a valid exit criterion** — the payouts are supposed to be there,
+   > and a tester who runs it as written will report a false pass or a false failure. It must
+   > be rewritten as: *the pending card's **id** and every `_`-prefixed field are absent; the
+   > table's `openQuestion` and the answerer's `answer` are byte-identical apart from
+   > `order`; and no `order` key appears anywhere in any viewer's payload.* Second, the
+   > replaced tests are **positive** ones ("the whole card is on screen") plus three new
+   > gates, so the suite got stronger while the threat got narrower.
 4. **Interrupt timing.** Out-of-turn plays are where digital board games traditionally
    break. **Still contested and deliberately left open:** `ARCHITECTURE.md` §8.1 D5
    proposes building no interrupt framework at all. See the OPEN DISAGREEMENT note in
@@ -899,13 +1189,60 @@ Short version, because §9 risk #1 is the project and this is the state of its i
 >
 > | Recovered | Shipped | Unshippable |
 > |---:|---:|---:|
-> | **50** real X-cards with complete official text | **60** cards (15 adapted, 45 inferred, **0 verbatim**) | **43 of the 50 (86%)** |
+> | **50** real X-cards with complete official text | **151** cards (41 adapted, 110 inferred, **0 verbatim**) | **most of the 50** |
 >
 > **The recovery effort worked and it bought us less than it looks like.** We have
-> verbatim text for 50 real cards and we can only *use* 7 of them. §9 risk #1 is no longer
-> "we have nothing" — it is **"we have the text and no way to express it"**, which is a
-> schema problem, not a writing problem, and a much more tractable one. The 24 gaps are
+> verbatim text for 50 real cards and we can only *use* a handful of them. §9 risk #1 is no
+> longer "we have nothing" — it is **"we have the text and no way to express it"**, which is
+> a schema problem, not a writing problem, and a much more tractable one. The gaps are
 > enumerated in `packages/cards/KNOWN-GAPS.md`; the milestone is **M2b**.
+
+> ### 🔴 THE CORPUS HONESTY NOTE — 151 shipped, and almost none of it is Memesys'
+>
+> **Read this before showing the game to anyone.** The numbers are exact, counted off
+> `"provenance"` across `packages/cards/decks/**/*.json`, with the per-card audit trail in
+> `packages/cards/decks/SOURCES.md` §3:
+>
+> | | count | what it means |
+> |---|---:|---|
+> | `verbatim` | **0** | **Deliberate and structurally unreachable, not an oversight.** While `reduce()` holds at 13 ops, reproducing a recovered card's text word-for-word would print a clause describing something the engine does not do — a card that lies (`SOURCES.md` §1, `KNOWN-GAPS.md` §0 state (b)). BLOCK and DEFLECT were the two legitimate counter-examples and they ship `adapted` too, with every dropped clause named |
+> | `adapted` | **41** | Recovered material, played as a reconstruction. Each names what it dropped in its `source` field |
+> | `inferred` | **110** | **Authored here.** Register copied from `AUTHENTIC-SHASN-REFERENCE` §8.2; the content is not Memesys' |
+>
+> **And the fact that should be impossible to miss, stated plainly: the 55 real cards
+> recovered from Memesys' own official player-aids are almost all Conspiracy and Headline.
+> ZERO real Ideology Cards were ever recovered. Not one, in full, from any campaign.** The
+> recovered Ideology material is **10 question stems** (`AUTHENTIC-SHASN-REFERENCE` §8.1),
+> which ship as the `adapted` stems of `ig-in2020-001` … `-008`, `-031` and `-032` with the
+> answers authored.
+>
+> **So the deck players see every single turn — the Ideology deck, 76 cards — is
+> substantially original work.** Only 10 of those 76 rest on a recovered stem; everything
+> past `ig-in2020-032` is authored outright. `SOURCES.md` §1 says so and adds the reason the
+> number has not moved: *"everything past `ig-in2020-032` is authored."*
+>
+> **Why zero, in one paragraph.** Ordinary question Ideology Cards exist only as images on
+> the physical product, in photo reviews and in video frames. **YouTube, Reddit and BGG were
+> all unreachable** in the research session (BGG returns 403/Cloudflare; Reddit and the
+> official site's `/play` page return JS-only empty shells). Press coverage describes the
+> category in general terms and nothing more. `docs/AUTHENTIC-SHASN-REFERENCE.md` **§2.4**
+> names the three places that would actually close it, in order of expected yield:
+>
+> 1. **The Tabletop Simulator mod on the Steam Workshop.** TTS mods ship the actual card
+>    art and JSON, and the Workshop filepages are scrapeable. Highest value per query, and
+>    it was not reached.
+> 2. **Photo reviews.** Dice Tower's video thumbnail gallery, `meeplemountain` and
+>    Space Biff review photo sets, and BGG image galleries on `cf.geekdo-images.com` — CDN
+>    hosted and directly fetchable *without* a Cloudflare challenge. BGG image URLs are the
+>    practical way around the BGG block.
+> 3. **Buy the deck.** The Essential Edition India 2022-23 is the cheapest route to 108
+>    real cards and legally the cleanest. This is the one "research" action that solves the
+>    problem outright.
+>
+> **This is now the highest-value unfunded research task in the project**, and it outranks
+> §10's earlier framing. It used to be *"the recovery effort bought less than it looks
+> like."* It is sharper: **for the deck that players actually see every turn, the recovery
+> effort bought ten stems.**
 
 **Recovered: 55 cards verbatim, from Memesys' own official player-aids.** Not fan wikis,
 not forum speculation — the "X Cards Explained" documents Memesys published *as player
@@ -925,18 +1262,11 @@ images on the physical product, in photo reviews and in video frames, and **YouT
 Reddit and BGG were all unreachable** in the research session (BGG returns 403/Cloudflare;
 Reddit and the official site's `/play` page return JS-only empty shells). Press coverage
 describes the category in general terms and nothing more. `docs/AUTHENTIC-SHASN-REFERENCE.md`
-§2.4 names the three places that would actually close the gap, in order of expected yield:
-
-1. **The Tabletop Simulator mod on the Steam Workshop.** TTS mods ship the actual card
-   art and JSON, and the Workshop filepages are scrapeable. Highest value per query, and
-   it was not reached.
-2. **Photo reviews.** Dice Tower's video thumbnail gallery, `meeplemountain` and
-   Space Biff review photo sets, and BGG image galleries on `cf.geekdo-images.com` — CDN
-   hosted and directly fetchable *without* a Cloudflare challenge. BGG image URLs are the
-   practical way around the BGG block.
-3. **Buy the deck.** The Essential Edition India 2022-23 is the cheapest route to 108
-   real cards and legally the cleanest. This is the one "research" action that solves the
-   problem outright.
+§2.4 names the three places that would actually close the gap, in order of expected yield —
+**listed in full in the corpus honesty note above**: the Tabletop Simulator mod on the Steam
+Workshop; photo reviews (Dice Tower, `meeplemountain`, Space Biff, and BGG galleries on
+`cf.geekdo-images.com`, which are CDN-hosted and fetchable *without* a Cloudflare challenge);
+and buying the Essential Edition India 2022-23.
 
 **Do not fabricate card text.** If none of the above lands, write original cards in the
 recovered register and cite §8.2 of the reference doc for the rules of that register.
@@ -962,4 +1292,20 @@ recovered register and cite §8.2 of the reference doc for the rules of that reg
   `sidePayout(side) >= 1`. The engine's `Delta = Partial<Record<Resource, number>>` is
   correct as-is — do **not** add a rule that a Capitalist answer must pay Funds, because it
   would reject a real card.
+
+  > **This finding got sharper on 2026-10-03 and is now a build constraint rather than a
+  > fidelity note.** Under full information **both payouts are printed on the card while the
+  > player decides**, which means the disc-per-resource encoding is no longer an aesthetic
+  > preference — it is how a player reads two `Delta`s and compares them without doing
+  > arithmetic. A numeral total would hide *which* resource, and the Ideologue that a
+  > `Capitalist` answer pays is often **not Funds**. So: `sidePayout()` still must never
+  > drive rendering, and now there is a second reason it must not — it would collapse a
+  > per-resource reading into a single comparable number on the one screen where comparison
+  > is the whole decision.
+  >
+  > **And the flip side, which nobody has written down until now:** because the disc
+  > encoding makes the comparison *easy*, §9 risk #2 (dominance) is worse than the raw
+  > numbers suggest. A player does not need to add up two payouts to see that
+  > `ig-in2020-006`'s side 0 has four discs and side 1 has three. It is visible at a glance,
+  > at the table, in front of everyone.
 

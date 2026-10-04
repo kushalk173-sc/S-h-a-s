@@ -1,5 +1,27 @@
 # Engine Audit - packages/engine
 
+> ### 📜 HISTORICAL DOCUMENT — and two of its premises are retired.
+>
+> This is a **point-in-time read-only audit** taken while `packages/engine` did not compile
+> (16 errors, an empty `test/` directory). Every finding was subsequently dispositioned in
+> `PLAN.md` §7 M1's table. **It is kept because that disposition is the audit trail**, and
+> because an audit that gets quietly deleted is indistinguishable from one that was wrong.
+>
+> **Two things in it are now wrong about the *game*, not about the engine:**
+> - **test 12**, *"`playerView` never ships the pending Ideology Card, by id or by payout"*,
+>   and **R1**'s framing of the blind answer as the leak of last resort, describe the retired
+>   design. **Under full information (2026-10-03) both payouts ARE shipped, deliberately.**
+>   Test 12's *by id* half is **still true and is now the load-bearing assertion**; its *by
+>   payout* half is retired. See `packages/server/src/FULL-INFORMATION.md`.
+> - **§7's `_pendingCard` row**, *"`CardID | null` | **THE GAME.** The card being answered
+>   blind. Leaking it ends the game permanently"* — "answered blind" is retired. "Leaking the
+>   id ends the game" is **more** true than it was, because the id is now the only pointer the
+>   withholding has left.
+>
+> **Nothing in this file was edited to reflect that**, on purpose. The engine itself is
+> **untouched** by the reversal: `_pendingCard` keeps its name, `PRIVATE_PLAYER_KEYS` keeps
+> `['conspiracies', 'ideologyCards']`, and the underscore convention keeps its meaning.
+
 Read-only audit. No source file was modified. Generated against commit-time state of packages/engine.
 
 Ground truth: `npm run typecheck` from repo root = **16 errors** (verbatim in section 2).

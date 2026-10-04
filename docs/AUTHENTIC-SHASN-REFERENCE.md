@@ -6,6 +6,31 @@ owns every rulebook number; this file does **not** repeat it).
 
 **Compiled:** 2026-09-30 · **Research type:** web research. No source code was modified.
 
+> ### 📌 Read this before using §7.2 or §5.2 as design inputs — they describe the REAL game, and we no longer copy that mechanic.
+>
+> This file is **research about Memesys' product**, and nothing in it was retracted. But it is
+> easy to mistake a finding about the real game for a decision about ours, so the distinction is
+> now stated up front:
+>
+> - **§5.2** (*"The payout is real, printed, and NOT tied to the Ideologue"*) and **§7.2
+>   step 1** (*the answerer sees the question only; the reading player holds the card*) are
+>   **accurate descriptions of the physical game and remain so.** We deliberately do **not**
+>   reproduce that mechanic: since 2026-10-03 our build publishes the whole card, payouts
+>   included, to every seat. `packages/server/src/FULL-INFORMATION.md` is the record.
+> - **What we kept from those findings, and why:** the **▼ on the seam** and the **printed
+>   nameplate per face** are now load-bearing in a *new* way. The real card's seam is what made
+>   "which side am I reading?" a physical question; our `order` draw is the digital equivalent,
+>   and it matters more precisely because the Ideologue is printed where the physical card only
+>   hints at it.
+> - **§2.4** (the three sources that would close the Ideology Card gap) is **unaffected and is
+>   now the highest-value unfunded research task in the project** — see `PLAN.md` §10's corpus
+>   honesty note. **Zero real Ideology Cards were ever recovered**; YouTube, Reddit and BGG were
+>   all unreachable in the session that produced this file.
+> - **§7.2 step 2's** *"Because the reading player does not know what the card pays, the redraw
+>   is a BET, not a decision"* is **accurate about the real game** and **retired as a
+>   justification for ours**. The mechanic is kept as a priced reroll; the reasoning behind it
+>   no longer holds in this implementation.
+
 **Evidence tags used throughout:**
 - `[VERIFIED <url>]` — read directly on the cited page.
 - `[INFERRED]` — reasoned from evidence; the reasoning is stated inline.

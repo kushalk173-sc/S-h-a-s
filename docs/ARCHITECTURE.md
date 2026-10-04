@@ -59,6 +59,34 @@
 > disagree, the code wins and the intent is annotated. Sections describing *observed
 > state* have been updated to match.
 
+> ### ⛔ A SECOND RECONCILIATION, 2026-10-03 — after full information
+>
+> **Read `packages/server/src/FULL-INFORMATION.md` first.** It is the authority and it is
+> short. This document's **§4** carries a supersession block saying plainly what is public
+> and what is still secret; §4.1, §4.2, §4.3, §4.4, §4.5, §3.3, §5.4, §6.5 and **D6** each
+> carry ⛔ markers at their own location.
+>
+> **Three corrections that are *not* about the reversal and are drift like any other:**
+> - **"60 cards ship"** (this header, §6, §6.5, §9, M2's row in §7.2, and **D14**) is
+>   **now 151** — 0 `verbatim`, 41 `adapted`, 110 `inferred`, of which **76 are Ideology
+>   Cards**. `packages/cards/decks/SOURCES.md` §3 is the per-card audit trail. **`D14`'s
+>   threshold argument is unchanged and its decision stands**; only its counts are stale,
+>   and `D14`'s own "the caveat that now dominates" is now outranked by `PLAN.md` §9
+>   **risk #2 (dominance)**, which did not exist as a live risk on 2026-09-30.
+> - **"the client does not compile — 14 errors in `GameScreen.tsx`"** (this header, §7.7)
+>   is **historical**. `AnswerScreen.tsx` and `TableQuestion.tsx` are live shipped code that
+>   quotes and depends on the current wire types, which is not consistent with a package
+>   that does not build. **I could not run `tsc` for this pass**, so the claim is recorded as
+>   *very likely stale* rather than corrected — see the ship-log entry in `PLAN.md`.
+> - **M2's ledger row** in §7.2 keeps its 2026-09-30 numbers for the same reason `PLAN.md`'s
+>   does: **a milestone ledger's value is that its entries are dated.** Append, never edit.
+>
+> **One thing that was *not* drift and is now wrong in the other direction:** the boardgame.io
+> disqualifier's phrase *"the full answer key, in order"* (this header, §3.1, **D1**) was
+> true only while the payout was withheld. What ordered history discloses now is **the deck and
+> the `order` argument's input**. Still disqualifying — see `FULL-INFORMATION.md` §6 for the
+> 45% position skew — but a smaller claim, and stated as such rather than quietly restated.
+
 ---
 
 ## 0. TL;DR — the decisions
@@ -823,6 +851,15 @@ fire-and-forget on a write-behind queue (§3.6).
 >   `Math.random`, or replay determinism breaks), and `answerSideFor` maps the index
 >   the player *pressed* back to the side of the card they *meant*. §5.3 rule 1 is
 >   therefore **wrong as originally written** and has been corrected below.
+>
+> ⛔ **2026-10-03 — the two names in that bullet are retired, and the mechanism is not.**
+> **`BlindPrompt` → `AnswerPrompt` (+ `AnswerSide`), and `match:state.blind` →
+> `match:state.answer`.** The `order` draw is **unchanged and is now the only thing withheld
+> at all**: `AnswerPrompt` carries the whole card — both labels, **both Ideologues, both
+> payouts** — plus `order`, owed by exactly one seat. The bullet above is kept as written
+> because its *reasoning* (`order` is a seed-derived draw from `_seed` and the card id, never
+> `Math.random`) is still exactly right and still load-bearing; see
+> `packages/server/src/FULL-INFORMATION.md` §3 and `PLAN.md` §2.
 
 Every message is `{ t: <type> }` plus payload. `id` is a client-supplied correlation id,
 echoed back in `error` messages.
@@ -904,6 +941,41 @@ architecture that made it safe. §5.3's client-side type-level proof
 (`client/src/answer/blindAnswer.types.ts`) is the mirror of this on the other side of
 the wire, and `order` is why the assertion is a compile-time check rather than a
 convention.
+
+> ⛔ **RETIRED IN WHOLE — 2026-10-03. `BlindPrompt` does not exist, and neither does the
+> argument it was making.** `packages/server/src/FULL-INFORMATION.md` §3 records the rename to
+> `AnswerPrompt` + `AnswerSide` with the reason: *"a type carrying two payouts and still called
+> `BlindPrompt` is a lie in a name."* The shipped shape is:
+>
+> ```ts
+> export type AnswerSide = {
+>   readonly label: string;
+>   readonly ideologue: Ideology;
+>   readonly pays: Delta;              // ← now public, to every seat, by decision
+> };
+> export type AnswerPrompt = {
+>   readonly question: string;
+>   readonly sides: readonly [AnswerSide, AnswerSide];   // already in DISPLAY order
+>   readonly order: 'ab' | 'ba';       // ← the guarantee now lives HERE, and only here
+> };
+> ```
+>
+> **The threat the paragraph above identifies is real and has not gone away — the control
+> moved.** *"There is nothing for a later refactor to accidentally bind into the DOM"* was
+> never quite true once the type held a `Delta`; it is now plainly false, because the DOM is
+> **supposed** to hold it. The property that is actually defended now is **narrower and
+> sharper**: the two sides must render identically, and no `order` key may reach the client at
+> any depth. That is enforced positively — `getComputedStyle` equality over both cells on a
+> fixture whose sides carry *different* Ideologues and *different* payouts, a DOM-level check
+> that no `data-ideologue` / `data-pays` / `order` attribute exists, and
+> `PublishedOpenQuestion` **refusing** a payload carrying `order`.
+>
+> **And the client-side type-level proof is gone with it**, by the same logic — a proof that
+> the payout cannot reach the DOM is a proof that the product is not supposed to ship.
+> `answer/blindAnswer.test.tsx` now asserts the *positive* version: the whole card is on
+> screen, and the `order` draw is not. The seven "no payout in the DOM" assertions were
+> **inverted, not deleted**, and the inversion is listed row by row at
+> `FULL-INFORMATION.md` §3.
 
 `Session` is the reconnect credential and the thing a client stores in
 `sessionStorage`:
@@ -1183,6 +1255,61 @@ client is in the match's action log. **Designed for, not built.**
 > This is the project's defining property. PLAN.md §9 risk #3. Everything below is
 > load-bearing; none of it is a hardening step to add later.
 
+> ### ⛔ PARTIALLY SUPERSEDED 2026-10-03 — full information. This section's *scope* shrank;
+> ### its machinery did not.
+>
+> **The authority is `packages/server/src/FULL-INFORMATION.md`.** Read it before editing
+> anything below. This block is the index; the sub-sections carry ⛔ markers at their own
+> locations.
+>
+> **Said plainly, because the section heading above is now a narrower claim than it was.**
+>
+> **What is PUBLIC, by deliberate reversal:**
+> - **The whole Ideology Card.** Question, both answer labels, **both Ideologues, and both
+>   payouts** — to every seat and every spectator, before anyone answers. This reaches every
+>   seat as `state.openQuestion` (`PublishedOpenQuestion`) and the answerer additionally as
+>   the `answer` prompt. At a physical table the card is read aloud and belongs to the table
+>   (`AUTHENTIC-SHASN-REFERENCE` §7.2 step 1).
+> - **`manifesto` and `manifestoCards`** — unchanged, and unchanged for the same physical-
+>   table reason (p13: answered cards sit face up under the mat).
+>
+> **What is still SECRET, and every item below is still gated by
+> `scripts/check-secrets.mjs`:**
+> - **`_pendingCard`'s *id*.** The card is public by **content** and secret by **id**. This
+>   is the load-bearing one, and the reason is mechanical rather than sentimental:
+>   `check-secrets.mjs` works by the field being `_`-prefixed and named in `SECRET_NAMES`, so
+>   publishing the id would move the value onto an unprefixed field **where no gate on that
+>   list covers it**. Four arguments, at `FULL-INFORMATION.md` §2.
+> - **The `order` draw** — refused at both boundaries. `PublicQuestion` admits no such key at
+>   any depth; `app/blindWire.ts`'s `openQuestionOf` returns `null` for a payload carrying
+>   one. **This is now the entire remaining mechanic**, and it matters more than it did,
+>   because the Ideologue is printed beside each answer and the deck's Ideologue-by-position
+>   skew is measured at 45%.
+> - **All eight draw and discard piles**, `_seed`, `_idSeq`.
+> - **`PlayerState.conspiracies`, for every viewer including its owner** (D25) — unchanged,
+>   and still a *rulebook* line rather than a convenience (p19: bought and **held**).
+> - **`PlayerState.ideologyCards`**, a donated Ideology Card held but not yet answered.
+>
+> **What did NOT change, and it is the section's real subject:** the machinery. The server is
+> still the only exit to the wire; `playerView` is still applied at exactly one place;
+> `playerView.ts` still strips **by prefix, structurally, recursively**; `render-all.ts` is
+> still `never`-checked; `check-secrets.mjs` is still wired into `typecheck`. `packages/engine`
+> is untouched — `_pendingCard` keeps its name, `PRIVATE_PLAYER_KEYS` keeps
+> `['conspiracies', 'ideologyCards']`, and the underscore convention keeps its meaning,
+> because **the engine's job did not change; the server's publication decision did.**
+>
+> **The tests got stronger while the threat got narrower.** Every assertion that read *"no
+> payout in the payload"* was **inverted, not deleted**: it is now *"the whole card is on
+> screen, in the shape the client reads"*, over the production broadcast, plus three new
+> gates — no card id for any viewer, the table's and answerer's copies byte-identical apart
+> from `order`, and `order` present in exactly one of them. The `BlindPrompt` type is gone
+> and so is the type-level proof, and `FULL-INFORMATION.md` §3 records each retirement with
+> its replacement rather than leaving a hole.
+>
+> **One consequence for this document's own §4.4 and §4.5 examples:** the payload sketch
+> below shows `blind: { question, labels }` and a `NO pays` footer. Both are retired. Read
+> them as the pre-reversal shape, because the shape is still what you must *not* ship.
+
 ### 4.1 The threat, stated precisely
 
 The client is fully hostile. Not "a curious user opening devtools" — a user who has
@@ -1190,6 +1317,25 @@ decided to win, has the game's card list in a GitHub repo, and will read every
 byte the server sends them. There is exactly one secret that matters:
 
 > **The payout of the Ideology Card currently put to player *X*.**
+
+> ⛔ **RETIRED 2026-10-03 — and this is the exact sentence the reversal happened to kill.**
+> Under full information the payout is **published to every seat and every spectator**, so it
+> is no longer the secret. `FULL-INFORMATION.md` §1 says what replaced it and why the old
+> withholding was protecting something already reachable: the Ideology corpus is public JSON
+> in this repository, so every payout was always one lookup away, and what the withholding
+> actually protected was *which* card was on the table.
+>
+> **The threat, restated for the design that ships:**
+>
+> > **Which side of the card is on the left, and which card is on the table at all** — i.e.
+> > the **`order` draw** and **`_pendingCard`'s id.**
+>
+> Both halves are corollary leakage of each other, and both are needed: `order` alone would
+> not tell you what you are looking at, and the id alone would be a lookup key into a public
+> corpus. Together they are the game. Everything else below is unchanged, including the
+> eleven-field scope and the asymmetry argument — a single successful leak is still
+> permanent and unrecoverable for that table, because a player who learns the deck order
+> cannot be made to forget it.
 
 Everything else — deck order, `_seed`, the identity of the next card — is *corollary
 leakage*: knowing the top of `_ideologyDraw` tells you the next answer's payout
@@ -1213,14 +1359,14 @@ get wrong — is why this is a first-class subsystem with its own files, not a c
 
 | Field | Contents | If leaked | Classification |
 |---|---|---|---|
-| `_pendingCard` | the `CardID` put to the active player | Reveals *which* card → with the public deck, the payouts. **Instant game over.** | **CATASTROPHIC** |
+| `_pendingCard` | the `CardID` put to the active player | ⛔ **Reclassified 2026-10-03.** It used to read *"Reveals which card → with the public deck, the payouts. **Instant game over.**"* — the **payouts are published now**, so that inference no longer holds. What the id still reveals is **which card is on the table**, which is the last pointer to the remaining deck and the input to the `order` argument: a client that knows the id knows the card's own `sides` tuple, and therefore which display position is the Capitalists' answer. That is the whole of what is left. | **CATASTROPHIC** — re-ranked on 2026-10-03 from "leaks the payouts" to "leaks the position", and the position is still the game |
 | `_ideologyDraw` | ordered remaining Ideology deck | Reveals the next N questions *and their payouts*, before the reveal. | **CATASTROPHIC** (corollary) |
 | `_conspiracyDraw` | ordered Conspiracy deck | Reveals conspiracy identities; costs are public. Reveals the *top* card before purchase — and p19 allows buying **only** the top card, so this is the whole of a purchase decision. | HIGH |
 | `_headlineDraw` | ordered Headline deck | Reveals pending volatility, including which penalties are queued against you. | HIGH |
 | `_voterDraw` | ordered Voter deck | Reveals upcoming market contents. Low value — market cards are face-up by design. | MEDIUM |
 | `_ideologyDiscard` | discard pile | The **answered** cards. `manifestoCards` is public, so little extra. | MEDIUM |
 | `_voterDiscard` / `_conspiracyDiscard` / `_headlineDiscard` | discard piles | Face-up information already public. **Except**: `_conspiracyDiscard` is the pile a `draw-from-discard` card would reach into (KNOWN-GAPS G17, unshipped), so its value rises the moment that gap closes. | LOW |
-| `_seed` | the PRNG cursor | **Reconstructs the entire random stream from the start.** With `setup`'s shuffle calls in a known order, an attacker who knows the deck composition can regenerate every future draw *and* every past one. **This is the highest-leverage single number in the process** — and `broadcast.ts` reads it, legitimately, to derive the blind answer's `order` (§3.3). That read is the single most delicate line in the server. | **CATASTROPHIC** |
+| `_seed` | the PRNG cursor | **Reconstructs the entire random stream from the start.** With `setup`'s shuffle calls in a known order, an attacker who knows the deck composition can regenerate every future draw *and* every past one. **This is the highest-leverage single number in the process** — and `broadcast.ts` reads it, legitimately, to derive the answer's `order` (§3.3). That read is the single most delicate line in the server. **⚠ Higher still after 2026-10-03:** with the payout published, `_seed` no longer has to be combined with a card id to extract value — it *is* the deck. | **CATASTROPHIC** |
 | `_idSeq` | monotonic counter behind every generated id | Reveals the exact number of pending choices and voter groups created so far — i.e. how far into the game the table is, and how many decisions are outstanding. Not a card secret, but it is state the client has no business holding and it is the field most likely to be added by a well-meaning contributor. | LOW (but must not ship) |
 
 **`_seed` deserves emphasis.** It is easy to overlook because it is a number and
@@ -1282,6 +1428,47 @@ export function blindPromptFor(
 }
 ```
 
+> ⛔ **SUPERSEDED 2026-10-03 — the function above no longer exists, and the shape above is
+> the shape you must not ship.** `blindPromptFor` is **`answerPromptFor`**, and the
+> "Deliberately: … NOT ideologue. NOT pays." comment is precisely the line that was
+> reversed. The shipped function returns **the whole card**: question, both `AnswerSide`s
+> (each carrying `label`, `ideologue` and `pays`), plus the `order` draw — owed by exactly
+> one seat, which is the only viewer-identifying branch left in it.
+>
+> **The shipped shape, for the reader who needs to edit this rather than read about it:**
+>
+> ```ts
+> // broadcast.ts — the ONLY sanctioned read of the pending card's id.
+> export function answerPromptFor(state, cards, viewer): AnswerPrompt | null {
+>   if (viewer !== state.activePlayer) return null;   // the ONLY asymmetry left
+>   if (state.phase !== 'answer') return null;
+>   const cardId = readPendingCard(state);            // ← still `_pendingCard`
+>   if (cardId === null) return null;
+>   const card = cards.ideology[cardId];
+>   if (card === undefined) return null;
+>   const order = orderFor(state, cardId);            // STILL seed-derived, never Math.random
+>   const sides = order === 'ab' ? card.sides : [card.sides[1], card.sides[0]];
+>   return { question: card.question, sides, order };
+> }
+> ```
+>
+> **What did not change, and is the part worth noticing:**
+> - It is still a **separate function from `playerView`**, and it is still the only sanctioned
+>   read of the pending card's id. Decision **(a)** below still holds as an argument — with
+>   the caveat that the structural test that used to *prove* it (`keys == ['labels','order',
+>   'question']`) has been **inverted**, because the property it asserted no longer exists.
+>   The replacement is positive: every viewer receives both whole sides.
+> - `orderFor` is unchanged, and is now doing **more** work, not less. See the §4.4 note.
+> - `answerSideFor` — decision **(d)** below — is unchanged and still load-bearing.
+> - `match:state` still carries the prompt in the same send. ✅ still shipped, under the name
+>   `answer` rather than `blind`.
+>
+> **One decision that had to be re-argued rather than inherited: the `manifestoCards`
+> precedent does not transfer.** It is safe to publish an *answered* card by id, because its
+> payout has already been paid and revealed. Full information deletes exactly that condition,
+> so the precedent is silent here and cannot be borrowed. `FULL-INFORMATION.md` §2 re-argues
+> the ruling from the gate instead, which is the argument the next reader will want.
+
 **Four design decisions here, each with a trade-off** (the shipped file states all
 four in its own header comment, which is why it is worth reading before editing it):
 
@@ -1299,6 +1486,22 @@ which contains no `Delta` and no `Ideologue`, and **can be asserted structurally
 expect(Object.keys(blindPromptFor(s, cards, me)!).sort())
   .toEqual(['labels', 'order', 'question']);
 ```
+
+> ⛔ **The assertion above is retired; the separation is not.** It asserted the *absence* of
+> a payout, which full information makes false. `FULL-INFORMATION.md` §3 lists every such
+> test that was rewritten rather than deleted. **What replaces it, in the same file and the
+> same spirit, is positive and stronger**: every viewer receives **both whole sides**, and no
+> viewer's payload contains the pending card's id — plus the two new gates (table and
+> answerer byte-identical apart from `order`; `order` in exactly one of them).
+>
+> **The reason the separation survives even though the narrow type is gone** is worth stating
+> plainly, because it is the non-obvious part: `AnswerPrompt` **does** now carry a `Delta`.
+> The function is still separate so that (i) it is the **one** place that reads
+> `readPendingCard`, and (ii) the one branch that identifies a viewer — `viewer !==
+> state.activePlayer` — is auditable in isolation. A `playerView` that conditionally appended
+> a full payout-bearing card would put a viewer-conditional *content* decision inside the
+> one function whose whole contract is "strip, structurally". **That is the leak shape, and it
+> has not changed even though the payload has.**
 
 **Trade-off:** a client cannot get the prompt and the state in one message, so there
 are two round-trips (or one message with two fields — see below). **Mitigation:**
@@ -1373,11 +1576,40 @@ What actually crosses the wire during a blind answer:
     "finalRoundFrom": null
   },
   "you": { "role": "player", "playerId": "p_9c1d…" }
-  /* NO _pendingCard. NO _ideologyDraw. NO _seed. NO _idSeq. NO pays.
-     NO ideologue for this card. NO conspiracy hand contents, for ANY player
-     including the viewer. */
+  /* NO _pendingCard. NO _ideologyDraw. NO _seed. NO _idSeq. NO card id.
+     NO order key at any depth. NO conspiracy hand contents, for ANY player
+     including the viewer.
+     ⚠ 2026-10-03: the payout and the Ideologue ARE here, on purpose. The list
+        above is what is still secret — read the ⛔ note below, not this sketch. */
 }
 ```
+
+> ### ⛔ 2026-10-03 — this sketch is the pre-reversal shape. Three things in it are wrong now,
+> and one of them is wrong in the dangerous direction.
+>
+> | In the sketch above | Actually shipped |
+> |---|---|
+> | `"blind": { question, labels[2] }` | `"answer": { question, sides: [{label, ideologue, pays}, {…}], order }` — and `order` is in **exactly one** copy |
+> | `"NO pays. NO ideologue for this card."` | **Both are published.** This is the reversal, and the footer line is now the most misleading sentence in the document |
+> | `"blind": null` for non-answerers | Non-answerers get `"answer": null` **and a full `state.openQuestion`** with the whole card in display order |
+> | — *(not in the sketch)* | **A card id appears nowhere in any viewer's payload.** That was never true of the sketch either, and it is now the load-bearing assertion |
+>
+> **The one thing that is easy to get backwards:** reading the retired footer and concluding
+> the contract is weaker. It is not. **Three things are now asserted over the production
+> broadcast that were not asserted before**, because the old assertions were about absence and
+> the new ones can be about *shape*: every viewer receives both whole sides in the shape the
+> client reads; **no** viewer's payload contains the pending card's id; and the table's copy
+> and the answerer's copy are **byte-identical apart from `order`**, with `order` present in
+> exactly one of them.
+>
+> **`order` is refused, not omitted, at both ends** — `PublicQuestion` admits no such key at
+> any depth, and `app/blindWire.ts`'s `openQuestionOf` returns `null` for a payload carrying
+> one. **And this is why it matters more than it did.** The sides arrive *already in display
+> order*, so the table and the answerer are looking at one card rather than two orderings of
+> it — and because the Ideologue is printed beside each answer, a client that knew `order`
+> would publish the left-hand cell's faction in one line. Measured across all 76 Ideology
+> Cards, **position 0 holds the Capitalists' answer in 34 (45%)**. The `order` draw is the
+> only thing closing that, and it is why `orderFor` still reads `_seed`.
 
 > ### ⚠ `conspiracies` is an empty array in this payload. That is the whole point.
 >
@@ -1403,10 +1635,18 @@ What actually crosses the wire during a blind answer:
 ```jsonc
 { "t": "match:state", "matchId": "m_7f3a…", "viewId": 412,
   "state": { …identical shape, INCLUDING the empty `conspiracies`…,
-             "awaitingAnswer": true, "deckSizes": {…same…} },
-  "blind": null,                               // only the answerer gets a prompt
+             "awaitingAnswer": true, "deckSizes": {…same…},
+             "openQuestion": { question, sides: [ {label, ideologue, pays}, {…} ] } },
+  "answer": null,                              // only the answerer gets the order draw
   "you": { "role": "player", "playerId": "p_…different…" } }
 ```
+
+> ⛑ **The second sketch, corrected.** `openQuestion` is the **whole card, in display order,
+> for every non-answerer including spectators** — `openQuestionFor(state, cards)` takes **no
+> player**, because at a physical table the card is read aloud and belongs to the table
+> (`AUTHENTIC-SHASN-REFERENCE` §7.2 step 1). The only thing a non-answerer does not get is
+> the `order` draw and the commit control. The `→ to the ACTIVE player` framing in the first
+> sketch, and `"blind": null` as a way of saying "they see nothing", are both retired.
 
 Note what a non-answering player **cannot** distinguish: `deckSizes.ideology` is 61 for
 everyone and `awaitingAnswer` is true for everyone, so no observer can tell whether
@@ -1421,6 +1661,25 @@ The payout of a card is not, because the *next* one has not been answered.
 which lets them enumerate a player's history. **Accepted** — that information is
 already public at the table, and hiding it would break a real informational game
 mechanic.
+
+> ⛔ **One sentence of the paragraph above is retired: *"The payout of a card is not [public],
+> because the next one has not been answered."*** That was true only while the *pending*
+> card's payout was withheld, and it is the reasoning that `manifestoCards` was safe. **The
+> reasoning no longer applies to the pending card — it is published — and it never applied to
+> the answered ones, which the same paragraph says are face up.** So after 2026-10-03
+> `manifestoCards` is safe for the *same* reason as before: the card it names has already been
+> answered and its payout already revealed. It is no longer safe "because the next one is
+> hidden", because the next one is not.
+>
+> **This is exactly the trap `FULL-INFORMATION.md` §2 warns about, recorded where the mistake
+> would be made.** The `manifestoCards` precedent — *it is fine to publish an answered card
+> by id* — reads as a general licence to publish card ids, and the only thing that ever
+> licensed it was the contingent fact that an answered card's payout was already public. Full
+> information removes exactly that fact for the **pending** card. **Do not extend the
+> precedent.**
+>
+> The **trade-off** paragraph is unchanged and still accurate: an attacker learns a player's
+> answer history, which is public at the table.
 
 > **Note the asymmetry this section now deliberately holds.** `manifestoCards` is
 > public because p13 says the answered cards sit face up on the mat. `conspiracies` is
@@ -1513,6 +1772,45 @@ it('no ServerMessage produced by the handler leaks a _ key', () => {
   }
 });
 ```
+
+> ⛔ **The middle test above is retired; the two around it are the contract now, and they are
+> stronger — 2026-10-03.** *"'the blind prompt contains exactly two string fields and no
+> numbers'"* asserted the absence of a payout and of `order`. Full information makes the
+> first false; `order` moved rather than disappeared, so the **key list** is wrong too. It was
+> **inverted, not deleted**.
+>
+> **What replaced it, over the production broadcast, in `test/secret-state.test.ts` LAYER 3**
+> — and this is the assertion to read before touching anything here:
+>
+> ```ts
+> // POSITIVE: every viewer receives the whole card, in the shape the client reads.
+> for (const viewer of [null, ...Object.keys(s.players)]) {
+>   expect(sidesOf(state, viewer)).toEqual([
+>     { label: expect.any(String), ideologue: expect.any(String),
+>       pays: expect.any(Object) },
+>     { label: expect.any(String), ideologue: expect.any(String),
+>       pays: expect.any(Object) },
+>   ]);
+> }
+>
+> // NO CARD ID, for any viewer including the answerer. ← the load-bearing one now.
+> for (const viewer of [null, ...Object.keys(s.players)]) {
+>   expect(JSON.stringify(stateFor(viewer))).not.toContain(pendingCardId);
+> }
+>
+> // The table's copy and the answerer's copy are the same card …
+> expect(stripOrder(openQuestion)).toEqual(stripOrder(answerPrompt));
+> // … and `order` is in exactly one of them.
+> expect('order' in openQuestion).toBe(false);
+> expect('order' in answerPrompt).toBe(true);
+> ```
+>
+> **Why this is a better gate than the one it replaces, and it is worth stating because the
+> instinct is to think a reversal weakens the checks:** the old test could only assert that a
+> field was *missing*. The new ones assert that the right **shape** is present for every
+> viewer **and** that the one thing that must be absent is absent. A shape assertion fails on
+> a missing field; an absence assertion fails on a leak. **The old suite had only the second
+> kind. It now has both.**
 
 **The `handler.renderAll` helper is the real teeth.** It is a test-only function
 that produces every message the handler *can* produce for a state, so the test
@@ -1827,10 +2125,24 @@ interface ClientStore {
   state: ClientState | null;
   /** Buffered until the matching match:state lands. §3.3 option B. */
   pendingEvents: { viewId: number; events: GameEvent[] }[];
-  /** From blindPromptFor. Cleared the moment it is no longer your blind answer. */
+  /** From answerPromptFor. Cleared the moment it is no longer your answer. */
   blind: BlindPrompt | null;
 }
 ```
+
+> ⛔ **Renamed, and the three-mutator line below needs it — 2026-10-03.** `blind:
+> BlindPrompt | null` is **`answer: AnswerPrompt | null`**, and `clearBlind` is **`clearAnswer`**.
+> **The behaviour is unchanged and still load-bearing**, including the comment: the prompt is
+> cleared the moment it stops being *yours* to answer, which is what keeps the `order` draw
+> from outliving the turn.
+>
+> **What is new in the store, and it is a second source of the card:** `state.openQuestion`
+> (`PublishedOpenQuestion`) is an ordinary property of `ClientState` and carries the **whole
+> card in display order, for every viewer including spectators**. It is read through the
+> fail-closed narrow cast in `app/blindWire.ts#openQuestionOf`, which returns `null` for
+> anything malformed **and for any payload carrying an `order` key**. So there are two sources
+> of the card and they are byte-identical apart from `order` — asserted, not hoped for
+> (`test/secret-state.test.ts` LAYER 3).
 
 **The store has exactly three mutators:** `applyState`, `applyEvents`, `clearBlind`.
 No reducer, no middleware, no thunks. It is a fold over a message stream and nothing
@@ -2131,6 +2443,26 @@ A client with the full deck can compute nothing they couldn't already compute (p
 are per-side and only two are relevant), but there is no reason to ship it, and
 "no reason to" is the standard §4 enforces. **Trade-off:** the client cannot render a
 card gallery or a "cards remaining" preview. Deliberate.
+
+> ⛔ **The premise of this paragraph is retired; the rule and the trade-off stand — 2026-10-03.**
+> *"A client with the full deck can compute nothing they couldn't already compute (payouts are
+> per-side and only two are relevant)"* was true while the payout was withheld and is **no
+> longer true at all**: every payout is published, so a client with the deck can compute
+> **every** payout, past and future. That is the accepted cost and it is argued at
+> `FULL-INFORMATION.md` §1 — the corpus is public JSON in this repository, so the "shipping the
+> deck" would change is a distinction without a difference.
+>
+> **The rule is unchanged and is now the whole of this paragraph: the deck list is never sent
+> in bulk.** Under full information the reason is not that it would leak value — it would not,
+> the value is already out — it is that a bulk send is the shape `broadcast.ts` names as its
+> own failure mode, and nothing needs it. **The trade-off is unchanged too**, and slightly
+> larger: no card gallery, no "cards remaining" preview, and now also **no payout reference a
+> player could consult mid-turn** — which is of no consequence, because the two payouts on the
+> table are the two that matter.
+>
+> **One consequential upgrade.** `openQuestion` is now a second place the server places card
+> text into `ClientState` (alongside `answer`), for **every** viewer. Both are per-card and
+> neither is a bulk send, so §4's standard holds.
 
 ### 6.4 The balance checker — concretely
 
@@ -2895,6 +3227,23 @@ past M7.
 | **D4** | **Persisted match state — action log is truth, snapshot is a cache** | "In-memory first" (PLAN.md §3) — **overturned** | PLAN.md risk #5 says a 4–6 hour match must survive a refresh; "in-memory first" loses to the first deploy. The engine is deterministic and seeded, so `(seed, rules, cards, log)` *reconstructs any state* — a 24-hour match is a replay, not a restore. | A `rulesVersion`/`cardsVersion` drift is a correctness bug (mitigated by pinning hashes and refusing mismatched replays). A JSONB row rewrite per append. |
 | **D5** | **No general interrupt framework — use the two turn-gate exceptions that already exist** | A pending-interrupt queue with windows (PLAN.md §7 M5) | `reduce` already permits `PLAY_CONSPIRACY` out of turn during `phase: 'answer'`, and `RESOLVE_CHOICE` is addressed to whoever owns the `PendingChoice`. `PendingChoice` **is** the general out-of-turn decision channel. A second framework means a second notion of "whose turn is it". | No timed window; a player can play a conspiracy at the least convenient moment. Accepted — it's the rulebook's own framing (p19) and disruption is the cost. **This is the decision most likely to be wrong.** |
 | **D6** | **`playerView` + a separate `blindPromptFor`; one projection for players and spectators** | Merging the blind prompt into a conditional `playerView` | The structural test (§4.5) walks for `_` keys. A conditional `playerView` emitting card data *passes* that test and still kills the game. Two narrow projections are each independently assertable. | One extra RTT, or a `blind` field computed in the same send. |
+
+> ⛔ **D6 is renamed and its reasoning survives intact — 2026-10-03.** `blindPromptFor` is
+> **`answerPromptFor`**, and the cost column's `blind` field is `answer`. **The decision is
+> upheld and its argument got stronger, not weaker**, which is the interesting part:
+> *"a conditional `playerView` emitting card data passes that structural test and still kills
+> the game"* used to mean *the payout leaks*. It now means *a viewer-conditional content
+> decision is buried inside the one function whose entire contract is "strip, structurally"* —
+> and the content in question is the whole card. **Two narrow projections remain each
+> independently assertable**, and `playerView` remains the *only* place `_` keys are removed.
+>
+> **D1's disqualifier needs the same correction as `PLAN.md` §3's**, since it is the same
+> sentence in two documents: *"the full answer key, in order"* was true of the payouts **only
+> while the payout was withheld**. Under full information the payouts are public and what the
+> ordered history actually discloses is **the remaining deck and the `order` argument's input**
+> — which is still disqualifying, still the reason D1 stands, and is a smaller claim than the
+> one written. See `FULL-INFORMATION.md` §6 for the 45% position skew that makes deck order
+> the thing worth protecting.
 | **D7** | **No optimistic UI in the client; the store is a fold over messages** | Optimistic apply + reconcile (what boardgame.io would have given us) | Rejections are frequent and real (`'voters in a Volatile Area cannot be affected'`) so rollback is janky; more importantly, a client that applies actions locally holds a copy of the game, and a client holding a copy is one refactor from holding a card. The rule survives only if it is structural — a store with no `dispatch(action)` has nothing to be optimistic *with*. | ~1 RTT before anything moves. Invisible at 2 actions/min. |
 | **D8** | **No optimistic *presentation* either — animate between server facts** | CSS transition on the newly-received state | Same reason, and it keeps the rule absolute rather than negotiable. A 300ms interpolation on an already-true fact is animation, not prediction. | 300ms on every action. |
 | **D9** | **One Node process, no workers** | Worker threads / a cluster | The engine is synchronous and pure — a whole turn is sub-millisecond. There is no CPU-bound work to move, and a worker adds a structured-clone boundary around the exact object whose secrets §4 is protecting. Keeps secrets in one heap with one audited exit. | Single point of failure — mitigated by the action log (a crash is a replay, not a loss) and verified in M7. No horizontal scale; designed for, not built (§3.7). |
@@ -2903,6 +3252,28 @@ past M7.
 | **D12** | **Ship raw TS from `src` (existing convention) + `tsx` on the server** | Add a build step / `tsc -b` project references | No published artefacts, no runtime consumers. `tsx` is one dev dependency in one package. | A dev dependency in the production image; the client bundles TS through Vite. Revisit if cards force a build. |
 | **D13** | **One Postgres JSONB row per match** | Relational `matches` + `match_actions` | ~2 appends/min, ~1 MB at 2,400 actions. The relational split is a 30-minute change later. | Whole-row rewrite per append. Listed in §9. |
 | **D14** | **Ship a bounded corpus; 60 cards ship, not 40 and not 100+** | Wait for 100+ | PLAN.md risk #1 is the corpus, and it is writing that does not parallelise. **Corrected 2026-09-30:** the plan said "ship with 40"; the corpus that actually landed is **60 cards across 3 decks** (15 `adapted`, 45 `inferred`, 0 verbatim). The threshold argument is unchanged — 60 is a complete, playable game with replay value; 100 is a content track with a reviewer, not an engineering gate. | Shallower replay variety. **And the caveat that now dominates: 43 of the 50 real recovered cards (86%) cannot be expressed in the schema at all** — `KNOWN-GAPS.md`, §6.5. More cards is not the constraint; **schema coverage is.** |
+
+> ⛔ **D14's counts are stale; its decision is not — corrected 2026-10-03.** The corpus is now
+> **151 cards across 7 deck files — 0 `verbatim`, 41 `adapted`, 110 `inferred`** — of which
+> **76 are Ideology Cards**, the deck players see every turn. **The threshold argument is
+> untouched and this row is not being reopened:** a bounded corpus is still a complete,
+> playable game; 100+ was always a content track rather than an engineering gate.
+>
+> **What has changed is which caveat dominates, and it is now two of them:**
+> 1. **Schema coverage** — unchanged and still true. `KNOWN-GAPS.md` §2 and
+>    `packages/cards/KNOWN-GAPS.md` remain the handoff for M2b.
+> 2. **⚠ Dominance — new, and outranking the first for the Ideology deck.** Under full
+>    information a one-resource edge between a card's two sides is **visible to every player at
+>    the table** and the player is expected to act on it. One dominated card exists today
+>    (`ig-in2020-006`); `PLAN.md` §9 risk #2 carries the entry. **The cost column above gains
+>    one more line:** the balance checker's severities were tuned for a game where a skew was
+>    invisible, and they have not been re-tuned.
+>
+> **And the number this row cannot supply, recorded so it is not lost:** for the 76 Ideology
+> Cards, **10 carry a recovered question stem and 66 are authored outright.** The deck is
+> substantially original because **zero real Ideology Cards were ever recovered**
+> (`AUTHENTIC-SHASN-REFERENCE` §2.4 names the three sources that would close that). D14's
+> "bounded corpus" is bounded partly by the recovery failing, not by choice alone.
 | **D15** | **Original decks; licence question asked, not awaited** | Write licensed decks now, or block on the email | Nothing in the engine or the pipeline depends on the licence. Path 2 keeps both branches open at zero cost. | No real campaign names. CI greps for Memesys/Zain Memon tokens. |
 | **D16** | **Balance checker: `PURE_UPGRADE` and `POWER_THRESHOLD_CLIFF` are CI *errors*; `TOTAL_SKEW` is a warning** | Totals-only checking | A **0-sum** card can still be degenerate, because the *distribution* crosses a power-unlock line the totals discard: `{funds:2, trust:2}` vs `{funds:4}` totals 4–4 and is totals-clean, yet side 1 reaches `funds@3` while side 0 reaches nothing, so side 1 buys a Capitalist unlock worth a power per turn forever. A totals checker cannot see it. **Corrected 2026-09-30** — this row previously used the same pair as a `PURE_UPGRADE` example, which is not what it is (see §6.4.3). | The corpus will not be `--strict` clean until human-reviewed. |
 | **D17** | **±1 total resource tolerance band** | Zero-tolerance | One resource is 8% of a 12 cap, ~30 resources pass through in a game, and it cannot be decisive. Two is 17% and decides redraw affordability at the margin — which is where Shasn is played. | Some fine cards get flagged and argued about. The argument is the design review. |
