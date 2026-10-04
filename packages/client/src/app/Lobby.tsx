@@ -15,15 +15,35 @@
 
 import { useEffect, useState } from 'react';
 
-import type { ClientStore, SeatCount } from '../net/index.ts';
+import type { ClientStore, Lobby, SeatCount } from '../net/index.ts';
 
 import { LobbyScreen } from './Panels.tsx';
 import { send } from './session.ts';
-import { useApp } from './store.ts';
+import { useApp, type Link } from './store.ts';
 
 export type LobbyScreenHarnessProps = {
   readonly store: ClientStore;
 };
+
+/**
+ * How often the open-rooms list re-asks the server. See the effect that uses it.
+ * Exported so a test can drive the interval deterministically instead of waiting.
+ */
+export const ROOM_LIST_POLL_MS = 4000;
+
+/**
+ * Whether the open-rooms list should be re-asking the server on a timer.
+ *
+ * Extracted as a predicate so the two guards are testable without a socket —
+ * `LobbyScreenHarness` cannot be rendered in jsdom with a live link, because
+ * `session.send` reaches a real `WebSocket` and the secret gate keeps a fake
+ * transport out of this package's tests. `lobbyRooms.test.tsx` asserts this table
+ * and separately pins that the effect still calls it, so deleting the timer is a
+ * red test rather than a silent regression to "press REFRESH".
+ */
+export function shouldPollRoomList(lobby: Lobby | null, link: Link): boolean {
+  return lobby === null && link === 'live';
+}
 
 export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
   const [name, setName] = useState('Player');
@@ -44,6 +64,44 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
   useEffect(() => {
     if (link === 'live') send((c) => c.listLobbies());
   }, [link]);
+
+  /*
+    * THE ROOM LIST NOW KEEPS ITSELF CURRENT, and this is the effect that fixes
+    * "press REFRESH or the room is invisible".
+    *
+    * The list was asked for once per link and once per room, so a room created
+    * while this player sat on the open-rooms screen simply did not exist for them
+    * until they knew to press a button. That is correct-but-unforgiving, and a
+    * headless run filed it under the things a human trips over: the second player
+    * in any real session has to already know the lobby has a REFRESH control,
+    * and no lobby screen since has said so.
+    *
+    * WHY AN INTERVAL AND NOT AN EVENT. There is no event to hang it on: this
+    * client has no notification that a room was created, because it is not in one
+    * and the server sends nothing. Polling is the only honest option at this
+    * layer, and it is the same choice the transport already makes for `phase`.
+    *
+    * THE GUARDS ARE THE POINT, and each one earns its line:
+    *
+    *   - `lobby === null`. The list is only rendered on the open-rooms screen. A
+    *     seated player's view shows seats, not rooms, so polling for them is
+    *     traffic nobody asked for.
+    *   - `link === 'live'`. `send` drops a frame on a socket that is not open
+    *     (the race the effect above documents), so a timer that fires during a
+    *     reconnect would silently do nothing — and would look like it worked.
+    *
+    * 4s is chosen against the thing being waited on: a person deciding whether to
+    * create a room or join one. Nobody should press REFRESH to find out whether
+    * the friend they were invited by has arrived, and 4s is well inside the
+    * "did it change?" threshold a person will actually notice. It is a floor on
+    * the wait, not a target: the list still updates the instant the server
+    * answers, because `store.lobbies` is driven by the reply, not by the timer.
+    */
+  useEffect(() => {
+    if (!shouldPollRoomList(lobby, link)) return undefined;
+    const timer = setInterval(() => send((c) => c.listLobbies()), ROOM_LIST_POLL_MS);
+    return () => clearInterval(timer);
+  }, [lobby, link]);
 
   // A player who has just refreshed mid-game wants their room, not the create form, and
   // the store's own phase tells us which: a `lobby:state` sets it, so the moment the

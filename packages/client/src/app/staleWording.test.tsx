@@ -188,7 +188,7 @@ describe('nothing on screen claims the Ideology Card is hidden', () => {
     const text = (sub?.textContent ?? '').replace(/\s+/g, ' ').trim();
     // It is the FIRST thing the product says, so it is asserted, not eyeballed.
     expect(text).toBe(
-      'Four Ideologues. Nine constituencies. One hundred and twenty-nine voters, and both ' +
+      'Four Ideologues. Nine constituencies. One hundred and twenty-nine seats, and both ' +
         'answers — with what each one pays — printed before you choose.',
     );
     for (const { re, says } of FORBIDDEN) {
@@ -197,6 +197,17 @@ describe('nothing on screen claims the Ideology Card is hidden', () => {
     // …and it names the thing that is now public, because a pitch that only removed
     // the old claim would say nothing at all about the ruling.
     expect(text).toMatch(/pays/);
+    /*
+     * AND IT COUNTS THE THING THAT IS ACTUALLY THERE. It used to read "one hundred
+     * and twenty-nine voters"; 129 is the AREA count — the board's printed wells —
+     * and a fresh board has none of them filled. A headless run read the line
+     * literally against an empty board and filed it as something "a human would
+     * trip over". The rules blurb lower in the same file already said "voter
+     * areas", so the app contradicted itself in two places on the same screen.
+     */
+    expect(text, 'the pitch must not claim 129 VOTERS exist before anyone is seated').not.toMatch(
+      /twenty-nine voters/i,
+    );
   });
 
   it('no title= or aria-label anywhere in the answer subtree claims concealment', () => {

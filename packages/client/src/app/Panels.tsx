@@ -363,11 +363,21 @@ export function HeadlineDialog({
           effects are applied when you resolve it, and it may ask you for a decision.
         </p>
 
-        <p className="panel__note panel__note--quiet">
-          The card&apos;s printed text is not part of the public state this client is given, so the
-          card resolves by its effect alone. That is a gap in the wire view, not a rendering
-          choice.
-        </p>
+        {/*
+          THE DEVELOPER NOTE THAT WAS HERE IS GONE, and it is worth saying what it
+          said: "The card's printed text is not part of the public state this client
+          is given, so the card resolves by its effect alone. That is a gap in the
+          wire view, not a rendering choice."
+
+          That is a true sentence about `broadcast.ts` addressed to nobody. It
+          rendered to a PLAYER, mid-turn, in the middle of the decision they owed —
+          the highest-cognitive-cost moment in the game — and told them nothing
+          they could act on. A wire-shape gap is a bug report, not copy.
+
+          The gap itself is real, is not this client's to close, and is documented
+          where a limitation belongs: the `HeadlineDialog` docstring above. Nothing
+          is lost by deleting it from the frame.
+        */}
 
         <div className="row" style={{ marginTop: 'var(--sp-3)' }}>
           <button
@@ -388,6 +398,45 @@ export function HeadlineDialog({
 }
 
 // ─────────────────────────── the lobby (§5.1) ───────────────────────────
+
+/**
+ * A room's own key, as shown on its row.
+ *
+ * `lobbyId` is minted by the server as `l_` + 8 random bytes (`room.ts:newId`), so
+ * it is already eleven characters and was already chosen to be short enough to
+ * show. This function therefore shortens NOTHING — and that is worth stating,
+ * because the obvious "trim it to six characters for the row" instinct produces a
+ * worse key: `l_aB3xY9zQ1` and `l_aB3xW2pL8` share their first six characters, so
+ * a truncated key re-creates the very collision this row exists to remove. (A test
+ * caught exactly that while this was being written: two realistic ids that differ
+ * only after the sixth character rendered as identical rows.)
+ *
+ * It stays a function so the decision has one name, and so a future id shape that
+ * IS too long to show has somewhere to go.
+ */
+function roomKey(lobbyId: string): string {
+  return lobbyId;
+}
+
+/**
+ * WHY this room's JOIN is disabled, as a sentence — `undefined` when it is not.
+ *
+ * A greyed JOIN with no reason is the §9.2 prohibited case, and in a list of
+ * rooms it is worse than a dead control: `inProgress` and `seated ===
+ * maxPlayers` are properties of ONE room, and without this the only visible fact
+ * is that *some* room's button is off. A first-time player reads that as "I am
+ * looking at the wrong room" — which cost the harness two wrong joins.
+ *
+ * A `title` is not reachable by touch or by a screen reader on some
+ * combinations, so it is a summary, not the only channel: the row itself prints
+ * `in progress`, and the seat count is right there beside it.
+ */
+function joinRefusalReason(name: string, l: LobbySummary): string | undefined {
+  if (name.trim() === '') return 'Type a name before joining a room.';
+  if (l.inProgress) return 'That match has already started — WATCH it instead.';
+  if (l.seated >= l.maxPlayers) return 'That room is full — WATCH it instead.';
+  return undefined;
+}
 
 export type LobbyScreenProps = {
   readonly lobbies: readonly LobbySummary[];
@@ -449,9 +498,16 @@ export function LobbyScreen(props: LobbyScreenProps) {
            * two answers and the two payouts are on the card before the choice. It does
            * NOT claim the payouts are knowable or that choosing is easy — the Ideologue
            * balance still makes one side the better bet, and that is a balance problem
-           * argued in the corpus checker, not something a pitch line may paper over. */}
+           * argued in the corpus checker, not something a pitch line may paper over.
+           *
+           * AND IT SAYS "SEATS", NOT "VOTERS", because 129 is the AREA count. A
+           * headless run read the old line literally, against a board that has 129
+           * printed wells and no voters in them at the start, and filed it under
+           * the things "a human would trip over": the first sentence the product
+           * says miscounts its own board. The rules blurb lower down already said
+           * "voter areas", so the pitch did not even agree with the app. */}
           <p className="lobby__sub">
-            Four Ideologues. Nine constituencies. One hundred and twenty-nine voters, and both
+            Four Ideologues. Nine constituencies. One hundred and twenty-nine seats, and both
             answers — with what each one pays — printed before you choose.
           </p>
         </div>
@@ -509,10 +565,30 @@ export function LobbyScreen(props: LobbyScreenProps) {
                 </p>
               ) : (
                 props.lobbies.map((l) => (
-                  <div key={l.lobbyId} className="row">
+                  <div
+                    key={l.lobbyId}
+                    className="row"
+                    data-testid="room-row"
+                    data-lobby-id={l.lobbyId}
+                  >
                     <span className="seat seat--1">
                       <span className="seat__name">{l.name}</span>
                       <span className="seat__meta">
+                        {/*
+                          THE ROOM'S OWN KEY, on the row, because a room is not a
+                          NAME. Two rooms created by players who both typed "Player"
+                          rendered as two identical rows, so "press JOIN" was a guess:
+                          the harness's driver joined the wrong room twice before it
+                          gave its host a unique name, which is exactly the trap a
+                          human falls into. `lobbyId` is already on the wire and is
+                          the one field that distinguishes two rooms, so it is shown
+                          — shortened, because it is a disambiguator and not a name.
+
+                          The server mints it, so this client cannot make it prettier
+                          than this; making it VISIBLE is the whole of the fix.
+                        */}
+                        <span data-testid="room-key">{roomKey(l.lobbyId)}</span>
+                        {' · '}
                         {l.seated}/{l.maxPlayers}
                         {l.inProgress ? ' · in progress' : ''}
                       </span>
@@ -523,7 +599,17 @@ export function LobbyScreen(props: LobbyScreenProps) {
                       onClick={() => props.onJoin(l.lobbyId)}
                       disabled={props.name.trim() === '' || l.inProgress || l.seated >= l.maxPlayers}
                       aria-disabled={props.name.trim() === '' || l.inProgress || l.seated >= l.maxPlayers}
+                      /* THE CONTROL NAMES ITS OWN ROW. "JOIN" on a list of identical
+                         rows is an ambiguous label under WCAG 2.1 SC 2.4.6, and the
+                         disabled case is worse: a full or running room's JOIN goes
+                         grey with no reason on the button, so a first-time player
+                         reads "JOIN is off, so this is the wrong room" — which is a
+                         claim about the WRONG room when the room next to it is the
+                         one they want. */
+                      aria-label={`Join ${l.name}'s room ${roomKey(l.lobbyId)}`}
+                      title={joinRefusalReason(props.name, l)}
                       data-testid="join-room"
+                      data-lobby-id={l.lobbyId}
                     >
                       JOIN
                     </button>
@@ -538,16 +624,25 @@ export function LobbyScreen(props: LobbyScreenProps) {
                       className="btn btn--sm"
                       onClick={() => props.onWatchRoom(l.lobbyId)}
                       data-testid="watch-room"
-                      aria-label={`Watch ${l.name} without taking a seat`}
+                      aria-label={`Watch ${l.name}'s room ${roomKey(l.lobbyId)} without taking a seat`}
+                      data-lobby-id={l.lobbyId}
                     >
                       WATCH
                     </button>
                   </div>
                 ))
               )}
-              <button type="button" className="btn btn--sm" onClick={props.onList}>
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={props.onList}
+                data-testid="refresh-rooms"
+              >
                 REFRESH
               </button>
+              <p className="panel__note panel__note--quiet">
+                The list keeps itself up to date; REFRESH asks again now.
+              </p>
               <p className="panel__note panel__note--quiet">
                 WATCH takes no seat. The watcher sees the whole board and cannot act.
               </p>
