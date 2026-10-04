@@ -1405,20 +1405,72 @@ describe('the checker has teeth — three corruptions of real cards, three repor
     return c;
   };
 
+  /**
+   * THE TWO PRINTED-SENTENCE ARMS, as functions, so that every case below runs the SAME
+   * code the sweep above runs. They were inlined in each case before, which is how a case
+   * came to assert the opposite of its own title: a copy of an arm that reports nothing is
+   * indistinguishable from an arm that detects nothing, and the copy is the one under test.
+   *
+   * **EACH CASE NOW ASSERTS ITS OWN CONTROL** — that the arm is SILENT on the uncorrupted
+   * card — before asserting that it fires on the corrupted one. That is the difference
+   * between a detection and a demonstration that a regex matched a string: without the
+   * control, `not.toEqual([])` is satisfied by an arm that reports everything.
+   */
+  const shapeReports = (card: ShippedCard): readonly string[] => {
+    const out: string[] = [];
+    for (const claim of SHAPE_CLAIMS) {
+      if (!claim.printed.test(card.text)) continue;
+      if (!card.effects.some(claim.needs)) out.push(`prints that it ${claim.says}, and no clause does`);
+    }
+    return out;
+  };
+  const restrictionReports = (card: ShippedCard): readonly string[] => {
+    const out: string[] = [];
+    for (const claim of RESTRICTION_KIND_CLAIMS) {
+      if (!claim.printed.test(card.text)) continue;
+      const kinds = card.effects.filter((e) => e.op === 'restrict').map((e) => (e as { kind: string }).kind);
+      if (!kinds.includes(claim.kind)) out.push(`prints ${claim.why} but restricts ${kinds.join('/') || 'nothing'}`);
+    }
+    return out;
+  };
+
   it('reports a card whose DONATION clause was deleted but whose text still donates', () => {
     // KHAKI TERROR is the audit's own card, so this is the C1 shape exactly: the printed
     // first sentence is a claim about the player's pool, and deleting the `lose` leaves
     // the text intact and the behaviour gone.
+    //
+    // ## IT USED TO ASSERT THE OPPOSITE OF ITS OWN TITLE, and that is worth recording
+    //
+    // The old body was `expect(disagreements(stripped, position)).toEqual([])` over a
+    // **Headline** fixture — and `disagreements` returned `[]` for every Headline on its
+    // first line, so the assertion could not have failed for any reason at all. A test
+    // named for a detection that performs no detection is worse than no test: it
+    // manufactures the confidence a reader is supposed to draw from its title. The one
+    // thing it did check was an unrelated negative — that KHAKI TERROR does not print the
+    // `no-purchases` lock, which is a fact about a DIFFERENT arm and about the real card.
+    //
+    // So the detection is now done by `SHAPE_CLAIMS`, the instrument that reads the
+    // PRINTED sentence, and the sibling below already establishes that the per-op
+    // obligation is blind to exactly this corruption: with the clause gone there is no
+    // clause to attribute anything to, so `disagreements` is *expected* to be silent. That
+    // silence is asserted here as a boundary of the instrument rather than smuggled in as
+    // the detection.
     const original = find('hl-in2020-007');
     expect(original.text).toMatch(/Donate/i);
     const stripped: ShippedCard = { ...original, effects: [] };
-    // Nothing is measured, so the card cannot disagree with itself — which is exactly
-    // why the shipped corpus cannot be caught this way and why the teeth have to be
-    // demonstrated on a card whose TEXT still makes the claim.
-    expect(disagreements(stripped, position), 'an empty effect list has no clause to fail').toEqual([]);
-    // The real assertion: put the card's own text back on a reduction that does nothing
-    // and the text-agreement claim is false — which is what the KIND arm below catches.
-    expect(RESTRICTION_KIND_CLAIMS.some((k) => k.kind === 'no-purchases' && k.printed.test(original.text))).toBe(false);
+
+    // THE CONTROL, first: the arm is armed on the real card and reports nothing, so a
+    // report below is a finding and not an artefact of a pattern that matches everything.
+    expect(shapeReports(original), 'the donation arm is not armed on the fixture').toEqual([]);
+    // THE DETECTION: same text, the donation clause deleted.
+    expect(shapeReports(stripped), 'a card whose text still donates and whose donation clause was deleted was accepted').not.toEqual([]);
+    // …and named, so the failure message says which claim fired rather than just that one
+    // did.
+    expect(shapeReports(stripped).join(' ')).toMatch(/takes resources from the caster themselves/);
+    // …and the boundary, honestly: with no clause left there is nothing to measure, which
+    // is why this corruption is caught by the printed-sentence arm and not by the per-op
+    // obligation. Asserted so it stays a stated limit rather than a silent one.
+    expect(disagreements(stripped, position), 'the per-op obligation is no longer blind here, so the boundary note above is stale').toEqual([]);
   });
 
   it('reports a card printing THEFT that was written as a GAIN', () => {
@@ -1438,12 +1490,8 @@ describe('the checker has teeth — three corruptions of real cards, three repor
       ...original,
       effects: original.effects.map((e) => (e.op === 'steal-any' ? { op: 'gain-any', n: 2 } : e)) as Effect[],
     };
-    const reported: string[] = [];
-    for (const claim of SHAPE_CLAIMS) {
-      if (!claim.printed.test(corrupted.text)) continue;
-      if (!corrupted.effects.some(claim.needs)) reported.push(`prints that it ${claim.says}, and no clause does`);
-    }
-    expect(reported, 'a card that prints a theft and performs a gain was accepted').not.toEqual([]);
+    expect(shapeReports(original), 'the shape arm is not silent on the real card, so the report below proves nothing').toEqual([]);
+    expect(shapeReports(corrupted), 'a card that prints a theft and performs a gain was accepted').not.toEqual([]);
     // And the per-op obligation is BLIND to it, which is why the shape arm is not optional.
     expect(disagreements(corrupted, position), 'the per-op obligation saw the corruption').toEqual([]);
   });
@@ -1457,12 +1505,8 @@ describe('the checker has teeth — three corruptions of real cards, three repor
       ...original,
       effects: original.effects.map((e) => ('target' in e ? e : { ...e, target: 'each-opponent' as const })) as Effect[],
     };
-    const reported: string[] = [];
-    for (const claim of SHAPE_CLAIMS) {
-      if (!claim.printed.test(corrupted.text)) continue;
-      if (!corrupted.effects.some(claim.needs)) reported.push(`prints that it ${claim.says}, and no clause does`);
-    }
-    expect(reported, 'a card that prints a donation and drains an opponent was accepted').not.toEqual([]);
+    expect(shapeReports(original), 'the shape arm is not silent on the real card, so the report below proves nothing').toEqual([]);
+    expect(shapeReports(corrupted), 'a card that prints a donation and drains an opponent was accepted').not.toEqual([]);
   });
 
   it('reports a PURCHASE TAX that was written as a purchase BAN', () => {
@@ -1475,12 +1519,7 @@ describe('the checker has teeth — three corruptions of real cards, three repor
       ...PYTHONPOST,
       effects: PYTHONPOST.effects.map((e) => (e.op === 'restrict' ? { ...e, kind: 'no-purchases' as const, owed: 99 } : e)),
     };
-    const failures: string[] = [];
-    for (const claim of RESTRICTION_KIND_CLAIMS) {
-      if (!claim.printed.test(swapped.text)) continue;
-      const kinds = swapped.effects.filter((e) => e.op === 'restrict').map((e) => (e as { kind: string }).kind);
-      if (!kinds.includes(claim.kind)) failures.push(`prints ${claim.why} but restricts ${kinds.join('/')}`);
-    }
-    expect(failures, 'a surcharge printed as a no-purchases ban was accepted').not.toEqual([]);
+    expect(restrictionReports(PYTHONPOST), 'the kind arm is not silent on the real card, so the report below proves nothing').toEqual([]);
+    expect(restrictionReports(swapped), 'a surcharge printed as a no-purchases ban was accepted').not.toEqual([]);
   });
 });
