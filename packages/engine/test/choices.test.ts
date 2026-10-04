@@ -350,6 +350,29 @@ const ALL_SCOPES = ['own', 'others', 'any'] as const;
 /** Pools chosen to sit on both sides of every ceiling: empty, one short, ample, at cap. */
 const POOLS_UNDER_TEST: readonly Pool[] = [POOL(0), POOL(1), POOL(2), POOL(12, 12, 12, 12), POOL(99, 99, 99, 99)];
 
+/**
+ * T3 — THE `ZoneSelector` AXIS, which the sweep was silent about while its docstring
+ * claimed a cross-product.
+ *
+ * `null` is "the op carries no `zone` at all", which is the baseline the other three are
+ * read against. The three real selectors are here because `zone` is the one narrowing on
+ * these ops that can produce an **empty** target set, and empty is what strands a
+ * decision: `resolveZone` returning `null` falls back to the whole board (the safe
+ * direction) but a zone that RESOLVES is a real narrowing, and `resolveChoice`'s
+ * `area.zone !== c.zoneId` guard is the only thing keeping the pick space equal to the
+ * offered one. The combinations that were never asked are `convert-voter` +
+ * `'chosen-zone'` (two narrowings stacked: which zone, then whose voter) and `evict` +
+ * `'your-strongest'`.
+ *
+ * ONLY the three voter ops carry `zone` at the type level, so the axis is `[null]` for
+ * every other kind — the same carve-out the `scope` axis already makes.
+ */
+const ALL_ZONE_SELECTORS = [null, 'this-zone', 'your-strongest', 'chosen-zone'] as const;
+type ZoneUnderTest = (typeof ALL_ZONE_SELECTORS)[number];
+
+/** The kinds whose `Effect` arm has a `zone` field at all. */
+const ZONED_KINDS: readonly Kind[] = ['evict-voter', 'discard-voter', 'convert-voter'];
+
 /** One probe card per op that can raise a decision, so each kind is raised for real. */
 const PROBE_EFFECTS: Readonly<Record<Kind, ConspiracyCard>> = {
   'gain-any': probeCard('probe-gain-any', [{ op: 'gain-any', n: 2, target: 'you' }]),
@@ -388,24 +411,56 @@ const probeCtx: Ctx = { rules: RULES, cards: probeCards };
  * opponent, and `volatile` count pegs that cannot be affected at all (p18).
  *
  * Pegs are the ONLY thing the three voter kinds read off the board, so a board with
- * no pegs, a board of only foreign pegs, a board of only the chooser's own, and a
- * board half of each are four genuinely different states for them — and the
+ * no pegs, a board of only foreign pegs, a board of only the chooser's own, and
+ * a board half of each are four genuinely different states for them — and the
  * `evict-voter`-by-its-own-caster scope (`'any'`) is only distinct from `'others'` in
  * the second and third.
+ *
+ * ## `spread` — T3, AND IT IS WHY THE `zone` AXIS IS WORTH HAVING AT ALL
+ *
+ * Without it every peg lands in the FIRST zone, because `take()` walks
+ * `zones.flatMap(...)` in order. Four pegs is four pegs in one zone, so
+ * `'your-strongest'` and a `'choose-zone'` decision are never asked to discriminate
+ * between two populated constituencies — the one question those two selectors exist
+ * to ask. `spread` takes the free areas round-robin across zones instead, so the same
+ * counts are laid out over at least two zones and the narrowing has something to
+ * narrow. It is a *separate* flag rather than a fifth count triple because "where the
+ * pegs are" and "how many there are" are different axes and crossing them is the point.
  */
-function pegged(s: GameState, who: PlayerID, own: number, foreign: number, volatile: number): GameState {
-  let free = [...s.zones.flatMap((z) => z.areas.map((a) => a.id))];
+function pegged(
+  s: GameState,
+  who: PlayerID,
+  own: number,
+  foreign: number,
+  volatile: number,
+  spread = false,
+): GameState {
+  const areas = s.zones.flatMap((z) => z.areas);
+  // Spread: take the first free area, then the first area in a DIFFERENT zone, then the
+  // next free area after each — so the first two pegs already sit in two constituencies
+  // and everything after alternates. `flatMap` order is zone order, so this is
+  // deterministic and needs no rng (R1: `reduce` and its fixtures read no clock).
+  const all = areas.map((a) => a.id);
+  let free: string[];
+  if (!spread || s.zones.length < 2) {
+    free = [...all];
+  } else {
+    const first = all[0];
+    const second = s.zones[1]?.areas[0]?.id;
+    const rest = all.filter((id) => id !== first && id !== second);
+    free = [first, ...(second === undefined ? [] : [second]), ...rest].filter((id): id is string => id !== undefined);
+  }
   const take = (): string => {
     const id = free.shift();
     if (id === undefined) throw new Error('ran out of areas');
     return id;
   };
-  let areas = s.zones.flatMap((z) => z.areas);
+  let placed = areas;
   for (let i = 0; i < own + foreign + volatile; i += 1) {
     const id = take();
-    areas = areas.map((a) => (a.id === id ? { ...a, peg: { owner: i < own ? who : 'p2', majority: false }, ...(i >= own + foreign ? { volatile: true } : {}) } : a));
+    placed = placed.map((a) => (a.id === id ? { ...a, peg: { owner: i < own ? who : 'p2', majority: false }, ...(i >= own + foreign ? { volatile: true } : {}) } : a));
   }
-  return { ...s, zones: s.zones.map((z) => ({ ...z, areas: areas.filter((a) => z.areas.some((x) => x.id === a.id)) })) };
+  return { ...s, zones: s.zones.map((z) => ({ ...z, areas: placed.filter((a) => z.areas.some((x) => x.id === a.id)) })) };
 }
 
 /** Give each named player a pool. Anything omitted is left as setup dealt it. */
@@ -517,33 +572,65 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
    *  - the count the card asks for, because a count above every clamp is the whole
    *    shape of the defect;
    *  - and for the voter kinds, every scope, because `ChoiceScope` deliberately makes
-   *    "your own" and "an opponent's" different questions.
+   *    "your own" and "an opponent's" different questions;
+   *  - **and, since T3, every `ZoneSelector`, crossed with a peg layout SPREAD OVER TWO
+   *    ZONES.** That last clause is the fix: the axis existed as a claim in this
+   *    docstring and not as a loop, so `evict`/`discard-voter`/`convert-voter` were
+   *    never raised with a narrowing at all — and every peg landed in the first zone,
+   *    so even `'your-strongest'` was never asked to choose between two populated
+   *    constituencies.
    */
-  it('no combination of chooser pool, other pools, pegs, scope or count strands a decision', () => {
+  it('no combination of pool, pegs, scope, count or zone strands a decision', () => {
     const stranded: string[] = [];
     const kindsRaised = new Set<string>();
+    const zonesRaised = new Set<string>();
+    const zonesNarrowed = new Set<string>();
     let raised = 0;
     let probed = 0;
 
     for (const kind of ALL_KINDS) {
       for (const mine of POOLS_UNDER_TEST) {
         for (const theirs of POOLS_UNDER_TEST) {
-          for (const [own, foreign, vol] of [[0, 0, 0], [0, 2, 0], [2, 0, 0], [1, 1, 1]] as const) {
+          // The count triples, each laid out FLAT and then SPREAD. Flat is the historical
+          // layout and spread is the one that makes a zone narrowing mean something.
+          const pegLayouts = [
+            [0, 0, 0, false], [0, 2, 0, false], [2, 0, 0, false], [1, 1, 1, false],
+            [0, 2, 0, true], [2, 0, 0, true], [1, 1, 1, true],
+          ] as const;
+          for (const [own, foreign, vol, spread] of pegLayouts) {
             for (const count of [1, 2, 3, 5]) {
-              for (const scope of kind === 'evict-voter' || kind === 'discard-voter' || kind === 'convert-voter' ? ALL_SCOPES : [null]) {
-                const base = pegged(
+              for (const scope of ZONED_KINDS.includes(kind) ? ALL_SCOPES : [null]) {
+                for (const zone of ZONED_KINDS.includes(kind) ? ALL_ZONE_SELECTORS : [null]) {
+                const seeded = pegged(
                   withPools(fresh(1, ['p1', 'p2', 'p3'], { startResources: [{}, {}, {}] }), { p1: mine, p2: theirs, p3: theirs }),
                   'p1',
                   own,
                   foreign,
                   vol,
+                  spread,
                 );
+                // `'this-zone'` reads `GameState.headlineQueue[0].areaId`, and an empty
+                // queue resolves to `null` — the safe fallback, which is a real case but
+                // not the narrowing this axis exists to test. So for that selector the
+                // queue is pointed at a PEGGED area, which makes `resolveZone` return a
+                // real `ZoneID` and the clamp below do the work it exists to do.
+                const anchored = seeded.zones.flatMap((z) => z.areas).find((a) => a.peg !== null);
+                // How many constituencies are POPULATED. Hoisted out of the castAt loop
+                // because it is a property of the board, not of the decision, and this
+                // sweep runs it tens of thousands of times.
+                const populatedZones = new Set(
+                  seeded.zones.filter((z) => z.areas.some((a) => a.peg !== null)).map((z) => z.id),
+                );
+                const base: GameState =
+                  zone === 'this-zone' && anchored !== undefined
+                    ? { ...seeded, headlineQueue: [{ areaId: anchored.id, by: 'p1' }] }
+                    : seeded;
                 const playable = withHand({ ...base, phase: 'actions', activePlayer: 'p1', _pendingCard: null, choices: [] } as GameState, 'p1', [PROBE_EFFECTS[kind].id]);
 
                 // The card's printed `n` is what sets `count`, so vary it through the
                 // card rather than through the choice — a state built by hand is not
                 // a state the engine can raise.
-                const card = probeCard(`probe-${kind}-${count}`, [probeEffect(kind, count)]);
+                const card = probeCard(`probe-${kind}-${count}`, [probeEffect(kind, count, zone)]);
                 const indexed = indexCards({
                   ideology: Object.values(CARDS.ideology),
                   voter: Object.values(CARDS.voter),
@@ -565,15 +652,25 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
                   for (const pending of out.choices) {
                     raised += 1;
                     kindsRaised.add(pending.choice.kind);
+                    if (zone !== null) {
+                      zonesRaised.add(zone);
+                      // THE REAL FLOOR: a selector only narrows if there is more than one
+                      // populated constituency to narrow TO. Recording how many zones the
+                      // pegs ended up spread across — not how many zones the board has,
+                      // which is always nine — is what makes "the zone axis ran" mean "a
+                      // narrowing happened" rather than "a loop iterated".
+                      if (populatedZones.size > 1) zonesNarrowed.add(zone);
+                    }
                     probed += 1;
                     if (!candidatePicks(out.state, pending).some((r) => r.ok)) {
                       stranded.push(
-                        `${kind} count=${count} scope=${scope ?? '-'} castAt=${castAt} ` +
-                          `mine=${JSON.stringify(mine)} theirs=${JSON.stringify(theirs)} pegs=${own}/${foreign}/${vol} ` +
+                        `${kind} count=${count} scope=${scope ?? '-'} zone=${zone ?? '-'} castAt=${castAt} ` +
+                          `mine=${JSON.stringify(mine)} theirs=${JSON.stringify(theirs)} pegs=${own}/${foreign}/${vol}${spread ? ' spread' : ''} ` +
                           `-> ${JSON.stringify(pending.choice)}`,
                       );
                     }
                   }
+                }
                 }
               }
             }
@@ -585,6 +682,17 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
     expect(kindsRaised.size, `only raised ${[...kindsRaised].join(',')}`).toBe(ALL_KINDS.length);
     expect(raised, 'no decision was raised, so nothing was proved').toBeGreaterThan(0);
     expect(probed).toBe(raised);
+    // T3's non-vacuity floor, and it is the whole point of the axis: without these two
+    // the loop could gain a `zone` dimension that is never actually consulted — which is
+    // exactly what it was before, and exactly the failure the audit found.
+    expect(
+      [...zonesRaised].sort(),
+      'the zone axis raised nothing, so the narrowing is still unproved',
+    ).toEqual(['chosen-zone', 'this-zone', 'your-strongest']);
+    expect(
+      [...zonesNarrowed].sort(),
+      'the zone axis only ever ran with every peg in one zone, so nothing was ever narrowed',
+    ).toEqual(['chosen-zone', 'this-zone', 'your-strongest']);
     expect(stranded, `${stranded.length} raised decisions had NO legal pick:\n${stranded.slice(0, 12).join('\n')}`).toEqual([]);
   });
 
@@ -641,19 +749,35 @@ describe('G21 — every kind accepts a legal pick in EVERY state it can be raise
   });
 
   /**
-   * The probe effect for one kind, with the count the card asks for.
+   * The probe effect for one kind, with the count the card asks for and — for the three
+   * voter kinds — the `zone` narrowing it asks for.
    *
    * The six pre-existing kinds are one op with a retargetable `target`. The two new
    * ones are FIELD values on an ordinary op — `'chosen-player'` is an `EffectTarget`
    * and `'chosen-zone'` is a `ZoneSelector` — so they are built as such here, and
    * `playAndRead` must not retarget them (see its guard).
+   *
+   * **T3: THE `zone` PARAMETER.** Only the three voter ops have a `zone` in their
+   * `Effect` arm, so `probeEffect` narrows `op` before attaching one rather than
+   * spreading a `zone` onto an arm that does not have it — a probe that could
+   * manufacture a shape the type forbids would be proving something that cannot ship.
+   * `zone: null` therefore means "no narrowing at all", which is the baseline.
    */
-  function probeEffect(kind: Kind, count: number): ConspiracyCard['effects'][number] {
+  function probeEffect(
+    kind: Kind,
+    count: number,
+    zone: ZoneUnderTest = null,
+  ): ConspiracyCard['effects'][number] {
     if (kind === 'choose-player') return { op: 'voters', n: count, target: 'chosen-player' };
     if (kind === 'choose-zone') {
       return { op: 'discard-voter', n: count, target: 'each-opponent', zone: 'chosen-zone' };
     }
-    return { op: opFor(kind), n: count, target: 'each-opponent' };
+    const op = opFor(kind);
+    if (zone === null) return { op, n: count, target: 'each-opponent' };
+    if (op !== 'evict' && op !== 'discard-voter' && op !== 'convert-voter') {
+      throw new Error(`${op} has no zone field, so the zone axis asked an impossible question`);
+    }
+    return { op, n: count, target: 'each-opponent', zone };
   }
 
   /**
