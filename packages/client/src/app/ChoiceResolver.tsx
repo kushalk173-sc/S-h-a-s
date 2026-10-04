@@ -32,7 +32,7 @@ import { useMemo, useState } from 'react';
 
 import type { ClientState, PlayerID } from '@shasn/engine';
 
-import { choosablePlayers, choosableZones, myChoices, targetableAreas, type MyChoice } from './derive.ts';
+import { choosableCards, choosablePlayers, choosableZones, isVoterDecision, myChoices, targetableAreas, type MyChoice } from './derive.ts';
 import { ResourcePicker } from './ResourcePicker.tsx';
 
 export type ChoiceResolverProps = {
@@ -53,15 +53,19 @@ export type ChoiceResolverProps = {
   readonly onResolvePlayer: (choiceId: string, playerId: string) => void;
   /** G16 — answer a `'choose-zone'`: the constituency the card's actor named. */
   readonly onResolveZone: (choiceId: string, zoneId: string) => void;
+  /** G17 — answer a `'choose-card'`: the Conspiracy Card off the published recycle list. */
+  readonly onResolveCard: (choiceId: string, cardId: string) => void;
+  /**
+   * G17 — the server's NAMED recycle list, read fail-closed in `GameScreen.tsx` the way
+   * `playableConspiracies` is. A client cannot name a card it has no corpus for, so the
+   * names have to arrive; `undefined` and `[]` are different claims and only one of them
+   * is safe to make on the server's behalf.
+   */
+  readonly recycle: readonly { readonly id: string; readonly name: string }[];
   /** The draft the resource picker is holding, when it is for this choice. */
   readonly draft: Readonly<Record<string, number>>;
   readonly onDraft: (next: Readonly<Record<string, number>>) => void;
 };
-
-/** Does this choice need the board, or just the four denominations? */
-function isAreaShaped(kind: string): kind is 'evict-voter' | 'discard-voter' | 'convert-voter' {
-  return kind === 'evict-voter' || kind === 'discard-voter' || kind === 'convert-voter';
-}
 
 export function ChoiceResolver(props: ChoiceResolverProps) {
   const { state, you } = props;
@@ -108,7 +112,7 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
      rather than behind it. `aria-modal` goes with it — telling a screen reader the
      rest of the page is inert is only true while it is.
   */
-  const areaShaped = isAreaShaped(pending.choice.kind);
+  const areaShaped = isVoterDecision(owed0);
 
   return (
     <div
@@ -128,7 +132,7 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
         </h3>
         <p className="sheet__body">{reason}</p>
 
-        {isAreaShaped(pending.choice.kind) ? (
+        {isVoterDecision(owed0) ? (
           <AreaChoice
             state={state}
             you={you}
@@ -158,6 +162,25 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
             onResolve={props.onResolveZone}
             noun="constituency"
             empty="No constituency holds a voter this card could reach, so there is nothing to choose."
+          />
+        ) : owed0.kind === 'choose-card' ? (
+          /*
+             G17. A NEW KIND AND A NEW BRANCH, and the branch is here — ABOVE the
+             `<ResourcePicker>` fallback — rather than after it, because the fallback is
+             not a fallback that fails loudly: a card choice would have rendered a
+             resource dialog, four disabled `Add` buttons and a `TAKE 1` that sent a
+             `Delta` the server refuses as `malformed action`. A dialog that renders the
+             WRONG THING is worse than one that renders nothing, because the player
+             believes they are answering.
+
+             `choosableCards` intersects the decision's offered set with the server's LIVE
+             named recycle list, so a card another play took while this dialog was open
+             is shown as gone rather than offered and refused.
+          */
+          <CardChoice
+            choice={first}
+            ids={choosableCards(owed0, props.recycle)}
+            onResolve={props.onResolveCard}
           />
         ) : owed0.kind === 'steal-any' ? (
           <StealChoice
@@ -262,7 +285,7 @@ function AreaChoice({
 }) {
   const c = choice.pending.choice;
   /* `AreaChoice` is only ever rendered for the three area-shaped kinds (the
-     parent's `isAreaShaped` decides), but the type is a six-way union, so the
+     parent's `isVoterDecision` decides), but the type is a six-way union, so the
      narrowing is restated rather than asserted. */
   if (c.kind !== 'evict-voter' && c.kind !== 'discard-voter' && c.kind !== 'convert-voter') {
     return null;
@@ -272,7 +295,16 @@ function AreaChoice({
      here is what stops a `scope: 'own'` ask from being answered with a set the
      engine refuses — see `derive.ts:targetableCount`. */
   const scope = c.scope;
-  const legal = useMemo(() => targetableAreas(state, you, kind, scope), [state, you, kind, scope]);
+  /* THE SCOPE IS THE CARD'S, not the widget's. Mirroring `reduce.ts:targetableCount`
+     here is what stops a `scope: 'own'` ask from being answered with a set the
+     engine refuses — see `derive.ts:targetableCount`. `zoneId` is passed for the
+     same reason: `required` below already counts against the card's constituency,
+     so counting the whole board here would print a number of legal voters that is
+     larger than the ask can ever be. */
+  const legal = useMemo(
+    () => targetableAreas(state, you, kind, scope, c.zoneId),
+    [state, you, kind, scope, c.zoneId],
+  );
   const ready = picked.length === choice.required;
   const nothingToDo = choice.required === 0;
   const pickedInOneZone = useMemo(() => {
@@ -531,4 +563,48 @@ function NameChoice({
 
 function totalOf(p: { funds: number; clout: number; media: number; trust: number }): number {
   return p.funds + p.clout + p.media + p.trust;
+}
+
+/**
+ * G17 — `'choose-card'`: one card off the published recycle list.
+ *
+ * `NameChoice` with its own empty copy rather than a new component, because the SHAPE
+ * is identical — a list of ids, one press each — and a second widget for it would be a
+ * second thing to keep in step. The one thing that differs is the empty message, and
+ * that is a real state here: the recycle list can empty between the offer and the
+ * answer, and the honest answer is "there is nothing left to take" rather than an empty
+ * box the player cannot dismiss. §5.9b gives a decision no exit, so it must never
+ * present one with no legal move.
+ */
+function CardChoice({
+  choice,
+  ids,
+  onResolve,
+}: {
+  choice: MyChoice;
+  ids: readonly { readonly id: string; readonly label: string }[];
+  onResolve: (choiceId: string, id: string) => void;
+}) {
+  return (
+    <div className="col" data-testid="card-choice">
+      <p className="panel__note">Take it into your hand.</p>
+      {ids.length === 0 ? (
+        <p className="panel__note panel__note--quiet" data-testid="card-choice-empty">
+          The discard pile is empty, so there is nothing left to take.
+        </p>
+      ) : null}
+      {ids.map((x) => (
+        <button
+          key={x.id}
+          type="button"
+          className="btn"
+          onClick={() => onResolve(choice.pending.id, x.id)}
+          data-testid="card-choice-option"
+          data-name={x.id}
+        >
+          {x.label}
+        </button>
+      ))}
+    </div>
+  );
 }

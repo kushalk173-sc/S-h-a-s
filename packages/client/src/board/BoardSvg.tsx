@@ -106,11 +106,15 @@ export type BoardSvgProps = {
  * Derive the per-slot interaction from the board state.
  *
  * The board does not decide legality — the engine does. What the board *can* do
- * without rules is refuse to contradict them, and that means: an empty slot is
- * the only placement target (a placement target must be empty), and any slot
- * the caller has not marked legal is illegal *with the caller's reason
- * attached*, because a refusal that does not name its reason is a puzzle rather
- * than a constraint (§6.1.2, §9.10).
+ * without rules is refuse to contradict them, and that means: when the caller has
+ * told us the legal set, THAT SET IS THE ANSWER (`legalAreaIds`), and when it has
+ * not, the only rule this component knows is the one true of every placement that
+ * has ever used it — an empty slot is the target.
+ *
+ * The second half of that sentence is exactly what made an eviction unanswerable,
+ * and it is now scoped rather than removed: a voter DECISION passes
+ * `legalAreaIds`, and the fallback below can only ever run for a placement, which
+ * is the one case it is true of. See `types.ts:legalAreaIds` for the whole story.
  */
 function slotInteraction(input: {
   readonly state: BoardState;
@@ -122,6 +126,19 @@ function slotInteraction(input: {
   if (state.mode === 'place') {
     if (state.pickedAreaIds?.includes(slot.areaId) === true) {
       return { legality: 'chosen', chosen: true };
+    }
+    /*
+     * THE CALLER OWNS LEGALITY, checked BEFORE anything below can narrow it —
+     * including `lockedZoneId`, because a caller that computed a legal set has
+     * already applied whatever narrowing it meant to apply.
+     */
+    const supplied = state.legalAreaIds;
+    if (supplied !== undefined) {
+      if (supplied.has(slot.areaId)) return { legality: 'legal' };
+      return {
+        legality: 'illegal',
+        reason: state.illegalReason ?? 'not a legal target',
+      };
     }
     const locked = state.lockedZoneId;
     if (locked !== undefined && slot.zoneId !== locked) {

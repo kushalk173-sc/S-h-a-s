@@ -96,6 +96,7 @@ import {
   UI_RULES,
   actions,
   canAfford,
+  choiceBoardInteraction,
   deltaTotal,
   gerrymanderRefusal,
   lockedZoneFor,
@@ -246,28 +247,17 @@ export function GameScreen({ store }: GameScreenProps) {
     // A pending area-shaped choice takes the board: "choose two voters" is a
     // board decision, and a list of 129 checkboxes would be the same action
     // with a worse interface.
-    const owedAreaChoice = state.choices.find(
-      (c) =>
-        c.player === you &&
-        (c.choice.kind === 'evict-voter' ||
-          c.choice.kind === 'discard-voter' ||
-          c.choice.kind === 'convert-voter'),
-    );
-    if (owedAreaChoice !== undefined) {
-      const oc = owedAreaChoice.choice;
-      if (oc.kind !== 'evict-voter' && oc.kind !== 'discard-voter' && oc.kind !== 'convert-voter') {
-        return IDLE_INTERACTION;
-      }
-      const legal = targetableAreas(state, you as PlayerID, oc.kind, oc.scope);
-      return {
-        mode: 'place',
-        pickedAreaIds: app.toughLovePicks.filter((id) => legal.has(id)),
-        lockedZoneId: null,
-        gerrySourceAreaId: null,
-        resolveGerrySources: false,
-        disabled: false,
-      };
-    }
+    //
+    // IT IS ONE FUNCTION, `derive.ts:choiceBoardInteraction`, and it carries the
+    // legal SET to the board. It used to be inlined here, which computed the same
+    // `targetableAreas` and returned only `mode: 'place'` — so `BoardSvg` fell
+    // back to its own rule, "a placement target must be empty", and highlighted
+    // every slot an eviction cannot touch. The dialog said "click the highlighted
+    // slots" and the board highlighted the complement: CONFIRM dead at `0 of 3`,
+    // no cancel, table locked. Extracted so `choiceInvariant.test.tsx` drives
+    // THIS expression rather than a copy of it.
+    const owedBoard = choiceBoardInteraction(state, you as PlayerID, app.toughLovePicks);
+    if (owedBoard !== null) return owedBoard;
 
     /*
       G13 — THE BOARD FREEZES, AND IT IS CHECKED *BELOW* THE OWED CHOICE ON PURPOSE.
@@ -332,6 +322,32 @@ export function GameScreen({ store }: GameScreenProps) {
 
   // ─────────────────────────── board interaction ───────────────────────────
 
+  /**
+   * G17 — THE NAMED RECYCLE LIST, read off the wire fail-closed, on
+   * `playableConspiracies`'s exact reasoning.
+   *
+   * `state.conspiracyRecycle` is on the server's `PublicView` rather than on
+   * `ClientState`, because naming a card needs the `CardIndex` and this client does not
+   * hold one — so the cast is the same narrow, shape-validating one. A payload without
+   * the field, a `null`, a non-array, or a row with no `name` all produce `[]`, and `[]`
+   * makes the picker render its honest "there is nothing left to take" state rather than
+   * a list of raw card ids — which would be a row of strings a player cannot choose
+   * between, and §9.10's prohibited case with the label changed.
+   */
+  const recycle = useMemo<readonly { readonly id: string; readonly name: string }[]>(() => {
+    if (state === null) return [];
+    const raw = (state as { conspiracyRecycle?: unknown }).conspiracyRecycle;
+    if (!Array.isArray(raw)) return [];
+    const out: { readonly id: string; readonly name: string }[] = [];
+    for (const entry of raw) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const c = entry as Record<string, unknown>;
+      if (typeof c['id'] !== 'string' || typeof c['name'] !== 'string') continue;
+      out.push({ id: c['id'], name: c['name'] });
+    }
+    return out;
+  }, [state]);
+
   const onSlotActivate = useCallback(
     (areaId: string) => {
       if (state === null) return;
@@ -347,9 +363,19 @@ export function GameScreen({ store }: GameScreenProps) {
       if (owedAreaChoice !== undefined && you !== null) {
         const kind = owedAreaChoice.choice.kind;
         if (kind !== 'evict-voter' && kind !== 'discard-voter' && kind !== 'convert-voter') return;
-        const legal = targetableAreas(state, you, kind, owedAreaChoice.choice.scope);
+        const legal = targetableAreas(
+          state,
+          you,
+          kind,
+          owedAreaChoice.choice.scope,
+          // THE CARD'S CONSTITUENCY. Omitting it made this set the whole board, so
+          // a zone-scoped decision offered out-of-zone voters the engine refuses
+          // with `that voter is in another zone` — a click the UI called legal and
+          // the server called malformed.
+          owedAreaChoice.choice.zoneId,
+        );
         if (!legal.has(areaId)) {
-          setRefusal('that voter cannot be chosen — Volatile-Area voters are permanent');
+          setRefusal('no voter here this decision can reach');
           return;
         }
         if (app.toughLovePicks.includes(areaId)) {
@@ -972,6 +998,11 @@ export function GameScreen({ store }: GameScreenProps) {
             dispatch(
               actions.resolveChoice(choiceId, { kind: 'zone', zoneId: zoneId as ZoneID }),
             );
+            clearPowerTarget();
+          }}
+          recycle={recycle}
+          onResolveCard={(choiceId, cardId) => {
+            dispatch(actions.resolveChoice(choiceId, { kind: 'card', cardId }));
             clearPowerTarget();
           }}
           draft={app.picker?.pick ?? {}}

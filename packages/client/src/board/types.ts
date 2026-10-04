@@ -214,6 +214,36 @@ export type BoardState = {
   /** Area ids already picked for the group in progress (§4.7.3 same-zone tether). */
   readonly pickedAreaIds?: readonly string[];
   /**
+   * THE CALLER'S LEGAL SET. When this is present it is the WHOLE of `place`
+   * mode's legality: a slot in it is a legal target, a slot not in it is
+   * illegal with `illegalReason`. Nothing the board could work out for itself
+   * may narrow or widen it.
+   *
+   * ## WHY THIS FIELD EXISTS, AND IT IS THE FIFTH INSTANCE OF ONE BUG
+   *
+   * `place` mode had exactly one rule in the board — "an empty slot is the
+   * target" — which is TRUE of `PLACE_VOTERS` and FALSE of every voter-DECISION
+   * (`evict-voter`, `discard-voter`, `convert-voter`), whose targets are pegs
+   * that are *already on the board*. The caller knew the right set: it computed
+   * it from the engine's own `targetableCount`/`targetableAreas` and then threw
+   * it away, so the board re-derived legality from "is this slot empty" and
+   * offered the exact complement of its own dialog's instruction. Every
+   * highlighted slot was refused ("illegal: already occupied" — on an empty one
+   * the click *did* land, but on every slot the dialog named, it did not), so
+   * CONFIRM was permanently disabled and §5.9b's no-exit rule turned a raised
+   * decision into a locked table.
+   *
+   * **The board never derives a rule.** It renders one it is given. A mode whose
+   * legality the board must guess does not get a guess.
+   */
+  readonly legalAreaIds?: ReadonlySet<string>;
+  /**
+   * The sentence attached to every slot outside `legalAreaIds`. §6.1.2/§9.10: a
+   * refusal that does not name its reason is a puzzle rather than a constraint.
+   * Defaults to "not a legal target" when the caller has nothing better to say.
+   */
+  readonly illegalReason?: string;
+  /**
    * The gerrymander source the player has picked up, if any. Drives `⟲` on the
    * source and `◈` / `✕` on destinations (§4.7.2).
    */

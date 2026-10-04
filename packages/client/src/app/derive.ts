@@ -37,6 +37,7 @@
 import type {
   Action,
   AreaID,
+  CardID,
   Choice,
   ChoicePick,
   ChoiceScope,
@@ -217,6 +218,19 @@ export type BoardInteraction = {
   readonly mode: BoardMode;
   /** Area ids already picked for the group in flight. */
   readonly pickedAreaIds: readonly string[];
+  /**
+   * THE ENGINE'S LEGAL SET, handed to the board rather than re-derived there.
+   *
+   * Present only for the three voter DECISIONS, whose targets are pegs already on
+   * the board — the one case where "a placement target must be empty" is false and
+   * is therefore fatal if the board assumes it. `undefined` for a placement, which
+   * is the case that assumption is true of.
+   *
+   * See `board/types.ts:legalAreaIds` and `choiceBoardInteraction` below.
+   */
+  readonly legalAreaIds?: ReadonlySet<string>;
+  /** The sentence the board attaches to every slot outside `legalAreaIds`. */
+  readonly illegalReason?: string;
   /** The zone the first pick locked, for a `sameZone: true` group. */
   readonly lockedZoneId: BoardZoneID | null;
   /** The gerrymander source the player has armed, if any. */
@@ -261,6 +275,9 @@ export function toBoardState(state: ClientState, interaction: BoardInteraction):
     disabled: interaction.disabled,
     ...(interaction.lockedZoneId === null ? {} : { lockedZoneId: interaction.lockedZoneId }),
     pickedAreaIds: interaction.pickedAreaIds,
+    ...(interaction.legalAreaIds === undefined
+      ? {}
+      : { legalAreaIds: interaction.legalAreaIds, ...(interaction.illegalReason === undefined ? {} : { illegalReason: interaction.illegalReason }) }),
     ...(interaction.gerrySourceAreaId === null
       ? {}
       : { gerrySourceAreaId: interaction.gerrySourceAreaId }),
@@ -427,7 +444,7 @@ export function marketView(state: ClientState, player: PlayerID): readonly Marke
 // ─────────────────────────── choices ───────────────────────────
 
 /**
- * The eight decision shapes, with the sentence a player needs to act on each.
+ * The decision shapes, with the sentence a player needs to act on each.
  *
  * ## THIS SWITCH IS PROVABLY TOTAL, and the `never` below is the proof
  *
@@ -439,10 +456,17 @@ export function marketView(state: ClientState, player: PlayerID): readonly Marke
  * into the dialog, and the only report was a blank screen.
  *
  * `assertNever(choice)` is what converts it into a COMPILE ERROR. `choice` is
- * narrowed to `never` after every `case`, so adding a tenth `Choice` kind makes this
- * line fail to type-check — at the point of the addition, in the client, which is the
- * whole reason this file and the engine's `Choice` union are one handshake rather than
- * two changes.
+ * narrowed to `never` after every `case`, so adding a `Choice` kind makes this line
+ * fail to type-check — at the point of the addition, in the client, which is the whole
+ * reason this file and the engine's `Choice` union are one handshake rather than two
+ * changes.
+ *
+ * **AND IT HAD NO `never`, which is why this comment was a lie.** G17's `'choose-card'`
+ * arrived in the engine and this switch went on returning `undefined` for it — the
+ * `default` case of `requiredPicks` below had an `assertNever` and this one did not, so
+ * the dialog title went blank while every suite stayed green. The two switches sit
+ * eighteen lines apart and one of them was guarded; that asymmetry was the defect, and
+ * the line is here so it cannot be removed without failing to compile.
  */
 export function choiceHeadline(choice: Choice): string {
   // `resource(s)` is built once so all three resource headlines pluralise the
@@ -468,7 +492,44 @@ export function choiceHeadline(choice: Choice): string {
       return 'Choose a player';
     case 'choose-zone':
       return 'Choose a constituency';
+    case 'choose-card':
+      // G17. Says what the set IS rather than only what to do — the recycle list is a
+      // named thing a player will have seen emptying and refilling all game, and
+      // "Choose a card" with no noun would read as a choice out of their own hand.
+      return 'Take a Conspiracy Card from the discard pile';
+    default:
+      return assertNever(choice);
   }
+}
+
+/**
+ * G17 — the cards a `'choose-card'` decision may name, in the order the offer was made.
+ *
+ * **MIRRORS `applyEffect`'s candidate set, and the mirroring is what makes the dialog
+ * honest.** The engine offers the recycle list — every viewer already holds it — and
+ * `resolveChoice` validates against the live pile, which can only have shrunk since. So
+ * the client renders the decision's offered set INTERSECTED with the live wire list, in
+ * the offered order: a card that left the pile while the dialog was open is shown as
+ * gone rather than offered and then refused, and a card the client was never offered
+ * cannot be picked at all.
+ *
+ * Rendering the live list alone would be wrong in the other direction — it would offer a
+ * card no decision names, which the server refuses, and that is the dead-button outcome
+ * `requiredPicks`' whole docstring is about.
+ *
+ * `recycle` is the server's NAMED list (`state.conspiracyRecycle`, read fail-closed in
+ * `GameScreen.tsx`) rather than something derived here, because a client has no card
+ * index: a button reading a card id is a button that says nothing about the card.
+ */
+export function choosableCards(
+  choice: Extract<Choice, { readonly kind: 'choose-card' }>,
+  recycle: readonly { readonly id: CardID; readonly name: string }[],
+): readonly { readonly id: CardID; readonly label: string }[] {
+  const live = new Set(recycle.map((c) => c.id));
+  const names = new Map(recycle.map((c) => [c.id, c.name] as const));
+  return choice.cards
+    .filter((id) => live.has(id))
+    .map((id) => ({ id, label: names.get(id) ?? id }));
 }
 
 /**
@@ -553,6 +614,11 @@ export function choiceReason(choice: Choice, player?: PlayerState): string {
  *                   `applyEffect` raising nothing for an empty set is what makes this
  *                   safe: a zone with no legal peg in it is never offered, because
  *                   offering it would be a button the server refuses.
+ *   `choose-card`   `1`, uncapped, and never 0. `applyEffect` raises at most
+ *                   `min(n, recycle.length)` decisions, so the k-th of them is
+ *                   answered with at least one card on the pile — the satisfiability
+ *                   argument is the CAP, not a filter on holdings, which is what makes
+ *                   it different from a hand.
  */
 export function requiredPicks(
   choice: Choice,
@@ -575,6 +641,7 @@ export function requiredPicks(
       return Math.min(choice.count, targetableCount(state, player, choice.kind, choice.scope, choice.zoneId));
     case 'choose-player':
     case 'choose-zone':
+    case 'choose-card':
       return choice.count;
     default:
       // The totality guarantee, at the second of the three switch sites. Without this
@@ -628,6 +695,87 @@ export function targetableCount(
     }
   }
   return n;
+}
+
+/**
+ * THE BOARD INTERACTION FOR AN OWED VOTER DECISION, or `null` when none is owed.
+ *
+ * ## WHY THIS IS A FUNCTION AND NOT AN INLINE MEMO
+ *
+ * Because the whole defect was a *disagreement between two places that each knew
+ * the right answer*. `GameScreen`'s memo computed `targetableAreas(...)` and
+ * returned `mode: 'place'` without it; `BoardSvg` then re-derived legality from
+ * "is this slot empty" and offered the exact complement of the dialog's own
+ * instruction ("click the highlighted slots"). Occupied slots read `illegal:
+ * already occupied`; empty slots read `legal target` and could not be an eviction
+ * target at all. CONFIRM was dead and, §5.9b, there was no way out — a raised
+ * `evict-voter`/`discard-voter`/`convert-voter` locked the table permanently.
+ *
+ * A test that re-implements this memo would test its own copy, which is the hole
+ * every one of these bugs fell through. So the memo IS this function, `GameScreen`
+ * calls it, and `choiceInvariant.test.tsx` calls the same one — one expression, so
+ * "the dialog says one thing and the board another" is not expressible.
+ *
+ * **`zoneId` IS PASSED, and the omission of it was a second defect.** `targetableCount`
+ * has always taken the card's resolved constituency; the AREA SET did not. A
+ * zone-scoped decision therefore counted against the whole board (a count the
+ * player could never reach) while offering out-of-zone voters the engine refuses
+ * with `that voter is in another zone`.
+ */
+export function choiceBoardInteraction(
+  state: ClientState,
+  you: PlayerID,
+  picked: readonly string[],
+): BoardInteraction | null {
+  const owed = state.choices.find(
+    (c) =>
+      c.player === you &&
+      (c.choice.kind === 'evict-voter' ||
+        c.choice.kind === 'discard-voter' ||
+        c.choice.kind === 'convert-voter'),
+  );
+  if (owed === undefined) return null;
+  const oc = owed.choice;
+  if (oc.kind !== 'evict-voter' && oc.kind !== 'discard-voter' && oc.kind !== 'convert-voter') {
+    return null;
+  }
+  const legal = targetableAreas(state, you, oc.kind, oc.scope, oc.zoneId);
+  return {
+    mode: 'place',
+    // Only ids that are STILL legal are shown as picked: a voter that left the
+    // board between the click and the render must not keep its tick, because the
+    // tick is a promise the confirm will keep.
+    pickedAreaIds: picked.filter((id) => legal.has(id)),
+    lockedZoneId: null,
+    gerrySourceAreaId: null,
+    legalAreaIds: legal,
+    /*
+     * ONE SENTENCE FOR EVERY SLOT OUTSIDE THE SET, and it has to be true of both
+     * kinds of slot — the empty ones (the majority: there is no voter there) and the
+     * occupied ones that are out of scope or on the wrong side of it. "No voter here
+     * this decision can reach" is true of both, which "already occupied" was not:
+     * that string is the placement rule, and it is false of an empty well.
+     */
+    illegalReason: 'no voter here this decision can reach',
+    resolveGerrySources: false,
+    disabled: false,
+  };
+}
+
+/**
+ * `evict-voter` / `discard-voter` / `convert-voter` — the three kinds the board
+ * resolves. A type guard for the six-way `Choice` union, shared by every caller
+ * that has to narrow it without re-asserting (the `ChoiceResolver` render and the
+ * click handler).
+ */
+export function isVoterDecision(
+  choice: Choice,
+): choice is Extract<Choice, { readonly scope: ChoiceScope }> {
+  return (
+    choice.kind === 'evict-voter' ||
+    choice.kind === 'discard-voter' ||
+    choice.kind === 'convert-voter'
+  );
 }
 
 /** The areas this choice may name, for highlighting the board. */
