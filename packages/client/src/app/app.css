@@ -497,6 +497,28 @@
   letter-spacing: 0;
 }
 
+/* The Ideologue, on its OWN LINE. It and the bonus line are two different facts —
+   which Ideologue the cards are, and what they pay — and rendered as two inline
+   spans in a centred cell they concatenated into "CAPITALIST2 MORE · +1 FUNDS PER
+   2", which reads as one garbled label rather than two. Measured in a browser
+   screenshot, not reasoned about. */
+.mani__ideo,
+.mani__bonus {
+  display: block;
+  font: var(--type-resource-cap);
+  color: var(--ink-500);
+  text-transform: uppercase;
+}
+
+/* The bonus line is the softer of the two: it is the forecast, and §5.4 calls the
+   strip "the main strategic read on the mat", so it must be readable without
+   competing with the noun above it. */
+.mani__bonus {
+  font-weight: 400;
+  color: var(--ink-500);
+  opacity: 0.85;
+}
+
 .chip {
   display: inline-block;
   font: var(--type-resource-cap);

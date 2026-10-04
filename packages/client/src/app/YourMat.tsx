@@ -238,19 +238,38 @@ export function ManifestoStrip({ state, you }: { state: ClientState; you: Player
           <span className="mani__count">
             {c.count}
             {/* THE NOUN, VISIBLE. `cards` is 11px of text on a cell whose numeral is
-                24px, so it costs no vertical space and it is the whole difference
-                between "23 funds" and "23 cards". */}
-            <span className="mani__noun"> cards</span>
+                24px, so it costs no vertical space, and it is the whole difference
+                between "23 funds" and "23 cards". PLURALISED, because a cell reading
+                "1 cards" is the same class of error as one reading "23 funds": a
+                number attached to a noun it does not agree with, on the strip whose
+                whole job is to be believed. A screenshot caught it. */}
+            <span className="mani__noun"> {c.count === 1 ? 'card' : 'cards'}</span>
           </span>
-          {/* THE IDEOLOGUE, not the resource: the 23 ARE Capitalist cards. */}
-          <span className="mani__name">{IDEOLOGUE_NAME[c.ideologue]}</span>
+          {/* THE IDEOLOGUE, not the resource: the cards ARE Capitalist cards. Its own
+              line — `display: block` — because it and the bonus line are two
+              different facts, and rendered as two inline spans they ran together into
+              "CAPITALIST2 MORE · +1 FUNDS PER 2". Also caught by a screenshot.
+
+              The explicit `{' '}` between the spans is not decoration either: `display:
+              block` is a VISUAL break, so `textContent` — which is what a screen
+              reader concatenates, and what this project's own harness reads out of
+              the DOM — still got "1cardCapitalist2 more". A separator that only exists
+              in the layout is not a separator for anything that reads the text. */}
+          <span className="mani__ideo">{' '}
+            {IDEOLOGUE_NAME[c.ideologue]}
+          </span>
           {c.level !== null ? (
-            <span className={`chip chip--${c.level === 'L3' ? 'l3' : 'l5'}`}>{c.level}</span>
+            <span className={`chip chip--${c.level === 'L3' ? 'l3' : 'l5'}`}> {c.level}</span>
           ) : null}
           {/* §5.4 calls this "the main strategic read on the mat": it is what a
-              player looks at to decide what to answer, so it is the p28 rule in
-              words rather than a countdown to an unnamed threshold. */}
-          <span className="mani__name">
+              player looks at to decide what to answer, so it is the p28 rule in words
+              rather than a countdown to an unnamed threshold. INDEPENDENT of the chip
+              above, not its alternative — a cell at L5 still pays `+2 funds per turn`,
+              and folding this into the chip's `else` would have shown the forecast
+              only until the unlock and never again, which is exactly when it stops
+              being a forecast. */}
+          <span className="mani__bonus">
+            {' '}
             {c.level === null
               ? `${c.toNext} more · +1 ${c.resource} per ${UI_RULES.passiveBonusPer}`
               : `+${c.bonusPerTurn} ${c.resource} per turn`}

@@ -122,9 +122,13 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     expect(cell, 'no Capitalist cell rendered').not.toBeNull();
     const text = cell.textContent ?? '';
     // THE NOUN, visible. This is the entire fix.
-    expect(text, 'the count has no noun and reads as the resource holding').toMatch(/1\s*cards/i);
+    expect(text, 'the count has no noun and reads as the resource holding').toMatch(/1 card Capitalist/i);
+    // �and it agrees with the numeral. A cell reading '1 cards' is the same class of
+    // error as one reading '23 funds': a number attached to a noun it does not agree
+    // with, on the strip whose whole job is to be believed. Caught by a screenshot.
+    expect(text, 'the count is pluralised wrongly').not.toMatch(/\b1\s*cards\b/i);
     // THE IDEOLOGUE, not the resource: the card IS a Capitalist card.
-    expect(text, 'the cell does not name the Ideologue the cards are').toContain('Capitalist');
+    expect(text, 'the DOM text runs the count and the Ideologue together').toContain('Capitalist');
     // …and the resource survives, on the bonus line where it is what is being PAID.
     expect(text, 'the bonus no longer names what it pays').toMatch(/\+\d*\s*funds/i);
     // The unlock requirement, which was a bare countdown to an unnamed threshold.
@@ -134,7 +138,62 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     r.unmount();
   });
 
+it('the DOM TEXT runs the three facts apart, because textContent is what is read', () => {
+    // Found by a screenshot, not by reasoning: the cell's three spans are block-level,
+    // so they LOOKED like three lines — but `display: block` is a visual break only,
+    // and `textContent` still read "1cardCapitalist2 more · +1 funds per 2". That
+    // matters twice over: a screen reader concatenates the same string, and this
+    // project's own harness reads the mat out of the DOM by exactly that route.
+    //
+    // And the numeral has to agree with its noun. "1 cards" is the same class of error
+    // as "23 funds" — a number attached to a noun it does not agree with, on the strip
+    // whose whole job is to be believed.
+    const one = seat(['capitalist']);
+    const many = seat(['capitalist', 'capitalist']);
+    for (const [label, player] of [
+      ['one card', one],
+      ['two cards', many],
+    ] as const) {
+      const r = render(
+        <ManifestoStrip
+          state={{ players: { [ME]: player } } as unknown as ClientState}
+          you={ME}
+        />,
+      );
+      const text = r.container.querySelector('[data-testid=manifesto-capitalist]')?.textContent ?? '';
+      expect(text, `${label}: the count and the Ideologue are glued together`).toMatch(
+        /\d card[s]? Capitalist/,
+      );
+      expect(text, `${label}: the Ideologue and the forecast are glued together`).toMatch(
+        /Capitalist\s+\d+ more|Capitalist\s+L\d/,
+      );
+      expect(text, `${label}: the count and its noun disagree`).not.toMatch(/\b1 cards\b/);
+      r.unmount();
+    }
+  });
+
+  it('a LEVELLED cell still states the bonus — the forecast is not the chip’s alternative', () => {
+    // Folded into the chip's `else` by accident while fixing the run-together text,
+    // which would have shown the bonus only until the unlock and never again — i.e.
+    // exactly when it stops being a forecast and becomes an income.
+    const r = render(
+      <ManifestoStrip
+        state={{
+          players: {
+            [ME]: seat(Array.from({ length: 5 }, () => 'capitalist' as const)),
+          },
+        } as unknown as ClientState}
+        you={ME}
+      />,
+    );
+    const text = r.container.querySelector('[data-testid=manifesto-capitalist]')?.textContent ?? '';
+    expect(text, 'an L5 cell lost its bonus line').toContain('L5');
+    expect(text, 'an L5 cell does not say what it pays').toMatch(/\+\d+\s*funds per turn/i);
+    r.unmount();
+  });
+
   it('a card count is never printed where a resource name would read as its holding', () => {
+
     // The reported shape end to end: the strip above and the strip below, on one mat.
     const manifesto = Array.from({ length: 23 }, () => 'capitalist' as const);
     const me = seat(manifesto);
