@@ -118,9 +118,17 @@ from any published card. Counted off the deck files:
 > | `adapted` | **41** | Recovered material, played as a reconstruction. Each names what it dropped. |
 > | `inferred` | **110** | **Authored here.** |
 
+> **⚠ The provenance split above is measured on a corpus that has since grown.** It is left
+> as counted, because it was correct when counted and a README that silently rewrites its own
+> history is not a README. What is known to have moved since: the corpus reached **221 cards**
+> (`KNOWN-GAPS.md` §8, which added nine original substitutes for the recovered names it ruled
+> out), and the Ideology deck is now **134 cards**, not 76. The `verbatim`/`adapted`/
+> `inferred` split has **not** been re-measured — re-run `npm run validate --workspace
+> @shasn/cards` and trust its output over this block, exactly as `docs/RUNNING.md` says.
+
 **The part that should be impossible to miss: zero real Ideology Cards were ever recovered.**
 The 55 real cards recovered from Memesys' own official player-aids are almost all Conspiracy
-and Headline. The Ideology deck — **the 76 cards players see every single turn** — rests on
+and Headline. The Ideology deck — **the 134 cards players see every single turn** — rests on
 **ten recovered question stems**; everything past `ig-in2020-032` is authored outright, and
 no answer side of any real Ideology Card was ever recovered. YouTube, Reddit and BGG were
 all unreachable during the research session.
@@ -130,12 +138,18 @@ all unreachable during the research session.
 - **Only 31 of the 151 shipped cards — 21% — are recovered real material.** Those are the 31
   Conspiracy and Headline Cards tagged `adapted`. The other 10 `adapted` cards are Ideology
   Cards carrying a recovered question stem and nothing else, so the whole recovered corpus
-  reaches **31 playable-looking cards**.
-- **All 76 Ideology Cards are authored.** That is the deck a player handles on every single
+  reaches **31 playable-looking cards**. **⚠ Superseded in part:** `KNOWN-GAPS.md` §8 measures
+  the corpus-resident recovered cards at **34** (and shipped-as-authored at **26**) after three
+  more were built and nine substitutes filed. The `21%` is a proportion of a corpus that has
+  since grown, so it has not been recomputed.
+- **All 134 Ideology Cards are authored.** That is the deck a player handles on every single
   turn, and it is authored end to end.
 - **23 of the 54 named recovered cards are absent from the corpus entirely** — 17 not
   representable, 3 expressible and played but not yet shipped, 1 played and held back on a
-  ruling (LAB-GROWN EARWORM), and 2 recovered as names with no effect.
+  ruling (LAB-GROWN EARWORM), and 2 recovered as names with no effect. **Superseded in part:
+  all 14 of the inexpressible recovered cards now carry a ruling** (`KNOWN-GAPS.md` §8) — 3
+  built, 8 ruled out with an original substitute filed, 2 blocked on a named decision, and 1
+  (CHAI-PAANI) ruled never to have been a gap at all.
 - **X-card coverage:** Earth 2040 ships 25 of its 35 distinct named cards; India ships 6 of
   the 18 named rows §4 lists. The gap is a schema gap, not a research gap, for everything
   except the Ideology deck.

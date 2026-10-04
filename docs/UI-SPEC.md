@@ -44,7 +44,7 @@ Conventions used throughout:
 > | Still current — enforce it | Retired — do not build it |
 > |---|---|
 > | **The symmetry contract** (§1.2 table) and the two-sides-render-identically gate. Unchanged, and now with teeth it did not have: see the note at §1.2. | **§1 principle 1** — *"the client must never receive a full card object"*, and the payout arriving "as one number after commitment". |
-> | **The seed-derived `order`** (§1.2, §5.3). Unchanged in mechanism. Its role went from one of four things withheld to **the only thing withheld**, and it now matters more, because the Ideologue is printed beside each answer. | **§1.2 `Payout — not sent`.** |
+> | **The seed-derived `order`** (§1.2, §5.3). Unchanged in mechanism. Its role went from one of four things withheld to **the only thing withheld**, and it now matters more, because the Ideologue is printed beside each answer. **It is a per-card CONSTANT**: `_seed` moves only on a reshuffle, so the same card always arrives the same way round — see §1.2's note. | **§1.2 `Payout — not sent`.** |
 > | **The one-commit-control rule.** Unchanged and more load-bearing: a player who believes they committed a side and has not believes they have banked a resource they have not. | **§1.2 "What must not exist on this screen"** — resource icons, payout numerals, the words *Funds/Clout/Media/Trust*, any `title=`/`aria-label=` naming a resource. |
 > | **UI-SPEC §9 anti-patterns 1 and 3** (count-up, card flip). Still forbidden, for a sharper reason: **there is nothing to reveal**, so a reveal animation would be theatre. The payout is in the same frame as the answer, as prose, with no icon and no `title`. | **§5.3** — *"Commit to one of two answers without knowing the payout"*, the `PLAN.md:41` payload description, and *"The payout is not shown until you commit."* |
 > | **The log records the answer by position, never by Ideologue** (§5.3 assertion 8). Still correct, for a different reason: the Ideologue is on the card, so position is all that is left to hold back. | **§8.8's framing** that the guarantee "does not depend on any animation" *because* the payout is not in the payload. The conclusion survives; the premise does not. |
@@ -221,15 +221,34 @@ mechanically. So a fixed "A is on the left" would leak. Two mitigations:
 2. The label text is sent pre-mapped, so side identity ("the Trusts' answer") is never a
    client-side lookup keyed on `A`/`B`.
 
+> **"Per card" is exact, and it is load-bearing — read it as a per-card CONSTANT.** `order`
+> is a function of `_seed` and the card id and of nothing else, and `_seed` advances on a
+> deck reshuffle and on no other event (`GameState._seed`, `packages/engine/src/state.ts`;
+> pinned by `packages/engine/test/rng.test.ts`). So **the same Ideology Card is presented the
+> same way every time it is dealt in a match** — turn 1 and turn 400 are the same card and the
+> same `order`. A client must not cache or "vary" this per turn. Two consequences worth naming:
+> a player who has seen a card before sees the same order again (and has already read both
+> printed sides and both Ideologues, so the repeat tells them nothing new), and
+> `docs/AUDIT-2026-10.md` §S2's *per-answer* reading of this field was wrong — see its
+> correction.
+
 > **Sharpened, 2026-10-03 — this mitigation is now the *entire* remaining mechanic, and the
 > measurement is no longer a design worry.** The old rule existed because the Ideologue was
 > hidden, so per-side styling was the only channel available. Now the Ideologue is **printed
 > beside each answer**, so the channel is not hypothetical: one CSS rule tints a cell by
 > Ideologue and the left-hand position's faction is on screen. And the deck really is
-> skewed — measured across all 76 Ideology Cards, **position 0 holds the Capitalists' answer
-> in 34 of them (45%)** and position 1 in 4, where a balanced deck would put each Ideologue
-> near 19 in each position (`FULL-INFORMATION.md` §6). The seed-derived draw is what closes
-> it, and nothing else does.
+> skewed — measured across all 76 Ideology Cards as the corpus stood on 2026-10-03,
+> **position 0 holds the Capitalists' answer in 34 of them (45%)** and position 1 in 4, where
+> a balanced deck would put each Ideologue near 19 in each position (`FULL-INFORMATION.md`
+> §6). The seed-derived draw is what closes it, and nothing else does.
+>
+> **⚠ Deck size moved after that measurement, and the conclusion does not depend on it.** The
+> Ideology deck is now **134 cards** (`decks/SOURCES.md` §3: 92 `in2020` + 42 `et2040`). The
+> 34-card count is a count of *cards*, so it still describes 34 cards — but it is **34 of 134,
+> not 34 of 76**, and nobody has re-run the measurement over the 58 added cards. **Re-measure
+> before quoting the percentage.** What the mitigation rests on is not the percentage but the
+> existence of any imbalance at all, and *that* is not in doubt: the Ideologue is printed, so
+> any positional styling publishes a faction by position.
 >
 > **Two changes to what the wire carries, both asserted in `secret-state.test.ts` LAYER 3:**
 > the table's `openQuestion` and the answerer's prompt are **byte-identical apart from
@@ -2005,8 +2024,10 @@ similar values. The assertion test in §8.8 is the enforcement.
 > *probability* leak: it would publish which side tended to pay more. **The Ideologue is now
 > printed on the card**, so per-side styling is a *certainty* leak: a stylesheet that tints a
 > cell by its Ideologue publishes which Ideologue the left-hand position holds, and across
-> all 76 Ideology Cards position 0 holds the Capitalists' answer **45% of the time**
-> (`FULL-INFORMATION.md` §6). One CSS rule would undo the only mechanic left.
+> the 76-card Ideology deck as measured on 2026-10-03 position 0 held the Capitalists' answer
+> **45% of the time** (`FULL-INFORMATION.md` §6). One CSS rule would undo the only mechanic
+> left. **⚠ The deck is now 134 cards and that percentage has not been re-measured** — see
+> §1.2's note. The rule stands on the certainty, not on the figure.
 >
 > **The rule in its current, sharpest form: _the payout differs because the payout differs;
 > nothing else may._** The shipped enforcement is `blindAnswer.css`'s selector audit, which

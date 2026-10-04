@@ -451,9 +451,11 @@ npm run balance --workspace @shasn/cards -- --strict   # warnings too
 
 `validate` also prints the provenance census. **⚠ The counts hard-coded here were stale as of
 2026-10-03** (`verbatim 0, adapted 19, inferred 45` over 64 cards); the corpus is now
-**151 cards — 0 `verbatim`, 41 `adapted`, 110 `inferred`**, 76 of them Ideology Cards.
-**Trust the command's own output over this sentence.** See `packages/cards/README.md`,
-`packages/cards/decks/SOURCES.md` (per-card audit trail) and
+**151 cards — 0 `verbatim`, 41 `adapted`, 110 `inferred`**, **134** of them Ideology Cards
+(was 76 when this line was written). **The corpus total has since moved again** — `KNOWN-GAPS.md`
+§8 measures **221 cards** — and the `verbatim`/`adapted`/`inferred` split above has **not** been
+re-measured here. **Trust the command's own output over this sentence.** See
+`packages/cards/README.md`, `packages/cards/decks/SOURCES.md` (per-card audit trail) and
 `packages/cards/KNOWN-GAPS.md`.
 
 > **One line to add to your reading of `balance` output, 2026-10-03.** The game is now

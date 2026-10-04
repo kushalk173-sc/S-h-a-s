@@ -73,6 +73,9 @@
 >   threshold argument is unchanged and its decision stands**; only its counts are stale,
 >   and `D14`'s own "the caveat that now dominates" is now outranked by `PLAN.md` §9
 >   **risk #2 (dominance)**, which did not exist as a live risk on 2026-09-30.
+>   **⚠ And those counts have drifted again since (2026-10-04): the corpus is 221 cards and
+>   the Ideology deck is 134** (92 `in2020` + 42 `et2040`, `decks/SOURCES.md` §3). The
+>   `verbatim`/`adapted`/`inferred` split has not been re-measured. **No decision changes.**
 > - **"the client does not compile — 14 errors in `GameScreen.tsx`"** (this header, §7.7)
 >   is **historical**. `AnswerScreen.tsx` and `TableQuestion.tsx` are live shipped code that
 >   quotes and depends on the current wire types, which is not consistent with a package
@@ -1447,6 +1450,9 @@ export function blindPromptFor(
 >   const card = cards.ideology[cardId];
 >   if (card === undefined) return null;
 >   const order = orderFor(state, cardId);            // STILL seed-derived, never Math.random
+>                                                   // and a PER-CARD CONSTANT: _seed moves only
+>                                                   // on a reshuffle, so the same card always
+>                                                   // arrives the same way round. AUDIT §S2.
 >   const sides = order === 'ab' ? card.sides : [card.sides[1], card.sides[0]];
 >   return { question: card.question, sides, order };
 > }
@@ -1607,9 +1613,14 @@ What actually crosses the wire during a blind answer:
 > one. **And this is why it matters more than it did.** The sides arrive *already in display
 > order*, so the table and the answerer are looking at one card rather than two orderings of
 > it — and because the Ideologue is printed beside each answer, a client that knew `order`
-> would publish the left-hand cell's faction in one line. Measured across all 76 Ideology
-> Cards, **position 0 holds the Capitalists' answer in 34 (45%)**. The `order` draw is the
-> only thing closing that, and it is why `orderFor` still reads `_seed`.
+> would publish the left-hand cell's faction in one line. Measured across the 76-card Ideology
+> deck as it stood on 2026-10-03, **position 0 holds the Capitalists' answer in 34 (45%)**. The
+> `order` draw is the only thing closing that, and it is why `orderFor` still reads `_seed`.
+> **⚠ The deck is now 134 cards and that 45% has not been re-measured** (`UI-SPEC.md` §1.2
+> carries the same caveat). **And `order` is a per-card CONSTANT, not a per-answer draw** —
+> `_seed` moves only on a reshuffle, so the same card always arrives the same way round.
+> `docs/AUDIT-2026-10.md` §S2 read it as per-answer and was corrected; do not propagate that
+> reading.
 
 > ### ⚠ `conspiracies` is an empty array in this payload. That is the whole point.
 >
@@ -2823,6 +2834,15 @@ building a UI for effects the engine cannot evaluate.
 > IOU, a vote needs a ballot with a re-vote rule, and a pass needs an in-flight queue plus
 > something to pass the card to.
 >
+> **⚠ Present tense, 2026-10-04 — the "25 of 54" above is that iteration's measurement, not
+> today's.** `npm run playable` now reads **43 PLAYED of 54 rows probed, 0 refused, 0 no-op,
+> 11 inexpressible** (`packages/cards/KNOWN-GAPS.md` §8). And the three ops this note calls
+> inexpressible have each been **ruled on**: `auction` and `vote` are **RULED OUT** with the
+> cost written down (§8.3), the two `pass`-shaped clauses are **blocked on a named
+> decision** (§8.2), and **all 14** previously-inexpressible recovered cards now carry a
+> ruling — 3 built, 8 ruled out with an original substitute filed, 2 blocked, 1 ruled never to
+> have been a gap. Nothing here should be read as "three ops are still unbuilt".
+>
 > Both reactive cards ship as **`adapted`, not `verbatim`**, and their dropped clauses are
 > named in their own `source` fields rather than here. BLOCK drops the *discard an open
 > Conspiracy or Headline Card* branch, blocking a card *stealing this card*, cleansing an
@@ -3259,6 +3279,13 @@ past M7.
 > untouched and this row is not being reopened:** a bounded corpus is still a complete,
 > playable game; 100+ was always a content track rather than an engineering gate.
 >
+> **⚠ Corrected again, 2026-10-04, numbers only.** The Ideology deck is **134 cards**, not 76
+> (`decks/SOURCES.md` §3: 92 `in2020` + 42 `et2040`), and the corpus has grown again to
+> **221 cards** (`KNOWN-GAPS.md` §8, which filed nine original substitutes for the recovered
+> names it ruled out). The `verbatim`/`adapted`/`inferred` split above has **not** been
+> re-measured — re-run `npm run validate --workspace @shasn/cards` rather than trusting it.
+> **The decision, and the threshold argument, are still exactly as stated.**
+>
 > **What has changed is which caveat dominates, and it is now two of them:**
 > 1. **Schema coverage** — unchanged and still true. `KNOWN-GAPS.md` §2 and
 >    `packages/cards/KNOWN-GAPS.md` remain the handoff for M2b.
@@ -3269,9 +3296,10 @@ past M7.
 >    one more line:** the balance checker's severities were tuned for a game where a skew was
 >    invisible, and they have not been re-tuned.
 >
-> **And the number this row cannot supply, recorded so it is not lost:** for the 76 Ideology
-> Cards, **10 carry a recovered question stem and 66 are authored outright.** The deck is
-> substantially original because **zero real Ideology Cards were ever recovered**
+> **And the number this row cannot supply, recorded so it is not lost:** for the Ideology deck,
+> **10 carry a recovered question stem and the rest are authored outright** — 66 authored when
+> the deck stood at 76 cards, and **124 authored at today's 134**. The deck is substantially
+> original because **zero real Ideology Cards were ever recovered**
 > (`AUTHENTIC-SHASN-REFERENCE` §2.4 names the three sources that would close that). D14's
 > "bounded corpus" is bounded partly by the recovery failing, not by choice alone.
 | **D15** | **Original decks; licence question asked, not awaited** | Write licensed decks now, or block on the email | Nothing in the engine or the pipeline depends on the licence. Path 2 keeps both branches open at zero cost. | No real campaign names. CI greps for Memesys/Zain Memon tokens. |

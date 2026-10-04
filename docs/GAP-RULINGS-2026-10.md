@@ -68,6 +68,25 @@ silent writer fails a test rather than becoming a leak nobody looked for.
 unchanged from §0's baseline, which is the arithmetic Step 1's own acceptance criterion
 predicted wrongly. Full suite: **1270 passing, 0 failing.**
 
+> **⚠ Superseded 2026-10-04. Both numbers above are that pass's measurement and both have
+> moved.** `npm run playable` now reads **54 probed, 43 PLAYED, 0 refused, 0 no-op, 11
+> INEXPRESSIBLE**, and `npm test` is **1452 passing** (engine 461 / server 336 / client 418 /
+> cards 237). **The fourteen cards this document left undecided now all carry a ruling** —
+> `packages/cards/KNOWN-GAPS.md` §8 is the decision, one row per card: 3 built, 8 ruled out
+> with an original substitute filed in the corpus, 2 blocked on a named decision (§8.2), and
+> 1 (CHAI-PAANI) ruled never to have been a gap at all (§7). **§0's table below is kept as
+> the baseline this document's argument was built against and must not be read as current.**
+>
+> **What did not change, and is the point of keeping the baseline:** §0bis's correction that
+> Step 1's ceiling was **40 → 40** and not 40 → 41 still holds *as a statement about Step 1*.
+> The probe has since moved 40 → 43 for an unrelated reason — three cards were built under the
+> §8 rulings — and that is not a vindication of Step 1's acceptance criterion, which was
+> wrong when it was written.
+>
+> **Not verified by this pass: no shell.** The 43/11 and 1452 figures are read off
+> `KNOWN-GAPS.md` §8 and carried on report respectively. Re-run `npm run playable` before
+> treating them as current.
+
 ---
 
 ## 0. The measured baseline this document reasons against
@@ -304,6 +323,9 @@ BLOCK and DEFLECT and about `IF YOU LIKE PIÑA COLADA` — a card that drops not
 `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print.
 **Say that out loud instead: the corpus is 151 cards, 0 `verbatim`, 41 `adapted`, 110
 `inferred`, and this card moved one clause from dropped to executed.**
+*(⚠ 151 was the count when this was written; the corpus is **221 cards** today
+(`KNOWN-GAPS.md` §8) and the provenance split has not been re-measured. The `0 verbatim`
+count is the load-bearing half of this sentence and it has never moved.)*
 
 **Two design calls this ruling makes, because they are cheaper than the alternatives:**
 

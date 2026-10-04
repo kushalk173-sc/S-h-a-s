@@ -31,6 +31,26 @@ Last updated: 2026-10-03
 >   **one dominated Ideology Card**, `ig-in2020-006`. Quoted in
 >   `packages/server/src/FULL-INFORMATION.md` §6.
 >
+> **⚠ Reconciled 2026-10-04, figures only — every number below has moved and none of the
+> decisions have.** Read this before quoting any count out of this file:
+>
+> | figure | as stated above | today |
+> |---|---|---|
+> | `npm test` | 1088 passing | **1452** (engine 461 / server 336 / client 418 / cards 237) |
+> | corpus size | 151 cards | **221 cards** (`KNOWN-GAPS.md` §8) |
+> | Ideology deck | 76 | **134** (`decks/SOURCES.md` §3: 92 `in2020` + 42 `et2040`) |
+> | `npm run playable` | 25 of 54 (ship-log rows 45, and §6.5) | **43 PLAYED of 54 probed, 0 refused, 0 no-op, 11 inexpressible** |
+> | the inexpressible recovered cards | 14, undecided | **all 14 ruled on** — 3 built, 8 ruled out with an original substitute filed, 2 blocked on a named decision, 1 ruled never to have been a gap (`KNOWN-GAPS.md` §8.0) |
+>
+> **What I could not check, and am not claiming:** this pass had **no shell**, so none of the
+> above was measured by me. The 221 / 134 / 43 figures are read off
+> `packages/cards/KNOWN-GAPS.md` §8 and `decks/SOURCES.md` §3, which state they are measured;
+> the 1452 test
+> count is carried on report. **`npm run playable`, `npm run balance` and `npm run validate`
+> must be re-run before any of these is treated as current**, and in particular the positional
+> skew and dominance measurements quoted in §9 risk #2 are **76-card measurements that have
+> never been re-run over 134 cards.**
+>
 > **Repository state: ~140 local commits, no git remote configured.** Nothing here has ever
 > left the machine. `PLAN.md` M0 has carried *"CI lint+test (deferred — no remote yet)"* since
 > 2026-09-30 and that is still exactly right.
@@ -142,15 +162,15 @@ still inexpressible, so M2b's priority is unchanged.
 | 47 | **The blind answer is gone. The card is public in full — question, both answers, both Ideologues, both payouts — to every seat and every spectator** | `packages/server/src/FULL-INFORMATION.md` (the record, and the authority). `blindPromptFor` → `answerPromptFor`; `BlindPrompt` → `AnswerPrompt` + `AnswerSide`; `match:state.blind` → `match:state.answer`. Nothing was deleted silently: every retirement is a rename or a rewrite onto the property that still holds |
 | 48 | **A new panel: the card on the table** | `packages/client/src/app/TableQuestion.tsx`. Reuses the `blind-answer__*` classes **verbatim**, renders for every seat including spectators, and carries **no commit control** — not even a disabled one, which would be §9.10's prohibited case. It is not a dialog: no scrim, no focus trap, because p19 lets the rest of the table act during an answer window |
 | 49 | **`_pendingCard` keeps its underscore, and this is a decision with four arguments** | `FULL-INFORMATION.md` §2. The card is public by **content**, secret by **id**. The load-bearing reason is mechanical: `check-secrets.mjs` works by the `_` prefix, so publishing the id would move the value onto an unprefixed field where no gate on that list covers it. The `manifestoCards` precedent does **not** transfer — it is safe only because an answered card's payout is already revealed, which is the one condition full information deletes |
-| 50 | **The seed-derived `order` survives, and it is now the only thing withheld — which makes it matter more, not less** | The Ideologue is printed beside each answer, so per-side styling would publish which faction the left-hand position holds. Measured across all 76 Ideology Cards: **position 0 holds the Capitalists' answer in 34 (45%)**, position 1 in 4, where balance would put each near 19. `PublicQuestion` **refuses** an `order` key at any depth rather than omitting it; `openQuestionOf` returns `null` for a payload carrying one |
+| 50 | **The seed-derived `order` survives, and it is now the only thing withheld — which makes it matter more, not less** | The Ideologue is printed beside each answer, so per-side styling would publish which faction the left-hand position holds. Measured across the Ideology deck **as it stood at 76 cards on 2026-10-03 — it is 134 now and this has not been re-measured**: **position 0 holds the Capitalists' answer in 34 (45%)**, position 1 in 4, where balance would put each near 19. `order` is a **per-card** constant, not a per-answer draw — see the correction in §2. `PublicQuestion` **refuses** an `order` key at any depth rather than omitting it; `openQuestionOf` returns `null` for a payload carrying one |
 | 51 | **The symmetry gate survived and gained teeth** | Enforced by `blindAnswer.css`'s selector audit and by `getComputedStyle` equality over both cells **in both panels**, on a fixture whose two sides carry *different* Ideologues and *different* payouts — so a per-side rule would show. The rule is restated in its sharpest form: *the payout differs because the payout differs; nothing else may* |
 | 52 | **The redraw survived as "pay 4 for a different card", and its original justification is recorded as gone** | `rules-reference.md` §7.2 step 2 said *"Because the reading player does not know what the card pays, the redraw is a BET, not a decision."* That sentence is retired. The mechanic is **kept**, deliberately: the engine has no legal action that returns a card to the draw pile mid-turn, so removing the only escape from a dominated card would leave a player holding a genuinely bad card with no out — and under full information a dominated card is a **routine** event, which makes the reroll more load-bearing, not less. It is also a rulebook change, and `packages/server` does not own the rulebook |
 | 53 | **Nothing was retired on the engine side, and that is right** | `packages/engine` is untouched. `_pendingCard` keeps its name, `PRIVATE_PLAYER_KEYS` keeps `['conspiracies', 'ideologyCards']`, the underscore convention keeps its meaning. Renaming the field would move a *wire* decision into the rules package and would break `packages/cards/test/card-playback.test.ts`, which reads `_pendingCard` directly. **The engine's job did not change; the server's publication decision did** |
-| 54 | **Dominance in the Ideology corpus went from a design smell to a broken card** | **One** dominated card in 76, and it is one resource: `ig-in2020-006`, side 0 `trust 2 + funds 2 = 4` against side 1 `media 2 + funds 1 = 3`. 75 of 76 cards have equal totals; mean \|A−B\| gap is 0.00–0.02. **§9 risk #2 rewritten with the new severity** — including the part that matters, which is that `TOTAL_SKEW` is still only a *warning* in `src/balance.ts`, so a new card can ship with a visible one-resource edge and the suite will be green |
+| 54 | **Dominance in the Ideology corpus went from a design smell to a broken card** | **One** dominated card in the 76-card deck as measured (**the deck is 134 now; not re-measured**), and it is one resource: `ig-in2020-006`, side 0 `trust 2 + funds 2 = 4` against side 1 `media 2 + funds 1 = 3`. 75 of those 76 cards have equal totals; mean \|A−B\| gap is 0.00–0.02. **§9 risk #2 rewritten with the new severity** — including the part that matters, which is that `TOTAL_SKEW` is still only a *warning* in `src/balance.ts`, so a new card can ship with a visible one-resource edge and the suite will be green |
 | 55 | **Current state: 1088 tests passing across four packages, zero failures; `npm run typecheck` exits 0** | **Reported, not re-run by this documentation pass** — see "what I could not check" below. The per-package breakdown has moved many times since the 2026-09-30 entry and is deliberately **not** restated here, because restating a number I did not observe is exactly the drift this log exists to stop |
 | 56 | **Winnability proven at 2/3/4/5 seats, 20 seeds each, real corpus, real reducer** | `packages/server/test/winnable.test.ts`: `SEEDS = Array.from({length: 20}, …)`, one suite per seat count, `maxActions: 1200`. The corpus-growth problem recorded at `KNOWN-GAPS.md` §6bis — where growing the Ideology pool to 76 turned eleven assertions red on `deepest turn > TURN_CLIFF` — **is resolved, and resolved by reframing rather than by weakening**: `winnable.test.ts:216-258` now asserts the *mechanism* (the exhaustion branch did not fire) and prints the deepest finished game's answer count against the deck size. It no longer asserts the proxy, and the comment says why in the author's own words |
 | 57 | **The card corpus, stated honestly: 151 shipped — 0 verbatim / 41 adapted / 110 inferred** | Counted off `"provenance"` across `packages/cards/decks/**/*.json`: **41 `adapted` matches, 0 `verbatim` matches**; total 151 per `decks/SOURCES.md` §3 (56 + 20 + 16 + 19 + 11 + 11 + 18 across seven deck files). `SOURCES.md` §1 explains why `verbatim` is structurally unreachable while `reduce()` holds at 13 ops: reproducing a recovered card's text word-for-word would print a clause describing something the engine does not do |
-| 58 | **Zero real Ideology Cards were ever recovered — and the deck players see every turn is substantially original** | `docs/AUTHENTIC-SHASN-REFERENCE.md` §2.4 names the three sources that would close it, in order of expected yield: (1) the **Tabletop Simulator mod on the Steam Workshop**, which ships real card art and JSON and whose filepages are scrapeable; (2) **photo reviews** — Dice Tower thumbnails, `meeplemountain`, Space Biff, and BGG galleries on `cf.geekdo-images.com`, which are CDN-hosted and fetchable *without* a Cloudflare challenge; (3) **buy the deck** — Essential Edition India 2022-23, 108 real cards and the legally cleanest route. YouTube, Reddit and BGG were all unreachable in the research session. The 55 real cards recovered from Memesys' own player-aids are almost all Conspiracy and Headline; **10 of the 76 shipped Ideology Cards carry a recovered question stem, and everything past `ig-in2020-032` is authored** (`SOURCES.md` §1) |
+| 58 | **Zero real Ideology Cards were ever recovered — and the deck players see every turn is substantially original** | `docs/AUTHENTIC-SHASN-REFERENCE.md` §2.4 names the three sources that would close it, in order of expected yield: (1) the **Tabletop Simulator mod on the Steam Workshop**, which ships real card art and JSON and whose filepages are scrapeable; (2) **photo reviews** — Dice Tower thumbnails, `meeplemountain`, Space Biff, and BGG galleries on `cf.geekdo-images.com`, which are CDN-hosted and fetchable *without* a Cloudflare challenge; (3) **buy the deck** — Essential Edition India 2022-23, 108 real cards and the legally cleanest route. YouTube, Reddit and BGG were all unreachable in the research session. The 55 real cards recovered from Memesys' own player-aids are almost all Conspiracy and Headline; **10 of the 134 shipped Ideology Cards carry a recovered question stem, and everything past `ig-in2020-032` is authored** (`SOURCES.md` §1) |
 | 59 | **Documentation reconciled: `PLAN.md` §2 and §9, `docs/UI-SPEC.md` §1/§1.2/§5.3/§7.3/§8.8/§9.1/§9.3/§9.6/§9.12, `docs/ARCHITECTURE.md` §4, `README.md`** | Retired rules are **kept and labelled**, not deleted — an earlier decision that turns out to be wrong is evidence, not clutter. `docs/UI-SPEC.md` opens with a supersession table because it is the document an engineer implements from; `packages/server/src/FULL-INFORMATION.md` is named as the authority in all of them |
 
 > ### ⚠ What this documentation pass could NOT check, stated rather than assumed
@@ -168,9 +188,13 @@ still inexpressible, so M2b's priority is unchanged.
 >   was not itself counted — `grep` truncated before the end of the list. The dominance
 >   measurement (`ig-in2020-006`) is quoted from `FULL-INFORMATION.md` §6, which quotes
 >   `npm run balance`; it was **not re-measured here.**
-> - **Row 58's "10 of 76 carry a recovered question stem"** is from `SOURCES.md` §1 (*"the
+> - **Row 58's "10 of the shipped Ideology Cards carry a recovered question stem"** is from
+>   `SOURCES.md` §1 (*"the
 >   number carrying recovered question text went 8 → 10 and has not moved since"*). Verified
->   by reading the source, not by re-deriving it.
+>   by reading the source, not by re-deriving it. **Updated 2026-10-04:** row 58 read *"10 of
+>   the 76"*; the deck is **134** (`SOURCES.md` §3: 92 `in2020` + 42 `et2040`) and the **10** is
+>   unchanged — it is a count of cards carrying a stem, not a proportion, which is exactly why
+>   it survived the deck growing.
 > - **~140 local commits and no git remote** is carried on report. Not verified with `git`.
 > - **The 14 client compile errors in §7 M5 are recorded as historical**, on the evidence
 >   that `FULL-INFORMATION.md` and `TableQuestion.tsx` both quote live shipped code and
@@ -251,6 +275,26 @@ board game **Shasn** (Zain Memon / Memesys Culture Lab, 2019).
 > seed-derived answer order is unchanged in mechanism and is now **the only thing being
 > withheld at all** — which makes it more load-bearing, not less, because the Ideologue is
 > printed beside each answer (§9, risk #2).
+>
+> **⚠ Corrected 2026-10-04: A′ is a PER-CARD field, and "per-card" is exact.** `orderFor` is a
+> function of the match seed and the **card id** and of nothing else, and `GameState._seed`
+> advances on a deck reshuffle and on no other event. So a given Ideology Card is presented in
+> the same order **every time it is dealt in a match** — turn 1 and turn 400 are the same card
+> and the same `order`. Pinned by `packages/engine/test/rng.test.ts` (*"the order is a per-card
+> constant: `_seed` moves on a reshuffle and on NOTHING else"*, which asserts `ANSWER`,
+> `INFLUENCE` and `END_TURN` leave the cursor unmoved and a reshuffle does not).
+>
+> **This was got wrong in one load-bearing place and is recorded rather than quietly fixed.**
+> `docs/AUDIT-2026-10.md` §S2 read `order` as a **one-bit-per-answer** oracle on `_seed` and
+> proposed rotating a dedicated order-salt in state **each answer** as a cheap fix. Both are
+> wrong. The bit is **per distinct card dealt**, so a recycled card repeats the bit it already
+> gave and carries no new information; and the per-answer salt is **REJECTED**, because it would
+> make `order` a function of salt history (breaking the reconnect-stability and redraw
+> reasoning in `broadcast.ts`, which holds *only* because the card is the whole input) **and it
+> would publish a fresh bit every turn — enlarging the leak rather than closing it.** A′ itself
+> is unaffected; only the audit's reading of it was wrong. The one mitigation of S2's three that
+> survives is a **second, independent secret** with more entropy than the table can publish,
+> which is an engine change and is deliberately not half-built.
 
 Shasn's core mechanic: **the player to your right reads an Ideology card aloud, and
 you answer without seeing it.** You do not know which resources your answer pays
@@ -363,11 +407,12 @@ the engine is deterministic). The client renders `order[0]` in the left cell.
 >   correlates with Ideologue over a full shuffled deck"* is **false about the deck and true
 >   about what the player sees**, and the distinction is the whole point of A′:
 >   - **The deck really is positionally skewed** — position 0 holds the Capitalists' answer in
->   **34 of 76 cards (45%)**. No amount of testing will make that assertion pass, and it
+>   **34 of the 76 cards measured on 2026-10-03 (45%)**. No amount of testing will make that
+>   assertion pass, and it
 >   should not: it is a **corpus** fact, and `FULL-INFORMATION.md` §6 measures it rather than
 >   hiding it.
 >   - **What the `order` draw makes true is the *marginal*** — with `order` uniform, each
->     display position holds each Ideologue about half the time across all 76 cards. That is
+>     display position holds each Ideologue about half the time across all the cards. That is
 >   the assertion worth having, and it is the one the deck-level balance output is evidence
 >   *for*, not against.
 >   - **So the correct release gate is the marginal, not the deck.** Assert that the
@@ -381,7 +426,7 @@ the engine is deterministic). The client renders `order[0]` in the left cell.
 > ### ⚑ MEASURED 2026-10-03 — the skew A′ was written to hide is real, and larger than §2.3 guessed
 >
 > `npm run balance --workspace packages/cards`, over the deck as shipped — all **76**
-> Ideology Cards:
+> Ideology Cards **as the corpus stood on 2026-10-03**:
 >
 > ```
 > position 0:  capitalist 34   supremo 16   showstopper 7   idealist 19
@@ -393,6 +438,13 @@ the engine is deterministic). The client renders `order[0]` in the left cell.
 > which cell was side 0 would know it was the Capitalists' answer nearly half the time —
 > **and because the Ideologue is now printed on the card, that is a channel anyone can read
 > off the screen in one step.**
+>
+> **⚠ The deck is now 134 cards and this table has NOT been re-measured.** The counts are
+> counts of *cards*, so 34 cards still hold the Capitalists' answer on side 0 — but 34 of 134
+> is **25%**, not 45%, and 58 authored cards have been added whose sides nobody has tallied.
+> **Re-run `npm run balance` before quoting any of these numbers.** Nothing about A′ depends on
+> the figure: the gate that matters is the *marginal* (above), and the leak exists if the
+> distribution is imperfect at all, which it plainly is.
 >
 > This is why the `order` draw was kept, why it is still server-side, and why
 > `PublicQuestion` **refuses** an `order` key at any depth rather than merely omitting it.
@@ -1078,7 +1130,9 @@ the architect independently relies on it** — §3 above exists because of #5, a
    routine event rather than a rare accident).
 
    **What is measured, right now** (`npm run balance --workspace packages/cards`, against
-   the deck as shipped — 151 cards checked, 76 of them Ideology):
+   the deck as shipped when this was written — 151 cards checked, **76** of them Ideology;
+   **⚠ the deck is 134 Ideology Cards and the corpus 221 today, and this has NOT been
+   re-measured — re-run the command rather than trusting these numbers**):
 
    ```
    DOMINATED CARDS: ONE, and it is a single resource.
@@ -1088,7 +1142,8 @@ the architect independently relies on it** — §3 above exists because of #5, a
    ```
 
    Side 0 pays one more resource than side 1, so a player who computes always picks side 0
-   on this card. **That is 1 of 76, and it is the whole of the *magnitude* exposure: 75 of 76
+   on this card. **That is 1 of the 76 cards measured, and it is the whole of the *magnitude*
+   exposure: 75 of those 76
    cards have sides that pay the same total, and the mean |A−B| gap across the deck is
    0.00–0.02 resources.** So the arithmetic is not currently a disaster — **and that is
    exactly why this entry is a live risk rather than a closed one.** `TOTAL_SKEW` was already
@@ -1096,7 +1151,8 @@ the architect independently relies on it** — §3 above exists because of #5, a
    one-resource edge cost a careful player nothing: nobody could see it. **Under full
    information it costs the player the game.** The checker and its severity classifications
    have not been re-tuned to match, and until they are, **a new card can be shipped with a
-   visible one-resource advantage and the suite will be green.**
+   visible one-resource advantage and the suite will be green.** **The 58 Ideology Cards added
+   since are exactly the untested population this risk is about.**
 
    **What follows, concretely:**
    - **`packages/cards` owns the fix, and it is not a card rewrite.** The dominated card is
@@ -1216,10 +1272,23 @@ Short version, because §9 risk #1 is the project and this is the state of its i
 > which ship as the `adapted` stems of `ig-in2020-001` … `-008`, `-031` and `-032` with the
 > answers authored.
 >
-> **So the deck players see every single turn — the Ideology deck, 76 cards — is
-> substantially original work.** Only 10 of those 76 rest on a recovered stem; everything
+> **So the deck players see every single turn — the Ideology deck, 134 cards — is
+> substantially original work.** Only 10 of those 134 rest on a recovered stem; everything
 > past `ig-in2020-032` is authored outright. `SOURCES.md` §1 says so and adds the reason the
-> number has not moved: *"everything past `ig-in2020-032` is authored."*
+> number has not moved: *"everything past `ig-in2020-032` is authored."* The deck grew from
+> 76 to 134 (`SOURCES.md` §3: 92 `in2020` + 42 `et2040`) and the **10** did not move with it,
+> because it is a count of cards carrying a stem rather than a proportion.
+>
+> **And one thing about that growth that is a live risk, not a detail: the deck is now large
+> enough that recycling is never exercised.** A driven game answers **63 / 62 / 73 / 84**
+> Ideology Cards at 2 / 3 / 4 / 5 seats (measured over 20 seeds against the 76-card deck,
+> `packages/server/test/ideology-recycling.test.ts`). Against **134** cards, **no seat count
+> can reach the deck size**, so on the shipped corpus the Ideology recycle branch now fires
+> **zero** times — where at 76 cards it fired in exactly one run of the whole sweep. That test
+> file already anticipates the consequence: it proves the positive half on a deliberately
+> **truncated 20-card** deck instead, because the shipped deck no longer tests it. **So
+> recycling is not "solved"; it is untested on the deck that ships.** Anything that claims
+> otherwise is reading an older corpus.
 >
 > **Why zero, in one paragraph.** Ordinary question Ideology Cards exist only as images on
 > the physical product, in photo reviews and in video frames. **YouTube, Reddit and BGG were
