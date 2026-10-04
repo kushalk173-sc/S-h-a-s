@@ -248,6 +248,14 @@ export function stagedCardLabel(
  * discipline required. `chosen-player` is here because it is a real target a player
  * must be able to predict — a card that will hit somebody the caster names is a
  * threat everybody at the table has to be able to read off the window.
+ *
+ * **AND IT DID NOT CHANGE FOR G1, WHICH IS WORTH SAYING.** The tenth `Effect` OP
+ * (`'move-peg'`) came with no new TARGET — `move-peg`'s target field is the same six
+ * members — so this record was already total and compiled untouched. The union that
+ * grew is the OP union, which the language cannot pin this way (a `switch` ending in
+ * `default` satisfies any closed union), so that one is guarded by the switch below
+ * plus `interrupt.test.ts`'s diff against `cards.ts`'s own source. Two proofs over one
+ * union, of different strengths, and neither covers the other's gap.
  */
 const TARGET_TEXT: Readonly<Record<EffectTarget, string>> = {
   you: '',
@@ -426,11 +434,25 @@ export function describeEffect(e: Effect): string {
       return e.to === 'destroy'
         ? `${countText(e.n)} Ideology Card${e.n === 1 ? '' : 's'} removed from the game`
         : `${countText(e.n)} extra Ideology Card${e.n === 1 ? '' : 's'} — answered in place of that player's next draw`;
-    case 'borrow-power':
+case 'borrow-power':
       // `target` is REQUIRED here and `'chosen-player'` is the only legal value
-      // (cards.ts), so it is stated in the sentence rather than appended: this is
-      // the one op whose target is part of what it DOES rather than who it hits.
+      // (cards.ts), so it is stated in the sentence rather than appended: this is the
+      // one op whose target is part of what it DOES rather than who it hits.
       return 'Use every Level 3 Ideologue Power a player you name holds, once each';
+    case 'move-peg': {
+      // G1. THE TENTH OP, and the sentence has to name BOTH halves because the panel
+      // is the last thing a table reads before it happens: "move a voter" reads as a
+      // mat operation, and this is a RELOCATION between two areas of the board, which
+      // is a different thing to every player at the table.
+      //
+      // Pluralised off `count` rather than hardcoded because `move-peg` is a `Count`,
+      // not a literal 1, and a sentence that said "voters" for a one-voter move would
+      // be the same small untrustworthiness `choiceHeadline`'s `res()` helper exists to
+      // stop. It is 1 for every recovered card — the corpus validator refuses a
+      // `move-peg` whose `n` is not 1 — so the singular is the one that ships.
+      const n = countText(e.n);
+      return `Move ${n} ${n === '1' ? 'voter' : 'voters'} to an empty area in an adjacent constituency${target}`;
+    }
     default:
       return 'an effect this client has no words for';
   }

@@ -474,6 +474,20 @@ export function clearToughLove(): void {
   set({ toughLovePicks: [] });
 }
 
+/**
+ * G1 — REPLACE the owed decision's picks outright.
+ *
+ * `addToughLovePick` appends, which is right for a COUNT and wrong for a SEQUENCE:
+ * a two-place pick's second half is only legal for the peg named by the first, so
+ * changing the first half has to drop the second rather than leave it behind. One
+ * whole-list setter is what makes that a single expression (`pegMovePick` returns the
+ * next list) rather than a pairing of an append and an undo the caller has to
+ * remember to do in the right order.
+ */
+export function setChoicePicks(areaIds: readonly string[]): void {
+  set({ toughLovePicks: [...areaIds], refusal: null });
+}
+
 // ─────────────────────────── React binding ───────────────────────────
 
 export function useApp(): AppState {

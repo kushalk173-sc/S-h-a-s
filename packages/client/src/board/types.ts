@@ -182,6 +182,14 @@ export type SlotInteraction = {
   /** Already picked for the group in progress. Drives the `⌾*` tick. */
   readonly chosen?: boolean;
   /**
+   * G1 — the clause for a slot picked as part of a TWO-PLACE pick, when the caller
+   * supplied one. "Already chosen for this group" is true of a voter group being
+   * placed and false of a peg move, which is one voter and one hole; the caller knows
+   * which of the two it is offering, so the caller says. `undefined` keeps the
+   * default clause and no other interaction changes.
+   */
+  readonly chosenReason?: string;
+  /**
    * The `PLAYER src` / `⟲` state. Row 4 and 6 of §4.6 are `own` + volatile and
    * majority, which are `✕` in `GERRY src` — a hatch, not just a dim, because
    * they are the cells where a player owns something they still cannot use.
@@ -243,6 +251,13 @@ export type BoardState = {
    * Defaults to "not a legal target" when the caller has nothing better to say.
    */
   readonly illegalReason?: string;
+  /**
+   * G1 — the clause for a slot picked as part of a TWO-PLACE pick ("the voter you
+   * picked up to move", "where it lands"). See `SlotInteraction.chosenReason`; the
+   * board prints what it is given, for the same reason it prints `illegalReason`
+   * rather than inventing one.
+   */
+  readonly chosenReason?: string;
   /**
    * The gerrymander source the player has picked up, if any. Drives `⟲` on the
    * source and `◈` / `✕` on destinations (§4.7.2).

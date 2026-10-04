@@ -125,7 +125,11 @@ function slotInteraction(input: {
 
   if (state.mode === 'place') {
     if (state.pickedAreaIds?.includes(slot.areaId) === true) {
-      return { legality: 'chosen', chosen: true };
+      // G1: a two-place pick names what the slot is holding, so the clause is the
+      // caller's. Default unchanged for every other interaction.
+      return state.chosenReason === undefined
+        ? { legality: 'chosen', chosen: true }
+        : { legality: 'chosen', chosen: true, chosenReason: state.chosenReason };
     }
     /*
      * THE CALLER OWNS LEGALITY, checked BEFORE anything below can narrow it —

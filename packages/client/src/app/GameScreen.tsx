@@ -77,6 +77,8 @@ import {
   removeToughLovePick,
   setGerrySource,
   setGerryTarget,
+  /** G1 — the two-place pick replaces the list wholesale, because it is a SEQUENCE. */
+  setChoicePicks,
   setMarketModifier,
   setMarketPower,
   setPowerTarget,
@@ -100,6 +102,7 @@ import {
   deltaTotal,
   gerrymanderRefusal,
   lockedZoneFor,
+  pegMovePick,
   placementRefusal,
   requiredPicks,
   rightsZones,
@@ -351,6 +354,29 @@ export function GameScreen({ store }: GameScreenProps) {
   const onSlotActivate = useCallback(
     (areaId: string) => {
       if (state === null) return;
+
+      /*
+        1a. G1 — a move in progress takes the board too, and it is TWO presses.
+        Checked before the area-list kinds because both own the board, and it is its
+        own branch rather than a `count` of 2 because its legal set changes with the
+        stage: the peg first, then that peg's destinations. `pegMovePick` is the ONE
+        expression for that transition — `choiceInvariant.test.tsx` drives the same
+        function, so "the board accepts a slot the dialog does not offer" is not
+        expressible here either.
+      */
+      const owedPegMove = state.choices.find(
+        (c) => c.player === you && c.choice.kind === 'choose-peg-dest',
+      );
+      if (owedPegMove !== undefined && you !== null) {
+        if (owedPegMove.choice.kind !== 'choose-peg-dest') return;
+        const step = pegMovePick(state, owedPegMove.choice, app.toughLovePicks, areaId);
+        if (!step.ok) {
+          setRefusal(step.reason);
+          return;
+        }
+        setChoicePicks(step.picks);
+        return;
+      }
 
       // 1. A pending area-shaped choice owns the board.
       const owedAreaChoice = state.choices.find(
@@ -987,6 +1013,14 @@ export function GameScreen({ store }: GameScreenProps) {
           }}
           onResolveAreas={(choiceId, areaIds) => {
             dispatch(actions.resolveChoice(choiceId, { kind: 'areas', areaIds }));
+            clearPowerTarget();
+            clearToughLove();
+          }}
+          onResolvePegDest={(choiceId, areaId, toAreaId) => {
+            // G1 — ONE pick carrying BOTH halves, in the engine's field order. Not
+            // `areas`: `resolveChoice`'s arm reads `pick.areaId`/`pick.toAreaId` and
+            // refuses anything else with "choose a voter and where it goes".
+            dispatch(actions.resolveChoice(choiceId, { kind: 'peg-dest', areaId, toAreaId }));
             clearPowerTarget();
             clearToughLove();
           }}

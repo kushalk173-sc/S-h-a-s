@@ -226,7 +226,13 @@ export function buildSlotLabel(input: {
       label += ' · gerrymander source';
       break;
     case 'chosen':
-      label += ' · already chosen for this group';
+      // G1: the default clause is about a voter GROUP, which is not what a two-place
+      // pick is holding. When the caller supplied one it wins — §8.5 parity with the
+      // sighted channel is the whole point of putting this in the accessible name.
+      label +=
+        interaction.chosenReason === undefined
+          ? ' · already chosen for this group'
+          : ` · ${interaction.chosenReason}`;
       break;
     case 'illegal':
       // A refusal always names its reason (§6.1.2, §9.10). Silent refusal

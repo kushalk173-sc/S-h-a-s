@@ -32,7 +32,7 @@ import { useMemo, useState } from 'react';
 
 import type { ClientState, PlayerID } from '@shasn/engine';
 
-import { choosableCards, choosablePlayers, choosableZones, isVoterDecision, myChoices, targetableAreas, type MyChoice } from './derive.ts';
+import { choosableCards, choosablePlayers, choosableZones, isVoterDecision, myChoices, pegMoveOptions, targetableAreas, type MyChoice, type PegDestChoice } from './derive.ts';
 import { ResourcePicker } from './ResourcePicker.tsx';
 
 export type ChoiceResolverProps = {
@@ -49,6 +49,15 @@ export type ChoiceResolverProps = {
     pick: Readonly<Record<string, number>>,
   ) => void;
   readonly onResolveAreas: (choiceId: string, areaIds: readonly string[]) => void;
+  /**
+   * G1 — answer a `'choose-peg-dest'`: BOTH halves of one move.
+   *
+   * Two arguments, not an array, because the two halves are not interchangeable: the
+   * resolver reads `areaId` as the voter and `toAreaId` as where it lands, and an
+   * array would leave the order to the caller — the mistake `ChoicePick`'s own doc
+   * refuses by carrying one object with two named fields.
+   */
+  readonly onResolvePegDest: (choiceId: string, areaId: string, toAreaId: string) => void;
   /** G1 — answer a `'choose-player'`: the seat the card's actor named. */
   readonly onResolvePlayer: (choiceId: string, playerId: string) => void;
   /** G16 — answer a `'choose-zone'`: the constituency the card's actor named. */
@@ -105,14 +114,21 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
      not a sample, though: `inset: 0` on a fixed element covers the viewport and there
      was no escape hatch, so this was a stall whenever it happened, not a race.
 
-     So an area-shaped choice gets a scrim variant that does NOT cover the board:
-     translucent rather than opaque (an invisible board behind an opaque wash would be
-     clickable and unreadable, which is worse), `pointer-events: none` with the sheet
-     taking them back, and the sheet anchored to the BOTTOM so the board is above it
-     rather than behind it. `aria-modal` goes with it — telling a screen reader the
-     rest of the page is inert is only true while it is.
+So an area-shaped choice gets a scrim variant that does NOT cover the board:
+      translucent rather than opaque (an invisible board behind an opaque wash would be
+      clickable and unreadable, which is worse), `pointer-events: none` with the sheet
+      taking them back, and the sheet anchored to the BOTTOM so the board is above it
+      rather than behind it. `aria-modal` goes with it — telling a screen reader the
+      rest of the page is inert is only true while it is.
+
+      G1's `'choose-peg-dest'` IS in that set, and for the same reason rather than a
+      fifth one of its own: it is resolved by naming slots on the board, two of them
+      in sequence, so a full-viewport scrim would hide the only place either half can
+      be chosen. Its legal set is also stage-dependent — the peg first, then the
+      destinations OF THAT PEG — which is what `derive.ts:choiceBoardInteraction`
+      derives from the picks so far.
   */
-  const areaShaped = isVoterDecision(owed0);
+  const areaShaped = isVoterDecision(owed0) || owed0.kind === 'choose-peg-dest';
 
   return (
     <div
@@ -181,6 +197,26 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
             choice={first}
             ids={choosableCards(owed0, props.recycle)}
             onResolve={props.onResolveCard}
+          />
+        ) : owed0.kind === 'choose-peg-dest' ? (
+          /*
+             G1. A NEW KIND AND A NEW BRANCH, ABOVE the `<ResourcePicker>` fallback for
+             the same reason `'choose-card'`'s is: the fallback does not fail loudly, so
+             a move would have rendered as a resource dialog — four disabled `Add`s, a
+             `TAKE 1` sending a `Delta` the server refuses as `malformed action` — while
+             the player believed they were answering the card that asked for the move.
+
+             The branch is a component rather than more inline JSX because this is the
+             only shape with a STAGE: the legal set is the pegs at first and that one
+             peg's destinations second, so the copy has to change with what is picked and
+             `AreaChoice` — which is a count, not a sequence — cannot express it.
+          */
+          <PegDestChoice
+            state={state}
+            choice={first}
+            picked={props.pickedAreaIds}
+            onRemovePick={props.onRemovePick}
+            onResolve={props.onResolvePegDest}
           />
         ) : owed0.kind === 'steal-any' ? (
           <StealChoice
@@ -376,6 +412,129 @@ function AreaChoice({
       </p>
     </div>
   );
+}
+
+/**
+ * G1 — `'choose-peg-dest'`: ONE voter and ONE hole, named together.
+ *
+ * ## WHY IT IS NOT `AreaChoice` WITH A BIGGER COUNT
+ *
+ * The other board-resolved kinds are a COUNT: press `n` pegs, confirm. This one is a
+ * SEQUENCE, because the two halves are not independent — the destinations are only
+ * knowable once the peg is named, and the engine says so in one expression:
+ * `pegDestinations(state, pick.areaId)`. So the legal set is a function of the stage,
+ * the board highlights one half or the other, and the copy has to say which half it
+ * wants. A count-shaped dialog would have to either offer every empty area in the
+ * game as stage one (most of them refused) or hide the board behind a list.
+ *
+ * ## THE PAIR IS ALWAYS VISIBLE, in words and in the board
+ *
+ * The whole hazard of a two-place pick is that a player cannot tell what they have
+ * half-committed to. So the dialog names the peg it is holding by constituency and
+ * slot, the board says the same on the slot itself (§8.5, via
+ * `BoardInteraction.chosenReason`), and CONFIRM states the move it will dispatch.
+ *
+ * ## AND THERE IS NEVER A DEAD CONFIRM
+ *
+ * The engine raises this decision only when a legal pair exists (`pegMoveOffered`), so
+ * an empty pick space is unreachable — but if the board moves under an open dialog
+ * (a majority forms on the chosen peg, somebody fills the only hole) the live
+ * computation CAN come back empty, and every pick would be refused. That state says
+ * so, on the frame, and renders NO confirm at all rather than a disabled one: a
+ * disabled button with nothing behind it is the fifth recurrence of this project's
+ * dead-dialog bug.
+ */
+function PegDestChoice({
+  state,
+  choice,
+  picked,
+  onRemovePick,
+  onResolve,
+}: {
+  state: ClientState;
+  choice: MyChoice;
+  picked: readonly string[];
+  onRemovePick: () => void;
+  onResolve: (choiceId: string, areaId: string, toAreaId: string) => void;
+}) {
+  const c = choice.pending.choice;
+  /* Restated rather than asserted, for the reason `AreaChoice` restates its own: the
+     parent decides on the discriminant, the type is the whole `Choice` union. */
+  if (c.kind !== 'choose-peg-dest') return null;
+
+  const options = useMemo(() => pegMoveOptions(state, c), [state, c]);
+  /* The stage comes from the picks, and the picks are FILTERED through the live map:
+     a peg that stopped being movable keeps no tick, because a tick is a promise the
+     confirm will keep. Same rule as `pegMoveInteraction`, one expression. */
+  const peg = picked.find((id) => options.has(id));
+  const dests = peg === undefined ? undefined : options.get(peg);
+  const dest = picked.find((id) => dests?.has(id) === true);
+  const ready = peg !== undefined && dest !== undefined;
+  const unreachable = options.size === 0;
+
+  return (
+    <div className="col" data-testid="peg-dest-choice">
+      <p className="panel__note" data-testid="peg-dest-progress">
+        {unreachable
+          ? 'No voter can be moved.'
+          : peg === undefined
+            ? `Choose which voter to move — ${options.size} can go${options.size === 1 ? '' : 's'}, each to an empty area in an adjacent constituency.`
+            : dest === undefined
+              ? `Moving ${areaLabel(state, peg)} — ${dests?.size ?? 0} empty area${(dests?.size ?? 0) === 1 ? '' : 's'} in an adjacent constituency will take it. Choose where it lands.`
+              : `Moving ${areaLabel(state, peg)} to ${areaLabel(state, dest)}.`}
+      </p>
+
+      {unreachable ? (
+        <p className="panel__note" data-testid="peg-dest-nothing">
+          Nothing on the board can be moved by this card: no voter that could move has an
+          empty area in a neighbouring constituency. There is no pick to make, so there is
+          no button here — the card has nothing to do, and the board will carry on without
+          an answer.
+        </p>
+      ) : (
+        <div className="row">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={!ready}
+            aria-disabled={!ready}
+            onClick={() => {
+              if (peg !== undefined && dest !== undefined) {
+                onResolve(choice.pending.id, peg, dest);
+              }
+            }}
+            data-testid="peg-dest-confirm"
+          >
+            {ready ? 'CONFIRM — MOVE THIS VOTER' : 'CONFIRM — PICK A VOTER AND A PLACE'}
+          </button>
+          <button type="button" className="btn" onClick={onRemovePick} disabled={picked.length === 0}>
+            UNDO
+          </button>
+        </div>
+      )}
+
+      <p className="panel__note panel__note--quiet">
+        {unreachable
+          ? 'This is a rule edge, not a hang: the engine raises this decision only when at least one legal move exists, so the table never waits on an answer it cannot give.'
+          : peg === undefined
+            ? 'The board is open above this: click the highlighted voter to pick it up. Majority voters and voters in Volatile Areas never move.'
+            : 'The board is open above this: click the highlighted empty area to land it. UNDO puts the voter back on its square.'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A slot the way a player reads it out: constituency, then position in it. The board
+ * says the same thing in its own `aria-label`, so the sentence here and the slot there
+ * are one sentence.
+ */
+function areaLabel(state: ClientState, areaId: string): string {
+  for (const z of state.zones) {
+    const i = z.areas.findIndex((a) => a.id === areaId);
+    if (i >= 0) return `${z.name}, slot ${i + 1}`;
+  }
+  return areaId;
 }
 
 /**

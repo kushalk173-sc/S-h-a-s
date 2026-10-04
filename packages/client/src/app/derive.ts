@@ -241,6 +241,17 @@ export type BoardInteraction = {
   readonly legalAreaIds?: ReadonlySet<string>;
   /** The sentence the board attaches to every slot outside `legalAreaIds`. */
   readonly illegalReason?: string;
+  /**
+   * G1 — what a picked slot has PICKED UP, for a two-place pick.
+   *
+   * The board's one chosen-clause is "already chosen for this group", and it is a
+   * true sentence for a voter group being placed and a FALSE one for a move, which
+   * is one voter and one hole with no group in between. So the caller supplies the
+   * clause, the same way it supplies the legal set: the board renders what it is
+   * given and derives no rules. `undefined` keeps the default clause, which is what
+   * every other interaction wants.
+   */
+  readonly chosenReason?: string;
   /** The zone the first pick locked, for a `sameZone: true` group. */
   readonly lockedZoneId: BoardZoneID | null;
   /** The gerrymander source the player has armed, if any. */
@@ -288,6 +299,7 @@ export function toBoardState(state: ClientState, interaction: BoardInteraction):
     ...(interaction.legalAreaIds === undefined
       ? {}
       : { legalAreaIds: interaction.legalAreaIds, ...(interaction.illegalReason === undefined ? {} : { illegalReason: interaction.illegalReason }) }),
+    ...(interaction.chosenReason === undefined ? {} : { chosenReason: interaction.chosenReason }),
     ...(interaction.gerrySourceAreaId === null
       ? {}
       : { gerrySourceAreaId: interaction.gerrySourceAreaId }),
@@ -507,6 +519,15 @@ export function choiceHeadline(choice: Choice): string {
       // named thing a player will have seen emptying and refilling all game, and
       // "Choose a card" with no noun would read as a choice out of their own hand.
       return 'Take a Conspiracy Card from the discard pile';
+    case 'choose-peg-dest':
+      // G1. TWO PLACES IN ONE PICK, and the title has to say both, because the
+      // sentence below it ("Card effect") says neither: a player reading "Choose a
+      // voter" would be offered the second half of the move with no idea it existed,
+      // and one reading "Choose a constituency" would be told to name a destination
+      // area inside it. It names the SOURCE and the RULE rather than the count,
+      // because `count` is 1 for every recovered card and a "Move 1 voter" title
+      // reads like a quantity the player may increase.
+      return 'Move a voter to an adjacent constituency';
     default:
       return assertNever(choice);
   }
@@ -683,6 +704,23 @@ export function requiredPicks(
     case 'choose-zone':
     case 'choose-card':
       return choice.count;
+    case 'choose-peg-dest':
+      /*
+       * G1. `1`, and NOT `Math.min(count, …)`.
+       *
+       * The clamp every other kind gets is a clamp on a COUNT OF PEGS the board can
+       * satisfy, and there is nothing to clamp here: one pick carries one
+       * (peg, destination) PAIR, so the number of picks is 1 whatever the board looks
+       * like. Clamping it to the number of movable pegs would be a category error —
+       * a player with one movable peg and nine destinations has exactly as many
+       * answers as a player with nine pegs, and a player with zero is a state the
+       * engine never raises (`pegMoveOffered`).
+       *
+       * The board-moved-under-the-dialog case is handled where it belongs — in
+       * `pegMoveOptions`, which is the live computation — and the dialog states that
+       * state rather than offering a CONFIRM the engine refuses on every press.
+       */
+      return choice.count;
     default:
       // The totality guarantee, at the second of the three switch sites. Without this
       // line a ninth kind returns `undefined`, which `MyChoice.required` types as a
@@ -719,7 +757,7 @@ export function requiredPicks(
 export function targetableCount(
   state: ClientState,
   player: PlayerID,
-  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  kind: VoterChoiceKind,
   scope: ChoiceScope,
   zoneId?: ZoneID,
 ): number {
@@ -735,6 +773,210 @@ export function targetableCount(
     }
   }
   return n;
+}
+
+// ─────────────────── G1: moving a peg, the TWO candidate sets ───────────────────
+
+/** G1 — the decision this whole section is about. */
+export type PegDestChoice = Extract<Choice, { readonly kind: 'choose-peg-dest' }>;
+
+/**
+ * G1, first candidate set: the pegs of `choice.source` that may be moved.
+ *
+ * **MIRRORS `reduce.ts:movablePegIds`, clause for clause**, and the mirroring is the
+ * whole correctness argument — a board that offers a peg the resolver refuses is a
+ * dead control, which is the defect class this client's suites exist for:
+ *
+ *   - it belongs to the card's ACTOR (`c.source`), **not** to the answerer. `scope`
+ *     is DESCRIPTIVE and `resolveChoice` decides on `peg.owner === c.source`, so a
+ *     client that filtered on `scope` would refuse the answerer's own peg when they
+ *     are the actor, and would offer a third player's when they are not. This reads
+ *     `source`, exactly as the engine does.
+ *   - it is not already a MAJORITY voter, and
+ *   - it is not in a VOLATILE area (p18 makes a peg there permanent).
+ *
+ * Every clause reads only public board state: nine fixed areas, every peg face up,
+ * on every payload a client already holds. No `_`-prefixed field is involved, so
+ * there is nothing for the engine's secret inventory to owe on this path.
+ */
+export function movablePegIds(state: ClientState, owner: PlayerID): readonly string[] {
+  const out: string[] = [];
+  for (const z of state.zones) {
+    for (const a of z.areas) {
+      if (a.peg === null || a.peg.owner !== owner) continue;
+      if (a.peg.majority) continue;
+      if (a.volatile) continue;
+      out.push(a.id);
+    }
+  }
+  return out;
+}
+
+/**
+ * G1, second candidate set: the empty areas the peg in `areaId` may land in.
+ *
+ * **MIRRORS `reduce.ts:pegDestinations`.** An EMPTY area, in a zone ADJACENT to the
+ * peg's own — and the peg's own zone is excluded, which is what "adjacent" means
+ * here: within-zone relocation is a no-op on the board's own terms, so refusing it
+ * also means the offer can never contain a move that does nothing.
+ *
+ * Adjacency is a READ, not a new field: `Zone.neighbours` is already on the board
+ * (`board/types.ts:BoardZone.neighbours` mirrors it), which is the same reason
+ * G12's `'player-after'` needed no `GameState` change.
+ */
+export function pegDestinations(state: ClientState, areaId: string): ReadonlySet<string> {
+  const out = new Set<string>();
+  const from = state.zones.flatMap((z) => z.areas).find((a) => a.id === areaId);
+  if (from === undefined) return out;
+  const zone = state.zones.find((z) => z.id === from.zone);
+  if (zone === undefined) return out;
+  for (const nb of zone.neighbours) {
+    const z = state.zones.find((x) => x.id === nb);
+    if (z === undefined) continue;
+    for (const a of z.areas) if (a.peg === null) out.add(a.id);
+  }
+  return out;
+}
+
+/**
+ * G1 — the WHOLE pick space: peg → the destinations that peg may reach, with pegs
+ * that have NOWHERE TO GO left out.
+ *
+ * **THIS IS `pegMoveOffered`, COMPUTED RATHER THAN ASSUMED.** The engine raises the
+ * decision only when `movablePegIds(...).some(id => pegDestinations(...).length > 0)`
+ * — one legal pair, somewhere — and it refuses a pick whose pair is not jointly
+ * legal. So a peg with an empty destination set is not a legal first pick either: it
+ * would pass the "is it yours and movable" guard and fail the destination guard, and
+ * the dialog would have highlighted a slot whose every continuation is refused.
+ *
+ * A MAP rather than two arrays, because it makes the second stage unrepresentable as
+ * anything else: `options.get(picked[0])` IS the legal set for stage two, so there is
+ * no second expression that could disagree with it.
+ *
+ * `size === 0` IS THE OFFER TEST'S ANSWER ON THE CLIENT SIDE. The engine raises
+ * nothing in that state, so a live client never sees it; the dialog states it rather
+ * than presenting a CONFIRM the engine would refuse on every press.
+ */
+export function pegMoveOptions(
+  state: ClientState,
+  choice: PegDestChoice,
+): ReadonlyMap<string, ReadonlySet<string>> {
+  const out = new Map<string, ReadonlySet<string>>();
+  for (const id of movablePegIds(state, choice.source)) {
+    const dests = pegDestinations(state, id);
+    if (dests.size > 0) out.set(id, dests);
+  }
+  return out;
+}
+
+/** What a board press does to a move in progress. */
+export type PegMoveTransition =
+  | { readonly ok: true; readonly picks: readonly string[] }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * G1 — the two-place pick, as ONE transition on the picks-so-far.
+ *
+ * **THIS IS THE ONLY PLACE THE TRANSITION IS WRITTEN.** `GameScreen`'s
+ * `onSlotActivate` calls it and `choiceInvariant.test.tsx`'s harness calls it, so
+ * "the board accepts a slot the dialog does not offer" is not expressible — the
+ * Defect A argument, applied to a pick with two halves.
+ *
+ * The rules, each with the engine's refusal string behind it:
+ *
+ *   - stage one takes a peg from `pegMoveOptions`, i.e. movable AND with somewhere to
+ *     go (`that voter may not be moved` otherwise);
+ *   - stage two takes a destination from THAT peg's set
+ *     (`that is not an empty area in an adjacent zone` otherwise);
+ *   - pressing what is already pressed steps BACK one half rather than being a dead
+ *     press, which is the toggle contract the area decisions already have;
+ *   - a pick no longer legal at press time is REFUSED WITH ITS REASON rather than
+ *     silently ignored, for `resolveChoice`'s own reason: a silent ignore is how a
+ *     player is shown they succeeded when they did not.
+ */
+export function pegMovePick(
+  state: ClientState,
+  choice: PegDestChoice,
+  picks: readonly string[],
+  areaId: string,
+): PegMoveTransition {
+  const options = pegMoveOptions(state, choice);
+  const [peg, dest] = picks;
+
+  if (peg === undefined) {
+    if (!options.has(areaId)) {
+      return { ok: false, reason: 'only a voter that can move is the source of this move' };
+    }
+    return { ok: true, picks: [areaId] };
+  }
+
+  const dests = options.get(peg);
+  if (dests === undefined) {
+    // The picked peg stopped being movable while the dialog was open — the board moved
+    // under it. Naming that is the honest answer, and the dialog states the same state.
+    return { ok: false, reason: 'that voter may not be moved' };
+  }
+  if (dest === undefined) {
+    if (!dests.has(areaId)) {
+      return { ok: false, reason: 'that is not an empty area in an adjacent constituency' };
+    }
+    return { ok: true, picks: [peg, areaId] };
+  }
+  if (areaId === dest) return { ok: true, picks: [peg] };
+  if (areaId === peg) return { ok: true, picks: [] };
+  return { ok: false, reason: 'this move is already complete' };
+}
+
+/**
+ * G1 — the board interaction for a move in progress, one stage at a time.
+ *
+ * **THE STAGE IS DERIVED FROM THE PICKS AND NEVER STORED**, so a stale pair cannot
+ * survive a re-render into a state the engine will not accept: an id no longer in
+ * the current legal set is dropped from `pickedAreaIds`, exactly as the area
+ * decisions drop theirs, because a tick is a promise the confirm will keep.
+ *
+ * `chosenReason` exists because the board's only chosen-clause is *"already chosen
+ * for this group"*, and there is no group here — this pick is one voter and one hole.
+ * Naming the peg as the thing being picked up is also the accessibility requirement
+ * for a spatial two-step: a keyboard player has to be able to tell WHICH peg they
+ * are holding before they go looking for somewhere to put it.
+ */
+function pegMoveInteraction(
+  state: ClientState,
+  choice: PegDestChoice,
+  picked: readonly string[],
+): BoardInteraction {
+  const options = pegMoveOptions(state, choice);
+  const peg = picked.find((id) => options.has(id));
+  const dests = peg === undefined ? undefined : options.get(peg);
+  const dest = picked.find((id) => dests?.has(id) === true);
+  const legal: ReadonlySet<string> =
+    peg === undefined ? new Set(options.keys()) : (dests ?? new Set<string>());
+  const kept = [peg, dest].filter((x): x is string => x !== undefined);
+
+  return {
+    mode: 'place',
+    pickedAreaIds: kept,
+    lockedZoneId: null,
+    gerrySourceAreaId: null,
+    legalAreaIds: legal,
+    illegalReason:
+      peg === undefined
+        ? 'only a voter of that player’s own that can move is the source of this move'
+        : 'that is not an empty area in an adjacent constituency',
+    /* `exactOptionalPropertyTypes` is on in this package, so an ABSENT clause is
+       spelled as an absent key rather than `chosenReason: undefined` — and absent is
+       the honest shape: before a peg is picked there is nothing a chosen slot is
+       holding, so there is nothing to say about it. */
+    ...(peg === undefined
+      ? {}
+      : {
+          chosenReason:
+            dest === undefined ? 'the voter you picked up to move' : 'where it lands',
+        }),
+    resolveGerrySources: false,
+    disabled: false,
+  };
 }
 
 /**
@@ -761,12 +1003,25 @@ export function targetableCount(
  * zone-scoped decision therefore counted against the whole board (a count the
  * player could never reach) while offering out-of-zone voters the engine refuses
  * with `that voter is in another zone`.
+ *
+ * **AND IT ANSWERS G1's TWO-PLACE PICK AS WELL**, with the same one-expression
+ * argument: the stage is a function of what has been picked so far, so the legal
+ * set the board highlights and the set `pegMovePick` will accept are computed from
+ * the same `pegMoveOptions` call and cannot disagree.
  */
 export function choiceBoardInteraction(
   state: ClientState,
   you: PlayerID,
   picked: readonly string[],
 ): BoardInteraction | null {
+  const owedPeg = state.choices.find(
+    (c) => c.player === you && c.choice.kind === 'choose-peg-dest',
+  );
+  if (owedPeg !== undefined) {
+    if (owedPeg.choice.kind !== 'choose-peg-dest') return null;
+    return pegMoveInteraction(state, owedPeg.choice, picked);
+  }
+
   const owed = state.choices.find(
     (c) =>
       c.player === you &&
@@ -803,14 +1058,48 @@ export function choiceBoardInteraction(
 }
 
 /**
- * `evict-voter` / `discard-voter` / `convert-voter` — the three kinds the board
- * resolves. A type guard for the six-way `Choice` union, shared by every caller
- * that has to narrow it without re-asserting (the `ChoiceResolver` render and the
- * click handler).
+ * THE THREE AREA-LIST KINDS, NAMED. G1's `'choose-peg-dest'` also carries a
+ * `scope` — it is published on the decision and the engine describes it as
+ * *"whose voters are on offer, relative to the answerer"* — so the old guard,
+ * `Extract<Choice, { readonly scope: ChoiceScope }>`, grew a FOURTH member the
+ * moment the tenth kind landed.
+ *
+ * **THAT WAS A GUARD THAT LIES, and it is the same defect class as the empty
+ * `default`.** Its body returns `false` for `'choose-peg-dest'` while its type
+ * promised `true`, so every caller that narrowed on it was handed a member whose
+ * `zoneId` does not exist: four compile errors here, and — worse — a guard that
+ * would have compiled fine had the fields happened to line up. A type guard is a
+ * promise about the union, so the promise is written out by hand: the three kinds,
+ * by name, and the compiler checks the names against the engine's union.
+ *
+ * A FOURTH area-shaped kind is therefore a deliberate act — add it to
+ * `VOTER_KINDS`, decide whether it is a count-of-N or a two-place pick, and the
+ * `VOTER_KINDS.every(...)` assertion below fails until you have.
  */
-export function isVoterDecision(
-  choice: Choice,
-): choice is Extract<Choice, { readonly scope: ChoiceScope }> {
+export type VoterChoiceKind = 'evict-voter' | 'discard-voter' | 'convert-voter';
+
+/** The three area-LIST decisions: pick `count` pegs already on the board. */
+export type VoterDecision = Extract<Choice, { readonly kind: VoterChoiceKind }>;
+
+/** The three kinds, as data — so a test can assert the guard agrees with them. */
+export const VOTER_KINDS: readonly VoterChoiceKind[] = [
+  'evict-voter',
+  'discard-voter',
+  'convert-voter',
+];
+
+/**
+ * `evict-voter` / `discard-voter` / `convert-voter` — the three kinds the board
+ * resolves as a LIST OF PEGS. A type guard for the `Choice` union, shared by every
+ * caller that has to narrow it without re-asserting (the `ChoiceResolver` render,
+ * the click handler, and both choice suites).
+ *
+ * G1's `'choose-peg-dest'` is ALSO board-resolved and is NOT this: it is a
+ * two-place pick, so it has its own branch, its own interaction and its own
+ * `pegMovePick` transition. Widening this guard to cover it would be the
+ * cheapest way to make the build green and the wrong one — see the type's own doc.
+ */
+export function isVoterDecision(choice: Choice): choice is VoterDecision {
   return (
     choice.kind === 'evict-voter' ||
     choice.kind === 'discard-voter' ||
@@ -822,7 +1111,7 @@ export function isVoterDecision(
 export function targetableAreas(
   state: ClientState,
   player: PlayerID,
-  kind: 'evict-voter' | 'discard-voter' | 'convert-voter',
+  kind: VoterChoiceKind,
   scope: ChoiceScope,
   zoneId?: ZoneID,
 ): ReadonlySet<string> {
