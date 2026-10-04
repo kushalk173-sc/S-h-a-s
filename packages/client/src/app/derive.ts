@@ -179,6 +179,16 @@ export function poolTotal(p: Pool): number {
   return p.funds + p.clout + p.media + p.trust;
 }
 
+/**
+ * The pool of a player who is not on the wire.
+ *
+ * A `Record<PlayerID, PlayerState>` lookup can miss — a seat that left mid-decision
+ * is the realistic case — and `undefined.resources` would throw inside a render.
+ * Zero is the safe direction for every use (`poolTotal` is only ever a CEILING),
+ * and it is stated here rather than inlined so the fallback has one name.
+ */
+const EMPTY_POOL: Pool = { funds: 0, clout: 0, media: 0, trust: 0 };
+
 export function deltaTotal(d: Delta): number {
   return (d.funds ?? 0) + (d.clout ?? 0) + (d.media ?? 0) + (d.trust ?? 0);
 }
@@ -591,12 +601,28 @@ export function choiceReason(choice: Choice, player?: PlayerState): string {
  *                   already own. A pick of any composition of `count` is
  *                   therefore always legal — including for a player holding
  *                   0/0/0/0, which is the case that used to dead-end the UI.
- *   `lose-any`      `count`, uncapped, and the engine then requires
- *                   `canAfford`. That is only safe because the engine never asks
- *                   for more than is held: `applyEffect` clamps to
- *                   `min(effect.n, held)` and skips the ask at 0, and
- *                   `enforceCap` asks `poolTotal - cap`. So `count <= held`
- *                   always holds, and a discard of `count` is always payable.
+ *   `lose-any`      `min(count, poolTotal(self.resources))`, and the engine then
+ *                   requires `canAfford`. **The clamp is the bug this paragraph
+ *                   used to get wrong, and it is the whole of Defect B.**
+ *
+ *                   It said: "`count`, uncapped. … The engine never asks for more
+ *                   than is held: `applyEffect` clamps to `min(effect.n, held)`
+ *                   and skips the ask at 0, and `enforceCap` asks
+ *                   `poolTotal - cap`. So `count <= held` always holds."
+ *
+ *                   It is true AT RAISE TIME and false AT ANSWER TIME, and the
+ *                   engine says so in the place this mirror is copied from
+ *                   (`reduce.ts:3227-3245`, "a pending decision is not a lock the
+ *                   answering player holds: the ask is frozen but the pool is
+ *                   not"). A Conspiracy Card strips a Fund from every opponent
+ *                   between the ask and the answer; the ask stays 41 and the pool
+ *                   becomes 40; `resolveChoice` — which clamps at resolution, like
+ *                   every other ask in that switch — wants 40. The client wanted
+ *                   41, so CONFIRM was permanently disabled at "40 of 41 chosen"
+ *                   with no cancel on the frame. Recorded in a 270-turn harness
+ *                   run; the whole table was locked behind it.
+ *
+ *                   So the clamp is copied from the RESOLUTION, not from the raise.
  *   `steal-any`     `min(count, victim's total)` when the victim is fixed, the
  *                   nominal `count` when the thief picks one. In the latter case
  *                   the number is recomputed per victim against that victim's own
@@ -627,8 +653,22 @@ export function requiredPicks(
 ): number {
   switch (choice.kind) {
     case 'gain-any':
-    case 'lose-any':
       return choice.count;
+    case 'lose-any': {
+      /*
+       * MIRRORS `reduce.ts:3246`, which is `min(c.count, poolTotal(self.resources))`
+       * — the SELF the engine reads at RESOLUTION time, which is the only reading
+       * that is right while an ask is open. See the header for the case that
+       * makes the difference (a Conspiracy Card stripping the pool under an open
+       * cap discard) and for why the uncapped `choice.count` was a dead dialog.
+       *
+       * `poolTotal(self)` is the engine's own name for "every denomination added
+       * up"; `requiredPicks` already has it for `steal-any` a few lines below,
+       * so this is one rule and one helper rather than two.
+       */
+      const me = state.players[player];
+      return Math.min(choice.count, poolTotal(me?.resources ?? EMPTY_POOL));
+    }
     case 'steal-any': {
       const victimId = choice.from;
       if (victimId === null) return choice.count;

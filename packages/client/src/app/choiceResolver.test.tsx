@@ -94,6 +94,7 @@ import type {
 } from '@shasn/engine';
 
 import { ChoiceResolver, type ChoiceResolverProps } from './ChoiceResolver.tsx';
+import { ResourcePicker } from './ResourcePicker.tsx';
 // The stylesheet that decides whether a click on the board reaches the board, read
 // as source rather than as a processed approximation (`appLayout.test.tsx` does the
 // same, and for the same reason: jsdom has no hit tester).
@@ -288,6 +289,22 @@ function areaShapedKind(
 const total = (d: Readonly<Record<string, number | undefined>>): number =>
   RES.reduce((n, r) => n + (d[r] ?? 0), 0);
 
+/**
+ * G17 — the NAMED recycle list a scenario's wire would carry.
+ *
+ * Derived from the decision's own `cards`, which is what the engine offers, so a
+ * scenario cannot pass by listing a card no decision named. And the names are FAKE on
+ * purpose: `recycle` is a prop rather than something read off `ClientState` precisely
+ * because the client has no card index, so this is the only place the label can come
+ * from and a test that used a real corpus would be testing the corpus.
+ */
+function recycleNames(
+  sc: Scenario,
+): readonly { readonly id: string; readonly name: string }[] {
+  if (sc.choice.kind !== 'choose-card') return [];
+  return sc.choice.cards.map((id) => ({ id, name: `Card ${id}` }));
+}
+
 function ownerOf(state: ClientState, areaId: string): PlayerID | null {
   for (const z of state.zones) {
     for (const a of z.areas) if (a.id === areaId) return a.peg?.owner ?? null;
@@ -297,8 +314,7 @@ function ownerOf(state: ClientState, areaId: string): PlayerID | null {
 
 function areaOf(state: ClientState, areaId: string) {
   for (const z of state.zones) {
-    for (const a of z.areas) if (a.id === areaId) return a;
-  }
+    for (const a of z.areas) if (a.id === areaId) return a;  }
   return undefined;
 }
 
@@ -355,6 +371,10 @@ function Harness({
     // area and theft picks are held to below rather than a weaker local check.
     onResolvePlayer: (_id, playerId) => onResolved({ kind: 'player', id: playerId }),
     onResolveZone: (_id, zoneId) => onResolved({ kind: 'zone', zoneId: zoneId as ZoneID }),
+    // G17. Routed through the same `onResolved` seam as every other kind, so a card pick
+    // is held to the engine's own refusal strings below rather than a local check.
+    onResolveCard: (_id, cardId) => onResolved({ kind: 'card', cardId }),
+    recycle: recycleNames(sc),
     draft,
     onDraft: setDraft,
   };
@@ -625,6 +645,23 @@ function assertEngineWouldAccept(sc: Scenario, pick: ChoicePick): void {
     return;
   }
 
+  /**
+   * G17. The card branch, and it is checked against the ENGINE's refusals rather than
+   * against a local shape test: a pick naming a card the decision did not offer is the
+   * `malformed action` outcome, so the assertion is that the engine's own `resolveChoice`
+   * accepts what this dialog produced.
+   */
+  if (pick.kind === 'card') {
+    expect(sc.choice.kind, `${sc.name}: expected a choose-card`).toBe('choose-card');
+    if (sc.choice.kind !== 'choose-card') return;
+    expect(
+      sc.choice.cards.includes(pick.cardId),
+      `${sc.name}: the dialog offered a card the decision did not name — ${pick.cardId}`,
+    ).toBe(true);
+    expect(sc.choice.count, `${sc.name}: a card pick is one card`).toBe(1);
+    return;
+  }
+
   // `areas`
   expect(areaShapedKind(sc.choice), `${sc.name}: expected a voter decision`).toBe(true);
   if (!areaShapedKind(sc.choice)) return;
@@ -765,20 +802,48 @@ describe('lose-any — a cost, and the engine only ever asks for what is held', 
     });
   });
 
-  it('an ask the player CANNOT pay is refused with a reason, not silently dead', () => {
-    // Unsatisfiable on the client too. The engine never raises it — `applyEffect`
-    // and `enforceCap` both clamp to what is held — but a picker that can only
-    // report a shortfall through a pick the player cannot complete is a picker
-    // that hides one when it happens. The reason has to be on the frame.
+  it('an ask LARGER than the pool derives down to what is held — Defect B', () => {
+    /*
+     * THIS TEST USED TO ASSERT THE OPPOSITE, AND IT WAS THE ONLY REASON THE BUG
+     * SURVIVED: it encoded "the engine never raises an ask the player cannot pay"
+     * as a property of the WIDGET — `You hold 1 of the 4 this needs`, CONFIRM
+     * disabled. That sentence is true AT RAISE TIME and false while the ask is
+     * open, which is the whole of Defect B: `reduce.ts:3227-3245` says so in the
+     * place the mirror is copied from ("a pending decision is not a lock the
+     * answering player holds: the ask is frozen but the pool is not"), and
+     * `resolveChoice` clamps again at resolution. The recorded real case was
+     * "Discard 41" against a pool of 40 — CONFIRM dead at "40 of 41 chosen", no
+     * cancel, table locked.
+     *
+     * So the ask is now DERIVED the way the engine derives it, and an over-cap ask
+     * is payable rather than a refusal. A refusal is no longer reachable through
+     * this dialog at all, which is a stronger statement than the old one.
+     */
+    const pick = assertResolvable({
+      name: 'lose-any 4 against a pool of 1',
+      choice: { kind: 'lose-any', count: 4, reason: 'Card effect' },
+      seats: [seat(P1, { funds: 1, clout: 0, media: 0, trust: 0 }), seat(P2, EMPTY)],
+      you: P1,
+    });
+    if (pick.kind === 'resources') expect(total(pick.res)).toBe(1);
+  });
+
+  it('the shortfall sentence stays for a genuinely unsatisfiable COST picker', () => {
+    // The clause is not decoration and is not dead: `ResourcePicker` is also the
+    // redraw payment, the Conspiracy purchase and the trade composer, and those
+    // CAN ask for more than the player holds — a market card a player cannot
+    // afford is §9.2's "disabled control with an adjacent reason". So the line is
+    // asserted here on the widget, with the widget's own props, rather than
+    // through a `lose-any` that can no longer produce the state.
     const r = render(
-      <Harness
-        sc={{
-          name: 'lose-any 4 from a pool of 1',
-          choice: { kind: 'lose-any', count: 4, reason: 'Card effect' },
-          seats: [seat(P1, { funds: 1, clout: 0, media: 0, trust: 0 }), seat(P2, EMPTY)],
-          you: P1,
-        }}
-        onResolved={() => undefined}
+      <ResourcePicker
+        pool={{ funds: 1, clout: 0, media: 0, trust: 0 }}
+        total={4}
+        pick={{ funds: 0, clout: 0, media: 0, trust: 0 }}
+        onPick={() => undefined}
+        heading="Discard exactly 4"
+        confirmLabel="DISCARD 4"
+        onConfirm={() => undefined}
       />,
     );
     expect(r.container.querySelector('[data-testid=picker-status]')?.textContent).toContain(
@@ -1579,5 +1644,97 @@ describe('the gate covers the KINDS, not only the shapes that found the bug', ()
         `${kind} is declared exercised but is not in the file's own list`,
       ).toBe(true);
     }
+  });
+});
+
+/**
+ * G17 — `'choose-card'`, and the two failures this dialog shape is prone to.
+ *
+ * `ChoiceResolver` is a ternary chain whose LAST arm is `<ResourcePicker>`, so a new kind
+ * with no branch of its own does not crash: it renders a RESOURCE dialog — four disabled
+ * `Add`s and a `TAKE 1` that sends a `Delta` the server refuses as `malformed action` —
+ * while the whole suite stays green. And the client has no card index, so the labels have
+ * to arrive on the wire: a button reading a card id is a row of strings a player cannot
+ * choose between, which is §9.10's prohibited case with the label changed.
+ */
+
+/**
+ * G17 — `'choose-card'`, and the two failures this dialog shape is prone to.
+ *
+ * `ChoiceResolver` is a ternary chain whose LAST arm is `<ResourcePicker>`, so a new kind
+ * with no branch of its own does not crash: it renders a RESOURCE dialog — four disabled
+ * `Add`s and a `TAKE 1` that sends a `Delta` the server refuses as `malformed action` —
+ * while the whole suite stays green. And the client has no card index, so the labels have
+ * to arrive on the wire: a button reading a bare card id is a row of strings a player
+ * cannot choose between, which is §9.10's prohibited case with the label changed.
+ */
+describe("G17 'choose-card' - the picker, and the two ways it could be wrong", () => {
+  const choice = (cards: readonly string[]): Choice => ({
+    kind: 'choose-card',
+    count: 1,
+    cards,
+    effects: [{ op: 'draw-conspiracy', n: 1, from: 'discard', pick: true }],
+    source: P1,
+    reason: 'Card effect',
+  });
+  const scenario = (cards: readonly string[]): Scenario => ({
+    name: `choose-card ${cards.length}`,
+    choice: choice(cards),
+    seats: [seat(P1, EMPTY), seat(P2, EMPTY), seat(P3, EMPTY)],
+    you: P1,
+  });
+
+  it('renders ONE NAMED button per card on the recycle list, and pressing one answers with that card', () => {
+    const seen: ChoicePick[] = [];
+    const sc = scenario(['ct-et2040-001', 'ct-et2040-002']);
+    const r = render(<Harness sc={sc} onResolved={(pick) => seen.push(pick)} />);
+
+    // NOT A RESOURCE DIALOG. This is the assertion that would have caught the missing
+    // branch: `ResourcePicker` renders its own testid and four `+` controls.
+    expect(
+      r.container.querySelectorAll('[data-testid=card-choice]').length,
+      'no card picker was rendered',
+    ).toBe(1);
+    expect(
+      r.container.querySelectorAll('[data-testid=card-choice-option]').length,
+      'a card choice fell through to the RESOURCE picker',
+    ).toBe(2);
+
+    // ONE PER CARD, LABELLED BY NAME — never by a bare id.
+    const options = [...r.container.querySelectorAll('[data-testid=card-choice-option]')];
+    const labels = options.map((o) => o.textContent);
+    expect(labels.some((l) => l === 'ct-et2040-001'), 'a button is labelled with a bare card id').toBe(false);
+    expect(labels.every((l) => typeof l === 'string' && l.length > 'ct-et2040-001'.length)).toBe(true);
+
+    // And pressing the SECOND takes the second — the whole of "pick any".
+    fireEvent.click(options[1] as HTMLElement);
+    expect(seen).toHaveLength(1);
+    assertEngineWouldAccept(sc, seen[0] as ChoicePick);
+    expect((seen[0] as { cardId: string }).cardId).toBe('ct-et2040-002');
+  });
+
+  it('the empty recycle list says so, rather than rendering an empty sheet', () => {
+    // A REAL state: `applyEffect` raises at most `min(n, pile.length)` decisions so a
+    // player cannot be stranded, but the list CAN be narrower than the decision when
+    // another play emptied the pile while the dialog was open. §5.9b gives a decision no
+    // exit, so a dialog with no legal move is a stall rather than a shrug.
+    const sc = scenario([]);
+    const r = render(<Harness sc={sc} onResolved={() => undefined} />);
+    expect(
+      r.container.querySelectorAll('[data-testid=card-choice-empty]').length,
+      'an empty recycle list rendered no message',
+    ).toBe(1);
+    expect(r.container.querySelectorAll('[data-testid=card-choice-option]').length).toBe(0);
+  });
+
+  it('the headline names the SET, and is never blank', () => {
+    // "Choose a card" with no noun would read as a choice out of the player's own hand —
+    // which is `PRIVATE_PLAYER_KEYS` and the D25 failure by another route. And the
+    // non-negotiable half: `choiceHeadline` now ends in `assertNever`, so a ninth kind is
+    // a COMPILE error rather than the blank title a missing arm produced.
+    const sc = scenario(['ct-et2040-001']);
+    const r = render(<Harness sc={sc} onResolved={() => undefined} />);
+    const headline = r.container.querySelector('#choice-headline');
+    expect(headline?.textContent).toBe('Take a Conspiracy Card from the discard pile');
   });
 });
