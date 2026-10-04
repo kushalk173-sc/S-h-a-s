@@ -10,8 +10,10 @@ import { loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck }
 import type { XCardLike } from '../src/balance.js';
 import {
   BALANCE_TOLERANCE_TOTAL,
+  IDEOLOGY_CAMPAIGN_SIZE,
   PAYOUT_DECIDED_SHARE_THRESHOLD,
   RESOURCE_BLIND_LEAN_THRESHOLD,
+  SESSION_ANSWERS_MAX,
   X_EFFECT_MAGNITUDE_BUDGET,
   balanceCorpus,
 } from '../src/balance.js';
@@ -96,6 +98,19 @@ for (const b of report.bias) {
   console.log(
     `  holdings sweep       all ${c.positions} reachable positions per card; ` +
       `${(c.tieShare * 100).toFixed(1)}% of (card, position) pairs are ties`,
+  );
+  // THE DECK-SIZE FINDING, printed on every run so the shortfall cannot be mistaken for a
+  // design choice. REF §2.2 ships 108 per campaign; a session consumes 52-68 answers, so a
+  // deck below that GUARANTEES a within-game repeat rather than making one unlikely.
+  const shortfall = IDEOLOGY_CAMPAIGN_SIZE - b.ideologyCards;
+  const recycles = b.ideologyCards < SESSION_ANSWERS_MAX;
+  console.log(
+    `  deck size            ${b.ideologyCards} cards against REF §2.2's ${IDEOLOGY_CAMPAIGN_SIZE} ` +
+      `per campaign (${shortfall > 0 ? `${shortfall} short` : 'met'})`,
+  );
+  console.log(
+    `                      a session answers ${SESSION_ANSWERS_MAX} cards at most, so this deck ` +
+      `${recycles ? 'RECYCLES INSIDE ONE GAME — a player will see the same dilemma twice' : 'does not force a within-game repeat'}`,
   );
   console.log('');
 }

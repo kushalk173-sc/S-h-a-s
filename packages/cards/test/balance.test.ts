@@ -4,8 +4,11 @@ import {
   BALANCE_TOLERANCE_TOTAL,
   CONSPIRACY_MIN_COST,
   IDEOLOGUE_SKEW_TOLERANCE,
+  IDEOLOGY_CAMPAIGN_SIZE,
   PAYOUT_DECIDED_SHARE_THRESHOLD,
   RESOURCE_BLIND_LEAN_THRESHOLD,
+  SESSION_ANSWERS_MAX,
+  SESSION_ANSWERS_MIN,
   X_EFFECT_MAGNITUDE_BUDGET,
   analyseIdeologyCard,
   balanceCorpus,
@@ -878,6 +881,27 @@ describe('the shipped decks leave real choices — the positive proof', () => {
     });
     expect(armed.bias[0]?.resourceBlind.decisive).toBe(1);
     expect(armed.errors.map((f) => f.code)).toContain('COMPOSITION_DOMINANT');
+  });
+  it('the deck is REPORTED as too small for one session, and that is pinned', () => {
+    // THE DECK-RECYCLING FINDING, made permanent and derived rather than asserted as a
+    // number someone typed. REF §2.2 ships 108 Ideology Cards per campaign; a session
+    // answers 52-68. So the floor for "a table never sees the same dilemma twice in one
+    // game" is SESSION_ANSWERS_MAX, and the reference's 108 is 1.6x that.
+    expect(IDEOLOGY_CAMPAIGN_SIZE).toBe(108);
+    expect(SESSION_ANSWERS_MIN).toBeLessThan(SESSION_ANSWERS_MAX);
+    expect(IDEOLOGY_CAMPAIGN_SIZE).toBeGreaterThan(SESSION_ANSWERS_MAX);
+
+    // The shipped decks are BOTH short, and the deck players see every turn is the one
+    // that matters. `in2020` at 56 is below the 68 a session can consume, which is why
+    // the harness saw one question at turns 51, 107 and 193 — turn 51 is the end of the
+    // draw pile. This is REPORTED by the CLI, not enforced: the fix is 52 authored cards
+    // in REF §8.2's register, and a build failure would only restate what SOURCES.md §4.6
+    // already says.
+    const india = loadIdeologyDeck('in2020');
+    expect(india.length, 'the shortfall closed - update the ruling and the CLI text').toBeLessThan(
+      SESSION_ANSWERS_MAX,
+    );
+    expect(IDEOLOGY_CAMPAIGN_SIZE - india.length, 'cards still to author').toBe(52);
   });
 });
 

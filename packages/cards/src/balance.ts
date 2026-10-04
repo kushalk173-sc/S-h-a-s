@@ -1205,6 +1205,87 @@ export function marketConversionModel(
   return shippedConversionModel([...voter.values()].flat());
 }
 
+/**
+ * How many Ideology Cards a real campaign ships, and what that implies for ours.
+ *
+ * REF §2.2, VERIFIED: *"Counts: 108 per campaign in the Kickstarter/Collectors edition"*.
+ * REF §2.3 then says why, and the reason is the answer to the deck-recycling finding:
+ * *"Total cards in hand after 8–12 turns is 8–12, so a 108-card campaign is only ~10%
+ * consumed in a typical 5-player game. [INFERRED] 108 is sized for many replays with one
+ * shared deck, and the effective card count per session is ~40-50 cards drawn from 108."*
+ *
+ * So 108 is not arbitrary padding: it is the smallest size at which **one shared deck
+ * survives a session without a table seeing the same dilemma twice**, and it is also the
+ * size that supports reuse across sessions at all.
+ *
+ * The engine's own figure for what a session consumes is in
+ * `packages/engine/test/winnable.test.ts`: *"Ideology Cards | 52 | one per turn, so the
+ * deck empties on turn 52"*. A harness measured ~67 answers per game across four games.
+ * So a session consumes **52–68** answers and a deck must be at least that large to avoid
+ * a within-session repeat.
+ *
+ * APPLIED TO THE SHIPPED DECKS, which is the finding rather than a plan: `in2020` is the
+ * deck a player sees every turn and it holds **56** cards. 56 < 68, so **recycling within
+ * a single game is guaranteed rather than marginal** — the deck cannot get to the size
+ * where the answer stops mattering. That is why a harness saw one question at turns 51,
+ * 107 and 193: turn 51 is the end of the draw pile.
+ *
+ * This is REPORTED, not enforced, and the distinction is deliberate. The fix is 52 authored
+ * cards in REF §8.2's register, which is a writing task and not a data edit; a checker that
+ * failed the build on it would only be asserting that the corpus is incomplete, which it
+ * already says in `decks/SOURCES.md` §4.6. It is printed by `npm run balance` on every run
+ * so the shortfall is impossible to forget and impossible to mistake for a design choice.
+ */
+export const IDEOLOGY_CAMPAIGN_SIZE = 108;
+
+/** Answers one session consumes. The floor is the engine's own figure; see above. */
+export const SESSION_ANSWERS_MIN = 52;
+export const SESSION_ANSWERS_MAX = 68;
+
+/**
+ * THE CHECK-BY-CHECK VERDICT, because "we rebuilt the instrument" is not an answer to
+ * "which of the old checks earned its place".
+ *
+ *  - `EMPTY_SIDE` — **KEEP, error.** Unfiring, and it must stay: a `{}` payout is
+ *    schema-valid and design-dead, and REF §5.2 explicitly recommends requiring
+ *    `sidePayout >= 1`. It is one line guarding a real future authoring slip.
+ *  - `PURE_UPGRADE` — **KEEP, error.** Unfiring on the corpus (0 of 76). Not subsumed by
+ *    `COMPOSITION_DOMINANT`: componentwise dominance is a *sufficient* condition for
+ *    conversion dominance but the market can value the surplus at zero, so a pure upgrade
+ *    can tie everywhere and a capacity-dominant card need not be an upgrade. Cheap,
+ *    unambiguous, checked first for a reason.
+ *  - `TOTAL_SKEW` — **DEMOTED error → warning**, on the measured inversion rates in the
+ *    ruling. This is the one severity that changed and it is the one the user owned the
+ *    mistake on. No card changes status (76 of 76 at skew 0) and the finding is still
+ *    raised, so no information is lost.
+ *  - `POWER_THRESHOLD_CLIFF` — **KEEP, error.** Unfiring on the shipped deck *by a
+ *    knowable cause*: the corpus caps every side at 2 of any resource and `RULES.level3` is
+ *    3. It is also the least dead check here — a `{clout: 6}` fixture on a Supremo trips it
+ *    today, which is asserted in `test/balance.test.ts`. It guards the permanent power
+ *    ladder, which `holdings.ts` deliberately excludes, so no other check covers it.
+ *  - `SAME_IDEOLOGUE_SKEW` — **KEEP, warning.** Unreachable through the schema, which is
+ *    the point: the checker is runnable against an unschema-checked corpus and p13 is a
+ *    real rule.
+ *  - `RESOURCE_BLIND_LEAN` / `resourceBlind()` — **REBUILT, not removed.** It was a dead
+ *    branch: it keyed on totals and pure upgrades, so it measured `decisive: 0` on both
+ *    decks and could never return `lean`. Its question — can a player solve this deck
+ *    without reading it — is the right one, so it now runs on the conversion model.
+ *  - `COMPOSITION_DOMINANT` — **NEW, error.** The check this whole round exists to add.
+ *    Provably not redundant: it is the only one of the four that sees `{clout: 6}` against
+ *    `{funds: 1, clout: 2, media: 1, trust: 2}`.
+ *  - `PAYOUT_DECIDED_DECK` — **NEW, warning.** The deck-level rollup, for cards that are
+ *    individually defensible and collectively a solved deck. Armed and silent at 0/76.
+ *  - `IDEOLOGUE_SKEW` — **KEEP, warning.** Orthogonal, and REF §2.3 measured the real
+ *    campaign as skewed on purpose, so a warning is the right severity.
+ *  - `VOTER_COST_NON_MONOTONIC` / `VOTER_VALUE_UNDERREPRESENTED` — **KEEP, warning, and
+ *    now load-bearing twice.** The market IS the economy `holdings.ts` measures against, so
+ *    a market that stops discriminating by size would quietly blunt the new instrument as
+ *    well as the old one.
+ *  - `X_EFFECT_MAGNITUDE` — **KEEP, warning.** A different card class with no two sides to
+ *    compare, orthogonal to this axis, and it fires today on `ct-et2040-017`.
+ */
+export const BALANCE_RULING = 'composition over totals';
+
 export function balanceCorpus(input: BalanceInput): BalanceReport {
   const findings: BalanceFinding[] = [];
   const bias: BiasStats[] = [];
