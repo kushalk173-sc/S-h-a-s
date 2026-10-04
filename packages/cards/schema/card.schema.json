@@ -481,6 +481,17 @@
             "kind": { "enum": ["no-purchases", "surcharge", "no-power", "no-income", "voter-shortfall"] },
             "value": { "type": "integer", "minimum": 0, "maximum": 9 },
             "owed": { "type": "integer", "minimum": 1, "maximum": 9 },
+            "owedRes": {
+              "type": "object",
+              "additionalProperties": false,
+              "$comment": "C1. THE PER-RESOURCE FORM OF `owed`, and the only shape in which \"1 resource of EACH TYPE\" is expressible: a total cannot say it, because `4` is four of anything and four Funds of one type is not one of each of the four.\n\n`maximum: 1` IS THE DISCHARGEABILITY PROOF, not a style bound. `creditDonation` settles a type outright when the donation carries it and settles it by waiver when the player holds none of it, so with every per-type ask at most 1 those two cases are exhaustive: one donation discharges the whole lock and no type can be left partly paid. An ask of 2 or more can leave a residue, and the residue is only reachable if some later card donates that resource - so it is refused here, at the gate, rather than shipped as a lock that might not be answerable.\n\n`owedRes` is read by `applyEffect`'s `restrict` case (EXECUTED_OPS in src/executable.ts), copied onto `Restriction.owedRes` as the initial REMAINDER, and decremented per donation from there - which is what lets a lock in two halves remember WHICH resource is still owed. `owed` stays the sum.\n\nSee Restriction and Effect.restrict.owedRes in packages/engine/src/{state,cards}.ts for the full argument.",
+              "properties": {
+                "funds": { "type": "integer", "minimum": 1, "maximum": 1 },
+                "clout": { "type": "integer", "minimum": 1, "maximum": 1 },
+                "media": { "type": "integer", "minimum": 1, "maximum": 1 },
+                "trust": { "type": "integer", "minimum": 1, "maximum": 1 }
+              }
+            },
             "target": { "$ref": "#/$defs/effectTarget" },
             "until": { "$ref": "#/$defs/effectDuration" }
           }

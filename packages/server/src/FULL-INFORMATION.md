@@ -65,6 +65,45 @@ the card". Four reasons, in descending order of how much they carry:
 Both halves are asserted over the production broadcast in `test/secret-state.test.ts` — every
 viewer receives both whole sides, and no viewer's payload contains the pending card's id.
 
+### 2a. THE ID IS WITHHELD AS A FIELD AND RECOVERABLE BY CONTENT — and that is the load-bearing fact
+
+§2 is usually read as "the client cannot tell which card is on the table". It cannot, as a
+**field**: no payload carries an `id`, and `check-secrets.mjs` fails the build on the name.
+But the client's inability to name the card and its inability to *identify* the card are
+different claims, and only the first is true.
+
+`PublicQuestion` publishes the question, both printed answers and both Ideologues. The
+Ideology corpus is public JSON in this repository. So the key a client can look up is
+
+    (question, the SET of printed sides)
+
+and it must compare the **set**, not the tuple, because the client has not been told `order`
+and therefore cannot tell which display position is side 0 — a lookup on side order matches
+only the `ab` cards, 26 of 76. Measured over the shipped deck: **76 distinct keys for 76
+cards, zero collisions**, and `test/public-payload.test.ts` pins both numbers.
+
+**What this changes.** `orderFor` folds `_seed` into the presentation-order draw, and the
+2026-10 audit (S2) listed as its first mitigation deriving that order from "a value that is
+already public — `turn`, the seat index, the card id alone — rather than from the cursor".
+**That mitigation is a regression.** If `order` were a function of public state and the card
+id, every client could compute it, and with `ideologue` printed beside each answer the
+position-to-Ideologue lookup that PLAN.md §2 amendment A′ exists to withhold would be rebuilt
+in one line. The seed fold is the only thing standing in that channel.
+
+**What this does not change.** The seed stays secret, and §7's list is unchanged. But one
+bit of a 31-bit value (`newSeed` masks to `0x7fffffff`) is published per card the answering
+seat holds, and a four-hour game has a seat answering roughly eight to fifteen cards — so a
+table that pools its answers holds more bits about the seed than the seed has. Recovery is an
+exhaustive search rather than an inversion, so it needs `orderFor`'s constants; those are in
+this package's source, not on the wire, so it is not exploitable by a network attacker today,
+and it becomes possible the moment the construction is disclosed.
+
+That is an **engine** problem and not a server one: every mitigation that removes the fold
+publishes A′, and every mitigation that keeps it keeps the oracle. The fix is a second,
+independent secret with more entropy than the table can publish — a `_`-prefixed salt in
+`GameState`, minted by `setup` beside the seed and persisted with it. Recorded in full on
+`orderFor` in `broadcast.ts`, and deliberately not half-built here.
+
 ---
 
 ## 3. What was retired, and what replaced it
@@ -210,7 +249,7 @@ Unchanged and still gated by `scripts/check-secrets.mjs`:
 - the four draw piles and the four discard piles (`_ideologyDraw` … `_headlineDiscard`);
 - `_seed`, the PRNG cursor;
 - `_idSeq`;
-- the pending card's **id** — see §2;
+- the pending card's **id** — see §2, and §2a for the part that matters most about it;
 - `PlayerState.conspiracies`, for every viewer **including its owner** (D25);
 - `PlayerState.ideologyCards`, a donated Ideology Card held but not yet answered;
 - the `order` draw, at the client boundary (`app/blindWire.ts` REFUSES a payload carrying it)

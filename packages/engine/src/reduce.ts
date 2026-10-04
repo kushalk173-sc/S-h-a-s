@@ -896,34 +896,119 @@ function incomeBlocked(state: GameState, id: PlayerID): boolean {
  * The card's punchline is that the resources sit physically ON the card and it is
  * discarded when all four are donated.
  *
- * `lose` never takes more than the player holds — `takeResources` clamps, and that
- * is not negotiable, because the alternative is a negative pool. So a player holding
- * 3 Funds and no Media has donated what they could and the card's own words are
- * satisfied. **Therefore `remaining` is decremented by what was ACTUALLY TAKEN, not
- * by what the card asked for.** Decrementing by the ask would make the only card
- * that can clear the lock unplayable for anyone short of 4 resources of every type,
- * which is a table-stalling bug wearing a card's clothes.
+ * ## RULING 1 — IT IS A *GIVING*, NOT A LOSING (C1)
+ *
+ * **THE BUG THIS FUNCTION HAD.** It was reached from the `lose` case for EVERY
+ * resource loss to the player, from any card, by anyone, and it decremented every
+ * `'no-purchases'` entry it found. So an OPPONENT'S DRAIN discharged the lock: the
+ * audit's probe had a locked player lose 4 Funds to somebody else's card, donate
+ * nothing whatever, and find the restriction removed — the entry was not even
+ * zeroed, it was `filter`ed away. "Until you donate" is a claim about the DIRECTION
+ * of a loss. A `lose` whose affected player is somebody else is a *taking*, and it
+ * is precisely the one thing the printed sentence is not.
+ *
+ * **THE FIX IS AT THE CALL SITE, not here, and that placement is the ruling.**
+ * `applyEffect`'s `lose` case computes `donated = p === source` — the loss landed on
+ * the actor's own mat — and only then calls this function. `p === source` is the
+ * whole test, and it is a test rather than a flag threaded through the effect list
+ * because the engine has no notion of "this particular clause is a donation": a
+ * donation and a drain are the same op with a different target, and the target is
+ * already resolved here.
+ *
+ * **WHY NOT "ONLY THE IMPOSING CARD'S DONATION", which is the stricter reading.**
+ * Because a Headline Card resolves once per game, so a lock keyed to its own card
+ * is a lock whose only key is a card nobody holds any more — the undischargeable-ask
+ * shape this codebase has now been bitten by twice (the original scalar `remaining`
+ * argument above, and `lose-any` before it was clamped to the chooser's pool). The
+ * printed condition is "until you donate", not "until you play this card again", and
+ * the direction test is what the sentence actually says. What is left is therefore
+ * *strictly weaker than any drain* and *strictly weaker than any other player's
+ * giving*, which is the honest reading of a public condition.
+ *
+ * ## RULING 2 — `lose` NEVER TAKES MORE THAN THE PLAYER HOLDS
+ *
+ * `takeResources` clamps, and that is not negotiable, because the alternative is a
+ * negative pool. So a player holding 3 Funds and no Media has donated what they could
+ * and the card's own words are satisfied. **Therefore `remaining` is decremented by
+ * what was ACTUALLY TAKEN, not by what the card asked for.** Decrementing by the ask
+ * would make the only card that can clear the lock unplayable for anyone short of 4
+ * resources of every type, which is a table-stalling bug wearing a card's clothes.
  *
  * THE SAFE DIRECTION IS DELIBERATE. Under-decrementing leaves the player locked, who
  * can donate again and eventually get to zero — annoying and recoverable.
  * Over-decrementing unlocks a purchase they have not paid for, which hands out a free
  * Voter Card. So the arithmetic rounds towards "still owed".
  *
+ * ## RULING 3 — "OF EACH TYPE" IS A VECTOR, AND A DONATION SETTLES A WHOLE TYPE
+ *
+ * `Restriction.owedRes` carries the requirement per resource rather than as a total,
+ * because a total sums away the very information the card's sentence turns on: four
+ * Funds of one type is not one of each of the four. `held` is the pool BEFORE the
+ * take, which is what the waiver is read against.
+ *
+ * Per resource `r` with `ask = owedRes[r]`:
+ *  - `ask === 0` — nothing owed for it.
+ *  - `taken[r] >= ask` — SETTLED. The donation carried it.
+ *  - `held[r] === 0` — SETTLED BY WAIVER. `takeResources` clamps, so a player holding
+ *    no Media can never give Media, and a lock that kept asking for it would be the
+ *    undischargeable-ask shape this codebase has been bitten by twice. This is
+ *    Ruling 2 read per resource instead of as a total.
+ *  - otherwise — `ask - taken[r]` still owed, tracked per type so the NEXT donation
+ *    knows which resource it has to bring.
+ *
+ * **THE DISCHARGEABILITY PROOF, and `held` is the whole of it.** The residue after
+ * any donation is, per type, either 0 (covered or waived) or `ask - taken[r]` with
+ * `0 < taken[r] < ask[r]`. With every per-type ask at most 1 — enforced by the corpus
+ * validator and argued on `Effect.restrict.owedRes` — the third case is empty, so a
+ * donation under a card that asks at least the owed amount of every resource type
+ * discharges the WHOLE lock in one donation. **Every surviving residue is therefore a
+ * resource the player demonstrably HOLDS**, which is the `capOverride` argument in a
+ * different costume: the target state is REACHABLE rather than merely approached,
+ * because the next card that donates that resource reaches it. KHAKI TERROR's own
+ * reduction asks one of each, which is the whole ask, so **in the corpus the lock is
+ * discharged in the resolution that imposes it and no `'no-purchases'` restriction is
+ * ever reachable at all** — `packages/engine/test/restrictions.test.ts` checks that by
+ * exhausting all 81 holding patterns rather than trusting this paragraph.
+ *
  * Called from the `lose` case, because a donation IS a `lose` in this engine — the
  * Public Reserve is modelled as the absence of a resource, not as a pile.
  */
-function creditDonation(state: GameState, id: PlayerID, taken: Delta): GameState {
-  const given = deltaTotal(taken);
-  if (given <= 0) return state;
+function creditDonation(
+  state: GameState,
+  id: PlayerID,
+  taken: Delta,
+  held: Pool,
+): GameState {
   const player = state.players[id];
   if (!player) return state;
+  if (deltaTotal(taken) <= 0) return state;
   let changed = false;
   const restrictions = (player.restrictions ?? []).map((r) => {
     if (r.kind !== 'no-purchases' || r.remaining <= 0) return r;
-    const next = Math.max(0, r.remaining - given);
-    if (next === r.remaining) return r;
+    if (r.owedRes === undefined) {
+      // The legacy total. Still a *donation*-gated credit — the gate is at the call
+      // site — but it cannot say "each type", which is the rest of C1.
+      const next = Math.max(0, r.remaining - deltaTotal(taken));
+      if (next === r.remaining) return r;
+      changed = true;
+      return { ...r, remaining: next };
+    }
+    const owedRes: Delta = {};
+    let still = 0;
+    for (const res of RESOURCES) {
+      const ask = Math.max(0, r.owedRes[res] ?? 0);
+      if (ask === 0) {
+        owedRes[res] = 0;
+        continue;
+      }
+      const gave = Math.max(0, taken[res] ?? 0);
+      const left = gave >= ask ? 0 : (held[res] ?? 0) === 0 ? 0 : ask - gave;
+      owedRes[res] = left;
+      still += left;
+    }
+    if (still === r.remaining) return r;
     changed = true;
-    return { ...r, remaining: next };
+    return { ...r, owedRes, remaining: still };
   });
   // A satisfied lock is REMOVED rather than left at zero, so `purchasesBlocked` stays
   // a single honest predicate and the client does not have to know that zero means
@@ -1180,14 +1265,24 @@ function applyEffect(
     }
     case 'lose': {
       for (const p of resolveTargets(s, source, target, forced)) {
-        // The `taken` Delta is what the engine ACTUALLY removed, which is the whole
-        // of the KHAKI TERROR ruling — see `creditDonation`.
+        // C1 — THE GATE. `p === source` is "this loss is the actor's own giving", which
+        // is what a donation is; a `lose` aimed at anybody else is somebody else taking,
+        // and must not touch a lock whose printed condition is "until you donate". See
+        // the argument on `creditDonation` for why the gate lives here and not on the
+        // imposing card's id.
+        if (p !== source) {
+          s = takeResources(s, p, resolveDelta(s, p, effect.res, effect.per, ctx))[0];
+          continue;
+        }
+        // The `taken` Delta is what the engine ACTUALLY removed and `held` is the pool
+        // before it, which is the whole of Ruling 2 and the waiver in Ruling 3.
+        const before = s.players[p]?.resources;
         const [after, taken] = takeResources(
           s,
           p,
           resolveDelta(s, p, effect.res, effect.per, ctx),
         );
-        s = creditDonation(after, p, taken);
+        s = creditDonation(after, p, taken, before ?? { funds: 0, clout: 0, media: 0, trust: 0 });
       }
       return s;
     }
@@ -1337,10 +1432,35 @@ function applyEffect(
       // G5. Writes a rule, not a resource. `target` says who carries it, so `'you'`
       // is KHAKI TERROR on its caster and a surcharge lands on whoever the card names.
       for (const p of resolveTargets(s, source, target, forced)) {
+        // C1 — "1 resource of EACH TYPE" is a per-resource requirement, and `owed`
+        // alone is a total that sums the four types away. `owedRes` when present is
+        // BOTH the ask and the initial remainder; `owed` stays the sum so `remaining`
+        // remains the one predicate that means "cleared". The clamp is per resource
+        // and not total, so a player holding no Media is not recorded as owing Media.
+        const ask: Delta = {};
+        let total = 0;
+        if (effect.owedRes !== undefined) {
+          for (const res of RESOURCES) {
+            const n = Math.max(0, effect.owedRes[res] ?? 0);
+            if (n === 0) continue;
+            const held = s.players[p]?.resources[res] ?? 0;
+            const clamped = Math.min(n, held);
+            if (clamped > 0) ask[res] = clamped;
+            total += clamped;
+          }
+          // Nothing owed of anything the player holds, so there is no lock to write.
+          // Pushing a zero-`remaining` entry instead would leave an inert row on a
+          // PUBLIC list, and `purchasesBlocked` would read it as clear while a client
+          // rendering the list would still show a purchase ban. Not writing it is the
+          // only version where the wire and the predicate agree.
+          if (effect.kind === 'no-purchases' && total === 0) continue;
+        }
+        const remaining = effect.owedRes !== undefined ? total : effect.owed ?? 0;
         s = pushRestriction(s, p, source, {
           kind: effect.kind,
           value: effect.value,
-          remaining: effect.owed ?? 0,
+          remaining,
+          ...(effect.owedRes !== undefined ? { owedRes: ask } : {}),
           // The same absolute-turn arithmetic a live effect uses, so all four
           // durations work with no special case and a replay reproduces it from the
           // state. `durationExpiry` is the single definition; see `Restriction`.

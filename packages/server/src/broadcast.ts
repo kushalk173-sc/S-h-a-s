@@ -523,11 +523,55 @@ function readPendingCard(state: GameState): CardID | null {
 /**
  * A seed-derived coin flip for presentation order.
  *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * THE SEED FOLD IS LOAD-BEARING, AND THE AUDIT'S FIRST "CHEAP MITIGATION" IS A REGRESSION
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * The 2026-10 audit raised this as S2 and offered three ways to break the dependency
+ * between `order` and `_seed`. The first — "derive the order from a value that is
+ * already public (`turn`, the seat index, the card id alone) rather than from the
+ * cursor" — **must not be taken**, and the reason is not a preference:
+ *
+ * `orderFor` needs the pending card's id, and that id is not actually secret. It is
+ * withheld as a FIELD — `PublicQuestion` carries no `id`, and `check-secrets.mjs` fails
+ * the build on the name — and it is nevertheless recoverable by CONTENT, because
+ * `openQuestion` publishes the question, both printed answers and both Ideologues and
+ * the Ideology corpus is public JSON in this repository. Measured over the shipped 76
+ * Ideology Cards: 76 distinct `(question, set of printed sides)` keys for 76 cards,
+ * zero collisions, and the key must be compared order-insensitively because a client
+ * has not been told `order`. `test/public-payload.test.ts` pins both numbers.
+ *
+ * So if `order` became a function of public state and the card id, every client could
+ * compute it, and with `ideologue` printed beside each answer the position-to-Ideologue
+ * lookup that PLAN.md §2 amendment A' exists to withhold would be rebuilt in one line.
+ * The seed fold is the only thing standing in that channel. That is also why
+ * `secret-state.test.ts`'s "a different match seed gives a different order for the same
+ * card" is an assertion about the game and not a tautology about a hash.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * THE DEPENDENCY THAT SURVIVES, AND WHY IT CANNOT BE CLOSED IN THIS PACKAGE
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * One bit of a 31-bit value (`newSeed` masks to `0x7fffffff`) is published per card the
+ * answering seat holds, and a 4-hour game has a seat answering roughly eight to fifteen
+ * cards — so a table that pools its answers holds more bits about the seed than the seed
+ * has. Recovering it is an exhaustive search rather than an inversion, so it needs the
+ * constants below; they are in this package's source and not on the wire, so a network
+ * attacker cannot do it today, and it becomes possible the moment the construction is
+ * disclosed.
+ *
+ * Every mitigation that removes the fold publishes A'; every mitigation that keeps it
+ * keeps the oracle. The fix is a SECOND, INDEPENDENT secret with more entropy than the
+ * table can publish — a `_`-prefixed salt in `GameState`, minted by `setup` beside the
+ * seed and persisted with it. That is an engine change (`GameState`, `setup`,
+ * `ServerOnlyKeys`, `SECRET_FIELDS`) and it is deliberately not half-built here: a
+ * partial version would be a fourth secret read with no fourth invariant behind it.
+ *
  * FNV-1a is used for the card id, then two avalanche steps with the match's PRNG
  * cursor folded in. Note *which* bit is taken, because FNV-1a has a well-known
  * weakness and it is exactly here: the low bit of an FNV hash is the parity of the
- * XOR of the input bytes, because the prime is odd and an odd multiply preserves
- * the low bit of its addend. Two card ids of the same length differ mostly in
+ * XOR of the input bytes, because the prime is odd and an odd multiply preserves the
+ * low bit of its addend. Two card ids of the same length differ mostly in
  * their trailing digits, so a raw low bit is close to a checksum of the id — an
  * attacker could enumerate the deck and predict the presentation order.
  *
@@ -539,7 +583,10 @@ function readPendingCard(state: GameState): CardID | null {
  *
  * It is written out rather than pulled from `rng.ts` because the engine's
  * `shuffle` would ADVANCE the cursor, and advancing the cursor outside the reducer
- * is precisely the impurity that makes replay worthless (ENGINE-AUDIT R2).
+ * is precisely the impurity that makes replay worthless (ENGINE-AUDIT R2). The seed
+ * is a CURSOR that has already advanced, which is why folding it in costs nothing and
+ * why it cannot simply be replaced by the turn number: the turn number is public, and
+ * so is everything else in this paragraph except the seed.
  */
 function orderFor(state: GameState, cardId: CardID): AnswerOrder {
   const seed = state._seed;

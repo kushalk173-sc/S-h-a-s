@@ -881,6 +881,18 @@ export type RestrictionKind =
  * direction is deliberate: erring towards "still locked" lets a player donate again
  * and again, while erring towards "unlocked" would hand out a free purchase.
  *
+ * ## C1 — AND "UNTIL YOU DONATE" IS A CONDITION ON THE DIRECTION OF THE LOSS
+ *
+ * The paragraph above is about *how much*. The audit found the missing half: the
+ * implementation decremented on **any** resource loss to the locked player, from any
+ * card, by anyone. So an opponent's drain discharged the lock — the probe had a
+ * player lose 4 Funds to somebody else's card, donate nothing, and lose the
+ * restriction entirely. "Until you donate" is a claim about a *giving*; a `lose` aimed
+ * at somebody else is a *taking*, and it is the one thing the printed sentence is not.
+ * `creditDonation` is therefore only reached from a `lose` whose affected player IS
+ * the actor — see the argument there. This paragraph is the state-level half of that
+ * ruling; the other half is that it must be a *type*, which is `owedRes`.
+ *
  * `expiresTurn` is the second decision, and it is a departure from the
  * `'resolved' | 'this-turn' | 'next-turn' | 'round' | 'rest-of-game'` enum KNOWN-GAPS
  * §4 proposed. That enum mixes two different clocks — a *condition* and a *deadline*
@@ -904,8 +916,52 @@ export type Restriction = {
   /**
    * `'no-purchases'` only: how much is still owed. Starts at the amount the card
    * named and is decremented by what was ACTUALLY donated — see the note above.
+   *
+   * **AND IT IS THE SUM OF `owedRes` WHEN THAT IS PRESENT**, maintained in lockstep
+   * by `creditDonation`, so `remaining <= 0` stays the single predicate that means
+   * "cleared" and no consumer has to know a second representation exists.
    */
   readonly remaining: number;
+  /**
+   * C1 — `'no-purchases'` only, and the field that makes *"1 resource of **each
+   * type**"* mean what the card says instead of what a total means.
+   *
+   * ## WHY A VECTOR, AND NOT A BIGGER `remaining`
+   *
+   * The audit found the lock being discharged by `deltaTotal(taken)` against a scalar
+   * `remaining`, and the per-type information is summed away before it is compared:
+   * four Funds of ONE type satisfied *"one of each of the four"*. There is no scalar
+   * that expresses "one of each" — `4` is four of anything. So the requirement has to
+   * be carried as a requirement, and `Delta` is already the shape a multi-resource
+   * amount takes everywhere else in the engine (`res`, `cost`, `pay`, `give`).
+   *
+   * ## WHAT IT HOLDS: THE REMAINDER, NOT THE ASK
+   *
+   * It starts as the card's ask and shrinks as donations land. That is what makes a
+   * lock in TWO halves expressible: with only a scalar, a donation of one Fund against
+   * an ask of "1 Fund and 1 Trust" would leave the engine unable to say WHICH of the
+   * two is still owed, and `reducer-parity`'s "the card is executable" says nothing
+   * about which one it would pick.
+   *
+   * ## THE TWO RULINGS ON IT, both falsifiable and both tested
+   *
+   *  1. **ABSENT MEANS THE LEGACY TOTAL.** A `'no-purchases'` written without this
+   *     field keeps the old scalar semantics (`owed` resources of any types). That is
+   *     what `owed` is for and it is what the older engine fixtures use. It cannot
+   *     express "each type", which is the defect; it is retained rather than deleted
+   *     because `owed` is on the wire and in the corpus JSON Schema and removing it
+   *     would change every card that carries it.
+   *  2. **A TYPE THE DONATION TOOK NOTHING OF IS SETTLED ANYWAY** — the waiver, and it
+   *     is the `capOverride` arithmetic in a different costume. `takeResources` clamps,
+   *     so a player holding no Media can never give Media, and a lock that kept asking
+   *     for it would be the undischargeable-ask shape this codebase has been bitten by
+   *     twice. Every other type is settled by the donation actually carrying it.
+   *
+   * **Visibility: PUBLIC, and no `_` prefix, so `secret-inventory.ts` owes nothing.**
+   * It is the card's own printed ask — the card imposing it is played face up under
+   * FULL INFORMATION, so every client can already read "one of each" off the table.
+   */
+  readonly owedRes?: Delta;
   /**
    * The absolute turn number this is removed at, or `null` for rest of game.
    *

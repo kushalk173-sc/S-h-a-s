@@ -704,11 +704,67 @@ of influence already spent, not a place to keep a debuff. So it is a RULE, and
    Showstopper pair the debuff with their own power and launder it away for free.
 
 **`owed` MEANS "HOW MANY CARDS" HERE, which is the third reading of one field.**
-`no-purchases` decrements by what was actually donated; `voter-shortfall` decrements by
+`no-purchases` decrements per resource type, by what was actually donated and with a
+type the player holds none of waived; `voter-shortfall` decrements by
 exactly one per INFLUENCE — *whether or not the card had any voters to shorten*,
 because the printed clause counts CARDS. A player therefore cannot extend a debuff by
 buying small cards. A spent entry is REMOVED rather than left at zero, the same rule
 `creditDonation` follows, so "is this rule in force" stays one predicate.
+
+### G5a — KHAKI TERROR's lock: the engine now discharges it in the same breath (C1)
+
+**THE AUDIT'S THREE DIVERGENCES, AND WHAT HAPPENS TO EACH.** C1 found `creditDonation`
+decrementing on any resource loss from any card, summing the loss to a total before
+comparing it, and running before the card's own `restrict` had written an entry. All
+three are fixed in `packages/engine/src/reduce.ts`; the third one is a *card* fix and
+it is below.
+
+1. **WRONG CONDITION — fixed, by the DIRECTION of the loss.** `creditDonation` is now
+   only reached from a `lose` whose affected player IS the actor (`p === source` in the
+   case). An opponent's drain is a taking, and *"you cannot make any purchases until you
+   donate"* is a claim about a giving. `packages/engine/test/restrictions.test.ts` drives
+   the audit's own probe: a locked player loses 4 Funds to somebody else's card, donates
+   nothing, and the lock is exactly where it was.
+2. **WRONG SHAPE — fixed, with `Restriction.owedRes`.** A total cannot say *"1 resource
+   of **each type**"*: `4` is four of anything. `owedRes` carries the requirement as a
+   per-resource remainder, is clamped to what the player actually holds, and a type the
+   player holds none of is **waived** rather than owed — the undischargeable-ask shape
+   this codebase has been bitten by twice. `owed` remains, and remains the sum, because
+   it is on the wire and in the schema; a `no-purchases` written without `owedRes` keeps
+   the legacy total semantics and **cannot express "each type"**, which
+   `restrictions.test.ts` asserts so the limitation cannot be quietly forgotten.
+3. **THE CARD'S OWN DONATION DID NOT COUNT — fixed by REORDERING the reduction**, and
+   this is the clause worth reading, because the fix is not in the engine at all.
+
+**WHY REORDERING, AND WHAT IT COSTS.** The probe row for KHAKI TERROR now reads
+`restrict` **then** `lose`, so the lock is on the board when the donation lands and the
+card's own donation discharges it. The consequence is that **the lock never outlives its
+own resolution**: `owedRes` is at most 1 per type, a donation either carries a type or
+takes none of it, and those are the only two cases — so one donation discharges the
+whole lock for *every* holding. `restrictions.test.ts` checks that by driving all 81
+holding patterns at 0/1/2 per resource through the real reducer rather than by asserting
+it. In the corpus that means **no `'no-purchases'` restriction is reachable at all**, and
+`hl-in2020-007` — which already ships the `lose` alone and names the lock as dropped — was
+right to.
+
+**SO WHAT REMAINS OF THE REAL CARD IS G10 AND WAS ALWAYS G10.** REF 4.1's punchline is
+that the four resources sit *on the card* and the discard happens when all four are
+handed over, so the real lock lasts until a LATER donation. `lose` at resolution time
+models "the tokens leave your mat" and `restrict` models "you cannot buy until you hand
+them over", and with both in one effect list the second is satisfied by the first.
+**DROPPED, and named on the probe row and in `SOURCES.md`: the real card's deferral.**
+Getting it needs the token pile — resources as objects that sit on a card and are
+discarded with it — which is G10 and not expressible in the `Delta` vocabulary. Until then
+KHAKI TERROR ships as a plain donation of one of each, which is what `hl-in2020-007` says
+on its printed text and which the engine now honours exactly.
+
+**THE RULING THAT WAS *NOT* TAKEN, because it would have been a soft-lock.** The stricter
+reading — a lock discharged only by the imposing card's own donation — was rejected: a
+Headline Card resolves once per game, so a lock keyed to its own card is a lock whose
+only key is a card nobody holds any more. The printed condition is *"until you donate"*,
+not *"until you play this card again"*, so the direction test is what the sentence says.
+This is the same reasoning as G15's `capOverride`, where the ask was rejected because
+arithmetic showed the target state was REACHABLE rather than merely approached.
 
 **Card gained: THE GRETA EFFECT — `npm run playable` 36 → 37 of 54, measured by
 playing.** Two clauses are dropped and both are named on `SOURCES.md` and on the probe

@@ -75,7 +75,7 @@ export const EXECUTED_OPS: Readonly<Record<Effect['op'], readonly string[]>> = {
   gerrymander: ['n', 'target'],
   'draw-conspiracy': ['n', 'target', 'from', 'onlyIfEmpty'],
   'refresh-market': [],
-  restrict: ['kind', 'value', 'owed', 'target'],
+  restrict: ['kind', 'value', 'owed', 'owedRes', 'target'],
   discount: ['n', 'target'],
   /**
    * G20. Every field is listed, including the ones that are a single allowed value,

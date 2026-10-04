@@ -511,7 +511,8 @@ export type Effect = (
    * `owed` is the KHAKI TERROR condition, and it is the field the soft-lock ruling
    * lives in: see `Restriction` in state.ts. It is the amount the card ASKS for; the
    * engine decrements `remaining` by what was ACTUALLY donated, so a player who
-   * cannot afford the whole ask can still clear it.
+   * cannot afford the whole ask can still clear it. `owedRes` is the per-resource
+   * form of the same condition and is what a card saying "of each type" must use.
    */
   | {
       readonly op: 'restrict';
@@ -539,8 +540,35 @@ export type Effect = (
         | 'voter-shortfall';
       /** Extra resources per purchase, for `'surcharge'`. Zero for `'no-purchases'`. */
       readonly value: number;
-      /** For `'no-purchases'`: what the player must give before buying again. */
+      /**
+       * For `'no-purchases'`: how many resources the player must give before buying
+       * again, as a TOTAL.
+       *
+       * **THE LEGACY SHAPE, and it is why `owedRes` exists.** A total cannot say
+       * *"1 resource of **each type**"*: `4` is four of anything, so a lock written
+       * this way is cleared by four Funds and not by one of each — the exact
+       * text-behaviour divergence C1 is. Read `owedRes` for that, and read the
+       * `owedRes` note below for why the two coexist.
+       */
       readonly owed?: number;
+      /**
+       * C1 — `'no-purchases'` only: the requirement AS A PER-RESOURCE VECTOR, which is
+       * the only shape in which *"1 resource of each type"* is expressible.
+       *
+       * Copied onto the `Restriction` as its initial remainder and decremented per
+       * donation from there, so the vector survives across several partial donations
+       * — which a scalar cannot, because a scalar cannot say WHICH resource is still
+       * owed. `owed` remains the sum, so anything reading the scalar still works.
+       *
+       * **PER-TYPE VALUES ARE 0 OR 1, and that is the whole dischargeability proof.**
+       * `creditDonation` settles a type outright when the donation carries it, and
+       * settles it by waiver when the donation takes none of it (the player holds
+       * none). With every ask at most 1 those are the only two cases, so **one donation
+       * discharges the whole lock** — no type can be left partly paid. An ask of 2 or
+       * more breaks that and is refused by the corpus validator rather than shipped as
+       * a lock that might not be answerable.
+       */
+      readonly owedRes?: Delta;
       readonly target?: EffectTarget;
     }
   /**
