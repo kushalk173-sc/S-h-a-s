@@ -33,6 +33,7 @@ import type { ClientState, PlayerID, Pool } from '@shasn/engine';
 import {
   RESOURCE_ORDER,
   UI_RULES,
+  effectiveCap,
   manifestoCells,
   poolTotal,
   freeSlotsIn,
@@ -76,10 +77,32 @@ export type YourMatProps = {
   readonly onTradeWith: (player: PlayerID) => void;
 };
 
-/** Resource strip + the single combined cap meter. */
-export function ResourceStrip({ pool, showMeter = true }: { pool: Pool; showMeter?: boolean }) {
+/**
+ * Resource strip + the single combined cap meter.
+ *
+ * `cap` is the player's EFFECTIVE cap, from `effectiveCap` — not the printed
+ * `UI_RULES.resourceCap`. Under THE BIG FREEZE those differ, and every number this
+ * meter renders is wrong if the printed one is used: the ceiling, the fill
+ * fraction, the warning threshold and the caption all move together. It defaults
+ * to the printed cap so a caller with no player in hand is still correct rather
+ * than undefined.
+ */
+export function ResourceStrip({
+  pool,
+  cap = UI_RULES.resourceCap,
+  showMeter = true,
+}: {
+  readonly pool: Pool;
+  readonly cap?: number;
+  readonly showMeter?: boolean;
+}) {
   const total = poolTotal(pool);
-  const overAtTen = total >= UI_RULES.resourceCap - 2;
+  // The warning fires two resources from the CEILING, because the discard is only
+  // forced on crossing it — under a reduced cap that threshold moves down with it,
+  // which is the whole point: at a cap of 6 a player on 4 is already one gain from
+  // being asked to discard.
+  const reduced = cap < UI_RULES.resourceCap;
+  const overSoon = total >= cap - 2;
   return (
     <div>
       <div className="res">
@@ -97,22 +120,26 @@ export function ResourceStrip({ pool, showMeter = true }: { pool: Pool; showMete
             role="meter"
             aria-valuenow={total}
             aria-valuemin={0}
-            aria-valuemax={UI_RULES.resourceCap}
-            aria-label={`Resources held against the cap of ${UI_RULES.resourceCap}`}
+            aria-valuemax={cap}
+            aria-label={`Resources held against the cap of ${cap}`}
           >
             <div
-              className={`meter__fill ${overAtTen ? 'meter__fill--warn' : ''}`}
-              style={{ width: `${Math.min(100, (total / UI_RULES.resourceCap) * 100)}%` }}
+              className={`meter__fill ${overSoon ? 'meter__fill--warn' : ''}`}
+              style={{ width: `${Math.min(100, (total / cap) * 100)}%` }}
             />
           </div>
           <p className="meter__caption">
             <span>
-              {total}/{UI_RULES.resourceCap} held
+              {total}/{cap} held
             </span>
             <span>
-              {/* A warning, not a block: the discard is only FORCED on crossing
-                  12, so the meter says so rather than refusing to move. */}
-              {overAtTen ? 'Over cap after your next gain — you must discard' : 'Cap 12 combined'}
+              {/* A warning, not a block: the discard is only FORCED on crossing the
+                  cap, so the meter says so rather than refusing to move. */}
+              {reduced
+                ? `Held to ${cap} by a card, not ${UI_RULES.resourceCap}`
+                : overSoon
+                  ? `Over your cap of ${cap} after your next gain — you must discard`
+                  : `Cap ${cap} combined`}
             </span>
           </p>
         </>
@@ -368,7 +395,7 @@ export function YourMat(props: YourMatProps) {
         {showControls ? 'YOUR MAT' : `${me.name.toUpperCase()}'S MAT — READ ONLY`}
       </h2>
 
-      <ResourceStrip pool={me.resources} />
+      <ResourceStrip pool={me.resources} cap={effectiveCap(me)} />
 
       <h3 className="panel__title" style={{ marginTop: 'var(--sp-3)' }}>
         MANIFESTO

@@ -101,6 +101,50 @@ export const UI_RULES = Object.freeze({
   toughLoveConverts: 2,
 });
 
+/**
+ * THE CAP THIS PLAYER IS ACTUALLY HELD TO — G15, "THE BIG FREEZE".
+ *
+ * Mirrors `capOf` in `packages/engine/src/reduce.ts`, which is the single place
+ * the engine reads it: the printed `rules.resourceCap`, unless `capOverride`
+ * holds a LOWER one. `min`, never `max` — a card can only make the cap more
+ * restrictive, and `expireCapOverrides` lifts it back to the printed value at
+ * the turn boundary.
+ *
+ * WHY THIS FUNCTION EXISTS AT ALL, since `capOverride` is already on the wire.
+ *
+ * It is, and that is worth being precise about because it decides this whole
+ * question. `PlayerState.capOverride` is unprefixed and is not one of
+ * `PRIVATE_PLAYER_KEYS`, so `playerView` passes it through to EVERY viewer, which
+ * was verified directly against the engine rather than assumed. `PUBLIC_BY_DESIGN`
+ * in the server's `secret-inventory.ts` is a list of fields a test asserts are
+ * PRESENT in the payload — it is an inventory of deliberate public fields, not the
+ * mechanism that publishes them. So the server needed no change to make this
+ * possible, and none is owed.
+ *
+ * What was missing was the CLIENT half. `ResourceStrip` hard-coded `12` in three
+ * places, so a player under a reduced cap was told their ceiling was 12 by the
+ * meter, and then told to discard resources by a dialog whose ceiling they could
+ * not see. A player who is told "you must discard" and shown no cap cannot tell
+ * whether the number means anything — and THE BIG FREEZE's own ruling says the
+ * cap is printed on the mat precisely so this is knowable in advance.
+ *
+ * `undefined` therefore means "no reduction in force", which is exactly the
+ * printed state, and is the same reading the engine's own field documentation
+ * gives. It stays optional for the same reason it is optional there: a required
+ * field breaks hand-built `PlayerState` literals in packages this one may not
+ * edit.
+ */
+export function effectiveCap(player: Pick<PlayerState, 'capOverride'>): number {
+  const over = player.capOverride?.to;
+  if (over === undefined) return UI_RULES.resourceCap;
+  return Math.min(UI_RULES.resourceCap, over);
+}
+
+/** What `enforceCap` asks this player to discard: 0 when they are under it. */
+export function overCap(pool: Pool, cap: number): number {
+  return Math.max(0, poolTotal(pool) - cap);
+}
+
 /** The four resources, in the printed order. Mirrors `state.ts:RESOURCES`. */
 export const RESOURCE_ORDER: readonly Resource[] = ['funds', 'clout', 'media', 'trust'];
 
@@ -441,8 +485,32 @@ export function assertNever(x: never): never {
 }
 
 /** Why the decision exists, in the card's own words where it gave any. */
-export function choiceReason(choice: Choice): string {
-  return choice.reason;
+/**
+ * Why the table owes this decision, in a sentence.
+ *
+ * Every reason but ONE is the engine's own string, passed through untouched: the
+ * engine knows what it asked for and a second phrasing of it is a second thing to
+ * keep in step.
+ *
+ * THE EXCEPTION IS THE RESOURCE CAP, and it is the exception because the engine's
+ * string is a NAME rather than a rule. `'Resource cap'` on a dialog that says
+ * "discard 4" tells a player they are over a limit and nothing about what the
+ * limit is — and under THE BIG FREEZE the limit is not the printed 12, so the
+ * player has no way to tell whether the ask makes sense. The ceiling is now stated
+ * in the same sentence as the ask: a number they can check their own pool against,
+ * which is the difference between a rule and a demand.
+ *
+ * The player's own state is what makes it nameable, so the parameter is optional:
+ * without it the sentence degrades to the engine's string, which is still honest
+ * and is what a caller that has no player in hand gets.
+ */
+export function choiceReason(choice: Choice, player?: PlayerState): string {
+  if (choice.reason !== 'Resource cap' || player === undefined) return choice.reason;
+  const cap = effectiveCap(player);
+  const reduced = cap < UI_RULES.resourceCap;
+  return reduced
+    ? `Resource cap — a card has held you to ${cap} this turn, not ${UI_RULES.resourceCap}.`
+    : `Resource cap — ${cap} across all four resources combined.`;
 }
 
 /**
@@ -651,7 +719,7 @@ export function myChoices(state: ClientState, player: PlayerID): readonly MyChoi
       pending,
       required: requiredPicks(pending.choice, state, player),
       headline: choiceHeadline(pending.choice),
-      reason: choiceReason(pending.choice),
+      reason: choiceReason(pending.choice, state.players[player]),
     }));
 }
 
