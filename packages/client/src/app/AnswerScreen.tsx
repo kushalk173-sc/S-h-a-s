@@ -45,7 +45,7 @@ import type { AnswerPrompt } from '../net/index.ts';
 
 import { committedSideToDisplayIndex, promptToProps } from './blindWire.ts';
 import { ResourcePicker } from './ResourcePicker.tsx';
-import { RESOURCE_ORDER, UI_RULES, canAfford, deltaTotal } from './derive.ts';
+import { RESOURCE_ORDER, UI_RULES, canAfford, deltaTotal, poolTotal } from './derive.ts';
 import type { PickerDraft } from './store.ts';
 
 export type AnswerScreenProps = {
@@ -229,6 +229,35 @@ export function AnswerScreen(props: AnswerScreenProps) {
 
   const wire = promptToProps(prompt);
 
+  /**
+   * CAN THIS PLAYER AFFORD THE REDRAW AT ALL — the button's own business, not the
+   * picker's.
+   *
+   * The engine refuses `REDRAW_IDEOLOGY` unless `canAfford(self.resources, pay)`, so
+   * a player holding three resources in total can never complete the payment no
+   * matter what the picker lets them draft. The affordability gate used to live only
+   * inside that picker, which meant the button itself was always live and a press
+   * opened a dialog whose only reachable outcome was Cancel.
+   *
+   * `poolTotal(pool) >= redrawCost` is EXACTLY the right condition, not an
+   * approximation of it. The payment is any split of `redrawCost` across the four
+   * denominations, so a legal split exists iff the total held is at least the total
+   * asked: fill denomination by denomination up to what is held and the sum reaches
+   * `redrawCost` as soon as the held total does, and no split can exist below it
+   * because every split's parts are bounded by their own holdings and therefore sum
+   * to at most the held total. `redrawControl.test.tsx` proves that equivalence
+   * exhaustively rather than leaving it to this comment.
+   *
+   * The button is disabled AND the reason is printed beside it, because §9.2's rule
+   * is that a control is never dead without an adjacent reason -- and the note below
+   * the button is already that place, so this adds a control's worth of meaning to
+   * existing copy rather than a second element beside the panel. The prompt's own
+   * chrome is untouched: this is a payment control and nothing about the card.
+   */
+  const canPayRedraw = me === undefined || poolTotal(me.resources) >= UI_RULES.redrawCost;
+  const redrawBlocked =
+    props.picker !== null || sending || committed || !canPayRedraw;
+
   return (
     <div className="scrim scrim--answer" data-testid="answer-screen">
       <div
@@ -299,8 +328,8 @@ export function AnswerScreen(props: AnswerScreenProps) {
             type="button"
             className="btn"
             onClick={props.onRedrawRequest}
-            disabled={props.picker !== null || sending || committed}
-            aria-disabled={props.picker !== null || sending || committed}
+            disabled={redrawBlocked}
+            aria-disabled={redrawBlocked}
             data-testid="redraw-offer"
           >
             REDRAW — {UI_RULES.redrawCost} RESOURCES
@@ -314,6 +343,12 @@ export function AnswerScreen(props: AnswerScreenProps) {
           You must choose before the turn can continue. Redrawing costs {UI_RULES.redrawCost}{' '}
           resources and swaps the card for a different one — both payouts are printed, so you
           are buying a different question rather than taking a chance at this one.
+          {/* The reason the control is dead, next to the control. A player on 0/0/2/0
+              reading "costs 4 resources" above a button that will not press is owed
+              the number they are short by. */}
+          {!canPayRedraw && me !== undefined
+            ? ` You hold ${poolTotal(me.resources)} of the ${UI_RULES.redrawCost} it costs, so there is no payment you can make.`
+            : ''}
         </p>
 
         {props.picker?.forKind === 'redraw' && me !== undefined ? (
