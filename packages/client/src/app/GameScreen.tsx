@@ -61,6 +61,7 @@ import {
   addToughLovePick,
   applyConnectionStatus,
   beginPlacement,
+  clearArmedModifier,
   clearPowerTarget,
   clearRefusal,
   clearMarketModifier,
@@ -156,8 +157,30 @@ export function GameScreen({ store }: GameScreenProps) {
   // render even when the board is identical. `ClientState` has no such field —
   // `state.viewId` was the second half of the same mistake as the import.
   useEffect(() => {
-    clearTurnInteraction();
+    clearTurnInteraction({ keepArmedModifier: true });
   }, [store.viewId, state?.turn]);
+
+  /*
+    THE ARMED MODIFIER IS TURN-SCOPED AND NOT FRAME-SCOPED, and it says so.
+
+    `clearTurnInteraction` runs on every `match:state` envelope, so it used to null
+    `marketModifier` here too — which meant an ARM was confirmed on screen by the
+    sheet's own words and then silently dropped by the next broadcast from anywhere
+    in the game. Going Viral and Helping Hands could not be spent. Found by playing
+    them: the driver armed the modifier thirty-odd times in a row and could never
+    get it to survive long enough to buy the card.
+
+    A new TURN does end it, because the HQ Mat refills and "market card 1" may be a
+    different card tomorrow. So this is keyed on the turn alone, and when there was
+    something armed it says what happened rather than letting the note disappear —
+    §9.10: a control that leaves without acting and without saying why is a control
+    that cannot do anything.
+  */
+  useEffect(() => {
+    if (app.marketModifier === null) return;
+    setRefusal('your turn passed with the power still armed, and the HQ Mat has been reshuffled - it is no longer armed');
+    clearArmedModifier();
+  }, [state?.turn]);
 
   const me = state === null || you === null ? null : state.players[you] ?? null;
 

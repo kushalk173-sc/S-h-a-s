@@ -321,8 +321,34 @@ function stopTicker(): void {
 
 // ─────────────────────────── local interaction mutators ───────────────────────────
 
-/** Clear everything that belongs to a turn in progress. */
-export function clearTurnInteraction(): void {
+/**
+ * Clear everything that belongs to a turn in progress.
+ *
+ * ## WHY THE ARMED MODIFIER IS OPTIONAL HERE, AND WHY IT HAS TO BE
+ *
+ * `GameScreen` calls this on `[store.viewId, state?.turn]`, and `store.viewId` is
+ * the sync ENVELOPE's counter — so this runs on **every `match:state` the server
+ * sends**, from any seat, for any reason.
+ *
+ * Nulling `marketModifier` in here made Going Viral and Helping Hands unusable
+ * through the UI. Observed in a browser: ARM pressed, the sheet's own words
+ * confirming it ("A power is armed on market card 1. Buy that card to spend it"),
+ * and then the next broadcast — from another seat, or from a reconnect sync —
+ * silently dropped the modifier. The player was told it was armed, it was not,
+ * and nothing said otherwise. `reduce.ts` takes `viral` and `discounts` as fields
+ * on `INFLUENCE`, so a modifier that evaporates is a power use that can never be
+ * spent.
+ *
+ * This is the same defect shape the picker draft had, and the repo already has the
+ * remedy for it: the thing must not live in a slot that every broadcast clears. A
+ * modifier is spent by a purchase or cancelled by a press, and both of those are
+ * this client's own events — so neither needs a broadcast to end it.
+ *
+ * `keepArmedModifier` is therefore the default-safe path and the turn boundary is
+ * handled separately by `clearArmedModifier`, which also says so out loud.
+ */
+export function clearTurnInteraction(opts?: { readonly keepArmedModifier?: boolean }): void {
+  const keepArmed = opts?.keepArmedModifier === true;
   set({
     placingGroupId: null,
     pickedAreaIds: [],
@@ -333,10 +359,22 @@ export function clearTurnInteraction(): void {
     picker: null,
     trade: null,
 powerTarget: null,
-    marketModifier: null,
-    pendingMarketPower: null,
+    ...(keepArmed ? {} : { marketModifier: null, pendingMarketPower: null }),
     toughLovePicks: [],
   });
+}
+
+/**
+ * The armed modifier alone, for the one thing that really does end it: a new turn.
+ *
+ * It has to be its own function because a slot index goes stale — the HQ Mat
+ * refills, so "market card 1" tomorrow may be a different card, and a discount
+ * aimed at the wrong card is worse than no discount. So the modifier is
+ * turn-scoped, and `GameScreen` says so when it drops one rather than letting the
+ * note vanish on its own.
+ */
+export function clearArmedModifier(): void {
+  set({ marketModifier: null, pendingMarketPower: null });
 }
 
 export function beginPlacement(groupId: string): void {
