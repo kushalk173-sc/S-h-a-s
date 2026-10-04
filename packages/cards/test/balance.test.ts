@@ -4,20 +4,34 @@ import {
   BALANCE_TOLERANCE_TOTAL,
   CONSPIRACY_MIN_COST,
   IDEOLOGUE_SKEW_TOLERANCE,
+  PAYOUT_DECIDED_SHARE_THRESHOLD,
   RESOURCE_BLIND_LEAN_THRESHOLD,
   X_EFFECT_MAGNITUDE_BUDGET,
   analyseIdeologyCard,
   balanceCorpus,
   deckBias,
+  marketConversionModel,
   voterValue,
   xCardMagnitude,
   type BalanceFinding,
   type XCardLike,
 } from '../src/balance.js';
-import { RULES, type Effect } from '../src/engine.js';
+import {
+  buildConversionModel,
+  measureDecisiveness,
+  reachableHoldings,
+  toughLoveOption,
+  voterMarketOptions,
+  type ConversionModel,
+} from '../src/holdings.js';
+import { RESOURCES, RULES, type Effect } from '../src/engine.js';
 import type { CorpusIdeologyCard, CorpusVoterCard } from '../src/corpus.js';
 import { DECK_IDS, loadConspiracyDeck, loadHeadlineDeck, loadIdeologyDeck, loadVoterDeck } from '../src/corpus.js';
 import { deltaTotal } from '../../engine/src/state';
+
+/** The economy every shipped card is measured against. Built once; the model is pure. */
+const shippedModel = (): ConversionModel =>
+  marketConversionModel(new Map([['core', loadVoterDeck('core')]]));
 
 let nextId = 0;
 
@@ -197,12 +211,18 @@ describe('the corrected arithmetic behind the header comment', () => {
   });
 });
 
-describe('dominance: D2 TOTAL_SKEW — an ERROR at any visible skew, band is ZERO', () => {
-  it('refuses a gap of ONE resource, which the old band of 1 tolerated', () => {
-    // THE RULING, AS AN ASSERTION. A one-resource total edge used to be inside the band
-    // and therefore invisible; it is now an error. The two sides here are deliberately
-    // NOT coordinatewise comparable (Trust against Media), so D1 is silent and this is
-    // the only finding — which is exactly the class of card the band was letting through.
+describe('dominance: D2 TOTAL_SKEW — REPORTED, and measured to be the wrong error', () => {
+  it('still reports a one-resource total edge, and says it is not enforced', () => {
+    // WHAT CHANGED, AND WHY THIS IS NOT THE CHECK BEING WEAKENED TO PASS CARDS.
+    //
+    // This test used to assert `severity === 'error'`. That assertion is gone because
+    // the severity was wrong, and the reason it was wrong is measured rather than
+    // preferred — see the ruling at the top of `src/balance.ts` and, here, the two
+    // assertions below that make the mistake impossible to reintroduce by accident.
+    //
+    // The FINDING IS STILL RAISED. A visible total edge is still reported, still names
+    // the side at fault and still carries the reason it is not an error, so the
+    // information reaches a pull request instead of being thrown away.
     const c = card(
       { answer: 'Yes. Publish the whole file and let the room decide.', ideologue: 'showstopper', pays: { media: 3, trust: 1 } },
       { answer: 'No. Publish the summary and keep the file closed.', ideologue: 'capitalist', pays: { funds: 4 } },
@@ -215,30 +235,68 @@ describe('dominance: D2 TOTAL_SKEW — an ERROR at any visible skew, band is ZER
       { answer: 'No. Publish the summary and keep the file closed.', ideologue: 'capitalist', pays: { funds: 4 } },
     );
     const skew = analyseIdeologyCard(tilted, 'test').find((f) => f.code === 'TOTAL_SKEW');
-    expect(skew, 'a visible one-resource edge was accepted').toBeDefined();
-    expect(skew?.severity, 'a removed decision is not a tilt and is not a warning').toBe('error');
+    expect(skew, 'a visible one-resource edge was not even reported').toBeDefined();
     expect(skew?.side).toBe(0);
-    expect(skew?.message).toContain('tolerance band is +/-0');
+    expect(skew?.message).toContain('REPORTED rather than refused');
+    expect(skew?.message).toContain('99.4%');
   });
 
-  it('and the band is zero, which is a ruling and not a rounding', () => {
-    // Asserted rather than merely configured, because the number is the ruling and a
-    // future edit that raises it back to 1 would re-open every card the ruling closed.
+  it('a total edge is usually an INVERSION, which is why an error band would be wrong', () => {
+    // THE MEASUREMENT, asserted rather than described. `canAfford` is componentwise and
+    // the cap is 12 TOTAL, so surplus of one resource is worthless while a missing one is
+    // a purchase. At `{funds: 9}` the bigger payout converts to 2 voters and the smaller
+    // to 5 — so an error-severity band on totals would refuse the better card.
+    const model = marketConversionModel(new Map([['core', loadVoterDeck('core')]]));
+    const rich = [9, 0, 0, 0];
+    const bigger = model.bestConversion(rich, { funds: 4 });
+    const smaller = model.bestConversion(rich, { funds: 1, trust: 2 });
+    expect(deltaTotal({ funds: 4 }), 'the fixture must really be the bigger payout').toBeGreaterThan(
+      deltaTotal({ funds: 1, trust: 2 }),
+    );
+    expect(bigger, 'the LARGER total converted better, which would vindicate error severity').toBeLessThan(
+      smaller,
+    );
+  });
+
+  it('and the band is still zero, so the corpus invariant is unchanged', () => {
+    // Asserted rather than merely configured, because the number is still the shipped
+    // convention. Demoting the SEVERITY did not widen the band: the corpus invariant
+    // "both sides of every card pay the same total" is untouched, and the next test
+    // proves it over the shipped decks.
     expect(BALANCE_TOLERANCE_TOTAL).toBe(0);
   });
 
   it('and NO shipped Ideology Card has a visible skew, which is the corpus measurement', () => {
-    // The ruling's effect, stated as an invariant over the corpus rather than as a number
-    // in a commit message. `ig-in2020-006` was the one card this changed: its side 1 paid
-    // {media 2, funds 1} against {trust 2, funds 2}, and its `source` field records the
-    // rebalance and why.
+    // Unchanged by this round, and asserted over the corpus rather than as a number in a
+    // commit message: the ruling is (a), so equal totals are PRESERVED, not relaxed.
     const skewed = DECK_IDS.flatMap((d) => loadIdeologyDeck(d))
       .map((c) => ({ id: c.id, a: deltaTotal(c.sides[0].pays), b: deltaTotal(c.sides[1].pays) }))
       .filter((r) => Math.abs(r.a - r.b) > BALANCE_TOLERANCE_TOTAL);
     expect(skewed.map((r) => `${r.id} ${r.a} vs ${r.b}`)).toEqual([]);
-    // And the honest distribution, so a future one-resource edge is visible as such.
     const band1 = DECK_IDS.flatMap((d) => loadIdeologyDeck(d)).filter((c) => Math.abs(deltaTotal(c.sides[0].pays) - deltaTotal(c.sides[1].pays)) === 1);
     expect(band1.map((c) => c.id), 'a card sits exactly on the old tolerance band').toEqual([]);
+  });
+
+  it('EVERY shipped side pays 2+1, which is the shape the ruling depends on', () => {
+    // The ruling's factual base, pinned so it cannot rot silently. 76 of 76 cards pay
+    // equal totals and every one of the 152 sides is a 2-of-one-plus-1-of-another shape
+    // of 3 (two cards pay 4 on BOTH sides). This is the "a rule, not an accident" half of
+    // the argument, and if a future edit breaks it the ruling's premise needs revisiting.
+    const sides = DECK_IDS.flatMap((d) => loadIdeologyDeck(d)).flatMap((c) => c.sides);
+    const shapes = new Map<string, number>();
+    for (const s of sides) {
+      const present = RESOURCES.filter((r) => (s.pays[r] ?? 0) > 0);
+      const key = present.map((r) => (s.pays[r] ?? 0).toString()).sort().join('+');
+      shapes.set(key, (shapes.get(key) ?? 0) + 1);
+    }
+    expect([...shapes.entries()].sort(), 'a shipped side pays a shape other than 1+2 or 2+2').toEqual(
+      expect.arrayContaining([
+        ['1+2', expect.any(Number)],
+        ['2+2', expect.any(Number)],
+      ]),
+    );
+    const bad = [...shapes.keys()].filter((k) => k !== '1+2' && k !== '2+2');
+    expect(bad, `a shipped side pays a shape other than 1+2 or 2+2: ${bad.join(', ')}`).toEqual([]);
   });
 });
 
@@ -539,6 +597,287 @@ describe('X-card magnitude: a card with no second side still has a value', () =>
       ]),
     ).toBe(2);
     expect(voterValue([])).toBeGreaterThan(0);
+  });
+});
+
+describe('the holdings-conditional instrument: mix vs what you can spend', () => {
+  const model = shippedModel();
+
+  it('enumerates EVERY reachable holdings vector, not a sample', () => {
+    // C(12+4, 4) = 1820. Asserted as a count AND as a property, because the whole
+    // soundness of "one side is always correct" rests on the space being complete:
+    // a sampled sweep could only ever say "no counterexample found".
+    const all = reachableHoldings(RULES.resourceCap);
+    expect(all).toHaveLength(1820);
+    expect(all.every((h) => h.reduce((a, b) => a + b, 0) <= RULES.resourceCap)).toBe(true);
+    // Closed under the definition: no reachable vector is missing.
+    const seen = new Set(all.map((h) => h.join(',')));
+    expect(seen.size).toBe(1820);
+    expect(all).toContainEqual([0, 0, 0, 0]);
+    expect(all).toContainEqual([12, 0, 0, 0]);
+    expect(model.reachable).toHaveLength(1820);
+  });
+
+  it('SATURATES at the cap, which is what makes count and composition different things', () => {
+    // rules-reference A3 item 3: the cap is 12 TOTAL, so a seventh Fund is worth
+    // nothing. If conversion did not saturate, total count would decide everything and
+    // this whole instrument would be a relabelled totals checker.
+    //
+    // The figures are hand-checkable against the shipped market, and being able to check
+    // them is the point: the only Funds-only cards are `vo-core-001` ({funds:2}, 1 voter)
+    // and `vo-core-004` ({funds:3}, 1 voter), and they cannot both be bought with 3 Funds.
+    // So 3 Funds buys 1 voter, and no amount of Funds buys more than those 2 voters.
+    expect(model.conversionValue([3, 0, 0, 0])).toBe(1);
+    expect(model.conversionValue([2, 0, 0, 0])).toBe(1);
+    expect(model.conversionValue([12, 0, 0, 0])).toBe(2);
+    // 9 Funds and 12 Funds are worth the same: the cap saturates the pool.
+    expect(model.conversionValue([9, 0, 0, 0])).toBe(model.conversionValue([12, 0, 0, 0]));
+  });
+
+  it('COMPOSITION gates what you can buy, because canAfford is componentwise', () => {
+    // The mechanism, asserted directly on the economy rather than argued in a comment.
+    // Same TOTAL, different composition, and a large difference in what each can buy:
+    // this is the whole ruling in one line.
+    const fundsOnly = model.conversionValue([9, 0, 0, 0]);
+    const spread = model.conversionValue([3, 3, 3, 0]);
+    expect(
+      9,
+      'the fixtures must hold the same TOTAL, or this proves nothing about composition',
+    ).toBe(3 + 3 + 3);
+    expect(spread, 'equal totals gave equal reach, so composition would not matter').toBeGreaterThan(
+      fundsOnly * 2,
+    );
+  });
+
+  it('lets the player make the p12 discard OPTIMALLY, so a rich player is not punished', () => {
+    // p12 says the player CHOOSES what to discard. Taking `{funds: 4}` from `{funds: 9}`
+    // overflows the cap by 1, and dumping the surplus Fund rather than a scarce Clout is
+    // what makes the concentrated payout worth as much as it is.
+    const capped = model.bestConversion([9, 0, 0, 0], { funds: 4 });
+    expect(capped).toBe(model.bestConversion([8, 0, 0, 0], { funds: 4 }));
+  });
+
+  it('DEMONSTRATION: catches a card that TOTAL_SKEW cannot see, by construction', () => {
+    // THE PROOF THE INSTRUMENT EARNS ITS PLACE. Equal totals, so `TOTAL_SKEW` is blind
+    // by definition. Neither side dominates componentwise, so `PURE_UPGRADE` is silent.
+    // Neither side buys more power unlocks, so `POWER_THRESHOLD_CLIFF` is silent. And
+    // the composition check refuses it anyway.
+    //
+    // This is a REAL pair from the sweep, not a contrived one: of the 9 equal-total
+    // payout pairs in the corpus's whole format space that are decided by their payout,
+    // every one is a spread side beating a pile. `{clout:6}` opens only the Clout cards
+    // in the market; `{funds:1, clout:2, media:1, trust:2}` opens all four.
+    //
+    // The Ideologues are chosen so `POWER_THRESHOLD_CLIFF` is ALSO silent, which is the
+    // whole claim: three independent checks and only this one sees the card. A Capitalist
+    // side pays 0 Funds so it crosses nothing on its own ladder, and an Idealist side
+    // paying 2 Trust is below `RULES.level3`. (Put `{clout: 6}` on a *Supremo* instead and
+    // D3 fires on it too — it crosses clout@3 and clout@5 — which is a fair reminder that
+    // D3 is not the dead branch it looks like on the shipped deck.)
+    const trap = card(
+      { answer: 'A. Everything into the one resource that pays best.', ideologue: 'capitalist', pays: { clout: 6 } },
+      { answer: 'B. Spread it, so every part of the market is open to me.', ideologue: 'idealist', pays: { funds: 1, clout: 2, media: 1, trust: 2 } },
+    );
+    expect(deltaTotal(trap.sides[0].pays), 'fixture must be equal-total').toBe(
+      deltaTotal(trap.sides[1].pays),
+    );
+    expect(codes(analyseIdeologyCard(trap, 'test', model))).not.toContain('PURE_UPGRADE');
+    expect(codes(analyseIdeologyCard(trap, 'test', model))).not.toContain('TOTAL_SKEW');
+    expect(codes(analyseIdeologyCard(trap, 'test', model))).not.toContain('POWER_THRESHOLD_CLIFF');
+
+    const d = measureDecisiveness(trap.id, trap.sides[0].pays, trap.sides[1].pays, model);
+    expect(d.decidedByPayout, 'the spread side should never be the worse answer').toBe(true);
+    expect(d.side0Wins, 'the piled side is the better answer somewhere - the relation is not one-sided').toBe(0);
+    expect(d.side1Wins, 'the spread side should win a large share of positions').toBeGreaterThan(0);
+    expect(d.side1Wins + d.ties, 'every position is a win for one side or a tie').toBe(d.positions);
+
+    const finding = analyseIdeologyCard(trap, 'test', model).find(
+      (f) => f.code === 'COMPOSITION_DOMINANT',
+    );
+    expect(finding, 'the checker did not catch the card it exists to catch').toBeDefined();
+    expect(finding?.severity).toBe('error');
+    expect(finding?.side, 'the WINNING side must be the one named').toBe(1);
+    expect(finding?.message).toContain('Equal totals do NOT save a card from this');
+  });
+
+  it('DEMONSTRATION: a genuinely equal-total 2+1 card is CLEAN, and that is the proof', () => {
+    // THE OTHER HALF OF THE PROOF OBLIGATION, and it is the one that settles ruling (a).
+    // Every shipped card has this shape, and every one of them must pass: for some
+    // reachable holding side A converts better, and for another side B does. If that
+    // ever stops being true, equal totals would have stopped being sufficient for the
+    // design and the ruling would need revisiting.
+    const good = card(
+      { answer: 'A. Funds and media.', ideologue: 'capitalist', pays: { funds: 2, media: 1 } },
+      { answer: 'B. Trust and media.', ideologue: 'idealist', pays: { trust: 2, media: 1 } },
+    );
+    const d = measureDecisiveness(good.id, good.sides[0].pays, good.sides[1].pays, model);
+    expect(d.decidedByPayout).toBe(false);
+    expect(d.side0Wins, 'side A is never better - the dilemma would be decoration').toBeGreaterThan(0);
+    expect(d.side1Wins, 'side B is never better - the dilemma would be decoration').toBeGreaterThan(0);
+    expect(codes(analyseIdeologyCard(good, 'test', model))).not.toContain('COMPOSITION_DOMINANT');
+  });
+
+  it('is measuring CONVERSION, not a coincidence of the shipped market', () => {
+    // If COMPOSITION_DOMINANT only fired against one particular market it would be a
+    // lookup table. Against a market that spends ONLY funds, a side whose second resource
+    // is worthless is strictly worse everywhere it matters — so the check follows the
+    // ECONOMY, which is what makes it a measurement rather than a fact about 18 cards.
+    const fundsOnlyMarket = buildConversionModel([
+      { id: 'a', cost: { funds: 2 }, value: 1 },
+      { id: 'b', cost: { funds: 3 }, value: 2 },
+      { id: 'c', cost: { funds: 4 }, value: 3 },
+    ]);
+    const pair = card(
+      { answer: 'A. Funds, which this market actually buys.', ideologue: 'capitalist', pays: { funds: 2, media: 1 } },
+      { answer: 'B. Mostly media, which this market never buys.', ideologue: 'showstopper', pays: { funds: 1, media: 2 } },
+    );
+    const lean = measureDecisiveness(pair.id, pair.sides[0].pays, pair.sides[1].pays, fundsOnlyMarket);
+    expect(lean.side0Wins, 'side A should be better at some holding').toBeGreaterThan(0);
+    expect(lean.side1Wins, 'side B is never better against a Funds-only market').toBe(0);
+    expect(lean.decidedByPayout).toBe(true);
+    // And the SAME card against the shipped market, which does buy media, is clean. The
+    // verdict follows the economy, not the card id — which is the only thing that makes
+    // this a check rather than a table.
+    const shipped = measureDecisiveness(
+      pair.id,
+      pair.sides[0].pays,
+      pair.sides[1].pays,
+      model,
+    );
+    expect(shipped.decidedByPayout, 'the verdict must follow the economy, not the card id').toBe(
+      false,
+    );
+    expect(codes(analyseIdeologyCard(pair, 'test', model))).not.toContain('COMPOSITION_DOMINANT');
+  });
+
+  it('a card worth the same at EVERY position is allowed - that is a pure dilemma', () => {
+    // NOT a finding, deliberately. Under ruling (a) a card whose two sides cost a player
+    // the same purchasing power is the HEALTHY case: the dilemma decides and the numbers
+    // stay out of it. Flagging this would push authors toward the exact skew the checker
+    // just proved is usually an inversion.
+    const pure = card(
+      { answer: 'A. Two of this, one of that.', ideologue: 'capitalist', pays: { funds: 2, media: 1 } },
+      { answer: 'B. The mirror image.', ideologue: 'idealist', pays: { media: 2, funds: 1 } },
+    );
+    const d = measureDecisiveness(pure.id, pure.sides[0].pays, pure.sides[1].pays, model);
+    // Mirror-image 2+1 payouts are convertible to the same score, and must not be an error.
+    expect(d.decidedByPayout).toBe(false);
+    expect(codes(analyseIdeologyCard(pure, 'test', model))).not.toContain('COMPOSITION_DOMINANT');
+  });
+
+  it('the model is derived from the shipped market, not hardcoded', () => {
+    // Both halves: the market options come from the Voter Cards, and the one power with
+    // a mandatory exact resource is added explicitly rather than being forgotten.
+    const market = loadVoterDeck('core');
+    const options = voterMarketOptions(market);
+    expect(options).toHaveLength(market.length);
+    expect(options.map((o) => o.value)).toEqual(market.map((c) => c.voters));
+    // p32 Tough Love: 2 Trust EXACTLY, worth its printed payoff.
+    const tl = toughLoveOption();
+    expect(tl.cost).toEqual({ trust: RULES.toughLoveTrust });
+    expect(tl.value).toBe(RULES.toughLoveConverts);
+    // And it is load-bearing rather than decorative: 2 Trust is worth its full payoff
+    // (2 voters) where the market's own {trust: 2} card is worth 1, and a single Trust
+    // is worth nothing at all — so Trust has an exact threshold the other pools do not.
+    expect(model.conversionValue([0, 0, 0, 2])).toBe(RULES.toughLoveConverts);
+    expect(model.conversionValue([0, 0, 0, 1])).toBe(0);
+  });
+});
+
+describe('the shipped decks leave real choices — the positive proof', () => {
+  const report = balanceCorpus({
+    ideology: new Map([
+      ['et2040', loadIdeologyDeck('et2040')],
+      ['in2020', loadIdeologyDeck('in2020')],
+    ]),
+    voter: new Map([['core', loadVoterDeck('core')]]),
+  });
+
+  it('ZERO of the shipped cards are decided by their payout', () => {
+    // THE NUMBER THE RULING RESTS ON, asserted over the corpus so it cannot rot. 76
+    // cards, 76 with a strict win for EACH side somewhere across all 1820 reachable
+    // holdings. This is what "equal totals are sufficient for the design" means when
+    // you actually check it rather than assume it.
+    for (const b of report.bias) {
+      expect(
+        b.composition.decidedByPayout,
+        `${b.deck}: ${b.composition.decidedByPayout} card(s) are decided by payout alone`,
+      ).toBe(0);
+      expect(b.composition.realChoice).toBe(b.ideologyCards);
+      expect(b.composition.positions).toBe(1820);
+    }
+    expect(report.errors.filter((f) => f.code === 'COMPOSITION_DOMINANT')).toEqual([]);
+  });
+
+  it('ties are common but the DISCRIMINATING positions are not the same side', () => {
+    // The honest shape of the result, asserted as a range rather than as a slogan. Most
+    // pools a player might hold cannot tell the two sides apart — 55.9% of (card,
+    // position) pairs are ties — and that is realistic rather than alarming: you are
+    // usually indifferent, and the card bites when your pool is lopsided.
+    //
+    // What must hold is the lower bound. If ties approached 100% the instrument would be
+    // measuring nothing, and if they approached 0% the deck would be decided by holdings
+    // alone. The deck sits comfortably inside, and 0 cards are universally decided.
+    for (const b of report.bias) {
+      expect(b.composition.tieShare, `${b.deck} tie share`).toBeGreaterThan(0.2);
+      expect(b.composition.tieShare, `${b.deck} tie share`).toBeLessThan(0.8);
+    }
+  });
+
+  it('the deck-level gate is armed but silent, because the deck is clean', () => {
+    // The rollup exists for the case where cards are individually defensible and
+    // collectively a solved deck. It must be WIRED (so it would fire) and must not be
+    // firing now (so the corpus is not paying for it).
+    expect(PAYOUT_DECIDED_SHARE_THRESHOLD).toBeGreaterThan(0);
+    for (const b of report.bias) {
+      expect(b.composition.decidedByPayoutShare).toBeLessThanOrEqual(
+        PAYOUT_DECIDED_SHARE_THRESHOLD,
+      );
+    }
+    expect(report.findings.filter((f) => f.code === 'PAYOUT_DECIDED_DECK')).toEqual([]);
+  });
+
+  it('every card is measured against the REAL market, never skipped', () => {
+    // `balanceCorpus` derives the model from the voter map it was given. If that
+    // derivation ever silently yielded `undefined`, every composition check would be
+    // skipped and the deck would pass VACUOUSLY — which is the exact failure mode the
+    // X-card magnitude check documents for scoring an unmeasurable card zero, and the
+    // reason the empty case has to be pinned rather than assumed unreachable.
+    const withMarket = balanceCorpus({
+      ideology: new Map([['in2020', loadIdeologyDeck('in2020')]]),
+      voter: new Map([['core', loadVoterDeck('core')]]),
+    });
+    const withoutMarket = balanceCorpus({
+      ideology: new Map([['in2020', loadIdeologyDeck('in2020')]]),
+      voter: new Map(),
+    });
+    expect(withMarket.bias[0]?.composition.positions).toBe(1820);
+    expect(withMarket.bias[0]?.composition.realChoice).toBeGreaterThan(0);
+    // With no market the block is honestly empty rather than fabricated.
+    expect(withoutMarket.bias[0]?.composition.positions).toBe(0);
+    expect(withoutMarket.bias[0]?.composition.realChoice).toBe(0);
+  });
+
+  it('the resource-blind heuristic is no longer a dead branch', () => {
+    // It used to read TOTALS, so it returned `decisive: 0` on both decks and could
+    // never produce a verdict. It is now scored on the real axis. The shipped decks are
+    // clean, so `decisive` is legitimately 0 — but for the RIGHT reason now: no card has
+    // a universally better side, so there is nothing to be biased toward.
+    for (const b of report.bias) {
+      expect(b.resourceBlind.decisive).toBe(0);
+      expect(b.resourceBlind.verdict).toBe('undecidable');
+    }
+    // And it is armed: a deck containing one payout-decided card must register it.
+    const trap = card(
+      { answer: 'A. Everything into one pool.', ideologue: 'supremo', pays: { clout: 6 } },
+      { answer: 'B. Spread wide.', ideologue: 'idealist', pays: { funds: 1, clout: 2, media: 1, trust: 2 } },
+    );
+    const armed = balanceCorpus({
+      ideology: new Map([['probe', [trap]]]),
+      voter: new Map([['core', loadVoterDeck('core')]]),
+    });
+    expect(armed.bias[0]?.resourceBlind.decisive).toBe(1);
+    expect(armed.errors.map((f) => f.code)).toContain('COMPOSITION_DOMINANT');
   });
 });
 

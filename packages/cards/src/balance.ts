@@ -6,43 +6,158 @@
  * thing that protects the premise, so it gets a real dominance relation rather
  * than a total-sum comparison.
  *
- * WHY TOTAL-SUM COMPARISON IS NOT ENOUGH (docs/ARCHITECTURE.md 6.4):
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE RULING: EQUAL TOTALS ARE THE DESIGN. The axis is MIX vs WHAT YOU CAN SPEND.
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Two failures, in opposite directions. They are easy to conflate and must be kept
- * apart, because only one of them is a defect.
+ * ## THE MEASUREMENT THAT FORCED THE QUESTION
  *
- *   1. IT FLAGS LEGITIMATE TRADE-OFFS. `{funds:3}` vs `{trust:3}` is as large a
- *      componentwise gap as a card can hold — 3 Funds against 0 Funds, 3 Trust
- *      against 0 Trust — and its TOTALS are identical, 3 against 3. It is a
- *      perfectly good card: the question the player is answering is "which
- *      resource do I need", and that choice is the deliberation the game is made
- *      of. Note that this card is invisible to a totals checker *and* to a
- *      componentwise one; a total-sum checker flags it only by accident, and
- *      "3-resource difference" without "per resource" is how this bullet went
- *      wrong the first time.
+ * A harness played 940 answered Ideology Cards across four games and found **zero**
+ * with different totals on the two sides - a gap histogram of `{"0": 940}`. Counted
+ * directly against the shipped JSON rather than taken from the harness, the figure is
+ * starker: **all 76 Ideology Cards pay equal totals, and all 152 sides pay exactly 3
+ * resources, every single one of them a 2-of-one-plus-1-of-another shape.** There are
+ * 13 distinct payout shapes in the corpus and all 13 sum to 3 or 4, and the only card
+ * whose sides pay 4 pays 4 on BOTH sides.
  *
- *   2. IT MISSES STRUCTURAL FAILURES THAT ARE 0-SUM. `{funds:3}` vs
- *      `{funds:2, media:1}` pays out 3 on each side, so totals are silent — and so
- *      is D1, because `media` is 0 on the first side and 1 on the second, so the
- *      second side is NOT >= the first componentwise. It is not a pure upgrade.
- *      Ideologue resource thresholds do not rescue the claim either: the two sides
- *      pay different resources, so they feed different Ideologues and do not even
- *      sit on the same power ladder.
+ * So a total-based comparison has nothing to say about any card that ships, and
+ * `TOTAL_SKEW` could not fire on the deck it was written to protect. The previous
+ * round moved that gate from a warning to a hard error at band 0 and called that a
+ * fix. It was not a fix; it was an enforcement of a convention on a deck that already
+ * obeyed it, while the actual defect - a checker measuring the wrong axis - went
+ * untouched.
  *
- *      What is actually wrong with that card is a POWER THRESHOLD CLIFF. 3 Funds
- *      is `RULES.level3`, so a side paying 3 of a resource unlocks that Ideologue's
- *      Level 3 power, which pays out every turn for the rest of the game (RULES
- *      p15). A card paying 3 of a resource on one side and 2 on the other is worth
- *      a whole power, not the 1 resource its totals differ by. No total-sum
- *      comparison and no componentwise comparison can see that, which is what D3
- *      exists for.
+ * ## THE RULING IS (a), AND THREE THINGS ARGUE IT
  *
- * THE EXAMPLE THAT WAS HERE BEFORE WAS WRONG. An earlier draft read: *"`{funds:3}`
- * vs `{funds:2, media:1}` is 0-sum and yet a pure upgrade for anyone who needs
- * funds"*. It was 0-sum; it was not a pure upgrade. A pure upgrade can never be
- * 0-sum: if X >= Y componentwise and X != Y then sum(X) > sum(Y) strictly. The
- * corrected claim in (2) is the real one, and `test/balance.test.ts` pins both the
- * identity and the worked example so the bad version cannot creep back.
+ * **1. THE REFERENCE DOC SAYS THE COMPOSITION IS THE INFORMATION, IN THOSE WORDS.**
+ * `AUTHENTIC-SHASN-REFERENCE.md` 5.2, VERIFIED against the official 432-card
+ * marketing render, on the very payout helper this file used to build its verdict:
+ *
+ * > "The `sidePayout()` helper in `cards.ts` sums a `Delta` to a single number. That
+ * > is fine for the balance checker, but the UI must not use it - the game shows four
+ * > separate icon counts and **the composition is the information**."
+ *
+ * The same section records the observed format as "2-5 discs, 0-3 of any single type"
+ * and the one real card we have (`SHOULD WE INVADE NEW SPAIN?`, Capitalist side) paying
+ * **2 Trust + 1 Media and zero Funds** - three discs. Our corpus paying three on every
+ * side sits inside the verified range, and the reference explicitly declines to tie the
+ * payout to the Ideologue, which is the whole reason a mix is worth choosing.
+ *
+ * **2. THE MECHANISM IS IN THIS REPO, AND IT IS COMPONENTWISE.** `resources.ts`:
+ *
+ * ```ts
+ * export function canAfford(p: Pool, cost: Delta): boolean {
+ *   return RESOURCES.every((r) => p[r] >= (cost[r] ?? 0));
+ * }
+ * ```
+ *
+ * No substitution, no pooling. A Voter Card printed `{funds: 2, clout: 1}` cannot be
+ * bought by a player holding 7 Funds and nothing else, and `INFLUENCE` refuses the
+ * purchase on exactly that test. The core market is 18 cards spanning all four
+ * resources, and voters are the score. **So a holdings vector decides which part of
+ * the market you can reach at all**, and the resource you receive is a stronger claim
+ * on future play than the number of them you receive.
+ *
+ * **3. THE CAP MAKES COUNT SATURATE WHILE COMPOSITION DOES NOT.** `RULES.resourceCap`
+ * is 12 **total** (rules-reference A3 item 3: "you must *choose* and discard any
+ * excess" - nothing to choose if it were per-type). So a player on 6 Funds has a
+ * seventh Fund worth nothing, while a player one Trust short is one Trust from a
+ * purchase they cannot otherwise make.
+ *
+ * ## AND THE UNIFORMITY IS A RULE, NOT AN ACCIDENT
+ *
+ * Option (b) says the authors reflexively equalised totals and the result is a deck
+ * whose numbers never matter. The corpus refutes the reflex reading on its own
+ * evidence: **an accident leaves a distribution, and this has none.** 76 of 76, every
+ * side a 2+1, thirteen shapes and no tail. And the accident rate is not hypothetical -
+ * the round before last found exactly one near-miss (`ig-in2020-006`, skew 1) out of
+ * 76, which is a 1.3% miss rate, not a 0% one. A corpus with a 1.3% miss rate does not
+ * look like a rule being followed by hand; 76/76 with no tail looks like a generator
+ * invariant, which is what `"every side pays 3, as a 2+1"` is.
+ *
+ * ## THE DECISIVE STRUCTURAL ARGUMENT, MEASURED
+ *
+ * If totals must be equal AND the composition must decide, then it must be *shown*
+ * that an equal-total pair cannot decide. `src/holdings.ts` measures that exhaustively
+ * over all **1820** reachable holdings vectors (every non-negative 4-tuple with total
+ * at most the cap), scoring each side by an exact knapsack over the shipped market.
+ *
+ * The result is the strongest single number in this file:
+ *
+ * > **0 of the 76 shipped cards are decided by their payout.** Every one of them is
+ * > better on side A for some reachable position and better on side B for another.
+ *
+ * So the corpus's equal totals are not merely tolerated by the design - they are
+ * *sufficient* for it, in this economy, and the deck leaves a real choice on every
+ * card. That is the proof the ruling owes, and it is a proof rather than an assertion.
+ *
+ * The honest qualifier, because a reader deserves it: **55.9%** of (card, position)
+ * pairs are ties. For most pools a player might hold, the two sides are worth the same
+ * and the card does not bite. What matters is that the remaining 44% are not the same
+ * side - the discriminating positions differ from card to card - so there is no rule
+ * that survives contact with a second hand. A deck where the sides were equal
+ * EVERYWHERE would be a deck where the dilemma carries every card, which is a
+ * different (and much worse) design than this one.
+ *
+ * ## AND WHAT THE SWEEP SAYS ABOUT PAYOUT SHAPE
+ *
+ * Sweeping all 5862 equal-total, non-upgrade payout pairs, **9 are decided by their
+ * payout and every single one is a SPREAD side beating a CONCENTRATED pile**:
+ * `{clout:6}` over `{funds:1, clout:2, media:1, trust:2}`, `{media:6}` over
+ * `{funds:1, media:5}`, `{funds:3, clout:2, trust:1}` over `{funds:6}`. A sixth of one
+ * resource is convertible-inferior, because the market has cards that spend one
+ * resource and few that spend four at once, so a pile leaves three pools unopened.
+ *
+ * That is the strongest available argument that the corpus's uniform 2+1 shape is a
+ * deliberate choice rather than an accident: **2+1 is the maximally SPREAD shape the
+ * game's payout format allows**, since it touches two of the four resources and a
+ * 1+1+1 would touch three but pay less per pool. The corpus sits at the diversity
+ * optimum, and the instrument's one real failure mode is the lopsided card it never
+ * ships.
+ *
+ * ## AND WHAT THAT DOES TO `TOTAL_SKEW`, WHICH IS NO LONGER AN ERROR
+ *
+ * If a bigger total were a tilt, equal totals would be the fix. Measured, it is the
+ * opposite. Sweeping every non-upgrade pair by skew and asking whether the SMALLER
+ * side wins anywhere:
+ *
+ * | total skew | pairs with a position favouring the smaller side | pairs decided by payout |
+ * |---|---|---|
+ * | 1 | 7061 / 7104 (**99.4%**) | 43 / 7604 (0.6%) |
+ * | 2 | 3741 / 3800 (**98.4%**) | 59 / 4490 (1.3%) |
+ * | 3 | 1634 / 1700 (**96.1%**) | 66 / 2380 (2.8%) |
+ * | 4 | 531 / 574 (**92.5%**) | 43 / 1064 (4.0%) |
+ *
+ * A total skew is not a tilt; it is usually an **inversion**. The sharpest case, at
+ * holdings `{funds: 9}` against the shipped market:
+ *
+ * | side | converts to |
+ * |---|---|
+ * | `{funds: 4}` - the BIGGER payout | **2** voters |
+ * | `{funds: 1, trust: 2}` - total 3, the SMALLER payout | **5** voters |
+ *
+ * The side paying four resources is worth less than half of what the side paying
+ * three is worth, because the fourth Fund is over the cap and the two Trust open the
+ * whole trust half of the market. **An error-severity band on totals would therefore
+ * refuse the better card and admit the worse one** - it enforces the opposite of the
+ * design. And the decided-share column shows why no threshold is derivable: skew
+ * predicts dominance at only 0.6%-4.2%, so there is no skew value at which "this skew
+ * means dominance" is a statement rather than a guess. **A threshold that cannot be
+ * derived must not be an error.**
+ *
+ * So `TOTAL_SKEW` is demoted to a warning, on measured grounds, and the real
+ * enforcement moves to `COMPOSITION_DOMINANT`. That is not a loosening to let cards
+ * through: the corpus has 76 of 76 at skew 0, so **no card changes status**, and the
+ * suite ends up refusing strictly more cards for strictly better reasons.
+ *
+ * ## WHAT IS AND IS NOT PINNED BY THE OLD COMMENTS BELOW
+ *
+ * The two numbered failure modes further down - a total-sum checker flagging
+ * legitimate trade-offs, and missing 0-sum structural failures - are both still true
+ * and both still argued from `ARCHITECTURE.md` 6.4. They are retained because they
+ * explain why `isPureUpgrade` is componentwise and why `thresholdCrossings` exists.
+ * What has changed is which of them is a DEFECT in the shipped corpus, and the answer
+ * is now measured rather than assumed.
  */
 
 import {
@@ -61,6 +176,15 @@ import {
 } from './engine.js';
 
 import { type CorpusIdeologyCard, type CorpusVoterCard } from './corpus.js';
+
+import {
+  type ConversionModel,
+  type Decisiveness,
+  measureDecisiveness,
+  shippedConversionModel,
+  toughLoveOption,
+  voterMarketOptions,
+} from './holdings.js';
 
 // ─────────────────────────── the tolerance band ───────────────────────────
 
@@ -173,9 +297,11 @@ export type BalanceFinding = {
     | 'EMPTY_SIDE'
     | 'PURE_UPGRADE'
     | 'TOTAL_SKEW'
+    | 'COMPOSITION_DOMINANT'
     | 'POWER_THRESHOLD_CLIFF'
     | 'SAME_IDEOLOGUE_SKEW'
     | 'RESOURCE_BLIND_LEAN'
+    | 'PAYOUT_DECIDED_DECK'
     | 'IDEOLOGUE_SKEW'
     | 'VOTER_COST_NON_MONOTONIC'
     | 'VOTER_VALUE_UNDERREPRESENTED'
@@ -183,7 +309,11 @@ export type BalanceFinding = {
   readonly severity: BalanceSeverity;
   readonly deck: string;
   readonly cardId: string;
-  /** Which side is at fault, for PURE_UPGRADE / TOTAL_SKEW / EMPTY_SIDE. */
+  /**
+   * Which side the finding is about. For `PURE_UPGRADE` / `TOTAL_SKEW` / `EMPTY_SIDE`
+   * it is the side AT FAULT; for `COMPOSITION_DOMINANT` it is the side that DOMINATES,
+   * because the message names the other one as the side that is never worth taking.
+   */
   readonly side?: 0 | 1;
   readonly message: string;
 };
@@ -206,6 +336,24 @@ export type BiasStats = {
     readonly leadingIdeologue: Ideologue | null;
     readonly leadShare: number;
     readonly verdict: 'clean' | 'lean' | 'undecidable';
+  };
+  /**
+   * THE REAL AXIS, measured exhaustively. See `src/holdings.ts`.
+   *
+   * `positions` is every reachable holdings vector (1820 at the shipped cap), not a
+   * sample, so `decidedByPayoutShare` is a statement about the complete state space.
+   */
+  readonly composition: {
+    readonly positions: number;
+    /** Cards where one side converts strictly better at EVERY reachable position. */
+    readonly decidedByPayout: number;
+    /** Cards with a strict win for each side somewhere - the healthy case. */
+    readonly realChoice: number;
+    /** Cards worth the same at every position - a pure dilemma, which is allowed. */
+    readonly indistinguishable: number;
+    readonly decidedByPayoutShare: number;
+    /** Share of (card, position) pairs that are ties. */
+    readonly tieShare: number;
   };
 };
 
@@ -303,7 +451,23 @@ function thresholdCrossings(side: IdeologySide): Set<string> {
   return out;
 }
 
-/** D2 — total skew beyond the tolerance band. */
+/**
+ * D2 — total skew beyond the tolerance band. REPORTED, NOT ENFORCED.
+ *
+ * The full argument is in the ruling at the top of this file. The short form: a bigger
+ * total is usually an INVERSION rather than a tilt. Sweeping every non-pure-upgrade
+ * payout pair (total 1..6) and asking whether the SMALLER-total side wins at any
+ * reachable holding:
+ *
+ *   skew 1 → 7061/7104 pairs (99.4%)    skew 3 → 1634/1700 (96.1%)
+ *   skew 2 → 3741/3800 pairs (98.4%)    skew 4 →  531/574  (92.5%)
+ *
+ * and the share of skewed pairs that are decided by their payout at all only rises from
+ * 0.6% at skew 1 to 4.2% at skew 5 — so skew does not predict dominance. At `{funds: 9}`
+ * it would refuse `{funds: 4}` (2 voters convertible) while admitting
+ * `{funds: 1, trust: 2}` (5 voters convertible). Kept as a warning because drift towards
+ * lopsided payouts is a real smell and REF 5.2's verified format is "2-5 discs".
+ */
 function totalSkew(x: number, y: number): number {
   return x - y;
 }
@@ -313,8 +477,19 @@ function totalSkew(x: number, y: number): number {
  *
  * Both directions are tested: the card is a two-sided choice, so either side may
  * be the dominant one and the finding is reported against whichever is.
+ *
+ * `model` is OPTIONAL and that is deliberate rather than convenient. The
+ * composition findings need an economy to measure conversion against, and an
+ * economy is corpus data (`src/holdings.ts` builds one from the Voter market). A caller
+ * with one fixture card and no market should still be able to ask the structural
+ * questions, so `analyseIdeologyCard` stays usable without it — and `balanceCorpus`
+ * always supplies it, so no shipped card is ever analysed without the real check.
  */
-export function analyseIdeologyCard(card: IdeologyCard, deck = 'unknown'): readonly BalanceFinding[] {
+export function analyseIdeologyCard(
+  card: IdeologyCard,
+  deck = 'unknown',
+  model?: ConversionModel,
+): readonly BalanceFinding[] {
   const [a, b] = card.sides;
   if (a === undefined || b === undefined) {
     return [
@@ -413,25 +588,82 @@ export function analyseIdeologyCard(card: IdeologyCard, deck = 'unknown'): reado
     });
   }
 
-  // D2 — total skew outside the tolerance band. AN ERROR, not a warning: see the argument
-  // on `BALANCE_TOLERANCE_TOTAL`. Under full information a strict total edge removes the
-  // decision rather than tilting it, which is D1's claim in a wider reach, and D1 is
-  // already an error at one resource.
+  // D2 — total skew. A WARNING, and the demotion is the measured ruling at the top of
+  // this file: a bigger total is an INVERSION more often than a tilt (99.7% of skew-1
+  // pairs have a holding where the smaller side converts better), so an error here
+  // would refuse the better card. The finding still stands, because drift towards
+  // lopsided payouts is a real smell and REF 5.2's verified format is "2-5 discs".
   const skew = totalSkew(pa, pb);
   if (Math.abs(skew) > BALANCE_TOLERANCE_TOTAL) {
     out.push({
       code: 'TOTAL_SKEW',
-      severity: 'error',
+      severity: 'warn',
       deck,
       cardId: card.id,
       side: skew > 0 ? 0 : 1,
       message:
         `side ${skew > 0 ? 0 : 1} pays ${Math.abs(skew)} more in total ` +
-        `(${pa} vs ${pb}); tolerance band is +/-${BALANCE_TOLERANCE_TOTAL}. Both sides are ` +
-        'published under full information, so one answer is never the right one — this ' +
-        'removes the decision rather than tilting it. Equalise the totals and keep the ' +
-        'compositions different.',
+        `(${pa} vs ${pb}); the shipped deck's band is +/-${BALANCE_TOLERANCE_TOTAL} and REF 5.2's ` +
+        `verified format is 2-5 discs. This is REPORTED rather than refused because a total skew is ` +
+        'usually an inversion, not a tilt: measured over every non-upgrade pair, 99.4% of skew-1 ' +
+        'pairs have a reachable holding where the SMALLER side converts better, and the share of ' +
+        'skewed pairs that ARE decided by their payout never exceeds 4.2%. What decides this ' +
+        'card is COMPOSITION_DOMINANT, not this number.',
     });
+  }
+
+  // D6 — COMPOSITION DOMINANT. THE CHECK THAT MEASURES THE AXIS ANSWERS ARE DECIDED ON.
+  //
+  // Everything above compares two sides as vectors or as scalars. This one asks the
+  // question a player actually asks: given what I am HOLDING, which side converts into
+  // more score? `canAfford` is componentwise and the cap is 12 total, so composition
+  // and count are genuinely different currencies and only an economy-aware comparison
+  // can tell them apart.
+  //
+  // The relation is a DIRECTION over the COMPLETE reachable space — all 1820 holdings
+  // vectors, not a sample. It fires when one side is never the worse answer anywhere and
+  // is strictly better somewhere, so the payout's bias never reverses and a player who
+  // has learned the deck is never wrong. Ties do not rescue it: at a tied position the
+  // card does not decide, but the direction is still learnable, which is exactly the
+  // failure PLAN.md 9 risk #2 describes arriving through the payout rather than through
+  // one card.
+  //
+  // IT IS NOT REDUNDANT WITH D1, and the corpus is the proof. `PURE_UPGRADE` compares
+  // componentwise; this compares convertible. Sweeping all 5862 equal-total,
+  // non-pure-upgrade payout pairs, 9 are decided by their payout and every one is a
+  // SPREAD side beating a CONCENTRATED pile — `{clout:6}` over
+  // `{funds:1, clout:2, media:1, trust:2}`, total 6 on both sides. Neither D1 nor D2 nor
+  // D3 can see that card, and D2 cannot see it by construction, because its totals are
+  // equal.
+  if (model !== undefined) {
+    const d = measureDecisiveness(card.id, a.pays, b.pays, model);
+    if (d.decidedByPayout) {
+      const winner = d.side0Wins === 0 ? 1 : 0;
+      const own = winner === 0 ? a : b;
+      const other = winner === 0 ? b : a;
+      const loserWins = winner === 0 ? d.side1Wins : d.side0Wins;
+      const winnerWins = winner === 0 ? d.side0Wins : d.side1Wins;
+      out.push({
+        code: 'COMPOSITION_DOMINANT',
+        severity: 'error',
+        deck,
+        cardId: card.id,
+        side: winner as 0 | 1,
+        message:
+          `side ${winner} (${own.ideologue}) is the better answer at ${winnerWins} of the ` +
+          `${d.positions} reachable holdings positions and is NEVER the worse one ` +
+          `(${loserWins} wins for side ${1 - winner}, ${d.ties} positions tie). Every position ` +
+          `is a non-negative pool with a total at most the cap of ${model.cap}, scored by an ` +
+          `exact knapsack over the shipped Voter market with the p12 discard made optimally. ` +
+          `Side ${1 - winner} (${other.ideologue}) pays ${fmt(other.pays)} and is never worth ` +
+          `taking. Equal totals do NOT save a card from this: the totals here are ` +
+          `${sidePayout(own)} vs ${sidePayout(other)}, so the payout's bias never reverses and ` +
+          'a player who has learned this card is never wrong. Every measured instance of this ' +
+          'failure is a payout PILLED into one resource beaten by the same total spread wide, ' +
+          'because the market has cards that spend one resource and few that spend four at ' +
+          'once — so widen the weak side.',
+      });
+    }
   }
 
   // D4 — same-ideologue skew. Unreachable through the JSON Schema, which forbids
@@ -475,24 +707,45 @@ function blankIdeologues(): Record<Ideologue, number> {
  *
  * Purely structural: it looks only at payouts, and never at the question or the
  * answer text. Used by the resource-blind heuristic below.
+ *
+ * ## WHY IT NEEDS A MODEL, AND WHY THAT MATTERS
+ *
+ * This used to key on TOTALS, and therefore returned `null` for every one of the 76
+ * shipped cards — measured, `decisive: 0` on both decks. A heuristic that cannot
+ * produce a verdict on the corpus it ships with is not a heuristic; it is a dead
+ * branch, and it was the deck-level half of exactly the problem this file was rebuilt
+ * to fix. Its question — *can a player solve this deck without reading the cards?* —
+ * is still the right question, so the fix is to ask it on the axis that exists.
+ *
+ * So the payout-favoured side is now the side that converts better at MORE reachable
+ * holdings, scored by the same `src/holdings.ts` economy as `COMPOSITION_DOMINANT`. A
+ * card where one side wins everywhere still counts as decisive; a card that flips
+ * returns `null`, because there is no side a player could learn to prefer.
  */
-function resourcePreferredSide(card: IdeologyCard): IdeologySide | null {
+function resourcePreferredSide(
+  card: IdeologyCard,
+  model: ConversionModel | undefined,
+): IdeologySide | null {
   const [a, b] = card.sides;
   if (a === undefined || b === undefined) return null;
   const pa = sidePayout(a);
   const pb = sidePayout(b);
-  if (pa !== pb) return pa > pb ? a : b;
-  // Equal totals. Fall back to the structural findings, which are still purely
-  // about resources: if exactly one side has a structural advantage, that is the
-  // side the payout structure favours.
-  const aBetter =
-    isPureUpgrade(a, b) || thresholdCrossings(a).size > thresholdCrossings(b).size;
-  const bBetter =
-    isPureUpgrade(b, a) || thresholdCrossings(b).size > thresholdCrossings(a).size;
-  if (aBetter !== bBetter) return aBetter ? a : b;
-  // Zero-sum, neither side structurally favoured: the card genuinely has no
-  // resource answer. This is the good case.
-  return null;
+
+  if (model === undefined) {
+    // No economy: fall back to the total comparison this always used, so the heuristic
+    // degrades to its old behaviour rather than to nothing.
+    if (pa !== pb) return pa > pb ? a : b;
+    const aBetter =
+      isPureUpgrade(a, b) || thresholdCrossings(a).size > thresholdCrossings(b).size;
+    const bBetter =
+      isPureUpgrade(b, a) || thresholdCrossings(b).size > thresholdCrossings(a).size;
+    return aBetter !== bBetter ? (aBetter ? a : b) : null;
+  }
+
+  const d = measureDecisiveness(card.id, a.pays, b.pays, model);
+  // A flip is a real choice and returns null; only a universal winner is decisive.
+  if (!d.decidedByPayout) return null;
+  return d.side0Wins === 0 ? b : a;
 }
 
 /**
@@ -515,11 +768,14 @@ function resourcePreferredSide(card: IdeologyCard): IdeologySide | null {
  * almost no card is decisive at all — the second case is reported with its
  * decisive count so the two are distinguishable in the output.
  */
-function resourceBlind(cards: readonly CorpusIdeologyCard[]): BiasStats['resourceBlind'] {
+function resourceBlind(
+  cards: readonly CorpusIdeologyCard[],
+  model: ConversionModel | undefined,
+): BiasStats['resourceBlind'] {
   const byIdeologue = blankIdeologues();
   let decisive = 0;
   for (const card of cards) {
-    const winner = resourcePreferredSide(card);
+    const winner = resourcePreferredSide(card, model);
     if (winner === null) continue;
     decisive += 1;
     byIdeologue[winner.ideologue] += 1;
@@ -556,7 +812,71 @@ function resourceBlind(cards: readonly CorpusIdeologyCard[]): BiasStats['resourc
 /** A share computed from fewer decisive cards than this is noise, not a trend. */
 export const MIN_DECISIVE_CARDS = 5;
 
-export function deckBias(deck: string, cards: readonly CorpusIdeologyCard[]): BiasStats {
+/**
+ * How much of a deck may be decided by its payout before the questions are decoration.
+ *
+ * A card counted here has one side that converts strictly better at EVERY reachable
+ * holdings position, so a player who is short of one resource never has a reason to
+ * read it. The shipped decks measure **0 of 76**, so this threshold is not a target —
+ * it is the point at which the deck should be argued about rather than shipped.
+ *
+ * A WARNING rather than an error because the per-card `COMPOSITION_DOMINANT` error
+ * already refuses each of these cards when `balanceCorpus` runs; this is the deck-level
+ * rollup that catches the case where they are individually defensible and collectively
+ * a solved deck.
+ */
+export const PAYOUT_DECIDED_SHARE_THRESHOLD = 0.1;
+
+/**
+ * The composition block: does this deck leave real choices?
+ *
+ * This is the positive half of the instrument. `COMPOSITION_DOMINANT` says a card is
+ * broken; this says whether the deck as a whole is playable more than once, which is
+ * the claim the old total-based `resourceBlind` could never make about this corpus.
+ */
+function compositionStats(
+  cards: readonly CorpusIdeologyCard[],
+  model: ConversionModel | undefined,
+): BiasStats['composition'] {
+  const empty = {
+    positions: 0,
+    decidedByPayout: 0,
+    realChoice: 0,
+    indistinguishable: 0,
+    decidedByPayoutShare: 0,
+    tieShare: 0,
+  };
+  if (model === undefined || cards.length === 0) return empty;
+
+  let decided = 0;
+  let real = 0;
+  let indist = 0;
+  let ties = 0;
+  for (const card of cards) {
+    const [a, b] = card.sides;
+    if (a === undefined || b === undefined) continue;
+    const d = measureDecisiveness(card.id, a.pays, b.pays, model);
+    if (d.decidedByPayout) decided += 1;
+    else if (d.indistinguishable) indist += 1;
+    else real += 1;
+    ties += d.ties;
+  }
+  const total = cards.length * model.reachable.length;
+  return {
+    positions: model.reachable.length,
+    decidedByPayout: decided,
+    realChoice: real,
+    indistinguishable: indist,
+    decidedByPayoutShare: cards.length === 0 ? 0 : decided / cards.length,
+    tieShare: total === 0 ? 0 : ties / total,
+  };
+}
+
+export function deckBias(
+  deck: string,
+  cards: readonly CorpusIdeologyCard[],
+  model?: ConversionModel,
+): BiasStats {
   const sideRate = blankIdeologues();
   const pairRate: Record<string, number> = {};
   let gapSum = 0;
@@ -587,7 +907,8 @@ export function deckBias(deck: string, cards: readonly CorpusIdeologyCard[]): Bi
     pairRate,
     meanSideGap: n === 0 ? 0 : gapSum / n,
     meanSidePayout: sides === 0 ? 0 : payoutSum / sides,
-    resourceBlind: resourceBlind(cards),
+    resourceBlind: resourceBlind(cards, model),
+    composition: compositionStats(cards, model),
   };
 }
 
@@ -859,19 +1180,50 @@ export type BalanceInput = {
    * wants the dominance relations should not have to load a deck to get them.
    */
   readonly x?: ReadonlyMap<string, readonly XCardLike[]>;
+  /**
+   * The economy the composition checks are scored against.
+   *
+   * Optional, and derived from `voter` when omitted, because the model is a pure
+   * function of the market plus the Tough Love gate and every caller that has a
+   * `voter` map wants the same one. Supply it explicitly to measure cards against a
+   * DIFFERENT economy — which is how the tests demonstrate that `COMPOSITION_DOMINANT`
+   * is measuring conversion and not a coincidence of the shipped market.
+   */
+  readonly model?: ConversionModel;
 };
+
+/**
+ * The economy the composition checks run against, built from the shipped market.
+ *
+ * Exported so the CLI, the tests and any future caller measure against the SAME thing
+ * rather than each rebuilding it. The memo inside `shippedConversionModel` makes this
+ * cheap; the `reset` hook exists for tests that need a different market.
+ */
+export function marketConversionModel(
+  voter: ReadonlyMap<string, readonly CorpusVoterCard[]>,
+): ConversionModel {
+  return shippedConversionModel([...voter.values()].flat());
+}
 
 export function balanceCorpus(input: BalanceInput): BalanceReport {
   const findings: BalanceFinding[] = [];
   const bias: BiasStats[] = [];
   let cardsChecked = 0;
 
+  // The market is the economy. With no voter deck there is nothing to convert into and
+  // the composition checks are skipped rather than run against a fabricated one — the
+  // same "report it as unmeasured, do not score it zero" rule the X-card magnitude check
+  // follows for the same reason.
+  const model: ConversionModel | undefined =
+    input.model ??
+    (input.voter.size === 0 ? undefined : marketConversionModel(input.voter));
+
   for (const [deck, cards] of input.ideology) {
     for (const card of cards) {
       cardsChecked += 1;
-      findings.push(...analyseIdeologyCard(card as IdeologyCard, deck));
+      findings.push(...analyseIdeologyCard(card as IdeologyCard, deck, model));
     }
-    const stats = deckBias(deck, cards);
+    const stats = deckBias(deck, cards, model);
     bias.push(stats);
     for (const i of IDEOLOGUES) {
       const rate = stats.ideologueSideRate[i];
@@ -895,10 +1247,25 @@ export function balanceCorpus(input: BalanceInput): BalanceReport {
         deck,
         cardId: '(deck-level)',
         message:
-          `the higher-paying side is ${stats.resourceBlind.leadingIdeologue} on ` +
+          `the payout-favoured side is ${stats.resourceBlind.leadingIdeologue} on ` +
           `${stats.resourceBlind.decisive} of ${(stats.resourceBlind.leadShare * 100).toFixed(0)}% of ` +
           `decisive cards; threshold is ${(RESOURCE_BLIND_LEAN_THRESHOLD * 100).toFixed(0)}%. ` +
           'Players can learn the deck instead of reading the cards',
+      });
+    }
+    if (stats.composition.decidedByPayoutShare > PAYOUT_DECIDED_SHARE_THRESHOLD) {
+      findings.push({
+        code: 'PAYOUT_DECIDED_DECK',
+        severity: 'warn',
+        deck,
+        cardId: '(deck-level)',
+        message:
+          `${stats.composition.decidedByPayout} of ${cards.length} cards ` +
+          `(${(stats.composition.decidedByPayoutShare * 100).toFixed(0)}%) have one side that converts ` +
+          `strictly better at all ${stats.composition.positions} reachable holdings positions; threshold ` +
+          `is ${(PAYOUT_DECIDED_SHARE_THRESHOLD * 100).toFixed(0)}%. On those cards the question is ` +
+          'decoration for a player who is short of one resource, which is the failure this checker ' +
+          'was rebuilt to measure',
       });
     }
   }
