@@ -383,6 +383,424 @@
           "pays": { "media": 2, "trust": 1 }
         }
       ]
+    },
+    {
+      "id": "ig-et2040-021",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the floor price and the queue, Supremo on who ends up holding the pipe. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the seabed mining licence be sold to the highest bidder?",
+      "sides": [
+        {
+          "answer": "Yes. The licence has a floor price and a queue.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Whoever holds the pipe holds the argument.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-022",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on weighing cargo at the next window, Supremo on the flag that was never a private interest. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the lunar landing rights be auctioned by the kilo?",
+      "sides": [
+        {
+          "answer": "Yes. Weigh the cargo and settle at the next window.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. The first flag on it was never a private interest.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-023",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on taxing the emitter, Supremo on owning a field the state can point at. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should carbon be bought by the tonne or taxed by the tonne?",
+      "sides": [
+        {
+          "answer": "No. Tax the emitters; the money arrives without a project.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Buy the capture and the state owns a field it can point at.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-024",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on unmetered traffic, Supremo on what a heavier sky leaves aimable. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should traffic in orbit be priced per tonne of lift?",
+      "sides": [
+        {
+          "answer": "Yes. Traffic with no meter is congestion with a delay.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Heavier up there means fewer objects that can be aimed.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-025",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on rebuilding before narrating, Showstopper on aid that arrives attached to the clip. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the flood footage be released before the water recedes?",
+      "sides": [
+        {
+          "answer": "No. Rebuild first; the story costs less once the walls hold.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Release it tonight and the aid arrives with the clip.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-026",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a price acting as the ration, Showstopper on a published price making the drought news. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the water market open while the taps are dry?",
+      "sides": [
+        {
+          "answer": "Yes. A price is a ration, and rationing is the only ration.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Publish the price and the drought becomes a headline.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-027",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what a single language does to the sponsorship, Showstopper on room size as the thing that changes the argument. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the summit be broadcast in one language or in every language?",
+      "sides": [
+        {
+          "answer": "No. One language, and the sponsors notice the size of the room.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Every language is a bigger room, and bigger rooms argue longer.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-028",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the pension nobody voted to raise, Showstopper on the evening slot as the only place it will pass. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the retirement age rise with the life expectancy it bought?",
+      "sides": [
+        {
+          "answer": "No. The pension fund is the last thing anyone voted to raise.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Put it in the evening slot and the young will carry it.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-029",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the price of an appeal nobody funds, Idealist on a decision no one can question. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the machine decide when the appeal cannot be funded?",
+      "sides": [
+        {
+          "answer": "Yes. A cheap mistake is cheaper than an expensive appeal.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. A decision nobody can question is not a decision.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-030",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the training invoice and the asset it produced, Idealist on having paid for what the model knows. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the model weights be closed when public money trained them?",
+      "sides": [
+        {
+          "answer": "No. The training was our invoice; the weights are the asset.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. We paid to train it, so we paid for what it knows.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-031",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on charging for a trait so it spreads, Idealist on a seed nobody can afford. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the edited seed be released to the growers for nothing?",
+      "sides": [
+        {
+          "answer": "No. Charge for the trait and the trait spreads faster.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. A seed nobody can afford is a seed replanted from stock.",
+          "ideologue": "idealist",
+          "pays": { "trust": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-032",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on contribution as the only self-paying ration, Idealist on age as the number everyone already agrees to. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the longevity cure be rationed by age or by contribution?",
+      "sides": [
+        {
+          "answer": "No. Contribution is the only ration that pays for itself.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Age is the one number every applicant already agrees on.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-033",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a sensor having exactly one master, Showstopper on reuse of an orbit already paid for. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the satellite that watches the ice also watch the border?",
+      "sides": [
+        {
+          "answer": "No. One sensor has one master, and the master is not weather.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "Yes. Reuse the orbit; the glacier gets the same picture as everyone.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "funds": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-034",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a chamber earning its emergency, Showstopper on the vote becoming a performance. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the emergency session be allowed to vote on camera?",
+      "sides": [
+        {
+          "answer": "Yes. A chamber that fears the camera has not earned the emergency.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "No. Filming the emergency turns the vote into a performance.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-035",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on sovereignty not being delegable to a shed, Showstopper on weekly proof in the open. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the restored species be released before the pen is proven?",
+      "sides": [
+        {
+          "answer": "No. Sovereignty over a species is not ours to delegate to a shed.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "funds": 2 }
+        },
+        {
+          "answer": "Yes. Keep the pen, and keep it in the open every week.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-036",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a state routed through a foreign relay, Idealist on somebody having to lay the cable. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the seabed cable belong to the state or the consortium?",
+      "sides": [
+        {
+          "answer": "Yes. A state routed through a foreign relay is not a state.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "No. Somebody has to lay it, and the consortium is somebody.",
+          "ideologue": "idealist",
+          "pays": { "trust": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-037",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a permit being a queue inside a border, Idealist on price deciding without a desk. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should population be managed by permit or by price?",
+      "sides": [
+        {
+          "answer": "No. A permit is a queue, and a queue is a border inside the border.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "Yes. Price decides without a desk, and no desk has ever been clean.",
+          "ideologue": "idealist",
+          "pays": { "trust": 1, "funds": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-038",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on voting before the water makes the vote redundant, Idealist on the plan needing a constitution attached. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the retreat be voted on before the water or after it?",
+      "sides": [
+        {
+          "answer": "Yes. Before. Afterwards the only vote is the one nobody needs.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "funds": 1 }
+        },
+        {
+          "answer": "No. After. Now it is a relocation plan with a constitution attached.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-039",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on an unallocated river being a rumour, Idealist on the cut being written down as an emergency. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the river be allocated before the drought is declared?",
+      "sides": [
+        {
+          "answer": "Yes. Allocate first; an unallocated river is a rumour with a map.",
+          "ideologue": "supremo",
+          "pays": { "clout": 1, "funds": 2 }
+        },
+        {
+          "answer": "No. Declare first, so the cut is written down as an emergency.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-040",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on where the audience stops listening, Idealist on the sources being on screen. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the model that writes the news explain itself on air?",
+      "sides": [
+        {
+          "answer": "No. The explanation is where the audience stops listening.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "trust": 2 }
+        },
+        {
+          "answer": "Yes. Put the sources on screen and let the reader finish it.",
+          "ideologue": "idealist",
+          "pays": { "trust": 1, "funds": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-041",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on silence reading as neglect, Idealist on commentary turning a loss into a segment. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the extinction be narrated or left to the sound?",
+      "sides": [
+        {
+          "answer": "Yes. Narrate it; silence on the archive reads as neglect.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Let the sound carry it; commentary turns a loss into a segment.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-042",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the classroom becoming an employer, Idealist on the two years of argument a later start buys. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should school start at four or at six?",
+      "sides": [
+        {
+          "answer": "No. Start at four and the classroom becomes the first employer.",
+          "ideologue": "showstopper",
+          "pays": { "media": 1, "funds": 2 }
+        },
+        {
+          "answer": "Yes. Start at six and the parents have two years to argue about it.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
     }
   ]
 }
