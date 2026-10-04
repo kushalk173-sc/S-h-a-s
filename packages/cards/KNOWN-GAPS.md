@@ -1760,27 +1760,54 @@ A gap list that says "these fourteen are blocked" is a to-do list; a gap list th
 decision. This section is the decision, taken per card, and it is the handoff.
 
 **Measured, not remembered.** 54 rows probed. **Before this iteration: 40 PLAYED, 0
-refused, 0 no-op, 14 inexpressible. After: 42 PLAYED, 0 refused, 0 no-op, 12
-inexpressible.** `IN THE CORPUS` rose **31 → 33** and `SHIPPED AS AUTHORED` **23 → 25**.
-The brief's list names thirteen of the fourteen and omits **DOSTI BANI RAHE**, which is
-inexpressible and is ruled on here too, so all fourteen appear.
+refused, 0 no-op, 14 inexpressible. After: 43 PLAYED, 0 refused, 0 no-op, 11
+inexpressible.** `IN THE CORPUS` rose **31 → 34** and `SHIPPED AS AUTHORED` **23 → 26**.
+The eleven still inexpressible are exactly the eleven this section rules out or blocks —
+`npm run playable` and §8.0 are the same list, which is the point of writing the ruling
+down before implementing it. The brief's list names thirteen of the original fourteen and
+omits **DOSTI BANI RAHE**, which is inexpressible and is ruled on here too, so all
+fourteen appear.
 
-**THE TWO THAT MOVED, and each moved for a different reason.** GREAT LEADER, BAD ECONOMY
+**THE THREE THAT MOVED, and each moved for a different reason.** GREAT LEADER, BAD ECONOMY
 is a **BUILD** and its mechanism was `move-peg` plus one new `Choice` kind. BRAVE NEW
 WORLDS is a **PART-BUILD** and needed **no engine change at all** — `no-income` already
 existed and `ANSWER` already consulted it — which is the honest answer to the brief's
-question about whether G18 was really "large". The *other* half of it is not large; it is
-a rules question (§8.2a).
+question about whether G18 was really "large". THOUGHTS AND PRAYERS is a **BUILD** and it
+is the `read`-vs-`target` split §3 had called "the shortest route to the next playable
+card": `per` widens onto `gain-any` / `lose-any` and a new `read?: EffectTarget` says whose
+board the multiplier comes off while `target` keeps saying who is paid. **Nothing is
+dropped on that card** — "any 2" is `gain-any`, "for each" is `per`, "Pick a player" is
+`read` — and it still ships `adapted`, because a Conspiracy Card also needs a `cost` the
+recovered text does not print.
 
-**AND A CORPUS CHANGE LANDED, which is its own kind of work.** Nine original substitute
-cards replaced the ruled-out names (§8.3, §8.4), so the deck has no permanent hole where a
-recovered card can never be played. That is 211 → 220 cards, and it found a bug in the
-shipped checker rather than the other way round: `semantic-agreement`'s "a lasting clause
-installed NO live effect" assertion was false about every lasting `restrict` in the corpus,
-because `reduce.ts isScoped` carves `restrict` / `borrow-power` / `set-cap` out for exactly
-the reason `until` means something else on them. The carve-out is now **derived from
-`isScoped`'s own source** rather than typed, so a fourth op carving itself out there fails
-this file instead of quietly making it assert a falsehood.
+**THE CORPUS MOVED TOO, which is its own kind of work.** Nine original substitute cards
+replaced the ruled-out names (§8.3, §8.4), so the deck has no permanent hole where a
+recovered card can never be played. That is 211 → 221 cards, and it found **two** bugs in
+the shipped checkers rather than the other way round:
+
+1. `semantic-agreement`'s *"a lasting clause installed NO live effect"* assertion was
+   **false about every lasting `restrict` in the corpus**, because `reduce.ts isScoped`
+   carves `restrict` / `borrow-power` / `set-cap` out for exactly the reason `until` means
+   something else on them. The carve-out is now **derived from `isScoped`'s own source**
+   rather than typed, so a fourth op carving itself out there fails this file instead of
+   quietly making it assert a falsehood.
+2. The same file's *"`per` may only be `held-of-each-resource`"* rule was **true only for
+   the two ops that have a `res`**. `gain-any` / `lose-any` have no `res` — the multiplier
+   scales the ASK, which is one number — so the carve-out is by **op**, and the reason is
+   in the message.
+
+**AND A FOURTH HONESTY SEAM, because `read` is not read by any case.** `EXECUTED_OPS` is
+re-derived by slicing `applyEffect`'s body between `case '…':` marks, so `read` — which is
+read in the `'chosen-player'` interception, one function above the switch — cannot be
+listed there. `FIELDS_READ_BY_CHOICE_INTERCEPTION` is the new registry, re-derived from the
+interception's own source and asserted disjoint from `EXECUTED_OPS` and
+`SCOPE_FIELDS_READ_BY_INSTALL`, on the same reasoning as the three seams before it.
+
+**WHAT IS RED, AND WHY, because it is a handoff and not an apology.** `packages/engine` and
+`packages/cards` are green: **450 and 233 tests, both up from 444 and 221**, typecheck and
+secret gate clean. `packages/client` (3 failures) and `packages/server` (57) are red, and
+every one of them traces to a **`Choice` kind or an op those packages have not been taught
+about**. The exact asks are in §8.6.
 
 ### 8.0 The table, and it is the deliverable
 
@@ -1788,7 +1815,7 @@ this file instead of quietly making it assert a falsehood.
 |---|---|---|---|---|
 | 1 | **GREAT LEADER, BAD ECONOMY** | G1/G14 | **BUILD** — landed this iteration as `hl-et2040-022` | ships as a recovered card; no substitute needed |
 | 2 | **BRAVE NEW WORLDS** | G18 | **PART-BUILD** — landed as `hl-et2040-023` on the `no-income` half, with NO engine change; the sweep half is the named decision in §8.2 | ships as a recovered card, `adapted` |
-| 3 | **THOUGHTS AND PRAYERS** | G4 | **BUILD**, and it is the `read`-vs-`target` split this file has called "the shortest route to the next playable card" since §3 | ships as a recovered card |
+| 3 | **THOUGHTS AND PRAYERS** | G4 | **BUILT** — landed this iteration as `ct-et2040-021`; nothing dropped | ships as a recovered card |
 | 4 | **404** | G18 | **BLOCKED ON A NAMED DECISION** — §8.2, question (a) | substitute filed |
 | 5 | **A CALL FROM KARACHI** | G13/G17/G20 | **RULE OUT** — the auction; §8.3 | substitute filed |
 | 6 | **QUANTUM WRISTBAND** | G13/G14 | **RULE OUT** — the auction *and* a Headline draw pile that does not exist; §8.3 | substitute filed |
@@ -2061,4 +2088,29 @@ was rewritten, not waived.**
   iteration reads a hidden pile: `move-peg`'s decision is raised only when at least one
   of its two candidate sets is non-empty, and it enumerates **the board**, which is nine
   fixed areas every client already has in full. **No `_`-prefixed field was added
-  anywhere.**
+  anywhere**, and the secret gate is clean on its own terms.
+
+### 8.6 THE FOUR ASKS THIS ITERATION OWES `packages/client` AND `packages/server`
+
+**This is the handoff, and it is four lines plus one table row.** Every red test in those
+two packages traces to one of them, and the engine and cards halves are green and committed
+so nothing above is waiting on them.
+
+| # | package | file | the ask | size |
+|---|---|---|---|---|
+| 1 | `server` | `test/secret-inventory.ts` | `CHOICE_KINDS['choose-peg-dest'] = 'pegs'`. **`'pegs'` is already an allowed classification**, so no widening is needed and no secrecy argument has to be re-made: the decision enumerates the board, which is public on every payload. | one line |
+| 2 | `server` | `test/driver.ts` `pickFor` | a `'choose-peg-dest'` arm. **This one causes 45 of the 57 server failures** and every one of them says `no legal pick for choice cNN (choose-peg-dest)` — the driver's `pickFor` is a `switch` over `Choice` and the new kind returns `undefined`, so the driver throws rather than answering. The arm mirrors `movablePegIds` / `pegDestinations`, and `packages/engine/test/driver.ts` already has it as a worked example. | ~14 lines |
+| 3 | `server` | `test/corpus-drift.test.ts` | a `MINIMAL_EFFECT` entry for `move-peg`. | ~6 lines |
+| 4 | `client` | `src/app/interrupt.ts` + `choiceInvariant.test.tsx` / `choiceResolver.test.tsx` | a `move-peg` sentence in `describeEffect`, and a `'choose-peg-dest'` / `'peg-dest'` arm in the two switches. Both are the client's own **totality proofs** — which is the point: an unhandled kind is a compile error rather than a dialog nobody can answer. | ~20 lines |
+
+**ONE MORE, and it is a corpus consequence rather than a code one.** `corpus-response-window`
+and `interrupt-window` assert that seed 20 still draws a reactive Conspiracy Card from a
+headline queue, and **12 X-cards later it does not**. That is the ordinary cost of growing a
+deck — the shuffle moved — and §6bis records the whole genre at length. The seed is the
+server owner's to re-pick, and it is named here rather than left to be discovered.
+
+**AND ONE THING THAT IS NOT AN ASK.** The `choose-peg-dest` decision carries `count`,
+`scope`, `source` and `reason`. It carries **no `CardID`**, so
+`secret-state.test.ts:1794`'s *"no corpus `CardID` in any `PendingChoice`"* assertion passes
+unchanged — the `choose-card` narrowing does not need re-arguing for this kind, because
+this kind never names a card at all.
