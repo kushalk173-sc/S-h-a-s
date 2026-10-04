@@ -252,6 +252,25 @@ export type BoardState = {
    */
   readonly illegalReason?: string;
   /**
+   * THE CALLER'S PER-SLOT REFUSALS, when one sentence is not enough.
+   *
+   * `illegalReason` is a single string, which is right for a voter decision — every
+   * slot it refuses is refused for being out of the legal set, and that is one
+   * thing. It is wrong for the SLOT POWERS, whose legality is stage-dependent:
+   * `'tough-love'` requires "both in the same constituency, both the same player",
+   * which cannot be known until the first pick is down, so the legal set NARROWS
+   * mid-answer and the slots that just went dark were legal a moment ago.
+   *
+   * A player watching a highlighted slot turn itself off needs to be told WHICH
+   * clause turned it off — "both voters must be in the same constituency" is
+   * actionable and "this power cannot reach that voter" is a shrug. So the caller
+   * may hand down the individual sentences, and the board prints whichever it is
+   * given, exactly as it prints `illegalReason` rather than inventing one.
+   *
+   * A slot absent from the map falls back to `illegalReason`.
+   */
+  readonly illegalReasons?: ReadonlyMap<string, string>;
+  /**
    * G1 — the clause for a slot picked as part of a TWO-PLACE pick ("the voter you
    * picked up to move", "where it lands"). See `SlotInteraction.chosenReason`; the
    * board prints what it is given, for the same reason it prints `illegalReason`

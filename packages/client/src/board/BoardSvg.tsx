@@ -141,7 +141,12 @@ function slotInteraction(input: {
       if (supplied.has(slot.areaId)) return { legality: 'legal' };
       return {
         legality: 'illegal',
-        reason: state.illegalReason ?? 'not a legal target',
+        // THE CALLER'S PER-SLOT SENTENCE IF IT SUPPLIED ONE. A single
+        // `illegalReason` is right for a voter decision, where every refused slot is
+        // refused for the same reason; it is wrong for the slot powers, whose legal
+        // set NARROWS as the picks are made — and a slot that was legal one press ago
+        // has to say which clause turned it off. See `types.ts:illegalReasons`.
+        reason: state.illegalReasons?.get(slot.areaId) ?? state.illegalReason ?? 'not a legal target',
       };
     }
     const locked = state.lockedZoneId;

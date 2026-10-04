@@ -104,6 +104,8 @@ import {
   lockedZoneFor,
   pegMovePick,
   placementRefusal,
+  powerAreaRefusal,
+  powerBoardLegality,
   requiredPicks,
   rightsZones,
   targetableAreas,
@@ -309,13 +311,47 @@ export function GameScreen({ store }: GameScreenProps) {
     // slots it has collected so far. It is checked AFTER placement because a player
     // mid-placement has already committed to a group, and yanking the board out from
     // under them to answer a power would be worse than making them cancel first.
-    if (powerTargetsArea(app.powerTarget) && isMyTurn) {
+    //
+    // AND IT PASSES THE LEGAL SET, which is the whole fix. Without it `BoardSvg`
+    // falls back to "an empty slot is the target", which is true of every placement
+    // and false of all three slot powers — Land Grab evicts a voter, Payback
+    // strikes one, Tough Love converts two, so every legal target is an OCCUPIED
+    // slot and every occupied slot was announced `illegal: already occupied`. The
+    // board contradicted the click handler, in front of the player, on all 129
+    // squares. That is Defect A's shape one layer out, and it is why Land Grab read
+    // as "areas offered, CONFIRM never enables".
+    //
+    // `powerTargetableAreas` is DERIVED from `powerAreaRefusal` — the same call the
+    // click handler makes — so the highlight and the acceptance test cannot drift.
+    // For `'tough-love'` it is a function of the picks, and that is correct rather
+    // than a re-render cost: the second half of its rule ("both in the same
+    // constituency, both the same player") is only knowable once one is down, so
+    // the legal set legitimately narrows as the pick is made.
+    if (powerTargetsArea(app.powerTarget) && isMyTurn && app.powerTarget !== null) {
+      const { legalAreaIds: legal, illegalReasons } = powerBoardLegality(
+        state,
+        you,
+        app.powerTarget,
+        app.pickedAreaIds,
+      );
       return {
         mode: 'place',
         pickedAreaIds: app.pickedAreaIds,
         lockedZoneId: null,
         gerrySourceAreaId: null,
         resolveGerrySources: false,
+        // UNCONDITIONALLY, and that is the whole point of the field. An EMPTY set is
+        // a real answer — "this power can reach nothing on this board" — and
+        // withholding it hands the board back to its fallback rule, which is the one
+        // that made Land Grab unusable. Both existing callers
+        // (`choiceBoardInteraction`, `pegMoveInteraction`) supply it the same way,
+        // empty or not, and a third reading is how the inconsistency happened.
+        legalAreaIds: legal,
+        // …and the reasons are handed down PER SLOT, not as one sentence, because
+        // Tough Love's set narrows as the picks are made and a slot that was legal
+        // one press ago has to say which clause turned it off.
+        illegalReasons,
+        illegalReason: 'this power cannot reach that voter',
         disabled: false,
       };
     }
@@ -1592,51 +1628,21 @@ function gerrySourceRefusal(
 }
 
 /**
- * Is this slot a legal target for the power being aimed?
+ * THE POWER LEGALITY MOVED TO `derive.ts`, next to `powerTargetableAreas`.
  *
- * The same three conditions `PowerDialog` shows and `reduce.ts` enforces, so the
- * refusal is consistent whichever of the two the player happens to press. Land Grab
- * takes anybody's peg; Payback and Tough Love take an opponent's, and Tough Love
- * additionally needs both in one zone — checked here on the SECOND pick, because
- * that is the frame the player can still change it on.
+ * It used to be a private function here, immediately above this comment, and that
+ * was the defect: the board needs the same rule to know what to HIGHLIGHT, and it
+ * was not being told. With no `legalAreaIds` supplied, `BoardSvg` fell back to its
+ * own rule — "an empty slot is the target" — which is true of every placement that
+ * has ever used `mode: 'place'` and false of all three slot powers, whose every
+ * legal target is an OCCUPIED slot. So the board announced every occupied slot as
+ * `illegal: already occupied` while this handler accepted it, which is why Land
+ * Grab read as "areas offered, CONFIRM never enables".
+ *
+ * One rule, one place, and the board's set is DERIVED from the refusal rather than
+ * restated beside it, so the two cannot drift. The full argument is on
+ * `derive.ts:powerAreaRefusal`.
  */
-function powerAreaRefusal(
-  state: ClientState,
-  you: PlayerID | null,
-  flow: PowerFlow,
-  areaId: string,
-  picks: readonly string[],
-): string | null {
-  if (you === null) return 'that slot does not exist';
-  let area: { readonly id: string; readonly zone: string; readonly volatile: boolean; readonly peg: { readonly owner: string; readonly majority: boolean } | null } | null = null;
-  for (const z of state.zones) {
-    const a = z.areas.find((x) => x.id === areaId);
-    if (a !== undefined) {
-      area = { id: a.id, zone: z.id, volatile: a.volatile, peg: a.peg };
-      break;
-    }
-  }
-  if (area === null) return 'that slot does not exist';
-  if (area.peg === null) return 'there is no voter there';
-  if (area.volatile) return 'voters in a Volatile Area cannot be moved';
-  if (flow.power !== 'land-grab' && area.peg.owner === you) {
-    return 'that is your own voter — this power targets an opponent';
-  }
-  if (flow.power === 'tough-love') {
-    for (const picked of picks) {
-      for (const z of state.zones) {
-        const p = z.areas.find((x) => x.id === picked);
-        if (p !== undefined && p.id !== areaId && z.id !== area.zone) {
-          return 'both voters must be in the same constituency';
-        }
-        if (p !== undefined && p.id !== areaId && p.peg !== null && p.peg.owner !== area.peg.owner) {
-          return 'both voters must belong to the same player';
-        }
-      }
-    }
-  }
-  return null;
-}
 
 /** How long the payout frame stays up before it retires. §9.3: one readable frame. */
 const REVEAL_MS = 4_000;

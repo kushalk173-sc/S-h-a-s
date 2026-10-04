@@ -23,9 +23,9 @@ import { useState } from 'react';
 
 import type { Area, ClientState, Delta, PlayerID, Pool, Resource } from '@shasn/engine';
 
-import { RESOURCE_ORDER, UI_RULES, canAfford, deltaTotal, poolTotal } from './derive.ts';
+import { RESOURCE_ORDER, UI_RULES, canAfford, deltaTotal, powerAreaRefusal, poolTotal } from './derive.ts';
 import type { MarketPower, PowerFlow } from './store.ts';
-import { powerAreaCount } from './store.ts';
+import { powerAreaCount, powerTargetsArea } from './store.ts';
 
 export type PowerDialogProps = {
   readonly state: ClientState;
@@ -51,13 +51,45 @@ export function PowerDialog(props: PowerDialogProps) {
   const { flow } = props;
   const title = TITLES[flow.power];
   const body = BODIES[flow.power];
+  /*
+     THREE OF THE FIVE SHAPES ARE RESOLVED ON THE BOARD, SO THREE OF THEM MUST NOT
+     COVER THE BOARD.
+
+     `.scrim` is `position: fixed; inset: 0; z-index: 20` over an OPAQUE
+     `--table-900`, and this dialog used it for all five. Land Grab, Payback and
+     Tough Love are answered by clicking slots — `commitPower` takes an `areaId`,
+     and `PowerDialog` has no slot list of its own. So for those three the only
+     place the pick could be made was under an opaque full-viewport overlay, and
+     `CONFIRM` (`ready = area !== null && …`) could never go live.
+
+     That is the measured symptom: "25-50 occupied areas offered, CONFIRM never
+     enables", across every playthrough that armed one of the three. It is the
+     seventh recurrence of this project's unreachable-dialog class, and the same one
+     `ChoiceResolver` was repaired for — see its header, and `.scrim--area` in
+     `app.css`, which exists for exactly this and which this dialog was not using.
+
+     `.scrim--area` is `pointer-events: none` with a translucent wash and the sheet
+     anchored to the BOTTOM, so the board stays visible, stays clickable, and sits
+     ABOVE the sheet rather than behind it. The sheet takes its pointer events back,
+     so CONFIRM, UNDO and CANCEL all still work.
+
+     `aria-modal` goes with it, for the same reason it does in `ChoiceResolver`:
+     telling a screen reader the rest of the page is inert stops being true the
+     moment the board is the other half of the answer. It is dropped for the three
+     board shapes only — Prospecting and Donations genuinely are modal, and saying
+     otherwise about them would be its own small lie.
+  */
+  const onBoard = powerTargetsArea(flow);
 
   return (
-    <div className="scrim" data-testid="power-dialog">
+    <div
+      className={onBoard ? 'scrim scrim--area' : 'scrim'}
+      data-testid="power-dialog"
+    >
       <div
         className="sheet"
         role="dialog"
-        aria-modal="true"
+        aria-modal={onBoard ? undefined : true}
         aria-label={title}
         data-testid={`power-dialog-${flow.power}`}
       >
@@ -252,8 +284,23 @@ function SlotTarget({
   const owned = poolOf({ state, you });
   const payables = RESOURCE_ORDER.filter((r) => owned[r] > 0);
 
-  const refusal = area === null ? null : slotRefusal(state, you, flow, area);
+  const refusal = area === null ? null : powerAreaRefusal(state, you, flow, area.id);
   const ready = area !== null && refusal === null && (pay !== true || (cost !== null && owned[cost] > 0));
+  /*
+     THE PAYMENT IS PART OF THE GATE ONLY WHEN THERE IS A PAYMENT.
+
+     This read `if (area === null || cost === null) return;` — but `cost` is
+     `useState<Resource | null>(null)` and nothing sets it unless `pay === true`, so
+     for LAND GRAB it was `null` forever and **CONFIRM did nothing at all**. The
+     button was enabled (`ready` gates on `pay !== true`, correctly), it looked
+     live, and pressing it silently dropped the power: §9.10's prohibited control,
+     reached by copying Payback's guard into a component that serves both.
+
+     `pay` is the only thing that distinguishes the two shapes here, and `ready`
+     above already reads it that way — the gate and the guard now agree.
+  */
+  const needsPay = pay === true;
+  const paid = !needsPay || (cost !== null && owned[cost] > 0);
 
   return (
     <div className="col" data-testid="slot-target">
@@ -293,11 +340,11 @@ function SlotTarget({
           disabled={!ready}
           aria-disabled={!ready}
           onClick={() => {
-            if (area === null || cost === null) return;
+            if (area === null || !paid || (needsPay && cost === null)) return;
             onSubmit(
               flow.power === 'land-grab'
                 ? { kind: 'land-grab', areaId: area.id }
-                : { kind: 'payback', areaId: area.id, pay: cost },
+                : { kind: 'payback', areaId: area.id, pay: cost as Resource },
             );
           }}
           data-testid="slot-target-confirm"
@@ -663,21 +710,18 @@ function areaName(state: ClientState, area: Area): string {
 }
 
 /**
- * The reducer's conditions for this flow, in its order and in its words.
+ * `slotRefusal` USED TO BE A SECOND COPY OF THIS RULE, HERE.
  *
- * Land Grab: a peg, not volatile, anyone. Payback: a peg, not volatile, and not
- * yours — `reduce.ts` returns "Payback targets an opponent's voter" for your own.
+ * Three copies of one legality test is the defect that made Land Grab unusable, so
+ * this one is gone: `SlotTarget` reads `derive.ts:powerAreaRefusal`, which is the
+ * same call `powerTargetableAreas` is derived from and the same call the click
+ * handler in `GameScreen` makes. The player now sees ONE sentence for a slot the
+ * power cannot reach, whichever of the three surfaces produced it — this dialog's
+ * status line, the board's `illegal: <reason>` aria-clause, and the refusal toast.
+ *
+ * The wording moved with it. This copy said "Payback targets an opponent's voter",
+ * which is `reduce.ts`'s own string for the SERVER's answer; the surviving one says
+ * "that is your own voter — this power targets an opponent", which names what is
+ * wrong rather than what would happen. An engine refusal string in a live region is
+ * a message the player cannot act on.
  */
-function slotRefusal(
-  _state: ClientState,
-  you: PlayerID,
-  flow: PowerFlow,
-  area: Area,
-): string | null {
-  if (area.peg === null) return 'there is no voter there';
-  if (area.volatile) return 'voters in a Volatile Area cannot be moved';
-  if (flow.power === 'payback' && area.peg.owner === you) {
-    return "Payback targets an opponent's voter";
-  }
-  return null;
-}

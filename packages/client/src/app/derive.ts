@@ -255,6 +255,13 @@ export type BoardInteraction = {
   /** The sentence the board attaches to every slot outside `legalAreaIds`. */
   readonly illegalReason?: string;
   /**
+   * THE CALLER'S PER-SLOT REFUSALS, for a legal set that NARROWS as the answer
+   * develops. `board/types.ts:illegalReasons` has the argument; the field is
+   * repeated here because `toBoardState` is a structural pass-through and an
+   * optional field it drops is a field the board never hears about.
+   */
+  readonly illegalReasons?: ReadonlyMap<string, string>;
+  /**
    * G1 — what a picked slot has PICKED UP, for a two-place pick.
    *
    * The board's one chosen-clause is "already chosen for this group", and it is a
@@ -311,7 +318,18 @@ export function toBoardState(state: ClientState, interaction: BoardInteraction):
     pickedAreaIds: interaction.pickedAreaIds,
     ...(interaction.legalAreaIds === undefined
       ? {}
-      : { legalAreaIds: interaction.legalAreaIds, ...(interaction.illegalReason === undefined ? {} : { illegalReason: interaction.illegalReason }) }),
+      : {
+          legalAreaIds: interaction.legalAreaIds,
+          ...(interaction.illegalReason === undefined ? {} : { illegalReason: interaction.illegalReason }),
+          // …and the per-slot sentences, alongside the single one. This pass-through
+          // is an allow-list, so a field added to `BoardInteraction` and not added
+          // here is silently dropped on the floor and the board falls back to the
+          // generic sentence — which is exactly what happened when this field was
+          // introduced and only `illegalReason` was forwarded.
+          ...(interaction.illegalReasons === undefined
+            ? {}
+            : { illegalReasons: interaction.illegalReasons }),
+        }),
     ...(interaction.chosenReason === undefined ? {} : { chosenReason: interaction.chosenReason }),
     ...(interaction.gerrySourceAreaId === null
       ? {}
@@ -786,6 +804,156 @@ export function targetableCount(
     }
   }
   return n;
+}
+
+// ─────────────────── the powers that target a SLOT ───────────────────
+
+/**
+ * WHY THIS IS HERE AND NOT IN `GameScreen`.
+ *
+ * It was in `GameScreen`, next to the click handler, and that is exactly where a
+ * rule cannot live: the board also needs it, to know which slots to HIGHLIGHT, and
+ * it was not getting it. `board/types.ts:legalAreaIds` exists because a voter
+ * DECISION passes its legal set down — "the caller owns legality, and when it has
+ * told us the legal set, THAT SET IS THE ANSWER" — and the power branch of
+ * `GameScreen`'s interaction memo passed none. So `BoardSvg` fell back to its own
+ * fallback: *"the only rule this component knows is the one true of every
+ * placement that has ever used it — an empty slot is the target."*
+ *
+ * **WHICH IS FALSE FOR ALL THREE SLOT POWERS.** Land Grab evicts a voter, Payback
+ * strikes one, Tough Love converts two: every legal target is an OCCUPIED slot, and
+ * every occupied slot was being drawn and announced as
+ * `illegal: already occupied`. So the board said the only legal targets were illegal
+ * while the click handler — a different copy of the same rule — accepted them.
+ *
+ * That is Defect A's shape exactly, one layer out: a dialog offering one set and a
+ * board announcing another. It is also why Land Grab read as "25-50 occupied areas
+ * offered, CONFIRM never enables" — nothing on the board looked pressable, and the
+ * harness, which finds its targets by the board's own `legal target` aria-label
+ * (§8.5), found none either.
+ *
+ * So the rule moved here, next to `targetableAreas`, and `powerTargetableAreas` is
+ * defined IN TERMS OF `powerAreaRefusal` rather than beside it. Two copies of one
+ * legality test is the defect; a set derived from the refusal cannot disagree with
+ * it, because it is the same call.
+ */
+
+/** The structural shape of a `PowerFlow` — named, so `derive` needs no store import. */
+export type BoardPowerFlow = { readonly power: string };
+
+/**
+ * Is this slot a legal target for the power being aimed, and if not, why?
+ *
+ * The same conditions `reduce.ts` enforces, in the reducer's order, so the refusal
+ * is consistent whichever of the two the player happens to press. Land Grab takes
+ * anybody's peg; Payback and Tough Love take an opponent's; Tough Love additionally
+ * needs both in one constituency and both belonging to the same player, checked
+ * here against the picks ALREADY MADE — which is the frame the player can still
+ * change it on.
+ *
+ * `picks` defaults to empty so a caller computing the whole legal set does not have
+ * to invent one, and so the two expressions below cannot be called with different
+ * arities by accident.
+ */
+export function powerAreaRefusal(
+  state: ClientState,
+  you: PlayerID | null,
+  flow: BoardPowerFlow,
+  areaId: string,
+  picks: readonly string[] = [],
+): string | null {
+  if (you === null) return 'that slot does not exist';
+  let area: { readonly id: string; readonly zone: string; readonly volatile: boolean; readonly peg: { readonly owner: string; readonly majority: boolean } | null } | null = null;
+  for (const z of state.zones) {
+    const a = z.areas.find((x) => x.id === areaId);
+    if (a !== undefined) {
+      area = { id: a.id, zone: z.id, volatile: a.volatile, peg: a.peg };
+      break;
+    }
+  }
+  if (area === null) return 'that slot does not exist';
+  if (area.peg === null) return 'there is no voter there';
+  if (area.volatile) return 'voters in a Volatile Area cannot be moved';
+  if (flow.power !== 'land-grab' && area.peg.owner === you) {
+    return 'that is your own voter — this power targets an opponent';
+  }
+  if (flow.power === 'tough-love') {
+    for (const picked of picks) {
+      for (const z of state.zones) {
+        const p = z.areas.find((x) => x.id === picked);
+        if (p !== undefined && p.id !== areaId && z.id !== area.zone) {
+          return 'both voters must be in the same constituency';
+        }
+        if (p !== undefined && p.id !== areaId && p.peg !== null && p.peg.owner !== area.peg.owner) {
+          return 'both voters must belong to the same player';
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Every slot this power may legally be aimed at, right now.
+ *
+ * Derived from `powerAreaRefusal` over the whole board, so the highlight and the
+ * acceptance test are one expression rather than two — and so a player can never be
+ * shown a slot the click handler will refuse, which is the whole of Defect A.
+ *
+ * It is a function of the PICKS for `'tough-love'` and of nothing else, because
+ * Tough Love's second half ("both in the same constituency, both the same player")
+ * is only knowable once one is down. That makes the highlight stage-dependent, which
+ * is correct: it narrows as the pick is made, exactly as the refusal does.
+ */
+export function powerTargetableAreas(
+  state: ClientState,
+  you: PlayerID | null,
+  flow: BoardPowerFlow,
+  picks: readonly string[] = [],
+): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const z of state.zones) {
+    for (const a of z.areas) {
+      if (powerAreaRefusal(state, you, flow, a.id, picks) === null) out.add(a.id);
+    }
+  }
+  return out;
+}
+
+/**
+ * THE SAME SET, AND THE REASON FOR EVERY SLOT OUTSIDE IT — from ONE pass.
+ *
+ * `powerTargetableAreas` and this are deliberately the same walk: two calls would be
+ * two chances for the highlight and the reasons to describe different boards, and
+ * the whole defect this pair was extracted to fix was two surfaces disagreeing. So
+ * this returns both, and the interaction memo uses only this.
+ *
+ * The reasons matter because `'tough-love'`'s legal set is stage-dependent. A slot
+ * the board highlighted one press ago goes dark on the second, and a single generic
+ * sentence for all of them is a shrug; the four clauses are "there is no voter
+ * there", "voters in a Volatile Area cannot be moved", "that is your own voter —
+ * this power targets an opponent", and the two same-constituency / same-player
+ * clauses — each of which tells the player what to do next.
+ */
+export function powerBoardLegality(
+  state: ClientState,
+  you: PlayerID | null,
+  flow: BoardPowerFlow,
+  picks: readonly string[] = [],
+): {
+  readonly legalAreaIds: ReadonlySet<string>;
+  readonly illegalReasons: ReadonlyMap<string, string>;
+} {
+  const legalAreaIds = new Set<string>();
+  const illegalReasons = new Map<string, string>();
+  for (const z of state.zones) {
+    for (const a of z.areas) {
+      const why = powerAreaRefusal(state, you, flow, a.id, picks);
+      if (why === null) legalAreaIds.add(a.id);
+      else illegalReasons.set(a.id, why);
+    }
+  }
+  return { legalAreaIds, illegalReasons };
 }
 
 // ─────────────────── G1: moving a peg, the TWO candidate sets ───────────────────
