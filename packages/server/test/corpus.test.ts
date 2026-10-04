@@ -359,7 +359,26 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
     // So the sweep is a RANGE, and the claim is per seat count rather than over the
     // union — a corpus change that stops raising a kind at 2 seats now says so,
     // instead of being masked by 4 seats raising it.
-    const KINDS = ['evict-voter', 'discard-voter', 'steal-any', 'lose-any', 'gain-any'];
+    //
+    // **THE LIST IS NOW THE COMPLETE SET, which it was not until 2026-10-04.** It named
+    // five kinds and three had shipped since it was written — G16's `choose-zone` is not
+    // raised by the shipped corpus at all (no shipped card names a constituency, so it
+    // stays out), but G1's `choose-player`, the `convert-voter` decision and G1's
+    // `choose-peg-dest` all are. A guard that lists five of eight is not a weaker version
+    // of this claim, it is a different claim: it says "the driver handles the kinds I
+    // remembered", which is the exact failure the paragraph above describes. Measured
+    // over seeds 1..5 at each seat count, all three are raised at ALL FOUR seat counts, so
+    // adding them costs nothing and the list now says what it means.
+    const KINDS = [
+      'evict-voter',
+      'discard-voter',
+      'convert-voter',
+      'steal-any',
+      'lose-any',
+      'gain-any',
+      'choose-player',
+      'choose-peg-dest',
+    ];
     const SEEDS = [1, 2, 3, 4, 5];
     for (const n of [2, 3, 4, 5]) {
       const kinds = new Set<string>();
