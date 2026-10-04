@@ -254,6 +254,7 @@ const TARGET_TEXT: Readonly<Record<EffectTarget, string>> = {
   everyone: ' · everyone',
   leader: ' · whoever holds the most majorities',
   'chosen-player': ' · a player you name',
+  'player-after': ' · the player after you',
 };
 
 const COMPUTED_TEXT: Readonly<Record<ComputedSource, string>> = {
