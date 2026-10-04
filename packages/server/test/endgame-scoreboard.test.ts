@@ -33,26 +33,36 @@
  *     here on a real `setup` at every seat count, and then shown to be UNREACHABLE
  *     through play — so it is a guard against a future board, not a rule in use.
  *
- * ## THE SCOREBOARD IS NOT SENT. IT IS DERIVED — AND THAT IS WHAT THIS FILE PROVES.
+ * ## THE SCOREBOARD IS DERIVED. THE WINNER LIST IS SENT. THE TWO ARE NOT THE SAME
+ * CLAIM, AND THE DISTINCTION IS THE POINT
  *
- * `match:over` is declared in `packages/server/src/protocol.ts:148` and handled in
- * `packages/client/src/net/store.ts:218`, where it is a no-op (`return`). **The
- * server never sends it.** `rg 'match:over' packages/` finds the declaration, the
- * client's no-op arm and `test/render-all.ts`'s exhaustive renderer — and no
- * producer anywhere.
+ * `match:over` used to be declared in `packages/server/src/protocol.ts:148`, handled
+ * as a no-op by `packages/client/src/net/store.ts`, walked by `test/render-all.ts`'s
+ * exhaustive renderer — and produced by NOTHING. `rg 'match:over' packages/` found the
+ * declaration, the client's no-op arm and the renderer, and no producer.
  *
- * So what a player sees as the scoreboard is `scoreboard(state, you)` in
- * `packages/client/src/app/derive.ts:798`: `majorityCount` per seat plus
- * `zonesHeld`, both computed from the broadcast `ClientState`. That design choice has
- * a consequence, and the consequence is the thing worth testing — **the scoreboard
- * can only be correct if the FINAL broadcast is complete.** A projection that dropped
- * a peg, a `majority` flag or a zone at the end of a game would render a scoreboard
- * that disagrees with the engine, and nothing client-side could notice, because there
- * is no server-sent answer to disagree with.
+ * That is now fixed and the fix is deliberately narrow: the message is now SENT, and it
+ * carries `winners` — taken from the engine's own `game-over` event, so the list on the
+ * wire is the list the engine computed when it ended the game rather than a
+ * recomputation that could disagree with it.
+ *
+ * **The SCOREBOARD is still derived, and that is unchanged.** `match:over` carries no
+ * scores, because the score is `majorityCount` per seat — a pure function of the board
+ * every viewer already has. Shipping a second copy of a derived number would create a
+ * value that could then disagree with the projection it was derived from, which is
+ * exactly the class of bug this file exists to catch. So what a player sees as the
+ * scoreboard is still `scoreboard(state, you)` in
+ * `packages/client/src/app/derive.ts:798`, and the consequence is the same as it was:
+ * **the scoreboard can only be correct if the FINAL broadcast is complete.** A
+ * projection that dropped a peg, a `majority` flag or a zone at the end of a game would
+ * render a scoreboard that disagrees with the engine, and nothing client-side could
+ * notice, because there is no server-sent scoreboard to disagree with.
  *
  * So section D asserts that every seat's own final projection — and the spectator's —
- * computes exactly `scores(finalState)`, and that the one winner list that IS on the
- * wire, the `game-over` event, names the same seats.
+ * computes exactly `scores(finalState)`, that the one winner list that crosses the wire
+ * names the same seats, and that `match:over` and the `game-over` event agree with each
+ * other and with the engine. Three sources for one fact, which is the point: none of
+ * them is a reimplementation.
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -584,7 +594,7 @@ describe('the ending survives the wire, with a spectator watching', () => {
         expect(spec.you.role).toBe('spectator');
         views.push({ who: 'spectator', state: spec.state });
 
-        // 2. AND THEY ALL COMPUTE THE SAME SCOREBOARD. No `match:over` exists on the
+        // 2. AND THEY ALL COMPUTE THE SAME SCOREBOARD. No scoreboard is sent on the
         //    wire, so this equality IS the scoreboard's correctness.
         for (const { who, state } of views) {
           expect(sortedRecord(scoreboardOf(state)), `${who} scored the finished board differently`).toEqual(
@@ -595,15 +605,15 @@ describe('the ending survives the wire, with a spectator watching', () => {
           );
         }
 
-        // 3. THE `game-over` EVENT, which IS broadcast, names the same seats. It is the
-        //    only winner list that ever crosses the wire, so it is the one that has to
-        //    be right — and it reaches every watcher, spectator included.
+        // 3. THE `game-over` EVENT, which IS broadcast, names the same seats. Together with
+        //    `match:over` it is the winner list on the wire, and it has to be right — and
+        //    it reaches every watcher, spectator included.
         const all = everyConnection;
-        const overs = all
+        const overEvents = all
           .flatMap((c) => c.all('match:events').flatMap((m) => m.events))
           .filter((e): e is Extract<typeof e, { type: 'game-over' }> => e.type === 'game-over');
-        expect(overs.length, 'no connection was ever sent a game-over event').toBeGreaterThan(0);
-        for (const over of overs) {
+        expect(overEvents.length, 'no connection was ever sent a game-over event').toBeGreaterThan(0);
+        for (const over of overEvents) {
           expect([...over.winners].sort(), 'the game-over event named the wrong seats').toEqual([...engineWinners].sort());
         }
         for (const c of all) {
@@ -614,12 +624,38 @@ describe('the ending survives the wire, with a spectator watching', () => {
           expect(own.length, 'a watcher never received the game-over event').toBeGreaterThan(0);
         }
 
-        // 4. CHARACTERISATION, NOT A GUARANTEE: the server never sends `match:over`.
-        //    It is declared in the protocol and handled as a no-op by the client, so
-        //    the scoreboard is derived. If a future change starts sending it, THIS is
-        //    the assertion that has to be revisited, and it says so in its failure text.
-        const sentOver = all.flatMap((c) => c.all('match:over' as never));
-        expect(sentOver.length, 'the server DID send match:over — the derived-scoreboard claim above must be revisited').toBe(0);
+        // 4. `match:over` IS SENT NOW, once per watcher, and it agrees with everything
+        //    else. This replaces a characterisation assertion that the server never sent
+        //    it — which was true, and was the reason a client author building against
+        //    the declaration would have found nothing on the wire.
+        //
+        //    It is asserted as AGREEMENT rather than as presence alone, because presence
+        //    is the easy half: three sources now name the winner (this message, the
+        //    `game-over` event, and `winners(state)`) and the only interesting claim is
+        //    that none of them is a reimplementation.
+        const overs = all.flatMap((c) => c.all('match:over'));
+        expect(overs.length, 'no connection was ever sent a match:over').toBe(all.length);
+        for (const over of overs) {
+          expect(over.matchId, 'match:over named the wrong match').toBe(run.matchId);
+          expect([...over.winners].sort(), 'match:over named the wrong seats').toEqual([...engineWinners].sort());
+        }
+        for (const c of all) {
+          const own = c.all('match:over');
+          expect(own, 'a watcher received match:over more than once — the end is being announced repeatedly').toHaveLength(1);
+        }
+
+        // …and it carries NO SCORE, deliberately: the scoreboard is derived from the
+        // board every viewer already has, and a second copy of a derived number is a
+        // value that can then disagree with the projection it came from. Pinned because
+        // "we added the scoreboard while we were here" is the obvious next change and it
+        // is the one that would break section 2 above.
+        for (const over of overs) {
+          expect(Object.keys(over).sort(), 'match:over grew a field the derived-scoreboard claim does not allow').toEqual([
+            'matchId',
+            't',
+            'winners',
+          ]);
+        }
 
         // 5. The store agrees, because the log is the authority.
         const harness = open[0];

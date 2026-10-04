@@ -967,6 +967,30 @@ async listen(): Promise<{ port: number; host: string }> {
         // One broadcast reaches every watcher, but each gets ITS OWN projection:
         // the answering player gets the answer prompt, everyone else does not. The
         // fan-out is the only place that knows who is watching.
+        //
+        // `match:over` is derived from the ENGINE'S OWN `game-over` event rather than
+        // from a second call to `winners()`. That is deliberate and it is the whole
+        // reason this message can be produced at all: `endOfGame` raises that event
+        // exactly once, in the same `reduce` that set `finished`, so the list that goes
+        // out is the list the engine computed when it ended the game rather than a
+        // recomputation that could disagree with it. A "scoreboard" recomputed here
+        // would be a second authority on who won, which is the thing this codebase
+        // keeps refusing to build.
+        //
+        // WHY IT IS SENT AT ALL, given `endgame-scoreboard.test.ts` proved the client
+        // derives the scoreboard: the message was DECLARED in `protocol.ts:148`,
+        // handled as a no-op by the client's store, walked by `render-all.ts`'s
+        // exhaustive switch, and produced by nothing. A declared message with no
+        // producer is worse than no message, because the next client author builds
+        // against it and the wire says nothing. It now has a producer, and what it
+        // carries is the one thing the engine already broadcasts: WHO won.
+        //
+        // It does NOT carry the scoreboard. The score is `majorityCount` per seat, a
+        // pure function of the board every viewer already has, and shipping it would be
+        // a second copy of a derived number that could then disagree with the
+        // projection it was derived from. So the wire carries the answer and the
+        // arithmetic stays in the one place that can be tested against the engine.
+        const over = events.find((e) => e.type === 'game-over');
         for (const conn of this.#watchers.get(room.matchId) ?? []) {
           if (conn.session === null) continue;
           this.#sendMatchState(conn, room, conn.session);
@@ -977,6 +1001,11 @@ async listen(): Promise<{ port: number; host: string }> {
               viewId: room.viewId,
               events,
             });
+          }
+          // LAST, so a client that ever acts on it has already been sent the finished
+          // board it is about to be told the result of.
+          if (over !== undefined) {
+            this.#send(conn.socket, { t: 'match:over', matchId: room.matchId, winners: over.winners });
           }
         }
       }),
