@@ -1330,7 +1330,7 @@ function pegDestinations(state: GameState, areaId: AreaID): readonly AreaID[] {
  * G1 — whether a `'choose-peg-dest'` decision is OFFERED at all, and why the answer is
  * a boolean rather than a decision with an empty pick space.
  *
- * **THE UNSATISFIABLE-CHOICE RULE, and it is the one this file has been bitten by three
+ * **THE UNSATISFIABLE-CHOICE RULE, and it is the one this file has been bitten by four
  * times.** A pending decision freezes its owner: `blockedBy` refuses every other action
  * that player could take and `END_TURN` is refused while any decision is open, so a
  * decision with no acceptable answer is a dead TABLE with no server-side recovery. So a
@@ -1338,6 +1338,16 @@ function pegDestinations(state: GameState, areaId: AreaID): readonly AreaID[] {
  * honest reading, because "you may move one of your voters to an adjacent zone" is not
  * an instruction a player who has no such voter can carry out, and `'chosen-zone'`
  * already sets this precedent for an unresolvable selector.
+ *
+ * **AND BEING TRUE HERE IS NECESSARY BUT NOT SUFFICIENT, which is the whole of the
+ * `'choose-peg-dest'` staleness defect.** This function is a statement about ONE state.
+ * The decision it gates outlives that state: the board is public to every seat, so the
+ * card's ACTOR — a different player from the frozen answerer — can act in the gap and
+ * empty both sets. A raise-time guarantee is therefore NOT the invariant; the invariant
+ * is that the decision is satisfiable in *every* state reachable while it is open. Two
+ * things carry that, and this function is neither of them: the staleness gate in `reduce`
+ * (the board cannot move), and the withdrawal in `resolveChoice` (an emptied offer closes
+ * itself). `test/peg-dest-staleness.test.ts` asserts both, at 2/3/4/5 seats.
  *
  * `chooser` is accepted and deliberately UNUSED in the offer test, which is the point:
  * the offer depends only on the BOARD and on whose voter it is, never on who is being
@@ -1350,6 +1360,70 @@ function pegDestinations(state: GameState, areaId: AreaID): readonly AreaID[] {
 function pegMoveOffered(state: GameState, owner: PlayerID, chooser: PlayerID): boolean {
   void chooser;
   return movablePegIds(state, owner).some((id) => pegDestinations(state, id).length > 0);
+}
+
+/** G1 — WITH DRAW EVERY RELOCATION WHOSE PICK SPACE HAS EMPTIED. See `reduce`. */
+function withdrawStaleRelocations(s: GameState): GameState {
+  const lapsed = s.choices.filter((c) => relocationLapsed(s, c));
+  if (lapsed.length === 0) return s;
+  const gone = new Set(lapsed.map((c) => c.id));
+  let next: GameState = { ...s, choices: s.choices.filter((c) => !gone.has(c.id)) };
+  for (const c of lapsed) {
+    next = log(next, { player: c.player, text: 'The relocation lapses — nothing on the board is left to move.', kind: 'system' });
+  }
+  return next;
+}
+
+/**
+ * G1 — HAS THIS RELOCATION GONE STALE? and the second half of the fix.
+ *
+ * ## WHY A RELOCATION CAN GO STALE AT ALL
+ *
+ * `pegMoveOffered` reads the BOARD, and the board is public to every seat, so the seat the
+ * decision FREEZES (`blockedBy` freezes `PendingChoice.player`, the answerer) is not the
+ * seat whose voter is on offer (`c.source`, the card's actor). GREAT LEADER, BAD ECONOMY
+ * makes that a different player by design — *"the player after you may move 1 of YOUR
+ * non-majority voters"* — and the consequence is that the actor, who is the active player
+ * on their own turn, was free to keep acting: a second firing of the card's own trigger,
+ * or simply a further influence that completed a majority and turned the only peg on offer
+ * into the score (`board.ts`'s majority block). With both halves re-derived live at answer
+ * time, the answerer was left frozen with an EMPTY pick space and `END_TURN` refused to
+ * them too, while the actor's `END_TURN` still succeeded: a dead TABLE, reproduced with
+ * legal actions at two seats.
+ *
+ * ## WHAT IS DONE ABOUT IT, and it is deliberately NOT a laxer `resolveChoice`
+ *
+ * `resolveChoice`'s two half-guards stay exactly as strict as they were. A stale pick is
+ * still refused, in the same words, because a stale pick really is illegal: the printed
+ * clause says **NON-MAJORITY** voters and the peg in the player's hand is now the score.
+ * Accepting it, or accepting some other pair the player did not pick, would be the engine
+ * choosing a move on the answerer's behalf.
+ *
+ * What changes is WHEN the offer dies. This predicate, read on every successful
+ * resolution, **withdraws** a relocation whose pick space has emptied — the decision closes
+ * itself, the board does not change, and the frozen seat is free. `'move-peg'`'s printed
+ * verb is *"MAY move"*, so an offer with nothing left to offer is satisfied by not moving,
+ * which is the same honest reading `applyEffect` takes when it raises NOTHING at all
+ * (`pegMoveOffered`). The difference between the two is that raising nothing is decided at
+ * raise time and this is decided the moment it becomes true, which is the entire point.
+ *
+ * **A REFUSAL HAS NO EXIT AND A WITHDRAWAL DOES**, and that is the whole ruling. Refusing
+ * a stale pick is not "you cannot do that", it is "you cannot do anything, ever, again":
+ * `blockedBy` refuses this player every action including `END_TURN`, the actor's
+ * `END_TURN` still succeeds, and the table turns forever. This is the fifth instance of the
+ * dead-table class in this engine.
+ *
+ * **THE RESIDUAL ROUTE IS ONE ACTION WIDE, and this predicate is why that is enough.**
+ * `reduce`'s staleness gate refuses every action except the three that discharge a
+ * decision, so between a raise and an answer the only thing that can move the board is an
+ * action the gate lets through — chiefly another seat's `RESOLVE_CHOICE`, which must stay
+ * permitted or a player frozen by p12 could never thaw. So the withdrawal is a POST-PASS on
+ * every successful `reduce` result rather than something each action has to remember, and
+ * it is therefore reachable from every route that can empty the pick space, including the
+ * ones no gate enumerates. See `reduce`.
+ */
+function relocationLapsed(state: GameState, pending: PendingChoice): boolean {
+  return pending.choice.kind === 'choose-peg-dest' && !pegMoveOffered(state, pending.choice.source, pending.player);
 }
 
 function applyEffect(
@@ -1949,8 +2023,12 @@ function applyEffect(
       // 1. THE OFFER IS A BOOLEAN. `pegMoveOffered` is false whenever the board cannot
       //    satisfy both halves of the pick, and then this raises NOTHING rather than a
       //    decision whose pick space is empty. That is the unsatisfiable-choice rule the
-      //    rest of this file argues everywhere else, and it is the whole of this case's
-      //    deadlock argument.
+      //    rest of this file argues everywhere else, and it is NECESSARY BUT NOT
+      //    SUFFICIENT for this one kind: it is a claim about the board at raise time, and
+      //    the board is public, so the staleness gate in `reduce` and the withdrawal in
+      //    `resolveChoice` are what make the decision satisfiable in every state it can be
+      //    open in. Neither of those two can be left out and this one cannot be trusted
+      //    alone; see `pegMoveOffered`'s own docstring for the full statement.
       // 2. `scope` IS DESCRIPTIVE. `'own'` when the answerer IS the card's actor,
       //    `'others'` when they are a different seat — which is GREAT LEADER, whose
       //    answerer is `'player-after'` and whose voter is therefore NOT the answerer's.
@@ -2565,7 +2643,47 @@ function advanceTurn(state: GameState, ctx: Ctx): Result {
 
 // ─────────────────────────── the reducer ───────────────────────────
 
+/**
+ * G1 — THE REDUCER, and it is a thin wrapper around `reduceStep` for one reason.
+ *
+ * `reduceStep` is the whole rules engine and it has never been wrapped before, so the
+ * reason is stated rather than assumed: **every successful action withdraws a relocation
+ * whose offer has gone stale**, and that is a property of the RESULT rather than of any
+ * one action. Doing it per-action would mean remembering it in `PLAY_CONSPIRACY`, in
+ * `INFLUENCE`, in `END_TURN`, in `ACK_HEADLINE`, in all nine `POWER_*` arms and in
+ * `resolveChoice` — nine places to forget one, and the forgetting is a dead table.
+ *
+ * ## WHY IT IS NOT THE FIRST THING THE ENGINE DOES
+ *
+ * It is a POST-PASS on the returned state, which is what makes it sound rather than
+ * clever: the board it reads is the board the action actually produced, so a relocation is
+ * withdrawn at the first instant its pick space is empty and not one instant earlier. A
+ * check placed before the action would be a check about the wrong board.
+ *
+ * ## WHY IT IS STILL A PURE FUNCTION OF `(state, action, ctx)`
+ *
+ * It reads only the state it is handed, writes only that state, and reads no clock and no
+ * module scope — `withdrawStaleRelocations` is three lines over `relocationLapsed`, which
+ * is `pegMoveOffered` over the live board. So `(seed, actionLog)` replay still reproduces
+ * every intermediate state, which `packages/engine/test/rng.test.ts` proves exhaustively
+ * and which would fail loudly here if a log line were stamped from anywhere but
+ * `state.turn`.
+ *
+ * ## WHAT IT DOES NOT DO
+ *
+ * It does not touch a refusal. `resolveChoice`'s two half-guards are unchanged, so a stale
+ * PICK is still refused in the same words — the printed clause says *non-majority* voters
+ * and that peg is now the score, and the engine does not pick a different move on the
+ * answerer's behalf. `packages/server`'s `peg-dest-boundary.test.ts` pins the wire against
+ * exactly that and is unaffected by this pass.
+ */
 export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx: Ctx): Result {
+  const r = reduceStep(state, playerId, action, ctx);
+  return r.ok ? { ...r, state: withdrawStaleRelocations(r.state) } : r;
+}
+
+/** The rules engine proper. `reduce` is this plus the staleness post-pass above. */
+function reduceStep(state: GameState, playerId: PlayerID, action: Action, ctx: Ctx): Result {
   const { rules, cards } = ctx;
   if (state.finished) return fail('the game is over');
 
@@ -2599,6 +2717,83 @@ export function reduce(state: GameState, playerId: PlayerID, action: Action, ctx
   const blocker = blockedBy(state, playerId);
   if (blocker && action.type !== 'RESOLVE_CHOICE') {
     return fail(`resolve "${blocker.choice.reason}" first`);
+  }
+
+  // G1 — THE STALENESS GATE, and it is the fifth instance of one class in this file.
+  //
+  // `blockedBy` freezes the seat that OWNS a pending decision. That is enough for every
+  // kind whose candidate set is read from the answerer's own mat or pool, because the
+  // board cannot move under them. `'choose-peg-dest'` is the ONE kind whose candidate
+  // sets are read from the BOARD, and the board is public to everybody — so the actor,
+  // who is a DIFFERENT seat from the answerer, could keep acting: another
+  // `on-voter-influenced` firing of GREAT LEADER's own trigger, or simply a further
+  // influence that completes a majority and turns the card's only peg into the score
+  // (`board.ts`'s `recount`). `pegMoveOffered` guarantees a legal pair AT RAISE TIME, and
+  // that guarantee does not survive the gap. With both halves re-derived live at answer
+  // time — which is the correct behaviour, because "your NON-MAJORITY voters" is a
+  // property of the card as ANSWERED — the answerer is left frozen with an empty pick
+  // space, and `END_TURN` is refused to them by the same `blockedBy`. That is a dead
+  // TABLE, not a stuck dialog: the actor's `END_TURN` still succeeds, the turn rotates
+  // forever, and the answerer never plays again.
+  //
+  // ## THE INVARIANT, stated once, because four other files restate it
+  //
+  // **A pending decision must be satisfiable in EVERY state reachable while it is open —
+  // not merely in the state it was raised in.** `state.ts`'s capOverride ruling
+  // (`state.ts:323-340`) states it for `lose-any`, whose ask is clamped DOWN to what the
+  // chooser holds when they answer; `Choice`'s `'choose-player'` arm states it for a
+  // candidate set that is literally `turnOrder` minus the actor. This is the case where
+  // the naive reading of the invariant — "guarantee a pick at raise time and re-validate
+  // at answer time, and the offer is safe because the answerer holds something" — DOES
+  // NOT HOLD, because the answerer holds nothing: the peg belongs to somebody else.
+  //
+  // ## WHAT IS DONE ABOUT IT, in two independent layers
+  //
+  //  1. **This gate, so the offer does not go stale in the first place.** While any
+  //     `'choose-peg-dest'` is open AND still has a legal pair, EVERY action is refused
+  //     except the three that discharge one: `RESOLVE_CHOICE`, and the two
+  //     interrupt-window moves (which are the window's own escape and are already the only
+  //     actions a window admits). The board therefore cannot move between the raise and the
+  //     answer for any reason short of another `RESOLVE_CHOICE`, so the pair the dialog
+  //     showed is the pair the resolver will accept.
+  //  2. **THE WITHDRAWAL IN `resolveChoice`, because layer 1 alone is not a proof.** Two
+  //     decisions can be open at once, and `RESOLVE_CHOICE` is exempt from this gate — it
+  //     must be, or a player frozen by p12 could never thaw. So an `evict-voter` or
+  //     `convert-voter` belonging to a THIRD seat can still be answered while the
+  //     relocation is open, and answering it can lift or re-own the very peg the
+  //     relocation needs. `resolveChoice`'s `drop` therefore WITHDRAWS a
+  //     `'choose-peg-dest'` whose pick space has emptied, which frees the frozen seat
+  //     without moving anything. `relocationLapsed` carries the whole argument, and the
+  //     resolver's own half-guards are untouched: a stale PICK is still refused, because
+  //     the printed clause says **non-majority** voters and that peg is now the score.
+  //
+  // ## WHY THE GATE IS CONDITIONED ON THE OFFER STILL BEING LIVE, and this is load-bearing
+  //
+  // A gate that fired on a STALE relocation would be the deadlock it was written to end: the
+  // offer can only go stale through a `RESOLVE_CHOICE`, so in a stale state the only action
+  // that could withdraw it is the one that made it stale — which has already happened — and
+  // the gate would then freeze that state in place forever. So this reads `relocationLapsed`
+  // and LIFTS the moment the offer dies: the actor can act again, any successful action
+  // withdraws the stale offer, and the answerer is freed. A table always has a legal move —
+  // the active player can always answer their Ideology Card or end their turn — so a stale
+  // offer can never be the last thing standing.
+  //
+  // The printed clause is *"the player after you MAY move 1 of your non-majority voters"*.
+  // `MAY` is optionality, so an offer that has nothing to offer is satisfied by not moving,
+  // and it is satisfied by a move in every other state. There is no reading on which
+  // withdrawing it is a wrong outcome and there is one on which refusing forever is: the
+  // refusal has no exit.
+  //
+  // **PLACED AFTER `blockedBy`, not before**, so the seat that actually OWNS the decision
+  // is still told to resolve its own, which is the more useful of the two messages and the
+  // one `packages/client`'s refusal-string assertions are ordered against.
+  if (
+    state.choices.some((c) => c.choice.kind === 'choose-peg-dest' && !relocationLapsed(state, c)) &&
+    action.type !== 'RESOLVE_CHOICE' &&
+    action.type !== 'RESPOND_INTERRUPT' &&
+    action.type !== 'PASS_INTERRUPT'
+  ) {
+    return fail('a voter relocation is being answered — resolve it first');
   }
 
   // p19 / rules-reference.md:283: a Conspiracy Card may be played out of turn,
@@ -3407,6 +3602,16 @@ function resolveChoice(
   const self = state.players[playerId];
   if (!self) return fail('unknown player');
 
+  /**
+   * G1 — DROP THE DECISION BEING ANSWERED, AND ANY RELOCATION THAT HAS GONE STALE.
+   *
+   * The second clause is the whole of the second layer of the staleness fix and it runs on
+   * every successful arm of this switch exactly once, because `RESOLVE_CHOICE` is the only
+   * action the staleness gate lets through that can move the board (see
+   * `relocationLapsed`). A relocation whose pick space has emptied WITHDRAWS: the frozen
+   * seat is freed, nothing moves, and the log says so in public words rather than leaving
+   * a dialog open on a card that can never be answered.
+   */
   const drop = (s: GameState): GameState => ({ ...s, choices: s.choices.filter((c) => c.id !== choiceId) });
   const c = pending.choice;
 
@@ -3649,26 +3854,50 @@ function resolveChoice(
     /**
      * G1 — the answerer named ONE of the card's actor's voters AND where it goes.
      *
-     * ## THE VALIDATION IS THE BOARD AS IT STANDS, and both halves are re-derived here
+* ## THE VALIDATION IS THE BOARD AS IT STANDS, and both halves are re-derived here
      *
      * `movablePegIds(state, c.source)` and `pegDestinations(state, pick.areaId)` are the
-     * same two expressions `applyEffect` offered from, re-read at ANSWER time. That is
-     * the `lose-any` clamp argument (`choices.test.ts`'s header: *the pool is not frozen
+     * same two expressions `applyEffect` offered from, re-read at ANSWER time. That is the
+     * `lose-any` clamp argument (`choices.test.ts`'s header: *the pool is not frozen
      * while the decision is open*) applied to the board: between the raise and the
      * answer a majority can form, a peg can be gerrymandered away, and a destination
      * area can be filled — so the pick the dialog was showing can become illegal.
      *
-     * **THE DANGEROUS DIRECTION IS WHY THE OFFER IS A BOOLEAN AND NOT A CLAMP.** For
-     * `lose-any` the ask shrinks to what the player holds, so the decision always has an
-     * answer. Here there is nothing to shrink to: a peg that has become a majority voter
-     * is simply no longer movable, and the right answer is to REFUSE the stale pick —
-     * which is safe precisely because `pegMoveOffered` guaranteed at raise time that at
-     * least ONE legal (peg, destination) pair existed, and every one of this function's
-     * guards is checked against a live board, so a player holding a stale dialog still
-     * has a legal pick to make. The exhaustive sweep in `test/choices.test.ts` proves
-     * that over every peg layout crossed with every destination area.
+     * **RE-DERIVING IS RIGHT AND THE OLD DOCSTRING'S INFERENCE WAS NOT.** An earlier
+     * version of this comment argued that refusing a stale pick "is safe precisely
+     * because `pegMoveOffered` guaranteed at raise time that at least one legal pair
+     * existed, and every one of this function's guards is checked against a live board,
+     * so a player holding a stale dialog still has a legal pick to make". **That
+     * inference does not hold, and the gap is the answerer's own holdings.** For
+     * `lose-any` the pool the decision reads IS the pool the answerer holds and cannot
+     * spend while frozen, so a guard that fails has shrunk the ask rather than emptied
+     * it. Here the candidate sets are the BOARD, and the board is public to every seat:
+     * `pegMoveOffered` was computed over `c.source`'s pegs, the card's actor, who is a
+     * DIFFERENT player from the one this branch freezes. GREAT LEADER, BAD ECONOMY makes
+     * that difference the whole point of the card, and it is exactly what let the actor
+     * complete a majority between the raise and the answer and leave the answerer with an
+     * empty pick space and a permanent refusal — a dead table, reproduced with legal
+     * actions at two seats. So the guarantee is now made twice over and in neither place
+     * by an inference about what the offerer still holds:
      *
-     * **`playerId !== pending.player` is the G21 self-redirect guard**, and it is
+     *  - `reduce`'s staleness gate refuses every action except the three that discharge a
+     *    decision while a LIVE `'choose-peg-dest'` is open, so the documented route into a
+     *    stale board does not exist; and
+     *  - **`relocationLapsed`, which is the actual guarantee.** It is not an optimisation
+     *    and it is not a fallback: it is what makes this kind satisfiable in EVERY state
+     *    reachable while it is open, including the one no gate can reach — a second
+     *    decision belonging to a third seat, which `RESOLVE_CHOICE` is deliberately exempt
+     *    from the gate so that a player frozen by p12 can thaw. A relocation whose pick
+     *    space has emptied is WITHDRAWN by `drop`, so the frozen seat is freed and no pick
+     *    is ever accepted that the printed "non-majority voters" clause forbids.
+     *
+     * **THE PICK SPACE OF A WITHDRAWN OFFER IS EMPTY AND THAT IS NOT A BUG.** The player
+     * never sees a legal move, because the moment one does not exist the dialog closes
+     * itself. A refusal would have left them looking at a button that cannot work, and
+     * `blockedBy` would have kept refusing them everything including `END_TURN` — which is
+     * the dead table this whole change exists to end.
+     *
+     * `playerId !== pending.player` is the G21 self-redirect guard**, and it is
      * checked FIRST: a beneficiary who could answer somebody else's relocation would be
      * moving a voter the card's owner never offered them. `c.source` names the card's
      * ACTOR, which is why it is a different field from the answerer — that is what makes
