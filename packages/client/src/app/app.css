@@ -746,6 +746,49 @@
   padding: 0;
 }
 
+/*
+   THE SCRIM THAT MUST NOT COVER THE BOARD.
+
+   `.scrim` is `position: fixed; inset: 0` with `background: var(--table-900)`, and
+   `--table-900` is `#141110` — fully opaque. Two consequences, both measured in a
+   live game by the browser audit:
+
+     · `document.elementFromPoint` at the centre of a legal board slot returned the
+       `choice-resolver`, not the slot, so a real click there went to the dialog; and
+     · the board behind it was not merely unclickable but invisible.
+
+   An `area-choice` (`evict-voter`, `discard-voter`, `convert-voter`) is resolved by
+   clicking highlighted slots, and its dialog has no dismiss control and refuses
+   Escape (§5.9b) — so its only exit needed a click the scrim was eating, and the
+   table waited on a decision no player could make. The dialog's own text used to
+   instruct the player to "close this", which was not possible.
+
+   So this variant does three things, and the sheet does the rest:
+     1. `pointer-events: none`, so a hit test at a slot falls THROUGH to the board.
+        The engine already refuses every action except `RESOLVE_CHOICE` while a
+        decision is owed, so a stray click anywhere else earns a refusal toast and
+        changes nothing — which is why nothing is lost by not blocking it.
+     2. a TRANSLUCENT wash. Point (1) without this would leave the player clicking a
+        board they cannot see, which is worse than either failure on its own.
+     3. `align-items: flex-end`, so the sheet sits at the BOTTOM and the board is
+        above it rather than behind it.
+   The sheet takes its pointer events back, so every control in it — CONFIRM, UNDO —
+   is still operable, and `aria-modal` is dropped at the same time by
+   `ChoiceResolver`, because telling a screen reader the rest of the page is inert
+   stops being true here.
+*/
+.scrim--area {
+  /* --table-900 at 55%: enough to separate the sheet from the board, little enough
+     that the highlighted slots stay the most legible thing on screen. */
+  background: rgb(20 17 16 / 55%);
+  pointer-events: none;
+  align-items: flex-end;
+}
+
+.scrim--area .sheet {
+  pointer-events: auto;
+}
+
 .sheet {
   background: var(--paper-100);
   border: 1px solid var(--paper-300);

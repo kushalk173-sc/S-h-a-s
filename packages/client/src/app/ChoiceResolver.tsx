@@ -82,12 +82,43 @@ export function ChoiceResolver(props: ChoiceResolverProps) {
      discriminant through this local instead. */
   const owed0 = pending.choice;
 
+  /*
+     AN AREA-SHAPED CHOICE DOES NOT TAKE THE VIEWPORT, because it cannot be done
+     without the board.
+
+     `evict-voter`, `discard-voter` and `convert-voter` are resolved by clicking
+     highlighted slots. The dialog's own copy used to say "Close this and click the
+     highlighted slots on the board" — and there was no way to close it: no dismiss
+     control, Escape refused (UI-SPEC 5.9b), and `.scrim` is `position: fixed;
+     inset: 0; z-index: 20` with no `pointer-events` override anywhere in the
+     stylesheet. The audit's in-page probe caught it in a live game: CONFIRM disabled
+     at "0 of 2 chosen", and `document.elementFromPoint` at the centre of a LEGAL slot
+     returning the choice-resolver itself. So the dialog's only exit needed a click
+     the dialog was eating, and the table waited on a choice no player could make.
+
+     The audit could not reproduce it on demand — reaching an area choice is rare, and
+     it rated the severity high rather than critical for that reason. The CSS fact is
+     not a sample, though: `inset: 0` on a fixed element covers the viewport and there
+     was no escape hatch, so this was a stall whenever it happened, not a race.
+
+     So an area-shaped choice gets a scrim variant that does NOT cover the board:
+     translucent rather than opaque (an invisible board behind an opaque wash would be
+     clickable and unreadable, which is worse), `pointer-events: none` with the sheet
+     taking them back, and the sheet anchored to the BOTTOM so the board is above it
+     rather than behind it. `aria-modal` goes with it — telling a screen reader the
+     rest of the page is inert is only true while it is.
+  */
+  const areaShaped = isAreaShaped(pending.choice.kind);
+
   return (
-    <div className="scrim" data-testid="choice-resolver">
+    <div
+      className={areaShaped ? 'scrim scrim--area' : 'scrim'}
+      data-testid="choice-resolver"
+    >
       <div
         className="sheet"
         role="dialog"
-        aria-modal="true"
+        aria-modal={areaShaped ? undefined : true}
         aria-labelledby="choice-headline"
         data-testid="choice-dialog"
       >
@@ -309,7 +340,7 @@ function AreaChoice({
       <p className="panel__note panel__note--quiet">
         {nothingToDo
           ? 'No board click is needed — the decision is already decided for you.'
-          : 'Close this and click the highlighted slots on the board.'}
+          : 'The board is open below this: click the highlighted slots, and the count above updates.'}
       </p>
     </div>
   );

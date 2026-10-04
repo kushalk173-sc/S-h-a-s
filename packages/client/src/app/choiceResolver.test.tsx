@@ -94,6 +94,10 @@ import type {
 } from '@shasn/engine';
 
 import { ChoiceResolver, type ChoiceResolverProps } from './ChoiceResolver.tsx';
+// The stylesheet that decides whether a click on the board reaches the board, read
+// as source rather than as a processed approximation (`appLayout.test.tsx` does the
+// same, and for the same reason: jsdom has no hit tester).
+import appCss from './app.css?raw';
 import {
   choosableZones,
   requiredPicks,
@@ -1401,6 +1405,149 @@ describe('a seat or a constituency is named, and every name is one the engine ac
     );
     expect(r.container.querySelector('[data-testid=name-choice-empty]')).not.toBeNull();
     r.unmount();
+  });
+});
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * THE AREA CHOICE MUST NOT COVER THE BOARD — and why this file had never noticed.
+ * ═════════════════════════════════════════════════════════════════════════════
+ *
+ * An area-shaped choice is resolved by CLICKING highlighted slots on the board. The
+ * dialog's own copy used to say "Close this and click the highlighted slots on the
+ * board" — and there was no way to close it. No dismiss control, Escape refused
+ * (§5.9b), and `.scrim` is `position: fixed; inset: 0; z-index: 20` over an OPAQUE
+ * `--table-900` wash, with no `pointer-events` override anywhere in the stylesheet.
+ *
+ * A browser audit caught it once in live play and could not reproduce it on demand
+ * (reaching an area choice is rare — it took the driver ~10 games), and rated the
+ * severity high rather than critical for that reason. The CSS fact is not a sample,
+ * though. Its in-page probe, at the exact moment the dialog was open:
+ *
+ *     progress readout : "0 of 2 chosen."
+ *     confirm button   : disabled
+ *     elementFromPoint at the centre of a LEGAL board slot:
+ *           {tag:"DIV", data-testid:"choice-resolver"}
+ *
+ * So this was a stall whenever it happened, not a race: the dialog's only exit
+ * needed a click the dialog itself was eating.
+ *
+ * WHY FIFTY EXISTING TESTS MISSED IT, which is the part worth recording. `drive()`
+ * above resolves an area choice by calling the board callback DIRECTLY — it finds
+ * `[data-testid^="slot-"]` in the harness's own tree and fires a click on it. That
+ * bypasses hit testing entirely. Every assertion in this file is about the wiring
+ * and the arithmetic; not one of them ever asked whether a real click on the real
+ * board could reach the real slot. So the gate below is on the SURFACE and the
+ * STYLESHEET, because those are the two things that decide whether the click lands.
+ */
+describe('an area choice leaves the board reachable', () => {
+  const AREA_SHAPED: readonly Choice[] = [
+    { kind: 'evict-voter', count: 2, scope: 'any', reason: 'Card effect' },
+    { kind: 'discard-voter', count: 2, scope: 'own', reason: 'Card effect' },
+    { kind: 'convert-voter', count: 2, scope: 'others', reason: 'Card effect' },
+  ];
+
+  it('renders a scrim variant that does not eat board input', () => {
+    for (const choice of AREA_SHAPED) {
+      const r = render(
+        <Harness
+          sc={{
+            name: choice.kind,
+            choice,
+            seats: [seat(P1, EMPTY), seat(P2, EMPTY, [{ areaId: N1, owner: P2 }])],
+            you: P1,
+          }}
+          onResolved={() => undefined}
+        />,
+      );
+      const scrim = r.container.querySelector('[data-testid="choice-resolver"]');
+      expect(scrim, `${choice.kind}: the dialog rendered`).not.toBeNull();
+      expect(
+        scrim?.classList.contains('scrim--area'),
+        `${choice.kind}: the scrim carries the board-open variant`,
+      ).toBe(true);
+      // …and the sheet still takes its pointer events back, so CONFIRM and UNDO are
+      // still operable. `pointer-events: none` on the scrim alone would make the
+      // dialog's own buttons dead, which is the same stall from the other side.
+      const sheet = r.container.querySelector('[data-testid="choice-dialog"]');
+      expect(sheet?.getAttribute('aria-modal'), `${choice.kind}: not a modal`).toBeNull();
+      r.unmount();
+    }
+  });
+
+  it('a resource-shaped choice still takes the viewport, and says so', () => {
+    // The opposite direction matters too: making every dialog non-modal would let a
+    // player click the mat behind a `lose-any` they still owe, and the cap meter
+    // would be the only thing telling them the game is waiting.
+    const r = render(
+      <Harness
+        sc={{
+          name: 'lose-any',
+          choice: { kind: 'lose-any', count: 2, reason: 'Over the cap' },
+          seats: [seat(P1, EMPTY), seat(P2, EMPTY)],
+          you: P1,
+        }}
+        onResolved={() => undefined}
+      />,
+    );
+    const scrim = r.container.querySelector('[data-testid="choice-resolver"]');
+    expect(scrim?.classList.contains('scrim--area')).toBe(false);
+    expect(scrim?.classList.contains('scrim')).toBe(true);
+    expect(r.container.querySelector('[data-testid="choice-dialog"]')?.getAttribute('aria-modal')).toBe('true');
+  });
+
+  it('never tells the player to close a dialog that cannot be closed', () => {
+    // The old copy was an instruction with no referent: there was no close control
+    // and Escape was refused. Now the board is simply open.
+    //
+    // Each scenario holds enough voters for the ask to be NON-ZERO, because the
+    // zero-ask branch is a different dialog with different copy ("no board click is
+    // needed") and asserting the board instruction against it would be asserting
+    // something the component deliberately does not say.
+    const satisfiable: readonly { choice: Choice; seats: readonly SeatSpec[] }[] = [
+      {
+        choice: { kind: 'evict-voter', count: 2, scope: 'any', reason: 'Card effect' },
+        seats: [seat(P1, EMPTY), seat(P2, EMPTY, [{ areaId: N1, owner: P2 }, { areaId: N2, owner: P2 }])],
+      },
+      {
+        choice: { kind: 'discard-voter', count: 2, scope: 'own', reason: 'Over the cap' },
+        seats: [seat(P1, EMPTY, [{ areaId: NW1, owner: P1 }, { areaId: NW2, owner: P1 }]), seat(P2, EMPTY)],
+      },
+      {
+        choice: { kind: 'convert-voter', count: 2, scope: 'others', reason: 'Card effect' },
+        seats: [seat(P1, EMPTY), seat(P2, EMPTY, [{ areaId: N1, owner: P2 }, { areaId: N2, owner: P2 }])],
+      },
+    ];
+    for (const { choice, seats } of satisfiable) {
+      const r = render(
+        <Harness sc={{ name: choice.kind, choice, seats, you: P1 }} onResolved={() => undefined} />,
+      );
+      const text = (r.container.textContent ?? '').toLowerCase();
+      expect(text, `${choice.kind}: no "close this"`).not.toContain('close this');
+      expect(text, `${choice.kind}: the instruction names the board`).toContain(
+        'click the highlighted slots',
+      );
+      r.unmount();
+    }
+  });
+
+  it('the STYLESHEET is what makes the board reachable, so it is what is gated', () => {
+    // jsdom performs no hit testing, so this cannot assert that a click lands. It
+    // CAN assert the three declarations that decide it, and those are exactly what
+    // the browser measurement above confirmed on the rendered page.
+    const RULES = appCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const start = RULES.indexOf('.scrim--area {');
+    expect(start, 'the variant exists').toBeGreaterThan(-1);
+    const block = RULES.slice(start, RULES.indexOf('}', start));
+    expect(block, 'a hit test at a slot falls through to the board').toContain('pointer-events: none');
+    // An OPAQUE wash here would leave the player clicking a board they cannot see,
+    // which is worse than either failure on its own: the alpha is the assertion.
+    expect(block, 'the wash is translucent').toMatch(/background:\s*rgb\(\s*20 17 16 \/ \d+%?\)/);
+    expect(block, 'and the sheet sits at the bottom, so the board is above it').toContain(
+      'align-items: flex-end',
+    );
+    // The sheet takes its events back.
+    expect(RULES).toMatch(/\.scrim--area\s+\.sheet\s*\{[^}]*pointer-events:\s*auto;/);
   });
 });
 
