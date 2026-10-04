@@ -30,7 +30,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { loadIdeologyDeck } from '../src/corpus.js';
+import { DECK_IDS, loadIdeologyDeck } from '../src/corpus.js';
 import { IDEOLOGUES, RESOURCES, RULES, sidePayout } from '../src/engine.js';
 import type { CorpusIdeologyCard } from '../src/corpus.js';
 
@@ -115,8 +115,7 @@ describe('the India Ideology deck is a deck, not a list', () => {
     }
   });
 
-  it('spans more than one question per subject, because a deck can be large and monotonous', () => {
-    // A coarse, honest proxy: the six most common words in the questions are counted
+  it('spans more than one question per subject, because a deck can be large and monotonous', () => {    // A coarse, honest proxy: the six most common words in the questions are counted
     // over a stem of at least five words, and the commonest must not be a majority of
     // the deck. REF 2.4 records that the eight recovered stems are entirely national and
     // international in framing; this is the guard against a future pass making that
@@ -138,5 +137,81 @@ describe('the India Ideology deck is a deck, not a list', () => {
     expect(commonest, 'no question contributed a word to count').toBeDefined();
     const [word, hits] = commonest as [string, number];
     expect(hits / india.length, `"${word}" appears in ${hits} of ${india.length}`).toBeLessThan(0.25);
+  });
+
+  it('gives every card two sides that ARGUE WITH EACH OTHER, not one argument twice', () => {
+    // THE WRITING CONSEQUENCE OF THE PAYOUT NEVER DECIDING, AND THE ONE DECK DEFECT
+    // THAT IS ACTUALLY MECHANICAL.
+    //
+    // `npm run balance` measures that 0 of 76 cards are decided by their payout, so the
+    // dilemma is the ONLY thing that decides an answer. That puts the whole burden on the
+    // two answer strings — and it turns out three cards were not carrying it. They opened
+    // both sides with the SAME three-word action frame, so each "No" told the reader to
+    // do the thing its own "No" refused:
+    //
+    //   ig-in2020-016  Q: digitise land records?   No. *Digitise it now* and ...
+    //   ig-in2020-023  Q: publish a deserter?      No. *Publish it* and ...
+    //   ig-in2020-029  Q: name the schools?        No. *Name the schools* and ...
+    //
+    // On those cards the polarity token was the entire difference between the sides, so
+    // the card asked nothing. All three answers were rewritten on 2026-10-04 and each
+    // rewrite is recorded in that card's own `source` field and in `decks/SOURCES.md`.
+    //
+    // NO BALANCE CHECK CAN CATCH THIS, which is the point of putting it here: the payout
+    // is identical on both sides of all three cards and always was, so the instrument
+    // that governs this deck had nothing to say and said nothing. The screen is
+    // deliberately mechanical — the first three content words of both answers, after the
+    // polarity token — so it costs nothing and cannot rot into a matter of opinion.
+    //
+    // WHY THREE WORDS AND NOT ONE. One word is far too loose: "Teach the old one" against
+    // "Teach the new one" (ig-et2040-005) and "Count them where they sleep" against
+    // "Count them where they vote" (ig-in2020-027) are both REAL dilemmas that happen to
+    // open with a shared verb, and a one-word rule would have flagged two good cards. The
+    // three-word frame includes the verb's object, which is where the two sides have to
+    // diverge for the card to be asking anything.
+    const STOP = new Set([
+      'should', 'the', 'a', 'an', 'be', 'to', 'of', 'for', 'and', 'is', 'it', 'in', 'on',
+      'its', 'their', 'every', 'that', 'with', 'by', 'from', 'one', 'this', 'we', 'our',
+      'us', 'they', 'them', 'not', 'but', 'so', 'if', 'as', 'at', 'do', 'does', 'did',
+      'has', 'have', 'had', 'will', 'would', 'can', 'could', 'than', 'then', 'there',
+      'what', 'when', 'who', 'how', 'all', 'any', 'more', 'most', 'only', 'also', 'into',
+      'over', 'under', 'out', 'up', 'down', 'about', 'after', 'before', 'because',
+      'been', 'being', 'both', 'each', 'few', 'other', 'some', 'such', 'own', 'same',
+      'too', 'very', 'just', 'now', 'get', 'make', 'take', 'give', 'let', 'put', 'see',
+      'say', 'tell', 'ask', 'use', 'need', 'want', 'like', 'good', 'better', 'bad',
+      'worse', 'never', 'always', 'still', 'yet', 'even', 'while', 'where', 'why',
+      'whether', 'which', 'during', 'above', 'below', 'between', 'through', 'against',
+      'among', 'within', 'without', 'along', 'across', 'behind', 'beyond', 'near',
+      'off', 'per', 'via', 'two', 'three', 'no', 'yes',
+    ]);
+    const content = (s: string): string[] =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !STOP.has(w));
+    const polarity = (s: string): string =>
+      /^\s*yes\b/i.test(s) ? 'Yes' : /^\s*no\b/i.test(s) ? 'No' : '??';
+
+    const offenders: string[] = [];
+    for (const deck of DECK_IDS) {
+      for (const card of loadIdeologyDeck(deck)) {
+        const [a, b] = card.sides;
+        const p0 = polarity(a.answer);
+        const p1 = polarity(b.answer);
+        // Same polarity on both sides is a different (and legitimate) shape; only an
+        // OPPOSED pair can be the "one argument, two tokens" failure.
+        if (p0 === p1 || p0 === '??' || p1 === '??') continue;
+        const b0 = content(a.answer);
+        const b1 = content(b.answer);
+        if (b0.length < 3 || b1.length < 3) continue;
+        if (b0.slice(0, 3).join(' ') === b1.slice(0, 3).join(' ')) offenders.push(card.id);
+      }
+    }
+    expect(
+      offenders,
+      'both sides open with the same action frame, so the polarity token is the only ' +
+        'difference and the card asks nothing — rewrite one answer, do NOT rebalance',
+    ).toEqual([]);
   });
 });

@@ -292,7 +292,7 @@
     },
     {
       "id": "ig-in2020-016",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. SIDE 1 REWRITTEN 2026-10-04: it read \"No. Digitise it now and the next sale is fast enough to be invisible.\", which told the reader to DO the thing its own \"No\" rejected, so the two sides advocated one action and the polarity token was the only difference. Nothing was dropped: the clause about the sale being fast enough to be invisible is retained, re-argued as the cost of digitising rather than as a reason to digitise. See decks/SOURCES.md.",
       "provenance": "inferred",
       "campaign": "India 2020",
       "question": "Should land records be digitised before the next election?",
@@ -303,7 +303,7 @@
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. Digitise it now and the next sale is fast enough to be invisible.",
+          "answer": "No. The register is the last thing here the state still owns outright, and a searchable copy is a copy somebody else is holding. Leave it on paper and the next sale stays slow enough to be legible.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -426,13 +426,13 @@
     },
     {
       "id": "ig-in2020-023",
-      "source": "original; register per REF 8.2. REF 8.2 rule 8 permits references to real subjects; no individual is named, the question is the register's ordinary register of consequence rather than of person.",
+      "source": "original; register per REF 8.2. REF 8.2 rule 8 permits references to real subjects; no individual is named, the question is the register's ordinary register of consequence rather than of person. SIDE 0 REWRITTEN 2026-10-04: it read \"No. Publish it and the next recruitment is only a rumour.\", which told the reader to publish the name its own \"No\" refused. Nothing was dropped: the clause about the next recruitment being only a rumour is retained and re-argued as the cost of the list rather than as an instruction to build one. See decks/SOURCES.md.",
       "provenance": "inferred",
       "campaign": "India 2020",
       "question": "Should a deserter's name be published after the war ends?",
       "sides": [
         {
-          "answer": "No. Publish it and the next recruitment is only a rumour.",
+          "answer": "No. A name on a list is a name the next government can reuse, and the next government is not us. Publish it and the next recruitment is only a rumour we have to live with.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         },
@@ -540,7 +540,7 @@
     },
     {
       "id": "ig-in2020-029",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. SIDE 1 REWRITTEN 2026-10-04: it read \"No. Name the schools and the parents read nothing else.\", which told the reader to name the schools its own \"No\" refused. Nothing was dropped: the clause about the parents reading nothing else is retained, re-argued as the risk of naming rather than as a reason to name. See decks/SOURCES.md.",
       "provenance": "inferred",
       "campaign": "India 2020",
       "question": "Should the examination results be published with the schools named?",
@@ -551,7 +551,7 @@
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. Name the schools and the parents read nothing else.",
+          "answer": "No. Publish the league table without a single name on it. The moment a school is printed next to a number, the parents read nothing else and the school teaches to the number.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
