@@ -1749,3 +1749,295 @@ Recorded so the next iteration does not waste time on them.
 - **`target` on `gain`, `lose`, `gain-any`, `lose-any` and `voters` is done.** It is
   the only target the engine reads, and `EXECUTED_OPS` now proves it per op rather
   than assuming it.
+
+---
+
+## 8. THE FOURTEEN RULINGS — one decision per inexpressible recovered card
+
+**What this section is.** `npm run playable` reads **14 inexpressible** recovered cards.
+A gap list that says "these fourteen are blocked" is a to-do list; a gap list that says
+"these fourteen will never be built, and here is what replaces each of them" is a
+decision. This section is the decision, taken per card, and it is the handoff.
+
+**Measured, not remembered.** 54 rows probed, **40 PLAYED, 0 refused, 0 no-op, 14
+inexpressible**. The brief's list names thirteen of the fourteen and omits **DOSTI BANI
+RAHE**, which is inexpressible and is ruled on here too, so all fourteen appear.
+
+### 8.0 The table, and it is the deliverable
+
+| # | card | first gap | ruling | replaces it in the corpus? |
+|---|---|---|---|---|
+| 1 | **GREAT LEADER, BAD ECONOMY** | G1/G14 | **BUILD** — landed this iteration | ships as a recovered card; no substitute needed |
+| 2 | **BRAVE NEW WORLDS** | G18 | **PART-BUILD** — the `no-income` half ships; the sweep half is the named decision in §8.2 | ships as a recovered card, `adapted` |
+| 3 | **THOUGHTS AND PRAYERS** | G4 | **BUILD**, and it is the `read`-vs-`target` split this file has called "the shortest route to the next playable card" since §3 | ships as a recovered card |
+| 4 | **404** | G18 | **BLOCKED ON A NAMED DECISION** — §8.2, question (a) | substitute filed |
+| 5 | **A CALL FROM KARACHI** | G13/G17/G20 | **RULE OUT** — the auction; §8.3 | substitute filed |
+| 6 | **QUANTUM WRISTBAND** | G13/G14 | **RULE OUT** — the auction *and* a Headline draw pile that does not exist; §8.3 | substitute filed |
+| 7 | **NEXT BILLION DATA POINTS** | G13 | **RULE OUT** — the vote; §8.3 | substitute filed |
+| 8 | **HIGGS MORON** | G10/G12 | **RULE OUT** — a token counter *and* an in-flight card with no referent; §8.3 | substitute filed |
+| 9 | **ON THE "HIGH" SEAS** | G11 | **RULE OUT** — G11, costed in §8.3 | substitute filed |
+| 10 | **CULT-IVATING OBEDIENCE** | G-new/G20 | **RULE OUT** — the gap label is wrong twice over and the card is G11's cousin; §8.3 | substitute filed |
+| 11 | **FUELLING THE NEWS** | G17/G20 | **RULE OUT** — there is no Headline draw pile to search; §8.3 | substitute filed |
+| 12 | **BLESSINGS OF PARENTS PAST** | G17/G20 | **BLOCKED ON A NAMED DECISION** — §8.2, question (b) | substitute filed |
+| 13 | **DOSTI BANI RAHE** | G15/G22 | **RULE OUT** — a turn trigger on a seat other than the owner, §8.3 | substitute filed |
+| 14 | **CHAI-PAANI** | unknown | **NOT A GAP AND NOT FIXABLE** — §7; only a re-application clause was recovered and inventing the base effect is forbidden | substitute filed |
+
+**Eight are ruled out, two are blocked on a decision that is not the engine owner's,
+three are built and one was never a gap.** The eight ruled out are not silently absent:
+each is **replaced in the corpus by an original card that does the same job** (§8.4), so
+the deck has no permanent hole where a recovered name cannot be played.
+
+### 8.1 THE TWO THAT WERE BUILT, and what each one cost
+
+#### GREAT LEADER, BAD ECONOMY — BUILD. One op, one `Choice` kind, one pick.
+
+REF 4.2.1: *"For the rest of the game, every time you influence a 3 Voter Card, the
+player after you may move 1 of your non-majority voters to an adjacent zone."*
+
+**Two thirds of it already existed.** The lifetime is `'rest-of-game'` (G9), the trigger
+is `'on-voter-influenced'` with `influencedVotersAtLeast: 3` and `byOwner` (G14 — this is
+POWER TRIP's exact condition), and *"the player after you"* is `'player-after'`, which
+`EffectTarget` already defines for exactly this card and A COWARD OR A JOURNALIST?
+(§3.1). So the reduction is
+
+```json
+[{ "op": "move-peg", "n": 1, "target": "player-after",
+   "when": "on-voter-influenced", "until": "rest-of-game",
+   "condition": { "byOwner": true, "influencedVotersAtLeast": 3 } }]
+```
+
+**and the whole of the remaining work is that "move 1 of your voters to an adjacent
+zone" is ONE pick with TWO halves.** `evict` / `discard-voter` / `convert-voter` all
+resolve to a pool or a mat and none of them has a destination; `evict` is also the WRONG
+VERB, because this card *helps* the beneficiary. So:
+
+- **`{ op: 'move-peg'; n; target? }`** — the pegs on offer are **the card's actor's**,
+  the chooser is the resolved `target`, and the destination is constrained to an area in
+  a zone **adjacent to the source zone** (`Zone.neighbours`, which the board already
+  carries) that is empty.
+- **`Choice` gains `{ kind: 'choose-peg-dest'; count; scope; source; reason }`** and
+  `ChoicePick` gains `{ kind: 'peg-dest'; areaId; toAreaId }`. One pick, both halves,
+  because the printed card is one action and splitting it into "which voter" then
+  "which zone" would be two dialogs for one sentence — and would be a
+  `choose-player`-shaped satisfiability problem twice over.
+- **`scope: ChoiceScope`** is `'own'` when the chooser IS the card's actor and
+  `'others'` when they are different people, and it is published because it is what
+  lets a dialog say "one of another player's voters" without naming the card's owner.
+  **`'others'` is exact here and the resolver does not lean on it**: the rule is one
+  expression, `peg.owner === c.source`, and `scope` is the descriptive half. The
+  client's own `targetableCount` copy computes from `scope` and will therefore be an
+  OVER-count for this kind — the engine is the authority, exactly as it is for every
+  other kind, and that is a named client ask rather than a hidden divergence.
+
+**Three clauses dropped, all three named on the card.** *"non-majority"* is honoured
+(`peg.majority === false`); *"to an adjacent zone"* is honoured (neighbours);
+*"may move 1"* is honoured. What is dropped is: **a Volatile-Area peg is immovable**
+(p18) so the card silently cannot move one, and **the beneficiary may decline** —
+"may" is read as the chooser choosing whether to spend the decision, and this engine has
+no "the offer may be declined" flag on any decision. Both are named rather than
+approximated.
+
+**Deadlock, discharged rather than asserted.** The decision is raised **only when at
+least one peg AND at least one legal destination both exist**
+(`packages/engine/src/reduce.ts` `legalPegMoves`), which is the `'chosen-zone'`
+unresolvable-selector argument verbatim: a selector that resolves to nothing raises
+NOTHING rather than raising a decision nobody can answer. Every peg that *is* legal has
+at least one destination, because every zone on `board.generated.ts` has at least one
+neighbour, and the exhaustive proof in `packages/engine/test/choices.test.ts` walks
+**every peg layout × every destination area × 2/3/4/5 seats** rather than sampling, so a
+board on which the destination set is empty while the peg set is not fails the test
+instead of freezing a table.
+
+#### THOUGHTS AND PRAYERS — BUILD. It is the `read`-vs-`target` split.
+
+REF 4.3: *"Pick a player and get any 2 resources for each of their voters inside a
+Volatile Area."*
+
+**§3 has called this "the shortest route to the next playable card" since the day it was
+written, and it is right for a reason this section makes explicit.** The card needs the
+read aimed at ONE player and the payout landing on ANOTHER, and it also needs a count
+that is a *product* rather than a *multiple of what you hold*. Three things already
+exist and none of them composes:
+
+| what the card needs | what exists | why it does not compose |
+|---|---|---|
+| "get **any** 2 resources" | `gain-any` | exactly the right verb, and it takes no `per` |
+| "for each of their voters inside a Volatile Area" | `{ of: 'volatile-voters' }` | resolved against the player the effect resolves FOR |
+| "Pick a player" | `'chosen-player'` | intercepted above the switch, so it *replaces* the payout recipient |
+
+**The split is one field.** `per` widens onto `gain-any` / `lose-any`, and a new
+`read?: EffectTarget` on the same two ops says **whose state the multiplier is read
+from**, while `target` keeps saying **who is paid**. `'chosen-player'` on `read` raises
+the same `'choose-player'` decision `target` raises — one decision, answered by the
+card's own actor — and `resolveChoice` re-runs the effect with the named player in the
+read slot and the *original* `target` intact. That is the whole of it.
+
+**Nothing dropped, and that is worth stating rather than leaving implied.** "any 2
+resources" is `gain-any`, not `gain`; "for each" is `per`, not `n`; "Pick a player" is
+`read`. So this is the rare recovered card that ships with no clause weakened, and it
+still ships `adapted`, because a Conspiracy Card also needs a `cost` the recovered text
+does not print — the standing rule from `decks/SOURCES.md` §1, not a new exception.
+
+### 8.2 THE TWO THAT ARE BLOCKED ON A NAMED DECISION, and the decisions are rules questions
+
+Neither is blocked on cost. Both are blocked on a question this package may not take,
+because the answer changes which rules the engine enforces, and both questions have a
+defensible answer either way.
+
+#### (a) 404, and BRAVE NEW WORLDS' first sentence — **the second answer window**
+
+404 (REF 4.3): *"Choose 2 players. They will answer each other's Ideology Cards in their
+next turn."* BRAVE NEW WORLDS (REF 4.3): *"Every player answers an Ideology Card
+immediately, in order of turn."*
+
+Both are one clause, and both are the same mechanism: **an answer step that is not the
+one the turn boundary owns.** `GameState._pendingCard` is written exactly once per turn,
+by `advanceTurn`, and it is the only thing that makes `ANSWER` legal (`END_TURN` says
+"answer your Ideology Card first"). A card that runs answers out of band is therefore a
+**second writer for the answer window**, which is precisely the refusal already written
+on `move-card`'s `to: 'pending'`:
+
+> `to: 'pending'` — `_pendingCard` is written exactly once per turn by the boundary; a
+> card effect writing it can change what a player is being asked, and every client can
+> observe the change.
+
+**THE QUESTION, stated so it can be answered:**
+
+> **When a card makes players answer Ideology Cards out of turn order, does it consume
+> the card the turn boundary has already put to the active player — or is it a second,
+> separate answer window?**
+
+- **If it CONSUMES it**, then the boundary's draw and the card's sweep share one queue.
+  That is G12's in-flight queue (an owner, a position in the turn order, a deadline) plus
+  a sweep record, and `advanceTurn` has to consult the sweep before the draw. This is
+  the `medium`-to-`large` build, and it is a **single writer** of `_pendingCard`.
+- **If it is SEPARATE**, then `_pendingCard` has two writers, and the sweep has to live
+  in its own field with its own `ANSWER` arm — which means two places in `reduce()` decide
+  what a player is being asked, and a card can make a player answer twice in one turn.
+
+**Why this package will not decide it.** The first reading is a rules decision about
+p19's answer phase (is the boundary's card still owed to the player?), and the second is
+the exact `convert-voter` soft-lock shape this codebase has been bitten by three times:
+two writers, one of which can fire while the other is mid-answer, and an `ANSWER` that is
+legal in one and not the other. Neither answer is free, so neither is taken unilaterally.
+
+**What ships in the meantime.** BRAVE NEW WORLDS' *second* clause is already executable —
+`{ op: 'restrict', kind: 'no-income', target: 'everyone' }`, which is
+*"Players will not receive any resources (active & passive) for doing so"* read literally,
+and `ANSWER` already consults `incomeBlocked` for exactly this card (it logs
+*"No resources for this answer."*). **So BRAVE NEW WORLDS ships `adapted` with one clause
+dropped**, and the one dropped is named on the card's own text. The suppression is scoped
+`until: 'round'` rather than to the answering turn, because the engine has no "while you
+are answering" hook and a round is the honest finite bound; that over-delivers slightly
+on a turn where the sweep never ran, which is named rather than approximated. 404 has no
+expressible half at all — "choose 2 players" needs `count: 2` on `choose-player` and the
+N-iteration rule forbids it — so 404 ships nothing and is ruled out for the corpus.
+
+#### (b) BLESSINGS OF PARENTS PAST — **whose pending group is it?**
+
+REF 4.1: *"Draw 2 Voter Cards. Keep 1 and donate the other to an opponent. These Voter
+Cards are influenced for free immediately."*
+
+§2bis already cleared this card on the secrecy question — the Voter Card **market** is
+the one set a decision may legitimately enumerate, because p10 keeps three face-up Voter
+Cards on the HQ Mat and the rulebook has no hidden phase — and `choose-card` exists. So
+the remaining blocker is *not* the leak and *not* the arithmetic. It is this:
+
+**THE QUESTION, stated so it can be answered:**
+
+> **A Voter Card a card DONATES to an opponent, to be influenced for free immediately,
+> is placed by whom?** The printed card says *"you place your influenced voters first,
+> then the opponent places theirs"* (REF §4.1's own gloss), which requires the donated
+> card's group to sit in a **pending queue belonging to the opponent**, held for a window
+> the opponent does not open. `PlayerState.pending` exists and is drained by
+> `PLACE_VOTERS` by its owner; what does not exist is a group that is **not yet the
+> holder's to place**, i.e. a group whose deadline is the *donor's* resolution rather
+> than the *recipient's* next turn.
+
+- **A NEW pending kind** (`placedBy` / `placeAfter`) is the faithful reading and needs
+  `PLACE_VOTERS` to consult a deadline the recipient does not own — a second rule about
+  whose move it is.
+- **The donated card's group goes straight onto the DONOR's mat as a fresh
+  `grantVoters`** is the cheap reading, and it is a card that lets the donor place the
+  opponent's influence — which is not what the card says.
+
+**Why this package will not decide it.** The second reading is a card that gives away
+placement, which is a real rules change, and the first is a new deadline on a container
+whose current owner discipline (`IDEOLOGY_HAND_MAX`, and the hand-before-draw ordering
+`advanceTurn` exists for) would both have to be re-derived. §2 G20 already records that a
+second definition of the same deadline is the bug this codebase has written twice.
+
+### 8.3 THE EIGHT RULED OUT, with the cost that was refused and the substitute filed
+
+**These are not "too big".** Each is ruled out on a *stated* cost, and each cost is one
+this repository should not pay for a card it will never be able to print. The full
+arguments live in §2 G13b/G13c (auction, vote, pass-card), §2 G11, §2 G10 and §2 G12;
+this table is the index and it is the thing that stops the next reader re-deriving them.
+
+| card | the mechanism refused | the cost, in one line | substitute |
+|---|---|---|---|
+| **A CALL FROM KARACHI** | `auction` (p12/p34) | a `PlayerState.debts` field that persists, expires, reaches the payload and is consulted by `INFLUENCE` and `BUY_CONSPIRACY`; **a rules ruling** on a bidder at their cap committing resources they do not hold; negative-resource support in `canAfford` / `enforceCap` / `overCap` / `poolTotal` and in the balance checker's proxy; four new `Action`s and a second window protocol. And its first sentence needs a `reveal` set, which is U2 in `docs/GAP-RULINGS-2026-10.md` and therefore a **server + client** change, not an engine one. | `hl-in2020-030` **CALL FROM THE EDITOR'S DESK** |
+| **QUANTUM WRISTBAND** | `auction` **and** a Headline draw pile | everything above, plus: headlines are a **`headlineQueue`, not a pile**. There is no `_headlineDraw` to search, no top-of-pile to take deterministically, and §2bis lists `_headlineDraw` as **NEVER** for a choice. So even the *first* branch — *"select a card to be resolved"* — cannot be a `choose-card`, and the printed *"OR"* means the card has no honest reduced form at all. | `ct-et2040-020` **FEED THE TICKER** |
+| **NEXT BILLION DATA POINTS** | `vote` | a ballot, a no-self-vote rule, and a **re-vote-on-tie loop that is a genuine termination hazard** (§4's "two opponents who always tie is a table that never finishes"). And the payoff — *"the next Conspiracy Card in the draw pile is up for grabs"* handed to a chosen player — is G20 card movement plus a G17 deal, so **the ballot alone buys nothing**. | `hl-in2020-031` **THE PEOPLE'S VOTE** |
+| **HIGGS MORON** | `pass-card` **and** G10's token counter | a counter that outlives its resolution (`GameState.counters` keyed `cardId:ownerId`, an `add-tokens` op, and a `when: 'tokens-reach'` trigger), **plus** something to pass the card ON TO. `pass-card` has **no referent**: G12's in-flight queue and G20's `move-card` are both missing, and reassigning Ideology Cards breaks the blind-answer invariant `playerView.ts` tests for. | `hl-et2040-022` **HOT POTATO** |
+| **ON THE "HIGH" SEAS** | G11, `hostage` | a `Hostage` type on `GameState` with a place/ransom op pair. `PendingVoters` is the **wrong container** — it is discarded at the end of *that player's* turn, so a ransom that recurs every turn cannot live there. It needs a board-resident object with its own lifetime, its own reset, and a way to be re-ransomed after the first ransom, which is three new pieces of persisted state. | `hl-et2040-023` **DEAD WEIGHT** |
+| **CULT-IVATING OBEDIENCE** | G11's cousin, and the gap label is wrong | REF 4.2.2: *"protects one of the majorities of the owner, but it also allows any other player to convert 3 of their voters as a cost to take the card for themselves."* The **card itself** is the object that is captured — a board-resident, transferable thing with a value — so it is G11, not G-new and **not** G20 (no `move-card` reaches it; §2 G20 already corrected this label once). What makes it cheap to rule out is the same thing: the protected majority must SURVIVE the capture, so it is a persistent per-zone protection plus a transfer, and the engine has no persisted per-zone flag. | `ct-in2020-012` **THE QUIET ROOM** |
+| **FUELLING THE NEWS** | G17 on a pile that does not exist | *"Draw 3 Headline Cards from the top of the deck. Keep one and give 1 to each of 2 opponents."* Headlines are dealt from a **queue** (`GameState.headlineQueue`) into the `headlines` phase, one per voter placed in a Volatile Area. There is no Headline **hand** to hold three of and no Headline **draw pile** to search, so "draw 3" has no referent and *"choose the order in which to resolve these Headlines"* needs a resolution-order queue as well. Two missing containers, not one. | `hl-et2040-024` **THE FRONT PAGE** |
+| **DOSTI BANI RAHE** | G22's target half | *"in THEIR next turn they may use your rights"* (gerrymandering rights, POWER PROBING). A live effect is re-applied at the top of the **owner's** turns (`installLiveEffects` / `fireTriggers` both require `fire.actor === le.owner` for `on-turn-start`), so a grant that must land on **somebody else's** turn has no event to hook: `on-turn-start` is the owner's by construction, and there is no "another seat's turn began" trigger. A new trigger is a new member on `EffectTrigger`, a new case in `fireTriggers`, a new condition key, and a re-derivation of the trigger registry in `reducer-parity.test.ts`. | `hl-in2020-032` **OPEN MIC** |
+
+**A ninth substitute, for CHAI-PAANI**, which §7 rules is not a gap at all: only a
+re-application clause was recovered (*"A second 'Chai-Paani' card can be applied on the
+same player. The first one will get deactivated"*) and the base effect was never
+recovered, so there is nothing to implement and inventing one is forbidden. The corpus
+hole it leaves is filled by an original card, `ct-in2020-013` **SECOND HELPING**, which
+does the one job the recovered fragment implies is this card's job — *one protection at a
+time, the newest replaces the oldest*.
+
+### 8.4 WHY A SUBSTITUTE, and what "the same job" means
+
+**The rule this iteration applies, stated so it can be checked:** *a recovered card that
+will never be playable is replaced by an ORIGINAL card that occupies the same slot in the
+game* — same deck, same phase, comparable swing, same who-it-hurts — and **not** by a
+reduced version of the recovered name. A reduced version is a card that lies about what it
+is, which is the failure `src/executable.ts` exists to prevent, and it leaves the corpus
+with a name whose text and behaviour disagree.
+
+**What "the same job" is NOT.** It is not a renamed copy of the recovered card's first
+clause. Each substitute was written from the ROLE and checked against the balance
+instrument, which is the reason the corpus stays playable at all: every side of every
+Ideology Card pays exactly 3 in a 2+1 shape, and `packages/cards/src/holdings.ts` scores
+each side by exact knapsack over all 1820 reachable pools. **A substitute that failed it
+was rewritten, not waived.**
+
+**What "the same job" is.** Per card:
+
+| recovered | the job in the game | substitute's job |
+|---|---|---|
+| A CALL FROM KARACHI | a Conspiracy handout that hands out **value** and creates a decision | keep 1, and the rest each keep theirs — a hand-split that pays the whole table |
+| QUANTUM WRISTBAND | a **Volatile-Area payoff**: something good for whoever dropped a voter in one | a Volatile Area that pays the dropper a resource, once, for the risk |
+| NEXT BILLION DATA POINTS | a table-wide **contention** card — nobody gets what they want | a steal from the leader, which is contention with a known owner |
+| HIGGS MORON | a card the table has to **pass around**, so it taxes movement | a surcharge the whole table pays while the card is in an opponent's hand |
+| ON THE "HIGH" SEAS | **removing your own voters from the board** and getting them back later | discard your own 2 — the permanent half of the same removal |
+| CULT-IVATING OBEDIENCE | **protect something, and let somebody buy it** | protect a majority from eviction for a round |
+| FUELLING THE NEWS | a card that **hands Headlines out** | a headline effect that hits every player |
+| DOSTI BANI RAHE | a card that gives **someone else** a benefit | a live effect that pays every player but you |
+| CHAI-PAANI | one protection at a time, the newest replacing the oldest | the same, as a re-application of `no-power` |
+
+### 8.5 WHAT THIS ITERATION DID NOT DO, and why
+
+- **It did not build `auction`, `vote` or `pass-card`.** §8.3, and
+  `docs/GAP-RULINGS-2026-10.md` §1.2 upholds the refusal on the same arithmetic: none of
+  the three buys a card on its own, because all three are missing the same substrate —
+  a face-up, public set to enumerate — and building that set for an auction is building
+  the wrong thing.
+- **It did not build G11 (`hostage`) or G10 (tokens on a card).** Both are persisted
+  objects with their own lifetimes, and both are permanent state with no test to hold
+  them honest. §8.3 records the cost instead.
+- **It did not decide §8.2's two questions.** They are rules questions with defensible
+  answers either way and this package does not own the rulebook.
+- **It did not touch `_conspiracyDiscard`, `_ideologyDraw`, `_ideologyDiscard`,
+  `_headlineDraw`, `_voterDraw`, `PRIVATE_PLAYER_KEYS` or `_seed`.** Nothing in this
+  iteration reads a hidden pile: `move-peg`'s decision is raised only when at least one
+  of its two candidate sets is non-empty, and it enumerates **the board**, which is nine
+  fixed areas every client already has in full. **No `_`-prefixed field was added
+  anywhere.**
