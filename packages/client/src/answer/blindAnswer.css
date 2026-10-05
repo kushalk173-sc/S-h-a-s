@@ -63,10 +63,10 @@
      proved, and a test asserts both so the two cannot drift apart. */
   font-family: var(--font-display);
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 40px;
   color: var(--ink-900);
-  margin: 0 0 var(--sp-8);
+  margin: 0 0 var(--sp-7);
   text-align: center;
   text-wrap: pretty;
   /* 22ch, not 26. At 32px a 26ch measure is a 640px line, which is a paragraph and
@@ -91,10 +91,24 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
   align-items: stretch;
-  background: var(--paper-100);
-  border: 1px solid var(--ink-300);
-  border-radius: var(--r-md);
-  padding: var(--sp-4);
+  /* NO BORDER AND NO FILL, and this is a fix rather than a subtraction.
+     This rule used to draw a 1px frame and a `--paper-100` fill AROUND the two
+     sides, each of which carries its own 2px frame and its own fill. The result was
+     a box inside a box inside a box, and at the size the two choices are now set
+     at — two 150px panels that are supposed to be the only thing on this screen you
+     can press — the outer frame read as a third, unpressable option sitting behind
+     them. The two sides ARE the group; `role="group"` and the shared `aria-labelledby`
+     already say so to assistive tech, and a screen reader has no use for a rectangle.
+
+     `TableQuestion` reuses this rule, so the table's copy of the card loses the frame
+     too — which is right, for the same reason: its two faces are read aloud, not
+     pressed, and the frame was the only thing there that could be mistaken for
+     something to press.
+  */
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 /*
@@ -157,15 +171,25 @@
      shorthand with literal values because jsdom's CSS engine does not
      implement the individual `padding-*` longhands for computed style, which
      would make the symmetry assertion vacuous for these four properties. */
-  padding: 20px 22px;
+  padding: 28px 22px;
   /* `min-width: 0` so a side may shrink below its min-content width inside the
      grid track. Without it this button's automatic minimum size re-imposes the
      floor `minmax(0, 1fr)` on the track was written to remove, and a long answer
      pushes the other one off the right edge of a phone. */
   min-width: 0;
-  /* Same min-height on both, so a long A and a short B are visually equal:
-     content-length differences must not change box size. */
-  min-height: 88px;
+  /* 150px, and this is the number that decides whether the screen works.
+     It was 88px — a floor sized for one line of 17px prose, back when a side held
+     an answer AND an Ideologue AND a payout. With the choice reduced to one word,
+     88px left two small buttons floating in the middle of a tall screen with a
+     third of the viewport empty below them, and the most consequential decision in
+     the game looked like a form field. 150px makes each one a target rather than a
+     control: roughly a 150x300 tap area on desktop and a comfortable thumb on a
+     phone, and enough that the two of them carry the screen.
+
+     Same on both sides, which is the §1.2 contract — this is the shared rule and
+     `tableQuestion.test.tsx` asserts the equality, so a long sentence on the table's
+     copy grows its card rather than changing this floor. */
+  min-height: 150px;
   display: flex;
   /* COLUMN, and this is the fix for the two lines below having no type of their own.
      Under the blind design a side held exactly ONE child — the answer — so the row
@@ -214,9 +238,9 @@
      shorthand here would make the whole hierarchy unassertable and therefore
      unguarded. */
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 40px;
   font-weight: 800;
-  line-height: 38px;
+  line-height: 44px;
   color: var(--ink-900);
   text-align: center;
   max-width: 22ch;
@@ -333,17 +357,39 @@
   color: var(--seal);
 }
 
-/* STEP ONE'S OWN LABEL. Naming the step is what stops "choose" and "commit"
-   being read as the same verb: this file once had a `Confirm` button whose
-   label became "Answer committed" on a click that only SELECTED a side, while
-   the real dispatch lived in another component entirely. */
+/* STEP ONE'S OWN LABEL, AND IT IS NOW INVISIBLE.
+   Naming the step is what stopped "choose" and "commit" being read as the same verb:
+   this file once had a `Confirm` button whose label became "Answer committed" on a
+   click that only SELECTED a side, while the real dispatch lived in another
+   component entirely. The two words "CHOOSE ONE" and "COMMIT ANSWER" are still the
+   two steps and they are still two different words — that is the fix, and it stands.
+
+   But the WORDS themselves no longer need to be on screen. Each side says NO or YES,
+   so "CHOOSE ONE" is a label for an action the two buttons already name, sitting
+   between a 32px question and two 40px answers, set larger than the footer copy and
+   competing with both. It was visual noise with a real job, and the job has a
+   non-visual home already: `aria-labelledby` on the panel points at this element, so
+   it is still the group's accessible name and a screen reader still hears "CHOOSE
+   ONE, group" before the two options.
+
+   `.sr-only` rather than `display: none`, and that distinction is the whole point:
+   `display: none` would remove the element from the accessibility tree too and take
+   the panel's name with it, leaving an unlabelled group — §8.5's parity failure, in
+   the name of tidying up a screen. */
 .blind-answer__choose {
   font: var(--type-tooltip);
   font-weight: 700;
   color: var(--ink-500);
   letter-spacing: 0.14em;
   text-align: center;
-  margin: 0 0 var(--sp-3);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 /* THE ONE COMMIT CONTROL. Styled like every other primary button in the
@@ -351,13 +397,21 @@
    entirely for "this is the one you picked". */
 .blind-answer__commit {
   display: block;
-  margin: var(--sp-6) auto 0;
+  margin: var(--sp-7) auto 0;
   font: var(--type-button);
+  /* Bigger than every other primary button in the product, because this is the
+     control that actually sends the answer and it is competing for attention with
+     two 150px panels directly above it. At the shared button size it read as a
+     third option of equal weight, which is the same box-in-the-middle-of-the-screen
+     problem the panel's own frame had. */
+  font-size: 17px;
+  line-height: 24px;
+  min-width: 260px;
   color: var(--paper-000);
   background: var(--seal);
   border: 1px solid var(--seal);
   border-radius: var(--r-sm);
-  padding: var(--sp-2) var(--sp-6);
+  padding: 14px var(--sp-6);
   cursor: pointer;
   transition: background var(--dur-90) var(--ease-board);
 }
@@ -386,6 +440,35 @@
   color: var(--ink-500);
   text-align: center;
   margin: var(--sp-3) 0 0;
+}
+
+/* ── THE REDRAW, AND IT IS THE QUIETEST THING ON THE SCREEN ─────────────────
+   A secondary action with its own cost, its own picker and a paragraph of
+   explanation, sitting underneath the only decision the game is waiting on. The
+   paragraph is what makes it read as important: three lines of 13px copy directly
+   under a 40px pair of buttons makes the paragraph the third-largest block of type
+   on the screen.
+
+   So the paragraph shrinks to one quiet line and the button loses its fill. It is
+   still a real control with a real price and it is still fully enabled when you can
+   afford it — quieter, not absent. `.redraw-*` lives here rather than in `app.css`
+   because it is part of this screen's composition, and because a rule in
+   `app.css` qualified by `.blind-answer` would be a cross-file dependency for one
+   screen's caption. */
+.redraw-note {
+  font: var(--type-tooltip);
+  color: var(--ink-500);
+  text-align: center;
+  max-width: 52ch;
+  margin: var(--sp-4) auto 0;
+  opacity: 0.85;
+}
+
+.redraw-note__short {
+  font: var(--type-tooltip);
+  color: var(--seal);
+  text-align: center;
+  margin: var(--sp-2) auto 0;
 }
 
 /* A side stops being selectable once the answer is in flight or in: the engine

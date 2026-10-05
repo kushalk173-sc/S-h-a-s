@@ -273,7 +273,7 @@ describe('§1.2 symmetry contract: both sides compute to identical styles', () =
     expect(root.getPropertyValue('--r-md').trim()).toBe('6px');
 
     // Geometry the contract fixes, and which jsdom DOES resolve.
-    expect(cs.getPropertyValue('min-height')).toBe('88px');
+    expect(cs.getPropertyValue('min-height')).toBe('150px');
     expect(cs.getPropertyValue('padding-right')).toBe('22px');
     expect(cs.getPropertyValue('padding-left')).toBe('22px');
     expect(cs.getPropertyValue('font-size')).toBe('17px');
@@ -896,9 +896,9 @@ describe('the stylesheet itself contains no side-differentiating rule', () => {
   it('sets equal min-height and equal padding on both sides, per the §1.2 table', () => {
     const start = CSS_RULES.indexOf('.blind-answer__side {');
     const base = CSS_RULES.slice(start, CSS_RULES.indexOf('}', start));
-    expect(base).toContain('min-height: 88px;');
+    expect(base).toContain('min-height: 150px;');
     // 20px 22px, written symmetrically and shorthand so jsdom can expand it.
-    expect(base).toContain('padding: 20px 22px;');
+    expect(base).toContain('padding: 28px 22px;');
     // All four borders, same width, same colour, same style.
     for (const side of ['top', 'right', 'bottom', 'left']) {
       expect(base).toContain(`border-${side}-width: 2px;`);
@@ -1050,13 +1050,13 @@ describe('the payout and the Ideologue left this screen but kept their rules', (
       />,
     );
     const label = typeOf(container, 'blind-answer__label');
-    // 34px/800, so a two-letter answer is the largest glyph on the screen and reads
+    // 40px/800, so a two-letter answer is the largest glyph on the screen and reads
     // as a decision rather than as a caption. Asserted as exact values because these
     // ARE the design: "make the question more prominent" was a request about these
     // two numbers, and a silent drift back down is how that request gets lost.
-    expect(label['font-size'], 'the choice is the largest thing on the card').toBe('34px');
+    expect(label['font-size'], 'the choice is the largest thing on the card').toBe('40px');
     expect(label['font-weight']).toBe('800');
-    expect(label['line-height']).toBe('38px');
+    expect(label['line-height']).toBe('44px');
     expect(label['text-align']).toBe('center');
     // Exactly one child per side, and it is the label. This is what makes the
     // `flex-direction: column` assertion below load-bearing rather than decorative.
@@ -1078,12 +1078,12 @@ describe('the payout and the Ideologue left this screen but kept their rules', (
     );
     const cs = window.getComputedStyle(container.querySelector('[data-testid="scenario"]') as Element);
     const px = (k: string): number => Number.parseFloat(cs.getPropertyValue(k));
-    expect(cs.getPropertyValue('font-weight'), 'the question is bold').toBe('700');
+    expect(cs.getPropertyValue('font-weight'), 'the question is bold').toBe('800');
     expect(px('font-size'), '32px, and it was 17px').toBe(32);
     expect(px('line-height'), 'with leading to match').toBe(40);
     expect(px('font-size'), 'and bigger than the CHOOSE ONE label below it').toBeGreaterThan(13);
 
-    // The two CHOICES are 34px, so the question at 32px sits deliberately just under
+    // The two CHOICES are 40px, so the question at 32px sits deliberately just under
     // them: it is the longest run of prose on the screen and it is set at the weight
     // that makes it read as a question, while the two words a thumb is aimed at are
     // the largest glyphs. Asserted as a RANGE because either extreme is a bug — 17px

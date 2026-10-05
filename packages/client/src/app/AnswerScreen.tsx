@@ -331,7 +331,7 @@ export function AnswerScreen(props: AnswerScreenProps) {
         >
           <button
             type="button"
-            className="btn"
+            className="btn btn--sm"
             onClick={props.onRedrawRequest}
             disabled={redrawBlocked}
             aria-disabled={redrawBlocked}
@@ -341,20 +341,30 @@ export function AnswerScreen(props: AnswerScreenProps) {
           </button>
         </div>
 
-        <p
-          className="panel__note panel__note--quiet"
-          style={{ textAlign: 'center', maxWidth: '46rem', margin: 'var(--sp-3) auto 0' }}
-        >
-          You must choose before the turn can continue. Redrawing costs {UI_RULES.redrawCost}{' '}
-          resources and swaps the card for a different one. You are not told what this card
-          pays, so a redraw is a bet on the next one rather than a decision about this one.
-          {/* The reason the control is dead, next to the control. A player on 0/0/2/0
-              reading "costs 4 resources" above a button that will not press is owed
-              the number they are short by. */}
-          {!canPayRedraw && me !== undefined
-            ? ` You hold ${poolTotal(me.resources)} of the ${UI_RULES.redrawCost} it costs, so there is no payment you can make.`
-            : ''}
+        {/* ONE QUIET LINE, and this is a cut rather than a trim. This used to be a
+            three-line paragraph directly under the two answers, which made it the
+            third-largest block of type on a screen whose entire subject is one
+            question and two words — and a player deciding between NO and YES was
+            being told, at length, about a reroll they may not even be able to afford.
+
+            The rulebook's own reasoning is kept and shortened rather than dropped:
+            §7.2 step 2 says the redraw is a BET precisely because the reading player
+            does not know what the card pays, and that is true again now the payout is
+            hidden from this seat. One sentence, at 13px, in the quietest ink on the
+            screen. */}
+        <p className="redraw-note" data-testid="redraw-note">
+          You are not told what this card pays, so a redraw is a bet on the next one.
         </p>
+
+        {/* The reason the control is dead, next to the control. A player on 0/0/2/0
+            reading "costs 4 resources" above a button that will not press is owed the
+            number they are short by — and §9.2's rule is that a control never dies
+            without an adjacent reason. */}
+        {!canPayRedraw && me !== undefined ? (
+          <p className="redraw-note__short" data-testid="redraw-short">
+            You hold {poolTotal(me.resources)} of the {UI_RULES.redrawCost} it costs.
+          </p>
+        ) : null}
 
         {props.picker?.forKind === 'redraw' && me !== undefined ? (
           <div style={{ maxWidth: '46rem', margin: 'var(--sp-4) auto 0' }}>

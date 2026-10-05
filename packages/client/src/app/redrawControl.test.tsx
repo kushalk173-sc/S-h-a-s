@@ -337,7 +337,11 @@ describe('the one redraw control is live only when a payment exists, and says wh
     // The number they hold, and the number it costs — the two facts a player needs
     // to know the button is not broken.
     expect(text).toContain('You hold 3 of the 4 it costs');
-    expect(text).toContain('no payment you can make');
+    // pays 3 of the 4 and nothing more: the shortfall is a number and a cost, not
+    // an explanation. The paragraph this line replaced also said "there is no payment
+    // you can make", which is the engine's own wording, but it was the third-largest
+    // block of type on a screen about one question and two words.
+    expect(text).not.toContain('no payment you can make');
   });
 
   it('says nothing about affordability when the control is live', () => {
@@ -356,7 +360,13 @@ describe('the one redraw control is live only when a payment exists, and says wh
         onPickerCancel={noop}
       />,
     );
-    expect(container.textContent ?? '').not.toContain('no payment you can make');
+    // The shortfall line is for a player who CANNOT pay, and only for them: a
+    // shortfall note on a live button is a warning about nothing. §9.2 wants the
+    // reason next to a dead control, not next to every control.
+    expect(container.querySelector('[data-testid="redraw-short"]')).toBeNull();
+    // …and the quiet one-line explanation is always there, because the redraw's
+    // meaning is not obvious from a price alone.
+    expect(container.querySelector('[data-testid="redraw-note"]')?.textContent).toMatch(/bet/i);
   });
 
   it('still does not offer a second redraw when it is dead', () => {

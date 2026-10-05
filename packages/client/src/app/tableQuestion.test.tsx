@@ -191,7 +191,7 @@ describe('the panel shows the table the whole card, and it is inert', () => {
       expect(a[prop], `${prop} differs between the two faces of the table's card`).toBe(b[prop]);
     }
     // The geometry is the §1.2 geometry, not a lookalike: same class, same box.
-    expect(a['min-height']).toBe('88px');
+    expect(a['min-height']).toBe('150px');
     expect(a['background-color']).toBe('var(--paper-100)');
     expect(a['border-top-width']).toBe('2px');
   });

@@ -106,6 +106,7 @@ import {
   choiceBoardInteraction,
   deltaTotal,
   gerrymanderRefusal,
+  gerrySourceRefusal,
   lockedZoneFor,
   marketCharge,
   pegMovePick,
@@ -1851,54 +1852,6 @@ function buyMarketCard(
 }
 
 // ─────────────────────────── small pure helpers ───────────────────────────
-
-/**
- * Is this slot a legal gerrymander SOURCE?
- *
- * Mirrors the engine's conditions — not a majority voter, not in a Volatile Area —
- * plus the rights question, because §6.2's "Arm (hover)" table lists "You have no
- * Gerrymanding Rights in North" as one of the reasons a peg cannot be armed. A
- * refusal that does not name its reason is a puzzle (§9.10).
- *
- * ## THE OWNER IS NOT ONE OF THE CONDITIONS
- *
- * This used to open with `if (a.peg.owner !== you) return '…'`, and its doc comment
- * above used to claim the engine's conditions were "yours, not a majority voter, not
- * in a Volatile Area". Both were wrong. rules-reference.md:256, transcribing p16:
- * *"You may gerrymander ANY PLAYER'S voters, including your own."*
- *
- * The engine has always agreed — `engine/test/gerrymander.test.ts:233` asserts an
- * opponent's voter moves and keeps its owner. The client did not, in two places
- * that had to agree with each other: this handler refused the click, and
- * `BoardSvg.tsx`'s source branch rendered the peg inert so there was no click to
- * refuse. A player with rights in a zone full of someone else's voters was told the
- * mechanic was unavailable. Reported as "I can't move anyone else's voters".
- *
- * `you` is still a parameter, and still load-bearing — for the rights check below.
- * What it no longer does is decide WHOSE voter may move.
- */
-function gerrySourceRefusal(
-  state: ClientState,
-  you: PlayerID,
-  rightsZoneId: string,
-  areaId: string,
-): string | null {
-  for (const z of state.zones) {
-    const a = z.areas.find((x) => x.id === areaId);
-    if (a === undefined) continue;
-    if (a.peg === null) return 'there is no voter there';
-    if (a.volatile) return 'Permanent — Volatile Area.';
-    if (a.peg.majority) return 'Majority voters do not move.';
-    if (z.id !== rightsZoneId) {
-      const rights = rightsZones(state, you);
-      if (!rights.includes(z.id) && !rights.some((r) => state.zones.find((x) => x.id === r)?.neighbours.includes(z.id))) {
-        return `you hold no rights in ${z.name} or next to it`;
-      }
-    }
-    return null;
-  }
-  return 'that slot does not exist';
-}
 
 /**
  * THE POWER LEGALITY MOVED TO `derive.ts`, next to `powerTargetableAreas`.

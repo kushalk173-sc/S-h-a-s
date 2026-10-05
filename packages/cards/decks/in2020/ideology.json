@@ -598,7 +598,7 @@
     },
     {
       "id": "ig-in2020-032",
-      "source": "REF 8.1 item 10 recovers the stem 'SHOULD KASHMIRI FARMERS BE GIVEN THE RIGHT TO FLY […]?' legible only up to the word FLY; REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: the object of 'fly' — 'drones' is supplied here and is authored, not recovered. No answer side was legible at all; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 item 10 recovers the stem 'SHOULD KASHMIRI FARMERS BE GIVEN THE RIGHT TO FLY [â€¦]?' legible only up to the word FLY; REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: the object of 'fly' â€” 'drones' is supplied here and is authored, not recovered. No answer side was legible at all; both answers are authored in the REF 8.2 register.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should Kashmiri farmers be given the right to fly drones?",
@@ -1753,6 +1753,120 @@
           "answer": "Yes. One child waited for is one child the timetable was written for.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-093",
+      "source": "PHOTOGRAPH https://www.boardgamequest.com/wp-content/uploads/2021/07/SHASN-Cards.jpg card 1 of 4; recovery row 1. Read off it: the question, the answer 'Yes. Let the world prepare for the glory of Made in India.', the SUPREMO nameplate, payout 2x clout + 1x trust. DROPPED: the second printed face (G23), in no photograph, so side B is AUTHORED; the card code (G24); the chaos chevrons (G25). Campaign INFERRED from subject matter. SOURCES.md 10.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should we launch a PR campaign to promote manufacturing within India?",
+      "sides": [
+        {
+          "answer": "Yes. Let the world prepare for the glory of 'Made in India'.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Nobody buys on a slogan; they buy on a landed price.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-094",
+      "source": "PHOTOGRAPH https://www.boardgamequest.com/wp-content/uploads/2021/07/SHASN-Cards.jpg, card 2 of 4; docs/recovered/ideology-questions.md row 2. Read off that image: the question, the answer 'No. Tight budgets cannot account for city-wide superstitions.', the CAPITALIST nameplate, the payout 2x funds + 1x trust. DROPPED, named: the second printed face (G23) is in no photograph, so side B is AUTHORED; the printed card code (G24); the single chaos chevron above the answer (G25). Campaign is INFERRED from subject matter, not a printed ID. Shared rulings: SOURCES.md 10.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should new cities be planned keeping 'Vastu Shastra' in mind?",
+      "sides": [
+        {
+          "answer": "No. Tight budgets cannot account for city-wide superstitions.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. A city that ignores where the water goes will move it later at four times the price.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-095",
+      "source": "PHOTOGRAPH https://www.boardgamequest.com/wp-content/uploads/2021/07/SHASN-Cards.jpg card 3 of 4; recovery row 3. Read off it: the question, the answer 'Yes. Why aren't the dead contributing more to society?', the SHOWSTOPPER nameplate, payout 2x media + 1x trust. DROPPED: the second printed face (G23), in no photograph, so side B is AUTHORED; the card code (G24); the two chaos chevrons (G25). This band's nameplate reads THE SHOWSTOPPER; the 2019 USA printing reads THE SHOWMAN and both are real - SOURCES.md 10.3.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should organ donation be mandatory?",
+      "sides": [
+        {
+          "answer": "Yes. Why aren't the dead contributing more to society?",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. A body is not a public resource because the person in it stopped objecting.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-096",
+      "source": "PHOTOGRAPH https://www.boardgamequest.com/wp-content/uploads/2021/07/SHASN-Cards.jpg card 4 of 4; recovery row 4. Read off it: the question, the answer 'No. Even the damned deserve dignity in death.', the IDEALIST nameplate, payout 1x clout + 2x trust. That is TWO of the card's own resource and one other, so the 2+1 shape is a SHAPE and not a fixed position; this corpus prints the doubled resource first. DROPPED: the second printed face (G23), so side B is AUTHORED; the card code (G24); the chevron (G25). SOURCES.md 10.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should people on death row be used as medical subjects?",
+      "sides": [
+        {
+          "answer": "No. Even the damned deserve dignity in death.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        },
+        {
+          "answer": "Yes. Nobody approves a medicine without a subject, and subjects are cheaper when condemned.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-097",
+      "source": "PHOTOGRAPH https://www.shasnthegame.com/cdn/shop/files/Ideology-Cards_d72ab092-4b79-4d0e-aae2-ac8b2947739c.png, official store render; recovery row 5. Read off it: question, answer 'No. The revolution may not be televised, but it will still be staged.', IDEALIST nameplate, payout 2 trust + 1 funds, CARD CODE A073. DROPPED: side B is AUTHORED - only 'Yes. Why lo...' is legible behind an overlapping card, so its POLARITY and IDEOLOGUE are recovered but not its wording (G23); the chevron (G25). This render is MARKETING ARTWORK fanning one question across three bands, not three cards.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should staging the play 'Nil Darpan' or Indigo Mirror be banned across India?",
+      "sides": [
+        {
+          "answer": "No. The revolution may not be televised, but it will still be staged.",
+          "ideologue": "idealist",
+          "pays": { "trust": 2, "funds": 1 }
+        },
+        {
+          "answer": "Yes. A banned play is a story that outlives the ban, and a staged one is only an advertisement.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-098",
+      "source": "PHOTOGRAPH https://cf.geekdo-images.com BGG image 4651186 'Ideology Cards'; recovery row 6. Read off it at 5x from the 1024px BGG copy: the question and the answer 'Yes. He called Gandhiji Simple Tax for a revision.' DROPPED: the second printed face (G23), in no photograph, so side B is AUTHORED; the card code (G24); the chevron (G25). LOW CONFIDENCE, recorded not smoothed: the payout is 2x media + 1 secondary, and at this image's colour balance the third disc reads red-orange, not the trust-yellow it shows on the better photographs. The TEXT is high confidence; the third resource is not.",
+      "provenance": "adapted",
+      "campaign": "India 2020",
+      "question": "Should the GST be abolished?",
+      "sides": [
+        {
+          "answer": "Yes. He called Gandhiji Simple Tax for a revision.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Abolish it and the states will tax the same parcel twice before it crosses a line.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
         }
       ]
     }

@@ -58,9 +58,9 @@ import type { ClientState, PlayerID, PlayerState } from '@shasn/engine';
 
 import { ManifestoStrip, YourMat } from './YourMat.tsx';
 import { ChoiceResolver, type ChoiceResolverProps } from './ChoiceResolver.tsx';
-import { UI_RULES, manifestoCells, overCap } from './derive.ts';
+import { UI_RULES, manifestoCells, overCap, gerrySourceRefusal, rightsZones } from './derive.ts';
 // Real geometry, so a fixture can never invent a board the branch cannot walk.
-import { makeZones } from '../board/fixtures.ts';
+import { makeZones, putPeg } from '../board/fixtures.ts';
 
 const ME: PlayerID = 'p1';
 const P2: PlayerID = 'p2';
@@ -490,5 +490,167 @@ describe('item 6 — the unreachable branch does not promise a resolution that n
     expect(said, 'the stale-offer sentence is not on the frame').not.toBeNull();
     expect(said?.closest('[data-testid=choice-dialog]')).not.toBeNull();
     r.unmount();
+  });
+});
+
+// ─────────────────────────── item 7: the gerrymander SOURCE rule ───────────────────────────
+
+/*
+  The third instance of one shape, and the one that took longest to see.
+
+  Reported: *"i cant move anyone elses voters"*.
+
+  rules-reference.md:256 (p16): *"You may gerrymander ANY PLAYER'S voters, including
+  your own."* The engine has always agreed — `engine/test/gerrymander.test.ts:233`
+  moves a `p2` peg and asserts it keeps its owner.
+
+  The client denied it in THREE layers that all agreed with each other, which is
+  why no test caught it: the §4.6 peg matrix printed row 7 as `d+○` (dimmed =
+  unavailable), `BoardSvg.slotInteraction` returned `neutral` for any peg the
+  active player did not own, and this function — then a private helper in
+  `GameScreen.tsx` — refused the click with the string "you may gerrymander any
+  voter, but this board only arms your own". A refusal that quotes the rule it
+  breaks.
+
+  What is asserted here is the SOURCE rule specifically, because it is the half
+  that had no test at all: `gerrymanderRefusal` (the destination half) is checked
+  only by being called from the click handler, and this one was reachable only by
+  clicking a peg the board had already rendered inert.
+*/
+
+describe("item 7 — a gerrymander source is any player's non-majority voter", () => {
+  /** A board with pegs placed, and a player set so rights can resolve. */
+  function board(pairs: readonly (readonly [string, PlayerID])[]): ClientState {
+    let zones = makeZones();
+    for (const [areaId, owner] of pairs) zones = putPeg(zones, areaId, owner);
+    return { players: { [ME]: seat([]), [P2]: seat([]) }, zones } as unknown as ClientState;
+  }
+
+  it("an OPPONENT's non-majority voter in the rights zone is a legal source", () => {
+    // ME holds rights in north (3 pegs to P2's 1). P2's peg is non-majority and
+    // in a normal slot, so it is a legal source — this is the reported case.
+    const s = board([
+      ['north-01', ME],
+      ['north-02', ME],
+      ['north-03', ME],
+      ['north-04', P2],
+    ]);
+    const refusal = gerrySourceRefusal(s, ME, 'north', 'north-04');
+    expect(refusal, "an opponent's voter in the rights zone is refused a source").toBeNull();
+  });
+
+  it("an opponent's voter in an ADJACENT zone is a legal source, because the move is 'out of it'", () => {
+    // p16 scopes the right to moves "into that zone, out of it, or between it and
+    // an adjacent zone" — so a neighbour of a rights zone can be the origin, and
+    // the voter there may be anyone's.
+    const neighbourOf = makeZones().find((z) => z.id === 'north')?.neighbours[0] as string;
+    const s = board([
+      ['north-01', ME],
+      ['north-02', ME],
+      ['north-03', ME],
+      // An OPPONENT's peg in the adjacent zone, in a non-volatile slot.
+      [`${neighbourOf}-01`, P2],
+    ]);
+    // Guard the fixture: if north has no neighbours, or the first slot is volatile,
+    // this test would pass for the wrong reason.
+    const src = s.zones
+      .find((z) => z.id === neighbourOf)
+      ?.areas.find((a) => !a.volatile && a.peg !== null);
+    expect(src, 'the fixture placed no peg in the adjacent zone').toBeDefined();
+    expect(
+      gerrySourceRefusal(s, ME, 'north', src?.id as string),
+      "an opponent's voter next to a rights zone is refused a source",
+    ).toBeNull();
+  });
+
+  it("the two rules that ARE about the peg still refuse, for YOUR OWN peg and an opponent's alike", () => {
+    // This is what stops the fix becoming "anyone's voter, always". Volatile is
+    // permanent (p18) and majority does not move (p16) — neither depends on
+    // ownership, so both must refuse an opponent's peg exactly as they refuse
+    // mine. Asserted as a table because the symmetry IS the rule.
+    const base = [
+      ['north-01', ME],
+      ['north-02', ME],
+      ['north-03', ME],
+    ] as const;
+
+    for (const [label, owner] of [
+      ['own', ME],
+      ['opponent', P2],
+    ] as const) {
+      let zones = makeZones();
+      for (const [areaId, o] of base) zones = putPeg(zones, areaId, o);
+
+      // A MAJORITY peg cannot move. `putPeg` writes minority, so flip one directly.
+      const north = zones.find((z) => z.id === 'north');
+      const target = north?.areas.find((a) => !a.volatile && a.id !== 'north-03');
+      zones = zones.map((z) =>
+        z.id !== 'north'
+          ? z
+          : {
+              ...z,
+              areas: z.areas.map((a) =>
+                a.id === target?.id ? { ...a, peg: { owner, majority: true } } : a,
+              ),
+            },
+      );
+      const s = { players: { [ME]: seat([]), [P2]: seat([]) }, zones } as unknown as ClientState;
+      expect(
+        gerrySourceRefusal(s, ME, 'north', target?.id as string),
+        `${label}: a MAJORITY voter was accepted as a source`,
+      ).toBe('Majority voters do not move.');
+
+      // A VOLATILE peg cannot move, ever.
+      const volatileArea = zones
+        .find((z) => z.id === 'north')
+        ?.areas.find((a) => a.volatile && a.id !== 'north-03');
+      zones = zones.map((z) =>
+        z.id !== 'north'
+          ? z
+          : {
+              ...z,
+              areas: z.areas.map((a) =>
+                a.id === volatileArea?.id ? { ...a, peg: { owner, majority: false } } : a,
+              ),
+            },
+      );
+      const s2 = { players: { [ME]: seat([]), [P2]: seat([]) }, zones } as unknown as ClientState;
+      expect(
+        gerrySourceRefusal(s2, ME, 'north', volatileArea?.id as string),
+        `${label}: a VOLATILE voter was accepted as a source`,
+      ).toBe('Permanent — Volatile Area.');
+    }
+  });
+
+  it('a voter with no rights behind it is still refused, and NAMES the reason', () => {
+    // §6.2's "Arm (hover)" table lists "You have no Gerrymanding Rights in North" as
+    // a reason a peg cannot be armed, and §9.10 requires a refusal to name its
+    // reason. Rights are the only thing that makes a move legal; this must survive
+    // the relaxation above it.
+    //
+    // The fixture: ME holds rights in north, and NOWHERE else. Two facts combine:
+    //   - p16: even ONE voter in an otherwise-empty zone grants rights there, so a
+    //     lone ME peg in the far zone would grant ME rights in the far zone. The far
+    //     zone therefore needs P2 to hold MORE than ME for ME to hold nothing there.
+    //   - so: ME has 1 in north and 1 in far, and P2 has 2 in far. ME's rights are
+    //     north only, and `far` is neither north nor adjacent to it — so the
+    //     `rights.includes` / `near` test has to do real work.
+    const far = makeZones()
+      .filter((z) => !z.neighbours.includes('north'))
+      .map((z) => z.id)
+      .find((id) => id !== 'north');
+    const s = board([
+      ['north-01', ME],
+      [`${far}-01`, ME],
+      [`${far}-02`, P2],
+      [`${far}-03`, P2],
+    ]);
+    // Assert the fixture's premise, so this cannot pass vacuously either.
+    expect(rightsZones(s, ME), 'the fixture did not give ME rights in north alone').toEqual(['north']);
+    const src = s.zones.find((z) => z.id === far)?.areas.find((a) => !a.volatile && a.peg !== null);
+    expect(src, 'the fixture placed no peg in the far zone').toBeDefined();
+    const refusal = gerrySourceRefusal(s, ME, 'north', src?.id as string);
+    expect(refusal, 'a source with no rights behind it is accepted').not.toBeNull();
+    expect(refusal, 'the refusal does not say why').toContain('no rights');
   });
 });

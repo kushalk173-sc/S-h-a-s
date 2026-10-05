@@ -47,7 +47,7 @@
     },
     {
       "id": "hl-in2020-007",
-      "source": "REF 4.1 (scribd 814006944/2024-Headline-And-Conspiracy-Cards-Explained) recovers the name and effect of Khaki Terror. The donation is represented exactly. DROPPED: 'You cannot make any purchases until you do so' — a standing RESTRICTION on the player, needing PlayerState.restrictions (KNOWN-GAPS G5) and the token pile of G10, since the real card's punchline is the resources sitting ON it until donated. What remains is a one-turn tax.",
+      "source": "REF 4.1 recovers Khaki Terror; the donation is represented exactly. DROPPED, named: 'You cannot make any purchases until you do so' - the real card's punchline is its four resources sitting ON it until handed over, so the real lock lasts until a LATER donation. NOT G5, which is DONE for the purchase locks: the vocabulary carries the lock but not its LIFETIME, which is G10 and always was (KNOWN-GAPS 2 G5a). CORRECTED: this field previously blamed G5 and claimed 'what remains is a one-turn tax'; both are wrong - no lock and no tax remain, only a plain donation of one of each.",
       "provenance": "adapted",
       "name": "Khaki Terror",
       "text": "Donate 1 Funds, 1 Clout, 1 Media and 1 Trust to the Public Reserve. Anything you are not holding is simply not donated.",

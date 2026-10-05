@@ -389,12 +389,33 @@ census.
 | | count |
 |---|---:|
 | `verbatim` | **0** |
-| `adapted` | **45** — 35 Conspiracy/Headline X-cards + 10 Ideology stems |
+| `adapted` | **54** — 44 Conspiracy/Headline X-cards + 10 Ideology stems |
 | `inferred` | **177** |
-| **total** | **222** |
+| **total** | **231** |
 
-By deck: Ideology **134** (92 `in2020` + 42 `et2040`) · Voter **18** · Conspiracy **31**
-(18 `et2040` + 13 `in2020`) · Headline **39** (25 `et2040` + 14 `in2020`).
+By deck: Ideology **134** (92 `in2020` + 42 `et2040`) · Voter **18** · Conspiracy **34**
+(21 `et2040` + 13 `in2020`) · Headline **45** (30 `et2040` + 15 `in2020`).
+
+**The nine recovered cards filed in the most recent pass, and why the corpus moved by
+nine.** Until that pass, `npm run playable` reported nine recovered cards as **expressible
+and played but absent from every deck file** — the engine could perform them and no player
+could ever draw one, so they measured the vocabulary and not the game. All nine are now
+filed under their recovered names: `ct-et2040-022` DEEP THOUGHTS, `ct-et2040-023`
+LAB-GROWN EARWORM, `ct-et2040-024` THE GRETA EFFECT, `hl-et2040-028` POLO RETREAT,
+`hl-et2040-029` SUBMERGED, `hl-et2040-030` A COWARD OR A JOURNALIST?, `hl-et2040-031`
+CARD GAMES, `hl-in2020-033` SNOOP B-O-DOUBLE-T, `hl-et2040-033` THE BIG FREEZE. **None of
+the nine needed an engine change** — the mechanism each one wanted had already landed in
+an earlier iteration (G14a `borrow-power`, G14b `voter-shortfall`, G5a `set-cap`, and
+`target: 'everyone'` from G8), so this was the cheapest kind of progress available: data
+only. **The phantom count is now zero**, which means the project's headline figure had
+been *understating* itself, because nobody had filed the cards.
+
+Three of the nine deliberately re-file an archetype already in the decks — SUBMERGED
+beside `hl-et2040-001`, SNOOP B-O-DOUBLE-T beside `hl-in2020-015`, CARD GAMES beside
+`hl-et2040-030`. That is a **decision, not an oversight**: REF itself calls each pair the
+same card, its own text says *"dedupe by effect"*, and each shipped card's `source` says
+outright that a table can draw the same mechanic twice. If that is ever judged a balance
+problem the fix is to retire one NAME, never to change either reduction.
 
 **Zero cards are `verbatim`, and that is deliberate, and it stays zero.** A `verbatim` card
 would have to reproduce Memesys' published rules text word-for-word in a competing product,
@@ -408,9 +429,11 @@ that text would print a sentence describing something the engine does not do —
 legitimate counter-examples and they ship `adapted` too, with every dropped clause named;
 `decks/SOURCES.md` §1 tabulates all eight of BLOCK's recovered clauses against what
 `reduce()` performs. **Dropping no clause is not reproducing text** — which is why
-`ct-et2040-017`, `-018` and `-021` all drop nothing and all stay `adapted`.
+`ct-et2040-017`, `-018` and `-021` all drop nothing and all stay `adapted`, and why the
+newly filed `hl-in2020-033` SNOOP B-O-DOUBLE-T — the only one of the nine that drops
+nothing at all — is `adapted` on the same grounds.
 
-The 45 `adapted` cards are here because the task brief asked for recovered material and
+The 54 `adapted` cards are here because the task brief asked for recovered material and
 they are useful as *fidelity evidence* — the `source` field on each names the exact clause
 that could not be represented, and those clauses are the substance of `KNOWN-GAPS.md`.
 
@@ -426,9 +449,12 @@ archetypes are mechanics, and mechanics are not copyrightable (REF §9.1).
 ## Known limitations
 
 - **`KNOWN-GAPS.md` is the important one**, and it has been re-measured against
-  `reduce()` rather than against the schema. **11 of the 50 real X-cards recovered in
-  REF §4 now ship and are playable; 39 still do not.** The finding behind that number is
-  that for the 39, the binding constraint is `reduce()` and `state.ts`, not the schema:
+  `reduce()` rather than against the schema. **44 of the 54 probed recovered X-card rows
+  are expressible, and all 44 now ship in a deck file; 10 are not expressible at all.**
+  (The probe's denominator is 54 *rows*, not the 51 distinct cards or the "50" REF §4's
+  own prose uses: three campaign reskins are probed under both names and BLOCK is printed
+  in two places. See `decks/SOURCES.md` §4.) The finding behind the 10 is that for them,
+  the binding constraint is `reduce()` and `state.ts`, not the schema:
   the shapes they need (`duration`, `timing`, `interrupt`, `when`/`until`, a computed
   `n`) are now *in* the schema and are refused by the validator with the engine change
   named, so they are specified rather than unauthorable. Five **phase-changing** ops
@@ -444,5 +470,5 @@ archetypes are mechanics, and mechanics are not copyrightable (REF §9.1).
 - **Voter Card costs are invented.** REF §3 and §10 item 3 record that the real 60-card
   cost distribution was never recovered. The structure is verified (REF §5.5); the numbers
   are ours.
-- **The corpus is small.** 64 cards against the real 108 per campaign. `PLAN.md` §9
-  names the corpus as risk #1 and calls it writing, not engineering.
+- **The corpus is small.** 92 cards in the `in2020` campaign deck against the real 108.
+  `PLAN.md` §9 names the corpus as risk #1 and calls it writing, not engineering.
