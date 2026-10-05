@@ -37,6 +37,8 @@ import {
   type Rules,
 } from '@shasn/engine';
 
+import { modeOf, type ModeId } from './modes.ts';
+
 export type MatchId = string;
 
 /** One row per player, for seat and resume bookkeeping. */
@@ -69,6 +71,17 @@ export type StoredMatch = {
   readonly rulesVersion: string;
   /** Hash of the deck manifest at creation. Same reasoning. */
   readonly cardsVersion: string;
+  /**
+   * The mode the match was created under, or absent for a match stored before modes
+   * existed.
+   *
+   * Absent is a real, expected state rather than a malformed row: those matches were
+   * dealt from the whole shipped corpus, which is exactly `standard`, so `modeOf`
+   * reads them as `standard` and they replay against the same cards they were dealt.
+   * This field is what makes that true — without it a restart has no way to know
+   * which decks to rebuild the draw piles from.
+   */
+  readonly mode?: ModeId;
   readonly createdAt: number;
   readonly updatedAt: number;
   readonly players: readonly StoredPlayer[];
@@ -84,6 +97,8 @@ export type NewMatch = {
   readonly seed: number;
   readonly rules: Rules;
   readonly cards: CardIndex;
+  /** Recorded into `StoredMatch.mode` so replay can rebuild the same deal. */
+  readonly mode: ModeId;
   readonly players: readonly { readonly id: PlayerID; readonly name: string; readonly colour: string; readonly resumeHash: string }[];
   readonly now: number;
 };
@@ -177,7 +192,26 @@ export class ReplayMismatch extends Error {
 
 export type ReplayInput = {
   readonly stored: StoredMatch;
+  /**
+   * The standard context.
+   *
+   * Kept for the two version checks, which are about the RULES and therefore about
+   * every mode equally — a mode is a bundle of decks, not a bundle of rules, so
+   * `rulesVersion` is mode-independent by design (see `modes.ts`).
+   */
   readonly ctx: Ctx;
+  /**
+   * Every mode's context, so the rebuild happens under the mode the match was
+   * actually created in.
+   *
+   * This is the field that makes restart safe. A `StoredMatch` with no mode predates
+   * modes and was dealt the whole corpus, so `modeOf` reads it as `standard` and it
+   * rebuilds against the same cards. A match created in a mode whose decks differ
+   * rebuilds against THAT mode's cards — because the alternative, reusing `ctx.cards`
+   * unconditionally, would rebuild a mode-specific draw pile from the standard corpus
+   * and produce a game whose opening hand was never dealt to anybody.
+   */
+  readonly modeCtx: Readonly<Record<ModeId, Ctx>>;
 };
 
 /**
@@ -199,7 +233,13 @@ export type ReplayInput = {
  * refusing to start.
  */
 export function replay(input: ReplayInput): { state: GameState; viewId: number } {
-  const { stored, ctx } = input;
+  const { stored, ctx, modeCtx } = input;
+
+  // Resolve the mode ONCE, at the top, and use it for both the hash check and the
+  // rebuild below. Reading it twice — or reading `stored.mode` at one point and
+  // `ctx` at another — is precisely the bug this ordering prevents.
+  const mode = modeOf(stored);
+  const modeCtxUsed = modeCtx[mode] ?? ctx;
 
   const liveRules = rulesVersion(ctx.rules);
   if (stored.rulesVersion !== liveRules) {
@@ -207,7 +247,8 @@ export function replay(input: ReplayInput): { state: GameState; viewId: number }
       `match ${stored.matchId} was created under a different rule set (stored ${stored.rulesVersion.slice(0, 12)}, now ${liveRules.slice(0, 12)})`,
     );
   }
-  const liveCards = cardsVersion(ctx.cards);
+  // Hash the cards this match was ACTUALLY dealt from, not the standard corpus.
+  const liveCards = cardsVersion(modeCtxUsed.cards);
   if (stored.cardsVersion !== liveCards) {
     throw new ReplayMismatch(
       `match ${stored.matchId} was created against a different card corpus (stored ${stored.cardsVersion.slice(0, 12)}, now ${liveCards.slice(0, 12)})`,
@@ -233,15 +274,15 @@ export function replay(input: ReplayInput): { state: GameState; viewId: number }
       : setup({
           players: seatIds,
           names,
-          cards: ctx.cards,
+          cards: modeCtxUsed.cards,
           seed: stored.seed,
-          ...decksOf(ctx.cards),
+          ...decksOf(modeCtxUsed.cards),
         });
 
   for (let i = tail; i < stored.log.length; i += 1) {
     const entry = stored.log[i];
     if (entry === undefined) break;
-    const r = reduce(state, entry.playerId, entry.action, ctx);
+    const r = reduce(state, entry.playerId, entry.action, modeCtxUsed);
     if (!r.ok) {
       // The log is authoritative and was only ever appended after a successful
       // reduce, so a failure here means the store is corrupt. Refuse loudly: a
@@ -274,6 +315,7 @@ export class InMemoryMatchStore implements MatchStore {
       seed: match.seed,
       rulesVersion: rulesVersion(match.rules),
       cardsVersion: cardsVersion(match.cards),
+      mode: match.mode,
       createdAt: match.now,
       updatedAt: match.now,
       players: match.players.map((p) => ({

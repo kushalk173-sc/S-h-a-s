@@ -38,6 +38,7 @@ import {
 } from '@shasn/engine';
 
 import type { ClientMessage, SeatCount } from './protocol.ts';
+import { isModeId } from './modes.ts';
 
 export type DecodeResult =
   | { readonly ok: true; readonly message: ClientMessage }
@@ -92,9 +93,15 @@ export function decodeMessage(value: unknown): DecodeResult {
       // i.e. it made every public room private and every private room illegal.
       if (typeof priv !== 'boolean') return bad('isPrivate');
       if (max === null || !isSeatCount(max)) return bad('maxPlayers');
-      return onlyKeys(value, ['t', 'name', 'maxPlayers', 'isPrivate'], {
+      const mode = value['mode'];
+      // Same shape and same reason as `isSeatCount` above: a closed set, checked
+      // against the registry rather than parsed. An unrecognised mode is refused
+      // here, at the boundary, instead of travelling into a live match and turning
+      // into a card lookup that resolves to nothing. See `modes.ts`.
+      if (!isModeId(mode)) return bad('mode');
+      return onlyKeys(value, ['t', 'name', 'maxPlayers', 'isPrivate', 'mode'], {
         ok: true,
-        message: { t: 'lobby:create', name, maxPlayers: max, isPrivate: priv },
+        message: { t: 'lobby:create', name, maxPlayers: max, isPrivate: priv, mode },
       });
     }
 

@@ -24,6 +24,7 @@ import { PLAYER_COLOURS, setup, type Ctx, type PlayerID } from '@shasn/engine';
 import { newId, newPlayerId, Room, type Seat } from './room.ts';
 import type { Lobby, LobbySeat, LobbySummary, SeatCount } from './protocol.ts';
 import { decksOf, type MatchStore } from './store.ts';
+import { ctxsForModes, type ModeCards, type ModeId } from './modes.ts';
 
 export type LobbyErrorCode = 'LOBBY_FULL' | 'LOBBY_CLOSED' | 'NOT_IN_LOBBY' | 'NOT_HOST' | 'SEAT_TAKEN';
 
@@ -50,8 +51,18 @@ export type LobbyRecord = {
   readonly lobbyId: string;
   name: string;
   readonly isPrivate: boolean;
-  hostId: PlayerID;
+  readonly hostId: PlayerID;
   readonly maxPlayers: SeatCount;
+  /**
+   * The mode this room was opened in, decided once by the host at creation.
+   *
+   * It lives on the record rather than being carried into `startMatch` as a
+   * parameter because it is part of what the room IS: anyone joining an existing
+   * room has to be able to see which mode they are joining, and the answer has to
+   * still be there when the host starts the game. Read it at deal time and the
+   * deck list is derived from exactly one place — `ctxForMode` in `modes.ts`.
+   */
+  readonly mode: ModeId;
   readonly members: Map<PlayerID, LobbyMember>;
   readonly createdAt: number;
 };
@@ -77,10 +88,25 @@ export class LobbyHub {
   readonly #rooms = new Map<string, Room>();
   readonly #store: MatchStore;
   readonly #ctx: Ctx;
+  /**
+   * One context per mode, resolved once at construction.
+   *
+   * `#ctx` remains the standard context and is still used for everything that is not
+   * mode-specific; `#modeCtx` is what the DEAL reads, so that a room opened in a mode
+   * whose decks differ is actually dealt that mode's cards. Both are derived from the
+   * same `rules` object, so there is no second source of rule truth.
+   */
+  readonly #modeCtx: Readonly<Record<ModeId, Ctx>>;
   readonly #now: () => number;
 
-  constructor(ctx: Ctx, store: MatchStore, now: () => number = () => Date.now()) {
+  constructor(
+    ctx: Ctx,
+    store: MatchStore,
+    now: () => number = () => Date.now(),
+    modeCards: ModeCards = { standard: ctx.cards, azadi: ctx.cards },
+  ) {
     this.#ctx = ctx;
+    this.#modeCtx = ctxsForModes(ctx.rules, modeCards);
     this.#store = store;
     this.#now = now;
   }
@@ -107,6 +133,7 @@ export class LobbyHub {
     name: string;
     maxPlayers: SeatCount;
     isPrivate: boolean;
+    mode: ModeId;
     now: number;
   }): { lobby: LobbyRecord; playerId: PlayerID } {
     const lobbyId = newId('l', 8);
@@ -117,6 +144,7 @@ export class LobbyHub {
       isPrivate: opts.isPrivate,
       hostId: playerId,
       maxPlayers: opts.maxPlayers,
+      mode: opts.mode,
       members: new Map([
         [
           playerId,
@@ -259,12 +287,17 @@ export class LobbyHub {
     });
 
     const seed = newSeed();
+    // The mode's OWN context, not `#ctx`. This is the only place the deal reads a
+    // card index, which is what makes "which cards is this table playing with?" have
+    // exactly one answer — and what lets `store.replay` reproduce the same draw by
+    // resolving the same mode out of the same map.
+    const ctx = this.#modeCtx[lobby.mode];
     const state = setup({
       players: seatIds,
       names,
-      cards: this.#ctx.cards,
+      cards: ctx.cards,
       seed,
-      ...decksOf(this.#ctx.cards),
+      ...decksOf(ctx.cards),
       // p7: player n receives n resources of their choice. The choice is the
       // player's, so it is not invented here — seats start on zero and earn.
     });
@@ -272,7 +305,7 @@ export class LobbyHub {
     const matchId = newId('m', 9);
     const room = new Room({
       matchId,
-      ctx: this.#ctx,
+      ctx,
       store: this.#store,
       seed,
       state,
@@ -288,8 +321,14 @@ export class LobbyHub {
       {
         matchId,
         seed,
+        // The mode's cards, for the same reason the deal and the Room use them: this
+        // is what `cardsVersion` hashes. Recording the standard corpus here while
+        // dealing a mode's cards would stamp the match with a hash of cards nobody
+        // is playing, and replay would then refuse — or worse, accept, under the wrong
+        // corpus.
+        cards: ctx.cards,
+        mode: lobby.mode,
         rules: this.#ctx.rules,
-        cards: this.#ctx.cards,
         players: seats.map((s) => ({
           id: s.playerId,
           name: s.name,

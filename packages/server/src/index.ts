@@ -42,6 +42,7 @@ import { newPlayerId, Room, RoomError } from './room.ts';
 import { SessionStore, type SessionRecord } from './session.ts';
 import { InMemoryMatchStore, sha, type MatchStore } from './store.ts';
 import { decodeFrame, isSeatCount, MAX_PAYLOAD_BYTES } from './validate.ts';
+import { ctxsForModes, loadModeCards, MODES, MODE_IDS, type ModeCards, type ModeId } from './modes.ts';
 import type { ClientMessage, ErrorCode, Lobby, ServerMessage, SeatCount } from './protocol.ts';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -57,8 +58,33 @@ export function loadCards(): CardIndex {
   });
 }
 
-export function loadCtx(): Ctx {
-  return { rules: RULES, cards: loadCards() };
+/**
+ * One `CardIndex` per mode, built once at boot.
+ *
+ * Every mode gets its own index rather than sharing the boot-time `loadCards()`,
+ * because the moment the Azadi deck lands `azadi` stops being the whole corpus and a
+ * shared index would silently keep dealing standard cards to a room that asked for
+ * something else. Building them per mode NOW means that change is one entry in
+ * `MODES` and nowhere else — see the note in `modes.ts`.
+ */
+export function loadModeCards(): ModeCards {
+  const out = {} as Record<ModeId, CardIndex>;
+  for (const id of MODE_IDS) {
+    // Each mode loads exactly the decks its registry entry names — not the whole
+    // corpus. `loadCorpus`'s parameter is the whole point of this function.
+    const corpus = loadCorpus(MODES[id].decks);
+    out[id] = indexCards({
+      ideology: corpus.ideology.map(toEngineIdeologyCard),
+      voter: corpus.voter.map(toEngineVoterCard),
+      conspiracy: corpus.conspiracy.map(toEngineConspiracyCard),
+      headline: corpus.headline.map(toEngineHeadlineCard),
+    });
+  }
+  return out;
+}
+
+export function loadCtx(cards: CardIndex = loadCards()): Ctx {
+  return { rules: RULES, cards };
 }
 
 export type ServerConfig = {
@@ -220,7 +246,12 @@ export class ShasnServer {
     const now = cfg.now ?? ((): number => Date.now());
     this.ctx = cfg.ctx ?? loadCtx();
     this.store = cfg.store ?? new InMemoryMatchStore();
-    this.hub = new LobbyHub(this.ctx, this.store, now);
+    // Build every mode's card index ONCE here, at boot, and hand the hub the whole
+    // set. The hub resolves a mode's context in its own constructor and never
+    // re-decides which decks a mode means, so the live deal and the replay rebuild
+    // read the same answer from the same map.
+    this.modeCards = cfg.modeCards ?? loadModeCards();
+    this.hub = new LobbyHub(this.ctx, this.store, now, this.modeCards);
     this.sessions = new SessionStore(now);
     this.#cfg = {
       port: cfg.port,
@@ -533,7 +564,7 @@ async listen(): Promise<{ port: number; host: string }> {
         });
         return;
       case 'lobby:create':
-        this.#createLobby(conn, msg.name, msg.maxPlayers, msg.isPrivate);
+        this.#createLobby(conn, msg.name, msg.maxPlayers, msg.isPrivate, msg.mode);
         return;
       case 'lobby:join':
         this.#joinLobby(conn, msg.lobbyId, msg.name, false);
@@ -573,8 +604,8 @@ async listen(): Promise<{ port: number; host: string }> {
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ lobby â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  #createLobby(conn: Conn, name: string, maxPlayers: SeatCount, isPrivate: boolean): void {
-    const { lobby, playerId } = this.hub.createLobby({ name, maxPlayers, isPrivate, now: this.#cfg.now() });
+  #createLobby(conn: Conn, name: string, maxPlayers: SeatCount, isPrivate: boolean, mode: ModeId): void {
+    const { lobby, playerId } = this.hub.createLobby({ name, maxPlayers, isPrivate, mode, now: this.#cfg.now() });
     const rec = this.sessions.create(name);
     rec.playerId = playerId;
     rec.lobbyId = lobby.lobbyId;

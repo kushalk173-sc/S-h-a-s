@@ -20,6 +20,8 @@
 import type { Action, GameEvent, LogEntry, PlayerID } from '@shasn/engine';
 import type { ClientState } from '@shasn/engine';
 
+import type { ModeId } from './modes.ts';
+
 export type MatchId = string;
 export type LobbyId = string;
 export type SeatId = string;
@@ -46,7 +48,17 @@ export type ClientMessage =
   | { readonly t: 'ping'; readonly nonce?: string }
   /** Ask for the public room list. */
   | { readonly t: 'lobby:list' }
-  | { readonly t: 'lobby:create'; readonly name: string; readonly maxPlayers: SeatCount; readonly isPrivate: boolean }
+  /**
+   * Open a room in a named game mode.
+   *
+   * `mode` is required rather than defaulted because a room's mode is decided once,
+   * by the host, and there is no correct guess: it is the input that decides which
+   * `CardIndex` the match is dealt from and the mode the store persists for replay.
+   * A client that cannot name one has no business opening a room, and `isModeId`
+   * refuses the frame at the boundary rather than letting an unknown name reach a
+   * card lookup inside a live match. See `modes.ts`.
+   */
+  | { readonly t: 'lobby:create'; readonly name: string; readonly maxPlayers: SeatCount; readonly isPrivate: boolean; readonly mode: ModeId }
   | { readonly t: 'lobby:join'; readonly lobbyId: LobbyId; readonly name: string }
   | { readonly t: 'lobby:leave' }
   | { readonly t: 'lobby:ready'; readonly ready: boolean }
