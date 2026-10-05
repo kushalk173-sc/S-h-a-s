@@ -12,15 +12,31 @@
  * ── THE THREE GUARANTEES THAT SURVIVED, and the one that did not ─────────────
  *
  * WHAT DID NOT SURVIVE, stated first because a reader who only reads the old comment
- * would be misled: the payout is now printed on the card, for the answering player and
- * for everyone else. §1.2's "no payouts, no ideologue names" is deliberately reversed, and
- * the reversal is recorded — in `net/protocol.ts`, in `app/blindWire.ts` and in the
- * server's `PublicQuestion` — together with what it costs the GAME rather than the wire:
- * with the payout visible, a player computes the better side instead of deliberating, so
- * dominance in the shipped Ideology deck is now permanently exploitable rather than
- * merely risky. That is a balance problem for the corpus, and the balance checker is
- * where it is argued; it is not a leak and there is no version of this component that
- * could have prevented it while also showing the payout.
+ * would be misled: the payout is NOT printed to the answering player any more. It was
+ * briefly printed here for every seat, under a "full information" ruling, and that has
+ * been narrowed — the answering player now sees the question and two bare YES/NO
+ * choices, with no Ideologue attribution and no payout. The rest of the table still
+ * sees the whole card, in `TableQuestion`, which is the same markup and the same
+ * classes; the asymmetry is deliberate and is discussed where it is made.
+ *
+ * WHAT THIS BUYS, and what it costs, stated here rather than in a changelog:
+ *
+ *   · The wire is untouched. The server still publishes the whole card, `pays` still
+ *     arrives on both `PrintedSide`s, and `IDEOLOGUE_FACTION`/`payoutLine` are still
+ *     exported for `TableQuestion`. Nothing below can derive a position from them.
+ *   · With the payout hidden, the answerer is choosing between two positions rather
+ *     than between two payoffs — which is the deliberative act the card was for, and
+ *     it puts the balance problem back into "the corpus, not the wire".
+ *   · The cost is real and is not hidden: the table now knows more than the person
+ *     deciding, so a player CAN read the payoff off the table panel and compute the
+ *     better side anyway. That is a genuine information asymmetry, introduced on
+ *     purpose, and it is the strongest argument for hiding the table panel during the
+ *     answer window. If this reads badly in play, that is the thing to change — not
+ *     the wiring.
+ *
+ * §1.2's "no payouts, no ideologue names" is therefore PARTLY reversed: the table's
+ * copy is full information, the answerer's copy is not. The reversal is recorded in
+ * `net/protocol.ts`, in `app/blindWire.ts` and in the server's `PublicQuestion`.
  *
  * 1. ORDER IS RANDOMISED PER CARD, FROM THE SEED.  ← STILL LOAD-BEARING, AND MORE SO
  *    The draw is a deterministic function of the match seed — never `Math.random`, so a
@@ -33,9 +49,9 @@
  * 2. BOTH SIDES ARE THE SAME ELEMENT WITH THE SAME CLASS.
  *    Not "similar styles" — the same class, the same tokens, the same geometry. There is
  *    no `nth-child`, no `data-side` selector, no modifier class, and no per-side inline
- *    style anywhere in `blindAnswer.css`. **And now the payout and the Ideologue are on
- *    screen, so this rule has teeth it did not have before**: the Ideologue is per-side
- *    and differs between the two cells, so tinting a cell by its Ideologue would publish
+ *    style anywhere in `blindAnswer.css`. This rule has teeth precisely because the
+ *    table's copy of the same card prints the per-side Ideologue and payout on
+ *    `TableQuestion`: a stylesheet that tinted a cell by its Ideologue would publish
  *    which Ideologue the left-hand position is — a position channel, and exactly what
  *    PLAN.md §2 amendment A′ forbids. The chosen state is also identical on both sides
  *    (`aria-pressed`, not a class).
@@ -49,10 +65,12 @@
  *    `blindAnswer.types.ts` proves the closed prop set at the type level and
  *    `blindAnswer.test.tsx` proves the identical-styles rule at the DOM level.
  *
- * And what must not exist here at all, per §1.2 and §9.6, restated for a card whose
- * payout IS printed: no per-side tint, no positional selector, no `order` reaching the
- * DOM, no tween or count-up on the payout, and no "reveal" affordance — the payout is
- * simply there, in the same frame as the answer, because a reveal implies it was hidden.
+* And what must not exist here at all, per §1.2 and §9.6: no per-side tint, no
+* positional selector, no `order` reaching the DOM, and — now that the payout is
+* withheld from THIS screen — no "reveal" affordance either. There is nothing here to
+* reveal, and an affordance that promises one would be §9.10's lie in a new costume.
+* The table's copy of the payout is printed in one frame with the question, so nothing
+* about it needs a moment.
  *
  * ── ONE COMMIT CONTROL, AND TWO WORDS FOR TWO STEPS ───────────────────────
  *
@@ -63,10 +81,7 @@
  * `ANSWER` to the server. So a player who pressed "Confirm" was told, in the
  * most safety-critical screen in the game, that something had happened when
  * nothing had: they had selected a side and had not committed it. A control
- * that lies about commitment is not a wording bug, and under full information it
- * is WORSE: with the payout on screen, a player who believes they have committed
- * a side and has not is a player who believes they have banked a resource they
- * have not.
+ * that lies about commitment is not a wording bug.
  *
  * The rule now, and it is a structural one rather than a copy one:
  *
@@ -100,12 +115,19 @@ export type PrintedSide = {
 };
 
 export type BlindAnswerProps = {
-  /** The scenario prose. `TYPE_CARD_SCENARIO` — 17/27, INK_700. */
+  /** The scenario prose. `--type-card-question` — the largest type on the screen. */
   readonly question: string;
   /**
    * Side A, PRE-MAPPED by the server: label, Ideologue and payout together. Deliberately
    * not derived from anything client-side: side identity ("the Trusts' answer") must
    * never be a client-side lookup keyed on A/B, or the mapping itself becomes the leak.
+   *
+   * `ideologue` and `pays` ARRIVE but are NOT PRINTED here — this screen shows the
+   * question and two bare YES/NO choices. They stay on the prop set because
+   * `PrintedSide` is the shared shape `TableQuestion` prints in full, and because
+   * `blindAnswer.types.ts` proves the closed set; a component that could not even
+   * receive them could not leak them, but neither could it be reused by the panel
+   * that legitimately does show them. What matters is that nothing here reads them.
    */
   readonly sideA: PrintedSide;
   /** Side B, pre-mapped. Same contract as `sideA`. */
@@ -191,12 +213,43 @@ export function commitStatus(state: CommitState): string {
 }
 
 /**
+ * THE TWO CHOICES, REDUCED TO THE ONE WORD A BUTTON CAN HOLD.
+ *
+ * Every Ideology Card in the shipped deck prints exactly one "Yes." and one "No."
+ * — 42 cards, 84 sides, verified rather than assumed — so the answerer's choice
+ * reduces to a binary and the prose belongs to the faction, not to the decision.
+ * This is that reduction, and it is a function of the SIDE'S OWN TEXT, never of its
+ * position: both sides run the same function on their own label, so it cannot
+ * publish which face of the card a display position is. That is the whole §1.2
+ * guarantee, and it is why this lives here rather than being computed from `A`/`B`
+ * in the caller.
+ *
+ * `\b` AFTER THE VERB is load-bearing rather than fussy: `/^no/i` alone would swallow
+ * "Not yet, and here is why…", which is a real thing for a card to say and would be
+ * silently mislabelled YES's opposite. `No.` and `No,` both fall on a boundary; `Not`
+ * does not.
+ *
+ * AND IT RETURNS `null` WHEN THE TEXT IS NOT BINARY. A hand-authored card whose
+ * answer opens with neither word gets its PROSE on the button rather than a bare
+ * "YES" that asserts a polarity the card never stated. A wrong binary is worse than
+ * a long one: one misleads, the other is merely verbose.
+ */
+export function verdictOf(label: string): 'YES' | 'NO' | null {
+  if (/^yes\b/i.test(label.trim())) return 'YES';
+  if (/^no\b/i.test(label.trim())) return 'NO';
+  return null;
+}
+
+/**
  * A side's payout as the card printed it, in the card's own pool order.
  *
- * NO COUNT-UP AND NO REVEAL, because there is nothing to reveal: UI-SPEC §9
- * anti-patterns 1 and 3 are about animating a number a player did not have, and
- * with the payout on the card from the first frame an animation of it would be
- * theatre. One string, in the frame the card was dealt.
+ * NOT RENDERED BY THIS SCREEN ANY MORE — it is printed in full on `TableQuestion`,
+ * which every other seat reads, and it is exported from here rather than duplicated
+ * so the two copies of the card cannot disagree about what a payout says.
+ *
+ * NO COUNT-UP AND NO REVEAL, and that is unchanged by the move: UI-SPEC §9
+ * anti-patterns 1 and 3 are about animating a number a player did not have, and the
+ * table's copy of the payout has been there in one frame since the card was dealt.
  *
  * POOL ORDER IS `RESOURCES` ORDER AND NOT IDEOLOGUE ORDER, deliberately. The Ideologue
  * is printed separately as a NAME — "the Trusts' answer" — because that is how the card
@@ -321,6 +374,10 @@ export function BlindAnswer({
         {order.map((side) => {
           const printed = sideFor(side);
           const chosen = selected === side;
+          // The card's own prose, reduced where it is safely reducible. See
+          // `verdictOf`: this is a function of the LABEL, so both sides are
+          // treated identically and neither can learn its position from it.
+          const verdict = verdictOf(printed.label);
           return (
             <button
               key={side}
@@ -329,10 +386,17 @@ export function BlindAnswer({
                  modifier, no per-side style, and no side-derived attribute that
                  any stylesheet could key on. `data-wire-side` is the WIRE side
                  (which side came from the server), never anything about value;
-                 no rule in blindAnswer.css matches it. In particular there is
-                 nothing here an Ideologue could be styled by — see the header. */
+                 no rule in blindAnswer.css matches it. */
               className="blind-answer__side"
               data-wire-side={side}
+              /* The FULL sentence as the accessible name whenever the visible
+                 word is a reduction of it. "YES" alone is a bare polarity with
+                 no question attached in a screen reader's flat reading of the
+                 page, and WCAG 2.5.3 (Label in Name) is satisfied because the
+                 card's prose always opens with the word on the button. When the
+                 label is not reducible the visible text IS the name and this
+                 attribute is left off rather than set to its own contents. */
+              aria-label={verdict === null ? undefined : printed.label}
               aria-pressed={chosen}
               disabled={locked}
               onClick={() => {
@@ -340,19 +404,7 @@ export function BlindAnswer({
               }}
             >
               <span className="blind-answer__label" data-testid="side-label">
-                {printed.label}
-              </span>
-              {/* THE FULLY VISIBLE CARD, in one frame. The Ideologue is a NAME in
-                  prose, the payout is a NAME in prose, and neither is given a
-                  class, an icon, a colour or a `title`. The point of printing them
-                  as words rather than badges is structural: a word cannot be
-                  styled per-side without a stylesheet rule keyed on it, and the
-                  audit in blindAnswer.test.tsx forbids exactly that. */}
-              <span className="blind-answer__faction" data-testid="side-ideologue">
-                {IDEOLOGUE_FACTION[printed.ideologue]} answer
-              </span>
-              <span className="blind-answer__payout" data-testid="side-payout">
-                pays {payoutLine(printed.pays)}
+                {verdict ?? printed.label}
               </span>
               {/* The chosen state is identical on both: the same seal border,
                   the same paper fill, the same check glyph in the same corner. */}

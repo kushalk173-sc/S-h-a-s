@@ -862,7 +862,7 @@ identical to the cell to its left".
 | 4 | own | minority | volatile | `◇` | `◇` + `⌾` | `◇` + `✕` | `◇` + `⌾*` | **`◇` + `✕`** | `◇` + `✕` | `◇` + `✕` |
 | 5 | own | majority | normal | `●` | `●` + `✕` | `●` + `✕` | `●` + `✕` | **`●` + `✕`** | `●` + `✕` | `●` + `✕` |
 | 6 | own | majority | volatile | `●◇` | `●◇` + `✕` | `●◇` + `✕` | `●◇` + `✕` | `●◇` + `✕` | `●◇` + `✕` | `●◇` + `✕` |
-| 7 | other | minority | normal | `○` | `○` + `✕` | `○` + `✕` | `○` + `✕` | `d` + `○` | `○` + `◈` | `○` + `✕` |
+| 7 | other | minority | normal | `○` | `○` + `✕` | `○` + `✕` | `○` + `✕` | **`⟲`** | `○` + `◈` | `○` + `✕` |
 | 8 | other | minority | volatile | `◇` | `◇` + `✕` | `◇` + `✕` | `◇` + `✕` | `d` + `◇` | `◇` + `◈` | `◇` + `✕` |
 | 9 | other | majority | normal | `●` | `●` + `✕` | `●` + `✕` | `●` + `✕` | `d` + `●` | `●` + `◈` | `●` + `✕` |
 | 10 | other | majority | volatile | `●◇` | `●◇` + `✕` | `●◇` + `✕` | `●◇` + `✕` | `d` + `●◇` | `●◇` + `◈` | `●◇` + `✕` |
@@ -878,6 +878,15 @@ identical to the cell to its left".
   voters are permanent — *"cannot be gerrymandered, converted, moved, evicted, discarded,
   or affected in any way"* (`rules-reference.md:269-270`). This is the one place a player
   *owns* something and still cannot use it, so it gets the hatch, not just a dim.
+- **Row 7 (`other` + minority + normal) is `⟲` in `GERRY src`, CORRECTING §4.6 as first printed.**
+  `rules-reference.md:256` (p16): *"You may gerrymander **any player's** voters, including your
+  own."* The printed cell said `d` + `○` — dimmed as unavailable — and `BoardSvg` implemented it, so
+  a player holding rights in a zone full of someone else's voters had no legal gerrymander at all.
+  Reported as *"I can't move anyone else's voters."* The spec already contradicted itself here: its
+  own row-8 note below reasons from that same "or an opponent's" rule to fix the **destination**
+  column, while the **source** column denied the same voter could be picked up. Ownership is not a
+  condition on a gerrymander; holding rights in an adjacent zone is. Rows 8–10 stay dimmed/hatched,
+  for the two reasons that *are* rules — Volatile is permanent (p18), majority does not move (p16).
 - **Row 8 (`other` + volatile) is `◈` in `GERRY dest legal`.** `rules-reference.md:271`: you
   may place your own **or an opponent's** voter into a Volatile Area. The catch is the
   Headline it triggers (§5.9) — that is surfaced in the tooltip and the confirm chip, not
@@ -1569,8 +1578,8 @@ This is not the blind answer mechanic and must never be confused with it.
 |---|---|---|
 | G1 | Rights in a zone go to whoever has **strictly more** voters there; **ties give nobody rights**. | `⚑ RIGHTS` / `⊘ NO RIGHTS` badge on **every** zone label during the mode (§5.6). Both states shown; absence is never the signal. |
 | G2 | Rights give **1 voter per turn per zone** (`RULES.gerrymandersPerZone`), or **2** under Election Fever. | The move counter `1 of 1 · North` in the mode strip; the number is per-zone and live. |
-| G3 | Only **non-majority** voters move (unless a card says otherwise). | Every majority peg is hatched in `GERRY src` (matrix rows 5, 6, 9, 10). Solid pegs cannot be picked; hollow ones can. **The silhouette teaches it.** |
-| G4 | **Volatile Area voters cannot be moved.** Ever. | Every rounded-square slot is hatched in `GERRY src` (matrix rows 4, 6). The square shape is the reminder. |
+| G3 | Only **non-majority** voters move (unless a card says otherwise), **and they need not be yours** — any player's voter may be moved. | Every majority peg is hatched in `GERRY src` (matrix rows 5, 6, 9, 10). Solid pegs cannot be picked; hollow ones can — **whether they are yours or an opponent's** (rows 3 and 7 both `⟲`). **The silhouette teaches it.** |
+| G4 | **Volatile Area voters cannot be moved.** Ever. | Every rounded-square slot is hatched in `GERRY src` (matrix rows 4, 6) and dimmed (rows 8, 10). The square shape is the reminder. |
 | G5 | The move is **into your zone, out of it, or between it and an adjacent zone** — and you may not move **your only voter out of the zone whose rights you are using**. | Legal destinations are ringed `POSITIVE` with `◈`; illegal ones hatch. Rule 5's last clause gets its own line in the always-visible strip (§5.6), because it is the one that surprises. |
 
 Plus one that surprises people and must be stated: **you may gerrymander any player's

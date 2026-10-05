@@ -65,7 +65,12 @@
   /* §5.0: the board track is capped at 780px so it cannot starve the mat. */
   grid-template-columns: minmax(320px, 780px) minmax(360px, 1fr);
   gap: var(--sp-3);
-  padding: var(--sp-3);
+  /* The bottom padding reserves the FIXED END TURN bar, which is on screen for the
+     whole of every one of your turns. It is reserved unconditionally rather than
+     only when the dock renders, because a reserve that appears and disappears with
+     the dock moves the whole board under the player's cursor at the exact moment
+     they press something else. */
+  padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + 68px);
   align-items: start;
 }
 
@@ -384,6 +389,72 @@
   gap: var(--sp-2);
 }
 
+/* ── Resource identity: ONE place, four inks ─────────────────────────────────
+   §2.7's four IDEO_INK_* tokens, applied through a single attribute.
+
+   THE ATTRIBUTE IS THE CONTRACT. Any element carrying `data-res="funds"` (or
+   clout/media/trust) publishes `--res-ink` to everything inside it, and the four
+   consumers below (`res__glyph`, `res__name`, `picker__name`, the cost runs) all
+   read that one variable. So a denomination is marked by setting an attribute,
+   never by picking a colour at the call site — which is what stops the mat strip,
+   the market price, the trade steppers and the power dialogs from drifting into
+   four slightly different ideas of "Clout is plum".
+
+   `--pip-ink` (the manifesto track, app.css:562) predates this and is left
+   alone: it is an Ideologue track, keyed by IDEOLOGUE not by resource, and the two
+   maps agree by construction (`derive.ts:158`).
+
+   WHY AN ACCENT AND NOT A FILL — §2.7 mitigation 2 is explicit: "resource tokens
+   never appear as flat fills", because a flat 20-22px disc of colour is exactly
+   what a peg looks like, and mistaking one for the other is a lost turn. So the
+   ink appears as a GLYPH STROKE, as TEXT, and as a 2px RULE. Never as a wash
+   behind the numeral. */
+
+[data-res] {
+  --res-ink: var(--ink-700);
+}
+[data-res='funds'] {
+  --res-ink: var(--ideo-capitalist);
+}
+[data-res='clout'] {
+  --res-ink: var(--ideo-supremo);
+}
+[data-res='media'] {
+  --res-ink: var(--ideo-showstopper);
+}
+[data-res='trust'] {
+  --res-ink: var(--ideo-idealist);
+}
+
+/* The glyph. §3.4: 2px stroke, currentColor, no fill. Sized in `em` off the type
+   scale it sits beside rather than pinned, so it tracks --type-resource-cap in
+   the picker and --type-resource-num on the mat without a second rule. */
+.res__glyph {
+  color: var(--res-ink, var(--ink-700));
+  vertical-align: -0.14em;
+  flex: none;
+}
+
+/* The denomination's NAME takes the ink. This is also a contrast win, not a
+   concession: §2.7 measured the inks at 5.44 / 8.30 / 7.40 / 6.64 on --paper-100
+   and 6.16 / 9.40 / 7.52 / 8.38 on --paper-000, where the name was carrying
+   --ink-500 at 4.85 / 4.85. Every one of these is a different hue AND a higher
+   ratio than what it replaced. */
+.res__name,
+.picker__name,
+.res__label {
+  color: var(--res-ink, var(--ink-500));
+}
+
+/* The rule. 2px, on the BOTTOM edge, so it reads as a token's ring rather than as
+   a highlight over the numeral — a top rule would sit between the glyph and the
+   number it belongs to. */
+.res__cell,
+.picker__cell,
+.cost {
+  border-bottom: 2px solid var(--res-ink, transparent);
+}
+
 /* ── The resource strip ─────────────────────────────────────────────────────
    Four numerals at TYPE_RESOURCE_NUM over a SINGLE combined cap meter. One
    meter, not four: RULES.resourceCap is a COMBINED cap, and four meters would
@@ -400,7 +471,23 @@
   padding: var(--sp-1) 0;
   border-radius: var(--r-sm);
   background: var(--paper-050);
+  /* Glyph, numeral, name — stacked, because the glyph is the identity channel
+     (§2.7 mitigation 1) and a glyph sitting BESIDE a 24px numeral in a quarter
+     of a phone's width is a glyph the player has to hunt for. The numeral stays
+     --ink-900: it is the data, it changes every turn, and it is the one thing on
+     this cell that must not be tinted. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
 }
+
+/* THE GAINED CELL IS NOT MUTED, and neither is the one that paid nothing. A cell
+   that pays zero still has an identity — the player reads the four payouts as a
+   row, and greying one out would say "this one does not exist" when what it means
+   is "this one is zero" (`AnswerScreen.tsx:PayoutLanded`). The distinction is
+   carried by the NUMERAL, which is POSITIVE on a gain and an em-dash otherwise,
+   and by the green that §2.6 owns. The ink stays at full strength on all four. */
 
 .res__num {
   font: var(--type-resource-num);
@@ -415,6 +502,8 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
+
 
 .meter {
   height: 8px;
@@ -510,13 +599,80 @@
   text-transform: uppercase;
 }
 
-/* The bonus line is the softer of the two: it is the forecast, and §5.4 calls the
-   strip "the main strategic read on the mat", so it must be readable without
-   competing with the noun above it. */
+/* THE PROGRESS TRACK. Three thresholds used to be three sentences; these are three
+   rules and three pips, so the player reads position instead of arithmetic.
+
+   The `gap` after every second pip is the `passiveBonusPer` grouping made visible —
+   a pair closing IS the +1 — and the third pip's notch is `level3`, where the power
+   arrives. Both are drawn, not written, because the written version is what put "3"
+   and "2" on adjacent lines and read as one price.
+
+   Sized in `em` off the cell so it scales with the numeral rather than being pinned
+   in px, and `justify-content: center` keeps a 4-across grid from jittering as cells
+   fill. `--pip-h` is the ONE knob if the track needs to grow. */
+.mani__track {
+  --pip-h: 5px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  margin: var(--sp-1) 0 var(--sp-1);
+}
+
+.mani__pip {
+  width: var(--pip-h);
+  height: var(--pip-h);
+  border-radius: var(--r-sm);
+  /* An EMPTY pip is an outline, not a faint fill: it has to read as a slot waiting
+     to be filled at 4px tall, which a low-alpha fill does not on parchment. */
+  border: 1px solid var(--ink-300);
+  background: transparent;
+}
+
+/* The pair gap. Doubling the margin after every second pip draws the cadence — the
+   whole point of the track — without adding an element or a label. */
+.mani__pip[data-pair-end='true'] {
+  margin-right: 3px;
+}
+
+.mani__pip[data-filled='true'] {
+  background: var(--pip-ink, var(--ink-700));
+  border-color: var(--pip-ink, var(--ink-700));
+}
+
+/* The Ideologue ink, per §2.7's four desaturated tokens. Set on the TRACK so each pip
+   inherits it, which keeps one source of truth for "which Ideologue is this" — the
+   underline on the cell border and the pips cannot drift apart. */
+.mani__track[data-ideo='capitalist'] { --pip-ink: var(--ideo-capitalist); }
+.mani__track[data-ideo='supremo'] { --pip-ink: var(--ideo-supremo); }
+.mani__track[data-ideo='showstopper'] { --pip-ink: var(--ideo-showstopper); }
+.mani__track[data-ideo='idealist'] { --pip-ink: var(--ideo-idealist); }
+
+/* The `level3` notch: a pip that unlocks a power is marked as one, permanently, so
+   the threshold is legible on a cell that has reached it AND on one that has not. A
+   filled pip is not enough — every pip fills, and only this one means something. */
+.mani__pip[data-threshold='power'] {
+  width: 7px;
+  height: calc(var(--pip-h) + 2px);
+  border-width: 1px;
+}
+
+/* The bonus line is the softer of the remaining lines: it is the forecast, and §5.4
+   calls the strip "the main strategic read on the mat", so it must be readable
+   without competing with the numeral above it. */
 .mani__bonus {
   font-weight: 400;
   color: var(--ink-500);
   opacity: 0.85;
+}
+
+/* Earning is worth a full-strength numeral and a resource glyph, because it is the
+   thing the cell exists to report. Earning nothing is the softer de-emphasised
+   tone: correct, but not a reason to look twice. */
+.mani__bonus[data-earning='true'] {
+  font-weight: 700;
+  color: var(--ink-900);
+  opacity: 1;
 }
 
 .chip {
@@ -624,6 +780,14 @@
   font: var(--type-mkt-cost);
   font-variant-numeric: var(--numeric-features);
   color: var(--ink-700);
+}
+
+/* One charge on a market card. `nowrap` because a 78px card cannot break
+   `2 F (waived)` across two lines — a price that wraps is a price nobody plans
+   against. The glyph sits at 12px, which is the floor the token disc can hold
+   without the 2px stroke filling in. */
+.cost {
+  white-space: nowrap;
 }
 
 .mkt--unavail .mkt__cost {
@@ -1081,6 +1245,278 @@
   margin: var(--sp-1) 0;
 }
 
+/* ── THE RESOLUTION ───────────────────────────────────────────────────────────
+   What the answer was and what it paid, in full, with the whole card on screen.
+
+   THIS IS THE ONE PLACE THE PRODUCT ANIMATES A NUMBER, and `.reveal` above — the
+   300ms opacity-only frame with no transform and no delay — is what it replaced.
+   §9.3 forbade it when the payout was withheld and printed in one frame at
+   resolution, because animating a number the player does not have leaks its value to
+   anyone watching, permanently. That argument is intact and is honoured everywhere
+   else; it does not apply here, because by the time this paints the secret is gone:
+   `reduce.ts` has already set `phase: 'actions'` and `_pendingCard: null`, and
+   `openQuestionFor` returns null outside `phase === 'answer'`. The number is yours,
+   it is already in your pool, and it is in the public log. The full argument is on
+   `AnswerResolution` in `AnswerScreen.tsx`.
+
+   THE MOTION IS A TIMELINE, NOT A DECORATION, and it runs in this order because
+   that is the order the player needs it in:
+
+     0. the scrim, so the screen arrives before anything on it
+     1. the question — you are told what you answered before you see what it paid
+     2. the chosen side
+     3. the side you passed over
+     4. the payout row, whose four numbers land last and staggered
+
+   The chosen side goes BEFORE the rejected one deliberately. A player scanning this
+   screen wants their own answer first; the alternative is a second of their eye
+   landing on the option they did not take.
+
+   `animation-fill-mode: both` on every rule, because without it each element would
+   be VISIBLE at its resting state during its `animation-delay` — which for the
+   payout row is most of a second. That is the classic way a staged reveal flashes
+   everything at once: the delays work, and the thing they were hiding was never
+   hidden.
+*/
+.resolution {
+  width: 100%;
+  max-width: 46rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+@keyframes resolution-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes resolution-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The numbers land with a small scale, because a count-up that only changes digits
+   reads as a flicker. Scaling slightly INTO place is what makes it read as an
+   arrival. Overshoot is 1.06 rather than anything bouncier: this is a document
+   settling, not a slot machine. */
+@keyframes resolution-land {
+  from {
+    opacity: 0.2;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.resolution .eyebrow {
+  animation: resolution-scrim-in var(--dur-300) var(--ease-panel) both;
+}
+
+.resolution__question {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 38px;
+  color: var(--ink-900);
+  margin: 0 0 var(--sp-6);
+  max-width: 24ch;
+  margin-inline: auto;
+  text-wrap: pretty;
+  animation: resolution-rise var(--dur-300) var(--ease-panel) 120ms both;
+}
+
+.resolution__sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: 0 auto var(--sp-6);
+  max-width: 42rem;
+}
+
+.resolution__side {
+  /* The SAME box for both sides. This screen marks one of them, which the answer
+     screen must never do — so the difference is a border and a fill and the
+     geometry is identical, and both are declared on the shared rule first. */
+  background-color: var(--paper-100);
+  border: 2px solid var(--ink-300);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  text-align: center;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* THE CHOSEN SIDE. A SEAL border and a fill, and that is ALL — the rejected side
+   keeps the identical geometry so the two boxes cannot be compared by size, which
+   would tell a player which answer is the longer one and by how much before they
+   have read either. */
+.resolution__side--mine {
+  border-color: var(--seal);
+  background-color: var(--paper-050);
+  animation: resolution-rise var(--dur-300) var(--ease-panel) 280ms both;
+}
+
+/* …and the side they passed over arrives second, at 440ms. */
+.resolution__side:not(.resolution__side--mine) {
+  animation: resolution-rise var(--dur-300) var(--ease-panel) 440ms both;
+}
+
+.resolution__verdict {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin: 0;
+}
+
+.resolution__side--mine .resolution__verdict {
+  color: var(--seal);
+}
+
+.resolution__tick {
+  margin-right: 4px;
+}
+
+/* The answer in full, at the size it is read aloud. Not the verdict word the answer
+   screen reduced it to — this is the sentence, because the resolution is where you
+   find out what you actually agreed to. */
+.resolution__answer {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 26px;
+  color: var(--ink-900);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.resolution__faction {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin: 0;
+}
+
+.resolution__payout {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 21px;
+  color: var(--ink-700);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--ink-300);
+}
+
+/* A side that pays nothing says so, rather than printing an empty line. */
+.resolution__payout--none {
+  color: var(--ink-500);
+}
+
+.resolution__payout-landed {
+  animation: resolution-scrim-in var(--dur-300) var(--ease-panel) 560ms both;
+}
+
+.resolution__payout-label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin: 0 0 var(--sp-2);
+}
+
+/* `animation-delay` is set per-cell INLINE from `STEP_MS`, because the stagger is
+   data (the pool's index) rather than a value four rules could share. It is the one
+   place in this file an inline style carries appearance, and it is a delay rather
+   than a colour, a size or a position — so it cannot make two cells look different
+   in a way that means something. The COUNT itself is JavaScript, because a number
+   that changes is not something CSS can count. */
+.resolution__cell {
+  animation: resolution-land var(--dur-300) var(--ease-panel) both;
+}
+
+.resolution__cell--gained .res__num {
+  color: var(--positive);
+}
+
+.resolution__cell .res__num {
+  font: var(--type-num-delta-gain);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visually hidden, still announced. This is how the count-up stays usable: the four
+   numerals are `aria-hidden` because announcing every frame of an animation is
+   noise, and the sentence beside them carries the meaning once. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The two sides stack on a phone, exactly as `.blind-answer__panel` does, for the
+   same reason: two columns of prose at 19px do not fit in a 390px viewport. */
+@media (max-width: 620px) {
+  .resolution__sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resolution__question {
+    font-size: 24px;
+    line-height: 31px;
+  }
+
+  .resolution__side:not(.resolution__side--mine) {
+    animation-delay: 380ms;
+  }
+}
+
+/* THE WHOLE MOTION IS OPT-OUT, and the count-up is opted out in JavaScript as well
+   as here — see `useCountUp`, which returns the final value immediately rather than
+   showing a number mid-flight. A reduced-motion reader must never be shown `4` when
+   the truth is `9`. */
+@media (prefers-reduced-motion: reduce) {
+  .resolution .eyebrow,
+  .resolution__question,
+  .resolution__side,
+  .resolution__side--mine,
+  .resolution__side:not(.resolution__side--mine),
+  .resolution__payout-landed,
+  .resolution__cell {
+    animation: none;
+  }
+}
+
 /* ── The response window ─────────────────────────────────────────────────────
    §8/§9: one card's effects are held for a beat so a BLOCK or a DEFLECT can land.
    `state.interrupt` is a nullable field and NOT a phase, so this is a suspension
@@ -1461,6 +1897,12 @@
   background: var(--paper-000);
   cursor: pointer;
   min-height: 64px;
+  /* Glyph, count, name — stacked, matching the mat strip so the player learns
+     "plum = Clout" once and it holds in every widget they meet it in. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
 }
 
 .picker__cell--max {
@@ -1484,6 +1926,38 @@
 .picker__status {
   font: var(--type-tooltip);
   color: var(--ink-700);
+}
+
+/* ── The trade stepper (GameScreen `DeltaStepper`) ────────────────────────────
+   THE ONE RESOURCE SURFACE THAT NAMED NOTHING.
+
+   Four `+ n −` steppers in a 4-column grid, no denomination on any of them. It is
+   the trade composer, so it is the screen where the player is *explicitly*
+   assessing what they hold and what they are asking for, and it was the only
+   surface where the answer required already knowing that column 2 was Clout.
+   Column position was doing the work of an identity channel, which is exactly
+   what §2.7's mitigation 1 exists to prevent.
+
+   So the glyph and the name are added, and the row takes the ink as a 2px rule
+   from the shared `data-res` block above. The buttons stay first and last in
+   DOM order and keep their `Add one …` / `Remove one …` labels — every test
+   driver in this repository finds the stepper by walking `.picker__grid .row--tight
+   button` and matching on those labels, so nothing about the controls moved. */
+.stepper {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-1);
+  padding: var(--sp-1) 0;
+  border-bottom: 2px solid var(--res-ink, transparent);
+}
+
+.stepper__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
 }
 
 .picker__status--short {
@@ -1597,16 +2071,52 @@
   border-top: 2px solid var(--seal);
 }
 
+/*
+   END TURN IS A FIXED BOTTOM BAR AT EVERY WIDTH, and it used to be phone-only.
+
+   It was `display: none` outside the `max-width: 599px` query, on the reasonable
+   assumption that a desktop had an END TURN somewhere else. It did not: the
+   "desktop" button in `GameScreen` was `{isMyTurn && ... && !isMyTurn ? null : null}`,
+   which is unsatisfiable and rendered nothing, and `YourMat`'s `onEndTurn` prop had
+   never been rendered either. Three controls' worth of intent, zero live controls, so
+   a desktop player literally could not end a turn. Found by playing it.
+
+   So the dock is now the single END TURN control and it is always on screen. Fixed,
+   rather than at the end of the side column, for the reason it was fixed on a phone:
+   `.shell__side` is a scrolling sticky column, and a control you have to scroll to
+   find is a control that ends up not being pressed.
+
+   The trade is real and is worth naming: a fixed bar permanently occupies the bottom
+   ~56px of every viewport, so `.shell__body` reserves it below. That reserve is why
+   the board is `calc(100vh - 190px)` and not taller — the bar is inside that 190px,
+   not extra on top of it.
+*/
 .endturn-dock {
-  display: none;
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 56px;
-  padding: var(--sp-2);
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
   background: var(--table-800);
   border-top: 1px solid var(--table-600);
-  z-index: 14;
+  z-index: 16;
+}
+
+/* WHY YOU MIGHT NOT WANT TO PRESS IT YET. §9.2 in the form that actually matters
+   here: END TURN sweeps anything unplaced, so the count of voters still on the mat is
+   a consequence the player cannot see from the button. It is one line, it is quiet,
+   and it is on the same bar rather than somewhere else on the page. */
+.endturn-dock__note {
+  font: var(--type-tooltip);
+  color: var(--table-text);
+  opacity: 0.78;
+  text-align: center;
+  margin: 0;
+  max-width: 60ch;
 }
 
 /* ── Spectator (§5.11) ──────────────────────────────────────────────────────
@@ -1719,11 +2229,16 @@
   }
 
   .shell__body {
-    padding-bottom: 120px;
+    /* Stacked, so the two fixed bars stack too: 56px of tab bar plus the END TURN
+       dock above it. See the phone `.endturn-dock` rule. */
+    padding-bottom: 180px;
   }
 
+  /* ON A PHONE THE DOCK SITS ABOVE THE TAB BAR, not on top of it. The tab bar is
+     `position: fixed; bottom: 0` at 56px, and two fixed bars at the same offset
+     overlap — which is what would happen if this rule kept `bottom: 0`. */
   .endturn-dock {
-    display: block;
+    bottom: 56px;
   }
 }
 

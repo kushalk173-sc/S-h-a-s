@@ -56,6 +56,7 @@
 import { useMemo } from 'react';
 
 import { RESOURCE_ORDER, deltaTotal, shortfall } from './derive.ts';
+import { ResourceGlyph } from './ResourceGlyph.tsx';
 import type { Delta, Pool, Resource } from '@shasn/engine';
 
 export type ResourcePickerMode = 'cost' | 'gain';
@@ -211,6 +212,7 @@ export function ResourcePicker({
               <button
                 type="button"
                 className={`picker__cell ${want > 0 ? 'picker__cell--max' : ''}`}
+                data-res={r}
                 onClick={() => bump(r, 1)}
                 /* The cell and its `+` are the SAME action, so they carry the SAME
                  * state. A cell that stayed live at the ceiling was a button that
@@ -225,6 +227,7 @@ export function ResourcePicker({
                     : `Add one ${r}. You hold ${have}, ${want} chosen.`
                 }
               >
+                <ResourceGlyph resource={r} />
                 <span className="picker__count">
                   {want}
                   {/* A gain has no `want / have` fraction — the numerator is not

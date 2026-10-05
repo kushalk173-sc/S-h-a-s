@@ -145,6 +145,18 @@
   --type-display-xl: 800 34px/40px var(--font-display);
   --type-display-l: 800 26px/32px var(--font-display);
   --type-display-m: 700 20px/26px var(--font-display);
+  /* THE QUESTION AND THE TWO CHOICES. These are the largest type on the card, and
+     deliberately so: the answer screen asks one question and offers two words, and
+     at 17px/400 that screen read as a caption over a form rather than as the one
+     decision the game stopped for. 24px/32px at 700 is the smallest size at which
+     the question still holds a phone at arm's length; the choices are heavier and
+     tracked because they are the two things a thumb is aimed at.
+
+     `--type-card-scenario` is kept, not deleted: it is the 17px prose setting this
+     pair replaced, and any future copy that wants the old register should have to
+     ask for it by name. */
+  --type-card-question: 700 24px/32px var(--font-display);
+  --type-card-verdict: 800 26px/30px var(--font-display);
   --type-card-scenario: 400 17px/27px var(--font-display);
   --type-card-side-label: 700 17px/23px var(--font-display);
   --type-zone-name: 700 15px/18px var(--font-display);

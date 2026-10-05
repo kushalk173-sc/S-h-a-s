@@ -160,11 +160,28 @@ function slotInteraction(input: {
   if (state.mode === 'gerry') {
     const source = state.gerrySourceAreaId;
     if (source === undefined) {
-      // Source eligibility is exactly: yours, non-majority, non-volatile.
-      // Nothing else moves, ever. Empty slots and opponents' pegs are context,
-      // not options, so they dim rather than hatch (§4.6 rows 1–2, 7–10).
+      /*
+       * Source eligibility is NON-MAJORITY, NON-VOLATILE — and it is NOT restricted
+       * to your own voters.
+       *
+       * rules-reference.md:256, transcribing p16: *"You may gerrymander ANY PLAYER'S
+       * voters, including your own."* The engine agrees and has a passing test for
+       * it (`engine/test/gerrymander.test.ts:233`, "may gerrymander an OPPONENT's
+       * voter").
+       *
+       * This branch used to say `peg.owner !== state.activePlayerId → neutral`,
+       * which made every opponent peg inert and unclickable — the client silently
+       * enforced a STRICTER rule than the book, on the mechanic the book calls its
+       * central one. Reported as "I can't move anyone else's voters". The refusal
+       * string said it outright ("you may gerrymander any voter, but this board only
+       * arms your own"), which is the shape of a bug that knows it is wrong and
+       * ships anyway: the comment above it asserted the false rule as fact.
+       *
+       * Nothing else about the branch changes. Majority and Volatile are still
+       * refused, and still refused VISIBLY — those are the two that surprise people,
+       * so they keep their hatched "blocked" overlay rather than dimming.
+       */
       if (peg === null) return { legality: 'neutral' };
-      if (peg.owner !== state.activePlayerId) return { legality: 'neutral' };
       if (slot.volatile) {
         return { legality: 'neutral', gerrySource: 'blocked', reason: 'Permanent — Volatile Area.' };
       }

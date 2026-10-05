@@ -6,8 +6,23 @@
  * It used to show the question and the two printed answers and nothing else, because
  * that was all the server published to the table. Under full information the server
  * publishes the WHOLE card and so does this: question, both answers, both Ideologues and
- * both payouts, for every seat and every spectator, before anyone answers. The
- * answerer's panel shows the identical card plus a commit control. Two panels, one card.
+ * both payouts, for every seat and every spectator, before anyone answers.
+ *
+ * ── THE TWO COPIES OF THE CARD ARE NOT IDENTICAL, AND THAT IS NOW A DECISION ──
+ *
+ * The answerer's panel prints the question and two bare YES/NO choices. This one
+ * prints the question, both answers in full, both Ideologues and both payouts. So the
+ * "one card, two panels" claim below is about the CARD, not about the copy: same
+ * question, same sides, same classes — and the answerer sees less of it than the table
+ * does. The asymmetry is deliberate: hiding the payoff from the seat that is deciding
+ * is what puts the deliberation back, and §7.2's "the reading player does not know
+ * what the card pays" depends on it.
+ *
+ * IT IS NOT FREE, and the honest cost is worth stating: a player at this table can
+ * read the payout off this panel and compute the better side while the person
+ * answering cannot. If that turns out to matter in play, the fix is to hide this
+ * panel for the length of the answer window — not to change the wiring below, which
+ * is correct either way.
  *
  * THE ONE THING STILL MISSING IS `order`, and that is not an omission — it is the whole
  * remaining mechanic. `order` says which face of the card the first display position is,

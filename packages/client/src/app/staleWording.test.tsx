@@ -214,13 +214,47 @@ describe('nothing on screen claims the Ideology Card is hidden', () => {
     // The audit checked the answer screen by hand: one `aria-label` (the dialog's own
     // name), no `title=`, no lock icon, no countdown. That is the screen where a
     // stale claim would do the most damage, so it is a gate rather than a note.
+    //
+    // `title=` IS still banned outright — it is a hover-only channel, so a claim in
+    // one is invisible to a touch user and to a screen reader, which makes it the
+    // worst possible place for a concealment claim.
+    //
+    // `aria-label=` IS NOT, and this is the one assertion that has been narrowed.
+    // There was a blanket ban because the only `aria-label` in the subtree was the
+    // dialog's own name, so "no aria-label but that one" was the cheap way to say
+    // "no aria-label of its own". Now each side's button carries one: the card prints
+    // a full sentence ("No. Teach it in some schools and it becomes a school trip.")
+    // and the button shows the one word `verdictOf` reduces it to, so a screen reader
+    // that read only the visible text would announce a bare "NO" with no question
+    // attached. The accessible name repeats the card's own sentence — which is what
+    // WCAG 2.5.3 (Label in Name) asks for, since the sentence opens with the word on
+    // the button.
+    //
+    // So the ban becomes the two things that actually matter, and both are STRICTER
+    // than the ban it replaces: an `aria-label` may not contain a concealment claim
+    // (the `FORBIDDEN` sweep, which already covered this file's text and now has to
+    // cover its attributes too), and it may not be anything other than a side's own
+    // label — so it cannot become a second channel for the payout, the Ideologue or
+    // the `order` draw.
     const files = sourceFiles();
     const answer = files.get('BlindAnswer.tsx') ?? '';
     const body = code(answer).replace(/ARIA-HIDDEN/g, 'aria-hidden');
     expect(body, 'BlindAnswer must render no title attribute').not.toMatch(/title=/);
-    expect(body, 'and no aria-label of its own').not.toMatch(/aria-label=/);
     for (const { re, says } of FORBIDDEN) {
       expect(body, `BlindAnswer must not say "${says}"`).not.toMatch(re);
     }
+
+    // Every `aria-label` is a rename of a value already in the markup, not new
+    // information. `aria-label={verdict === null ? undefined : printed.label}` is the
+    // only permitted shape, so anything else is a channel.
+    const labels = [...body.matchAll(/aria-label=\{([^}]*)\}/g)].map((m) => (m[1] ?? '').trim());
+    expect(
+      labels.filter((l) => l.length > 0),
+      'every aria-label must be a bare expression on the side\'s own printed label',
+    ).toEqual(labels.filter((l) => /printed\.label/.test(l)));
+    expect(body, 'no aria-label may be a literal string').not.toMatch(/aria-label="[^"]*"/);
+    expect(body, 'and no aria-label may read a field that is not printed').not.toMatch(
+      /aria-label=\{[^}]*\b(pays|ideologue|order)\b/,
+    );
   });
 });

@@ -27,25 +27,29 @@
  *    (§5.3). The redraw button below the panel is the single exception the spec
  *    makes (§5.3.5), and it is a payment control, not a hint about the card.
  *
- * 4. THE PAYOUT IS ONE FRAME. §9.3: no count-up, no flip, no reel, no delay, no
- *    comparison between the two sides. The reveal renders fully-formed numbers
- *    in a single 300ms fade — the same instant information arrives, not a
- *    sequence that paces it. See `.reveal` in `app.css`, whose only declaration
- *    is opacity, deliberately.
+ * 4. WHAT IS NOT ON THIS SCREEN. §9.6: no resource tokens, no Ideologue colours,
+ *    no manifesto, and — the change — no payout and no faction attribution. The
+ *    question and two bare YES/NO choices are the whole of it, which is what
+ *    restores §7.2's premise that the answerer does not know what the card pays. The
+ *    rest of the table still sees the whole card, on `TableQuestion`; §9.3's no-
+ *    count-up, no-flip, no-delay rule is unchanged and is what keeps that panel's
+ *    payout in one readable frame. See `.reveal` in `app.css`, whose only
+ *    declaration is opacity, deliberately.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ClientState, Pool } from '@shasn/engine';
 import type { PlayerID, Resource } from '@shasn/engine';
 
-import { BlindAnswer } from '../answer/BlindAnswer.tsx';
+import { BlindAnswer, IDEOLOGUE_FACTION, payoutLine } from '../answer/BlindAnswer.tsx';
 import type { CommitState } from '../answer/BlindAnswer.tsx';
-import type { AnswerPrompt } from '../net/index.ts';
+import type { AnswerPrompt, AnswerSide } from '../net/index.ts';
 
 import { committedSideToDisplayIndex, promptToProps } from './blindWire.ts';
 import { ResourcePicker } from './ResourcePicker.tsx';
 import { RESOURCE_ORDER, UI_RULES, canAfford, deltaTotal, poolTotal } from './derive.ts';
+import { ResourceGlyph } from './ResourceGlyph.tsx';
 import type { PickerDraft } from './store.ts';
 
 export type AnswerScreenProps = {
@@ -297,29 +301,30 @@ export function AnswerScreen(props: AnswerScreenProps) {
           onCommit={commit}
         />
 
-        {/* ── THE REDRAW, AND WHAT IT NOW MEANS. p13 keeps it, and the reason it used
-            to exist is gone. ─────────────────────────────────────────────────────
+        {/* ── THE REDRAW, AND WHAT IT NOW MEANS. ──────────────────────────────────
             "pay any 4 resources to have your Ideology Card redrawn before answering"
             was a BET: §7.2 step 2 says so in as many words — "Because the reading
             player does not know what the card pays, the redraw is a BET, not a
-            decision." Under full information the payout is printed on the card
-            above, so this is no longer a bet and the honest description is "pay 4 for
-            a different card" — a reroll, priced at 4, which every player can now
-            compute against the two payouts they are looking at.
+            decision."
 
-            It is KEPT rather than deleted, and the ruling is on this bar: a mechanic
-            whose justification evaporated is a decision to be made, not one to be
-            quietly inherited, and the two available answers both close the game. Delete
-            it and a player holding a genuinely bad card has no out, because the engine
-            has no legal action that returns a card to the draw pile mid-turn. Keep it
-            and it is the only priced escape from a dominated card — which, with the
-            payout visible, is a real and frequent situation rather than a rare one.
-            Deleting it would also be a rulebook change, and this is not the package
-            that owns the rulebook.
+            It briefly stopped being a bet. Full information printed the payout on the
+            card for the answerer too, which made the redraw a priced reroll you could
+            compute against two payoffs, and the copy below said exactly that. The
+            answerer no longer sees the payout, so the bet is BACK, and this copy has
+            been returned to the rulebook's own reasoning rather than left arguing for
+            a mechanic that no longer applies to this seat.
 
-            What it is NOT, and the copy below is what says so: it is not a hint about
-            the card, and it contains no second commit affordance. It buys a different
-            card, not a better answer to this one. */}
+            It is KEPT rather than deleted. A mechanic whose justification was briefly
+            withdrawn is a decision to be made, not one to be quietly inherited. And it
+            is the only priced escape from a card you think is bad — the engine has no
+            other legal action that returns a card to the draw pile mid-turn — which,
+            with the payoff hidden, is a real and frequent situation rather than a rare
+            one. Deleting it would also be a rulebook change, and this is not the
+            package that owns the rulebook.
+
+            What it is NOT: it is not a hint about the card, and it contains no second
+            commit affordance. It buys a different card, not a better answer to this
+            one. */}
         <div
           className="row"
           style={{ justifyContent: 'center', maxWidth: '46rem', margin: '0 auto' }}
@@ -341,8 +346,8 @@ export function AnswerScreen(props: AnswerScreenProps) {
           style={{ textAlign: 'center', maxWidth: '46rem', margin: 'var(--sp-3) auto 0' }}
         >
           You must choose before the turn can continue. Redrawing costs {UI_RULES.redrawCost}{' '}
-          resources and swaps the card for a different one — both payouts are printed, so you
-          are buying a different question rather than taking a chance at this one.
+          resources and swaps the card for a different one. You are not told what this card
+          pays, so a redraw is a bet on the next one rather than a decision about this one.
           {/* The reason the control is dead, next to the control. A player on 0/0/2/0
               reading "costs 4 resources" above a button that will not press is owed
               the number they are short by. */}
@@ -375,7 +380,8 @@ export function PoolNumbers({ pool }: { pool: Pool }) {
   return (
     <div className="res">
       {RESOURCE_ORDER.map((r: Resource) => (
-        <div key={r} className="res__cell">
+        <div key={r} className="res__cell" data-res={r}>
+          <ResourceGlyph resource={r} />
           <span className="res__num">{pool[r]}</span>
           <span className="res__name">{r}</span>
         </div>
@@ -384,45 +390,395 @@ export function PoolNumbers({ pool }: { pool: Pool }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   THE RESOLUTION — what the answer actually was, and what it paid.
+
+   THIS REVERSES §9.3's "no count-up, no delay", and the reversal is argued rather
+   than assumed. The old rule was written when the payout was WITHHELD and printed
+   in one frame at resolution: animating a number the player did not have leaks its
+   value to anyone watching over a shoulder, and the leak is permanent. Every clause
+   of that argument is about a number that is still secret when the animation runs.
+
+   None of it applies here, for three reasons that are all structural:
+
+     1. THE SECRET IS GONE BEFORE THIS RENDERS. `reduce.ts` sets `phase: 'actions'`
+        and `_pendingCard: null` on the ANSWER branch, and `broadcast.ts`'s
+        `openQuestionFor` returns `null` unless `phase === 'answer'` — so the card
+        is off the wire before the first frame of this screen paints. There is no
+        window in which an observer could time an animation to learn it.
+     2. THE NUMBER IS YOURS AND IT IS ALREADY SPENT. It is in your pool, it has
+        been capped, and it is in the public log. Nothing here reveals a fact.
+     3. WHAT IT DOES REVEAL IS THE OTHER SIDE — and that is a correction, not a
+        leak. The answerer is the one seat that never saw the card in full, so
+        until now they chose without ever learning what the alternative paid. This
+        closes the asymmetry the answer screen opened.
+
+   So the animation is allowed to be an animation, and it is doing the job §9.3
+   actually wants: making a resolution land rather than appear.
+
+   ── THE CARD IS A LOCAL SNAPSHOT, AND THAT IS THE WHOLE TRICK ──────────────────
+
+   This component is handed the prompt, not told to go and find it, because the card
+   CANNOT be re-read after the fact — see 1 above. `GameScreen` captures the prompt
+   in the same callback that dispatches `ANSWER`, which is the last instant at which
+   it exists. So this is a snapshot of something the player was already shown, not a
+   new channel: `AnswerPrompt` is the server's own payload and the Ideology corpus
+   is public JSON (see `app/blindWire.ts`).
+
+   ── NEW CLASS NAMES, AND IT MATTERS ──────────────────────────────────────────
+
+   `.resolution__*`, not `.blind-answer__*`. This screen marks ONE side as chosen,
+   and a modifier on `.blind-answer__side` would be exactly what `blindAnswer.css`'s
+   header forbids — no modifier class, no per-side rule, because on the ANSWER screen
+   a per-side style is a channel publishing which Ideologue a display position is.
+   That contract does not apply here (post-commit, your own card) but the stylesheet
+   audit is a regex over the FILE, not a judgement about context, so borrowing the
+   class would fail the build and — more to the point — would make the two screens
+   look related when they are deliberately not.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/** How long the numbers take to land. Long enough to read as counting, short enough not to wait. */
+const COUNT_MS = 900;
+
+/** Stagger between the two sides and the payout row, in ms. */
+const STEP_MS = 160;
+
 /**
- * The resolved-answer frame. §7.3 / §9.3.
+ * Count `target` up from zero, or report it immediately.
  *
- * It renders for exactly one state and then the phase moves on, so this is not
- * an animation controller — it is a static frame with a 300ms fade on opacity.
- * The numbers come from the server's own `ClientState` (the answer's resources
- * are already in the pool, credited by the engine), so there is nothing here to
- * compute and therefore nothing here to get subtly wrong.
- *
- * WHAT IT DELIBERATELY DOES NOT SHOW: the other side's payout, a comparison, a
- * "you would have got" line, or a count-up. Every one of those animates on a
- * length that leaks, and the leak is permanent for everyone who saw it.
+ * `prefers-reduced-motion` is honoured in JAVASCRIPT as well as in CSS, and the
+ * reason is specific: this is the only animation in the product that changes a
+ * NUMBER rather than a transform. A reduced-motion user who gets the number
+ * mid-flight sees `4` when the truth is `9`, and a wrong number is not a milder
+ * version of a right one — it is a lie with a smaller animation attached. So the
+ * hook short-circuits to the final value and the CSS transition is a separate
+ * concern entirely.
  */
-export function AnswerReveal({
-  state,
-  you,
-  answeredLabel,
-}: {
-  state: ClientState;
-  you: PlayerID;
-  /** The label the player committed to. Public per rules-reference.md:190-191. */
-  readonly answeredLabel: string | null;
-}) {
-  const me = state.players[you];
-  if (me === undefined) return null;
+function useCountUp(target: number, enabled: boolean): number {
+  const reduced = usePrefersReducedMotion();
+  const [shown, setShown] = useState(enabled && !reduced ? 0 : target);
+
+  useEffect(() => {
+    if (!enabled || reduced) {
+      setShown(target);
+      return;
+    }
+    if (target === 0) {
+      setShown(0);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - start) / COUNT_MS);
+      // Ease-out, so it decelerates into the final value instead of stopping dead.
+      // A linear count reads as a progress bar; this reads as a number arriving.
+      const eased = 1 - (1 - t) * (1 - t) * (1 - t);
+      setShown(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, enabled, reduced]);
+
+  return shown;
+}
+
+/** `true` when the reader has asked for less motion. Safe on the server. */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(mq.matches);
+    const onChange = (e: MediaQueryListEvent): void => setReduced(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return reduced;
+}
+
+/**
+ * THE CARD, AS THE RESOLUTION IS ALLOWED TO HOLD IT.
+ *
+ * This is `AnswerPrompt` MINUS `order`, and the subtraction is the point rather than
+ * tidiness. `order` — the seed-derived draw saying which face of the card is the
+ * first display position — exists on `AnswerPrompt` and on nothing else the client
+ * receives; it is the one field PLAN.md §2 amendment A′ exists to protect, and
+ * `openQuestion` deliberately fails closed on a payload carrying one
+ * (`blindWire.ts:openQuestionOf`).
+ *
+ * The snapshot in `GameScreen` has to be taken from `store.answer`, so `order` is
+ * unavoidably in hand at that moment. Handing the component the narrow type means it
+ * CANNOT render it, cannot pass it down, and cannot have it read out of devtools by
+ * anyone who later adds a debug attribute — not because a rule forbids that, but
+ * because the property is not there. A prohibition is something the next edit can
+ * forget; a missing field cannot be forgotten, only re-added on purpose.
+ */
+export type ResolvedCard = {
+  readonly question: string;
+  readonly sides: readonly [AnswerSide, AnswerSide];
+};
+
+/**
+ * The card, stripped to what the resolution needs, at the last instant the card is
+ * readable at all.
+ *
+ * THE ONLY FUNCTION IN THE CLIENT THAT TOUCHES `order`, and it does so to throw it
+ * away. It is called from the `ANSWER` dispatch callback because that is the last
+ * instruction that runs while `store.answer` is still non-null: `net/store.ts` nulls
+ * it the moment the phase moves on, and `reduce.ts` has already nulled
+ * `_pendingCard`.
+ */
+export function cardForResolution(prompt: AnswerPrompt): ResolvedCard {
+  return { question: prompt.question, sides: prompt.sides };
+}
+
+export type AnswerResolutionProps = {
+  /** The card as it was when the answer was sent. See the snapshot note above. */
+  readonly prompt: ResolvedCard;
+  /** Which DISPLAY position the player committed to. `0` is the left cell. */
+  readonly chosenIndex: 0 | 1;
+  /**
+   * What the SERVER wrote to the log as this player's answer, or `null`.
+   *
+   * This wins over the snapshot's own label for the chosen card, and the reason is
+   * a specific failure rather than general distrust: `committedSideToDisplayIndex` is
+   * the one mapping in this mechanic that can be got backwards, and if it were, the
+   * resolution would cheerfully animate the WRONG payout as though the player had
+   * earned it. The log is written by `reduce.ts` from the side the engine actually
+   * took, so it cannot be wrong about that. When the two agree — which is every real
+   * run — this changes nothing; when they somehow do not, the screen says what the
+   * server did rather than what the client hoped.
+   */
+  readonly serverText: string | null;
+  readonly onContinue: () => void;
+};
+
+/**
+ * THE RESOLUTION. The whole card, both sides in full, the chosen one marked, and
+ * the points counted up in front of the player.
+ *
+ * The prose comes from `payoutLine` and `IDEOLOGUE_FACTION` — the same two helpers
+ * `TableQuestion` prints with — rather than from a second implementation, so the
+ * table's copy of a card and the answerer's copy of the same card cannot disagree
+ * about what a side says or what it pays. That is the whole reason those two live
+ * in `answer/BlindAnswer.tsx` and are exported rather than copied.
+ */
+export function AnswerResolution({
+  prompt,
+  chosenIndex,
+  serverText,
+  onContinue,
+}: AnswerResolutionProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
+
+  const chosen = prompt.sides[chosenIndex];
+  const reduced = usePrefersReducedMotion();
+
+  // The server's own words for this answer, stripped of the quotes `reduce.ts` wraps
+  // them in, and only when they name a side of THIS card. A log entry from an
+  // earlier turn on the same seat carries an answer to a card that is long gone, and
+  // printing that here would put a stranger's sentence under "YOU CHOSE THIS".
+  const serverLabel = useMemo(() => {
+    const bare = serverText?.trim().replace(/^"|"$/g, '') ?? null;
+    if (bare === null || bare.length === 0) return null;
+    return bare;
+  }, [serverText]);
+
   return (
-    <div className="reveal sheet" role="status" data-testid="answer-reveal">
-      <h2 className="sheet__title">Answer recorded</h2>
-      {answeredLabel === null ? null : (
-        <p className="sheet__body">
-          <span className="reveal__summary">{answeredLabel}</span>
+    <div className="scrim scrim--answer" data-testid="answer-resolution">
+      <div
+        ref={rootRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Your answer"
+        className="resolution"
+        style={{ outline: 'none' }}
+      >
+        <p className="eyebrow" style={{ textAlign: 'center' }}>
+          YOUR ANSWER
         </p>
-      )}
-      <PoolNumbers pool={me.resources} />
-      <p className="panel__note panel__note--quiet">
-        {me.manifesto.length} card{me.manifesto.length === 1 ? '' : 's'} on your mat. The full
-        resolution is in the log.
-      </p>
+
+        {/* THE WHOLE QUESTION, at the size it was asked. It is on this screen
+            because the resolution is about this question, not about a number. */}
+        <h2 className="resolution__question" data-testid="resolution-question">
+          {prompt.question}
+        </h2>
+
+        {/* BOTH SIDES, IN FULL, whichever one you took. The one you did not take is
+            shown because the asymmetry it closes is the point: until now the
+            answerer was the only seat that never learned what the other side paid. */}
+        <div className="resolution__sides">
+          {([0, 1] as const).map((i) => {
+            const side = prompt.sides[i];
+            const mine = i === chosenIndex;
+            const label =
+              mine && serverLabel !== null ? serverLabel : side.label;
+            return (
+              <div
+                key={i}
+                className={`resolution__side${mine ? ' resolution__side--mine' : ''}`}
+                data-mine={mine ? 'true' : 'false'}
+                data-testid={mine ? 'resolution-mine' : 'resolution-theirs'}
+              >
+                <p className="resolution__verdict">
+                  {mine ? (
+                    <>
+                      <span className="resolution__tick" aria-hidden="true">
+                        ✓
+                      </span>
+                      YOU CHOSE THIS
+                    </>
+                  ) : (
+                    'YOU DID NOT CHOOSE THIS'
+                  )}
+                </p>
+                <p className="resolution__answer">{label}</p>
+                <p className="resolution__faction">
+                  {IDEOLOGUE_FACTION[side.ideologue]} answer
+                </p>
+                <p
+                  className={`resolution__payout${
+                    side.pays === undefined || Object.keys(side.pays).length === 0
+                      ? ' resolution__payout--none'
+                      : ''
+                  }`}
+                >
+                  pays {payoutLine(side.pays)}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* WHAT YOU GOT, COUNTING UP. Only ever YOUR side — the other side's figure
+            is printed above as prose and is not animated, because animating the
+            number you did not earn is theatre. */}
+        <PayoutLanded pays={chosen.pays} animate={!reduced} />
+        <PayoutSummary pays={chosen.pays} />
+
+        <div className="row" style={{ justifyContent: 'center', marginTop: 'var(--sp-6)' }}>
+          <button
+            type="button"
+            className="btn btn--primary btn--wide"
+            onClick={onContinue}
+            data-testid="resolution-continue"
+          >
+            CONTINUE
+          </button>
+        </div>
+
+        <p
+          className="panel__note panel__note--quiet"
+          style={{ textAlign: 'center', marginTop: 'var(--sp-3)' }}
+        >
+          Your answer and its resolution are in the log for the whole table.
+        </p>
+      </div>
     </div>
+  );
+}
+
+/**
+ * THE POINTS YOU GOT, arriving one at a time.
+ *
+ * `delay` staggers the four pools so they land in `RESOURCE_ORDER` rather than all
+ * at once — a row of four numbers appearing simultaneously reads as one number, and
+ * the stagger is what makes it read as four. Pools the card did not pay are shown
+ * at zero rather than omitted, because "you gained nothing here" and "this card
+ * said nothing about here" are different facts and the second is invisible.
+ */
+function PayoutLanded({
+  pays,
+  animate,
+}: {
+  readonly pays: Readonly<Partial<Record<'funds' | 'clout' | 'media' | 'trust', number>>>;
+  readonly animate: boolean;
+}) {
+  const reduced = usePrefersReducedMotion();
+  return (
+    <div className="resolution__payout-landed">
+      <p className="resolution__payout-label">YOU GAINED</p>
+      <div className="res">
+        {RESOURCE_ORDER.map((r: Resource, i: number) => (
+          <LandedCell
+            key={r}
+            resource={r}
+            amount={pays[r] ?? 0}
+            animate={animate && !reduced}
+            delay={i * STEP_MS}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LandedCell({
+  resource,
+  amount,
+  animate,
+  delay,
+}: {
+  readonly resource: Resource;
+  readonly amount: number;
+  readonly animate: boolean;
+  readonly delay: number;
+}) {
+  // A cell that pays zero waits its turn and then lands on zero, rather than
+  // appearing at zero instantly — otherwise the stagger reads as "these two are
+  // missing" instead of "these two are zero".
+  const [armed, setArmed] = useState(!animate);
+  useEffect(() => {
+    if (!animate) {
+      setArmed(true);
+      return;
+    }
+    const t = window.setTimeout(() => setArmed(true), delay);
+    return () => window.clearTimeout(t);
+  }, [animate, delay]);
+
+  const shown = useCountUp(amount, armed);
+  const gained = amount > 0;
+
+  return (
+    <div
+      className={`res__cell resolution__cell${gained ? ' resolution__cell--gained' : ''}`}
+      data-res={resource}
+      data-testid={`landed-${resource}`}
+      // The only inline appearance in this screen, and it is a DELAY. The stagger
+      // is data — the pool's position in `RESOURCE_ORDER` — so it cannot be four
+      // hand-written rules, and a delay cannot make one cell look different in a way
+      // that means something. Every colour, size and position is in `app.css`.
+      style={{ animationDelay: `${delay}ms` }}
+      // The number is announced once, at its final value, by the `role="status"`
+      // sentence beside the row. Announcing every frame of a count-up would be
+      // unusable, so the cells themselves are hidden from the accessibility tree.
+      aria-hidden="true"
+    >
+      <ResourceGlyph resource={resource} />
+      <span className="res__num">{gained ? `+${shown}` : '—'}</span>
+      <span className="res__name">{resource}</span>
+    </div>
+  );
+}
+
+/** One spoken sentence for the whole payout, rather than four animating numerals. */
+function PayoutSummary({ pays }: { pays: AnswerResolutionProps['prompt']['sides'][0]['pays'] }) {
+  const parts = RESOURCE_ORDER.map((r) => ({ r, n: pays[r] ?? 0 })).filter((p) => p.n > 0);
+  const sentence =
+    parts.length === 0
+      ? 'This answer paid you nothing.'
+      : `You gained ${parts.map((p) => `${p.n} ${p.r}`).join(' and ')}.`;
+  return (
+    <p className="sr-only" role="status" data-testid="resolution-summary">
+      {sentence}
+    </p>
   );
 }
 

@@ -45,7 +45,12 @@ import {
   cardStranded,
   surchargeOf,
 } from './derive.ts';
+import { ResourceGlyph } from './ResourceGlyph.tsx';
 import type { PendingVoters } from '@shasn/engine';
+// TYPE-ONLY, and from `./derive.ts` rather than value-imported: it is the return
+// shape of the `manifestoCells` call below, and naming it is what lets `cellName`
+// and `trackName` be plain functions.
+import type { ManifestoCell } from './derive.ts';
 import type { Link } from './store.ts';
 
 export type YourMatProps = {
@@ -84,7 +89,22 @@ export type YourMatProps = {
    */
   readonly onGerry: () => void;
   readonly onPower: (power: string) => void;
-  readonly onEndTurn: () => void;
+  /*
+    NO `onEndTurn`, AND ITS REMOVAL IS THE THIRD HALF OF A BUG.
+
+    §5.4 lists END TURN as mat region 5, and this prop has been here ever since the
+    mat was split into its own panel — and it was never rendered. So for the whole
+    time it existed, the type said a control was wired and the component drew nothing.
+
+    Together with `.endturn-dock` being `display: none` outside the phone query and
+    the "desktop" END TURN in `GameScreen` being an unsatisfiable condition
+    (`isMyTurn && … && !isMyTurn`), that is three controls' worth of intent and zero
+    live controls: a desktop player could not end a turn at all.
+
+    END TURN now lives in ONE place — the fixed dock in `GameScreen`, on screen at
+    every width — and this prop is gone rather than left as a second, unwired copy.
+    A prop nobody renders is how the next reader concludes the control exists.
+  */
   /**
    * Open the trade composer. §5.7 is a two-party screen, so the mat needs one
    * button per OTHER player rather than a "trade" command that opens a picker —
@@ -150,7 +170,8 @@ export function ResourceStrip({
     <div>
       <div className="res">
         {RESOURCE_ORDER.map((r) => (
-          <div key={r} className="res__cell">
+          <div key={r} className="res__cell" data-res={r}>
+            <ResourceGlyph resource={r} />
             <span className="res__num">{pool[r]}</span>
             <span className="res__name">{r}</span>
           </div>
@@ -219,6 +240,54 @@ export function ResourceStrip({
  * know that three Capitalist cards is the price and that each one pays a Fund, and
  * `23 funds L5` told them neither.
  */
+/**
+ * THE CELL'S ACCESSIBLE NAME, as a FUNCTION rather than an inline template.
+ *
+ * §8.5 parity: a screen-reader user must not have to reassemble "23", "cards",
+ * "Capitalist", "L5" from four separate nodes to learn what the number means.
+ *
+ * It is hoisted out of the JSX for a reason that is not tidiness. Written inline,
+ * this sentence is a template literal nested three deep inside a JSX attribute —
+ * ternaries inside `${}`, inside another ternary, inside `${}` — and the failure
+ * mode is silent and nonlocal: an unbalanced brace in the innermost branch reports
+ * its position tens of lines away, at an unrelated comment, as `Expected "}" but
+ * found "funds"`. That is exactly how it presented here, and it cost a bisect to
+ * locate. As two functions it is plain TypeScript that fails where it is wrong.
+ */
+function cellName(c: ManifestoCell): string {
+  const more = c.cardsToBonus === 1 ? 'card' : 'cards';
+  return [
+    `${c.count} ${IDEOLOGUE_NAME[c.ideologue]} Ideology Cards.`,
+    c.level === null
+      ? `A power unlocks at ${UI_RULES.level3} cards, ${c.toNext} more to go.`
+      : `Level ${c.level} reached.`,
+    c.bonusPerTurn > 0
+      ? `Pays ${c.bonusPerTurn} extra ${c.resource} per turn.`
+      : `Pays nothing yet, ${c.cardsToBonus} more ${more} for +1.`,
+    `One extra ${c.resource} for every ${UI_RULES.passiveBonusPer} cards.`,
+  ].join(' ');
+}
+
+/**
+ * THE PIP TRACK'S NAME, in words.
+ *
+ * The track is `role="img"` precisely so its POSITIONS carry the rules — the gap
+ * after every second pip IS the `passiveBonusPer` cadence and the notched pip IS
+ * `level3` — and a position is invisible to anyone not looking at it. So the
+ * thresholds are stated here too, for the same reason `cellName` exists: the
+ * visual encoding must not be the only place a threshold is written down.
+ */
+function trackName(c: ManifestoCell): string {
+  const filled = Math.min(c.count, UI_RULES.level5);
+  return [
+    `${filled} of ${UI_RULES.level5} pip slots filled.`,
+    c.level === null
+      ? `The power unlocks at the ${UI_RULES.level3}rd card.`
+      : 'Power unlocked.',
+    `Every pair of pips pays +1.`,
+  ].join(' ');
+}
+
 export function ManifestoStrip({ state, you }: { state: ClientState; you: PlayerID }) {
   const p = state.players[you];
   if (p === undefined) return null;
@@ -232,12 +301,15 @@ export function ManifestoStrip({ state, you }: { state: ClientState; you: Player
           data-level={c.level ?? 'none'}
           /* The whole cell, in one accessible name. §8.5 parity: a screen-reader
              user must not have to reassemble "23", "cards", "Capitalist", "L5" from
-             four separate nodes to learn what the number means. */
-          aria-label={`${c.count} ${IDEOLOGUE_NAME[c.ideologue]} Ideology Cards. ${
-            c.level === null
-              ? `${c.toNext} more unlocks a power and pays ${c.bonusPerTurn} extra ${c.resource} per turn.`
-              : `Level ${c.level} reached. Pays ${c.bonusPerTurn} extra ${c.resource} per turn.`
-          }`}
+             four separate nodes to learn what the number means.
+
+             It restates the pip track's thresholds in words, because the track is
+             `role="img"` precisely so its POSITIONS carry the rules — and a
+             position is invisible to anyone not looking at it. The three facts a
+             player needs (how many, what it pays, what is still locked) are all
+             present, and the "every N cards" cadence is here because it is the one
+             number the track encodes rather than prints. */
+          aria-label={cellName(c)}
           data-testid={`manifesto-${c.ideologue}`}
         >
           <span className="mani__count">
@@ -251,9 +323,9 @@ export function ManifestoStrip({ state, you }: { state: ClientState; you: Player
             <span className="mani__noun"> {c.count === 1 ? 'card' : 'cards'}</span>
           </span>
           {/* THE IDEOLOGUE, not the resource: the cards ARE Capitalist cards. Its own
-              line — `display: block` — because it and the bonus line are two
-              different facts, and rendered as two inline spans they ran together into
-              "CAPITALIST2 MORE · +1 FUNDS PER 2". Also caught by a screenshot.
+              line — `display: block` — because it and the lines below are different
+              facts, and rendered as inline spans they ran together into "CAPITALIST2
+              MORE · +1 FUNDS PER 2". Also caught by a screenshot.
 
               The explicit `{' '}` between the spans is not decoration either: `display:
               block` is a VISUAL break, so `textContent` — which is what a screen
@@ -266,18 +338,62 @@ export function ManifestoStrip({ state, you }: { state: ClientState; you: Player
           {c.level !== null ? (
             <span className={`chip chip--${c.level === 'L3' ? 'l3' : 'l5'}`}> {c.level}</span>
           ) : null}
-          {/* §5.4 calls this "the main strategic read on the mat": it is what a
-              player looks at to decide what to answer, so it is the p28 rule in words
-              rather than a countdown to an unnamed threshold. INDEPENDENT of the chip
-              above, not its alternative — a cell at L5 still pays `+2 funds per turn`,
-              and folding this into the chip's `else` would have shown the forecast
-              only until the unlock and never again, which is exactly when it stops
-              being a forecast. */}
-          <span className="mani__bonus">
+          {/* THE PROGRESS TRACK. The strip has THREE thresholds — `passiveBonusPer`
+              (2), `level3` (3) and `level5` (5) — and all three were prose. `3 MORE
+              UNLOCKS A POWER` and `+1 FUNDS PER 2` are two of them, and a player
+              reading both had to notice they were on different clocks: a cell at one
+              card said the power needed two more AND that the next Fund needed one,
+              on adjacent lines with nothing marking which was which. Reported as
+              "the UI doesn't feel super intuitive", after a screenshot showed the
+              strip being arithmetically true and practically unreadable.
+
+              Pips make it legible without arithmetic: three RULES that never change
+              (one per threshold) so the track cannot grow to hide a 23rd card, filled
+              to `count`. The gap after every second pip IS the `passiveBonusPer`
+              grouping — a player watches a pair fill and knows the `+1` is why —
+              and the third pip wears a notch because that is where the power comes
+              in. Both facts are now POSITIONS rather than sentences to reconcile.
+
+              Capped at `level5`, which is the last threshold in the rules: past five
+              the pip track is full and stops being information, so the overflow is
+              carried by the numeral above it, which is unbounded and correct. */}
+          <span
+            className="mani__track"
+            data-ideo={c.ideologue}
+            role="img"
+            aria-label={trackName(c)}
+          >
+            {Array.from({ length: UI_RULES.level5 }, (_, i) => {
+              const n = i + 1;
+              return (
+                <span
+                  key={n}
+                  className="mani__pip"
+                  data-filled={n <= c.count}
+                  data-threshold={n === UI_RULES.level3 ? 'power' : undefined}
+                  data-pair-end={n % UI_RULES.passiveBonusPer === 0 || n === UI_RULES.level5}
+                />
+              );
+            })}
+          </span>
+          {/* THE INCOME, not the rule. `+1 funds per 2` states a RULE; `+1 funds` states
+              what the player actually receives this turn, which is the number they
+              are playing for and the only one that survives into a score. Stating the
+              cadence here was correct and still wrong-shaped: it made the cell's
+              bottom line a formula to apply rather than a quantity to bank, and it
+              is what put `3` and `2` next to each other in the first place.
+
+              So the cadence lives in the pip gaps (visual, permanent, unmissable) and
+              this line carries the income. At zero it says so plainly, because
+              "nothing yet" is itself the strategic read — a player deciding whether
+              to chase a third Capitalist needs to know the second card is what pays. */}
+          <span className="mani__bonus" data-earning={c.bonusPerTurn > 0}>
             {' '}
-            {c.level === null
-              ? `${c.toNext} more · +1 ${c.resource} per ${UI_RULES.passiveBonusPer}`
-              : `+${c.bonusPerTurn} ${c.resource} per turn`}
+            {c.bonusPerTurn > 0
+              ? `+${c.bonusPerTurn} ${c.resource} per turn`
+              : `+0 ${c.resource} · ${
+                  c.cardsToBonus === 1 ? 'next card pays' : `next in ${c.cardsToBonus}`
+                }`}
           </span>
         </div>
       ))}
@@ -585,17 +701,55 @@ export function MarketStrip({
             data-testid="market-card"
           >
             <span className="mkt__cost" data-testid="market-charge">
-              {RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > 0)
-                .map((r) => {
-                  const left = Math.max(0, (slot.cost[r] ?? 0) - (waived.has(r) ? 1 : 0));
-                  return waived.has(r)
-                    ? left === 0
-                      ? `${r[0]!.toUpperCase()} waived`
-                      : `${left} ${r[0]!.toUpperCase()} (waived)`
-                    : `${slot.cost[r]} ${r[0]!.toUpperCase()}`;
-                })
-                .concat(tax > 0 ? [`+${tax} F tax`] : [])
-                .join(' · ') || 'free'}
+              {(() => {
+                /*
+                 * `2 F · 3 T · +1 F tax` WAS THE SURFACE NOBODY COULD READ.
+                 *
+                 * Four single letters, and F/C/M/T are the four letters a player is
+                 * least likely to hold in order: a card costing `3 M` is Media and
+                 * a card costing `3 T` is Trust, and they are one glyph apart with
+                 * nothing between them. §5.4 already specified the fix — "four
+                 * glyph+numeral pairs in TYPE_MKT_COST" — and it was never built.
+                 *
+                 * The LETTER STAYS, and it has to: `marketCharge.test.tsx` parses
+                 * this string on `/^(\d+) ([FCMT])/` to prove the printed price
+                 * equals the charged price, which is the invariant that stops a
+                 * waiver being priced one thing and charged another. The glyph is
+                 * an `<svg>`, so it contributes nothing to `textContent` and that
+                 * invariant is untouched. The letter becomes the *abbreviation of*
+                 * an identified token rather than the whole of one.
+                 *
+                 * The `·` separators stay as literal text between the runs for the
+                 * same reason: the test splits on them.
+                 */
+                const initial = (r: Resource) => r[0]!.toUpperCase();
+                const runs: { res: Resource; text: string }[] =
+                  RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > 0).map((r) => {
+                    const left = Math.max(0, (slot.cost[r] ?? 0) - (waived.has(r) ? 1 : 0));
+                    return {
+                      res: r,
+                      text: waived.has(r)
+                        ? left === 0
+                          ? `${initial(r)} waived`
+                          : `${left} ${initial(r)} (waived)`
+                        : `${slot.cost[r]} ${initial(r)}`,
+                    };
+                  });
+                // The surcharge is a Funds tax, so it takes the Funds ink — it is
+                // money, and a player reading a price should see which resource
+                // the extra is denominated in before they read how much.
+                if (tax > 0) runs.push({ res: 'funds', text: `+${tax} F tax` });
+                if (runs.length === 0) return 'free';
+                return runs.map((run, i) => (
+                  <span key={run.res}>
+                    {i > 0 ? ' · ' : null}
+                    <span className="cost" data-res={run.res}>
+                      <ResourceGlyph resource={run.res} size={12} />
+                      {run.text}
+                    </span>
+                  </span>
+                ));
+              })()}
             </span>
             <span className="mkt__voters">◈ {slot.voters}</span>
             {/* §9.2: the reason is stated, next to the control, in a colour

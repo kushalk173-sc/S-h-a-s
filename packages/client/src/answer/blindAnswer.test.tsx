@@ -345,101 +345,144 @@ describe('the presentation order is seed-derived and actually varies', () => {
     expect(firstOrder).toEqual(['A', 'B']);
     expect(secondOrder).toEqual(['B', 'A']);
     // …while the WHOLE SIDE follows it. A player cannot learn "the long one is always
-    // on the right", "the Trusts' answer is always first", or — and this is the part
-    // that only became checkable under full information — "the Capitalists' answer is
-    // always on the left". A side is label, Ideologue and payout together, and all
-    // three move as one.
-    const wholeSide = (label: string, side: typeof SIDE_A | typeof SIDE_B): string =>
-      `${label}${side.ideologue === 'idealist' ? "the Idealists'" : "the Capitalists'"} answerpays ${
-        side.ideologue === 'idealist' ? '4 Fund · 1 Trust' : '1 Fund'
-      }`;
-    expect(firstLabels).toEqual([wholeSide(LABEL_A, SIDE_A), wholeSide(LABEL_B, SIDE_B)]);
-    expect(secondLabels).toEqual([wholeSide(LABEL_B, SIDE_B), wholeSide(LABEL_A, SIDE_A)]);
+    // on the right", "the Trusts' answer is always first", or "the Capitalists'
+    // answer is always on the left".
+    //
+    // A SIDE IS NOW LESS THAN IT WAS, and that is the change this file records: the
+    // answerer sees the question and two choices, not the Ideologue and the payout.
+    // So the thing that travels with the position is the LABEL — or, where the card
+    // is safely binary, the word `verdictOf` reduces it to. Both are functions of the
+    // side's own text, so neither can be read backwards into a position.
+    //
+    // These fixtures open "Sue them…" and "Let it stand.", neither of which is a
+    // binary verdict, so both sides fall through to the label. The binary case is
+    // covered separately, by the `verdictOf` describe below.
+    expect(firstLabels).toEqual([LABEL_A, LABEL_B]);
+    expect(secondLabels).toEqual([LABEL_B, LABEL_A]);
   });
 });
 
 /**
- * FULL INFORMATION: the whole card is on screen, and the only thing that cannot reach
- * the DOM is the `order` draw.
+ * FULL INFORMATION, NARROWED TO THE TABLE. The `order` draw is still the one thing
+ * that cannot reach the DOM.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * THIS DESCRIBE USED TO ASSERT THE OPPOSITE, and the replacement is stated first
- * because a reader who only reads the old comment would be misled about what the
- * component does.
+ * THIS DESCRIBE USED TO ASSERT THE OPPOSITE, TWICE, and both reversals are stated
+ * here because a reader who only reads the old comment would be misled about what
+ * the component does.
  *
  * It was called `no payout can reach the DOM`, and every test in it was about a card
- * whose payout and Ideologue were withheld. Full information reverses that: the server
- * publishes the whole card to every seat (`PublicQuestion` in the server's
- * `broadcast.ts`), so the question, both answers, both Ideologues and both payouts are
- * now on the card from the first frame, and the tests below assert THAT rather than its
- * absence.
+ * whose payout and Ideologue were withheld. Then it was called "the whole card is on
+ * screen", and every test asserted the OPPOSITE: both Ideologues and both payouts,
+ * printed on the answerer's panel. Full information put them there.
+ *
+ * They are not there now. The answerer sees the question and two choices. The rest of
+ * the table still sees the whole card — on `TableQuestion`, which is the same card and
+ * the same classes — so the wire, the server payload and `payoutLine` are all
+ * untouched. What changed is this screen, and the assertion below is now that the
+ * payout and the Ideologue are ABSENT, which is what stops the component quietly
+ * growing them back.
  *
  * What is still forbidden is the one field that remains: `order`, the seed-derived face
- * order. With the Ideologue printed beside each answer, a client that knew `order` could
- * publish which Ideologue the left-hand position is — the channel PLAN.md §2 amendment A′
- * exists to prevent, and the last surviving property of the old design. So: no prop
+ * order. A client that knew `order` could publish which face of the card a display
+ * position is — the channel PLAN.md §2 amendment A′ exists to prevent. So: no prop
  * carries it, no `order` key appears in the DOM, and nothing in the markup encodes it.
  */
-describe('the whole card is on screen, and the `order` draw is not', () => {
-  it('renders the scenario, both answers, both Ideologues and both payouts', () => {
+describe('the answerer sees the question and two choices, and not the payout', () => {
+  it('renders the scenario and both choices, and NOTHING else', () => {
     const { container } = render(
       <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
     expect(container.querySelector('[data-testid="scenario"]')?.textContent).toBe(QUESTION);
 
-    // The three lines per side, in the order the card prints them.
-    const faction = [...container.querySelectorAll('[data-testid="side-ideologue"]')].map((e) => e.textContent);
-    expect([...faction].sort()).toEqual(["the Capitalists' answer", "the Idealists' answer"].sort());
-    const payout = [...container.querySelectorAll('[data-testid="side-payout"]')].map((e) => e.textContent);
-    expect([...payout].sort()).toEqual(['pays 1 Fund', 'pays 4 Fund · 1 Trust'].sort());
+    // Two choices, one per side, each carrying the side's own words.
+    const labels = [...container.querySelectorAll('[data-testid="side-label"]')].map((e) => e.textContent);
+    expect([...labels].sort()).toEqual([LABEL_A, LABEL_B].sort());
+
+    // THE ABSENCE, which is the whole test. Both lines are gone from this screen, and
+    // both are printed in full on `TableQuestion`, so this is a decision about which
+    // panel shows what rather than a loss of information from the game.
+    expect(container.querySelector('[data-testid="side-ideologue"]'), 'no Ideologue for the answerer').toBeNull();
+    expect(container.querySelector('[data-testid="side-payout"]'), 'no payout for the answerer').toBeNull();
+    expect(container.innerHTML, 'no faction or payout class survives in the markup').not.toMatch(
+      /blind-answer__(faction|payout)/,
+    );
+    // …and no faction NAME has leaked in as bare text either, which is the shape a
+    // partial reversion would take.
+    for (const name of ["the Capitalists'", "the Idealists'", "the Supremos'", "the Showstoppers'"]) {
+      expect(container.textContent ?? '', `${name} must not reach the answerer's screen`).not.toContain(name);
+    }
+    expect(container.textContent ?? '', 'no payout figure reaches the answerer').not.toMatch(/\bpays\b/);
 
     // …and the whole prompt is EXACTLY those parts, in DOM order. Built from the
     // pieces the component rendered rather than from hard-coded prose, so a rewording
     // that added something could not pass and one that dropped something could not
-    // either — and read per-SIDE, because that is the order they appear in: a side is
-    // its label, then its Ideologue, then its payout, and they travel together.
-    const perSide = [...sides(container)].map((el) => [
-      el.querySelector('[data-testid="side-label"]')?.textContent ?? '',
-      el.querySelector('[data-testid="side-ideologue"]')?.textContent ?? '',
-      el.querySelector('[data-testid="side-payout"]')?.textContent ?? '',
-    ]);
+    // either.
     const text = (container.textContent ?? '').replace(/\s+/g, ' ').trim();
     expect(text).toBe(
-      [
-        QUESTION,
-        'CHOOSE ONE',
-        ...perSide.flat(),
-        commitLabel('idle'),
-        commitStatus('idle'),
-      ].join(''),
+      [QUESTION, 'CHOOSE ONE', ...labels, commitLabel('idle'), commitStatus('idle')].join(''),
     );
   });
 
-  it('names every pool the card prints, and only those', () => {
-    // The rule the old version asserted inverted. A `Delta` is PARTIAL: a pool the
-    // card does not mention is absent, not zero, so "pays 1 Fund" must not print Clout,
-    // Media or Trust as zeroes — a player reading "0 Clout" would learn nothing and a
-    // reader of the card would learn something false.
+  it('pays nothing to the answerer even when the card pays a lot', () => {
+    // A generous fixture, because "the payout is not rendered" is trivially true for a
+    // card that pays `{}`. This one pays 9 Funds, and the number 9 must not appear
+    // anywhere on the answerer's screen.
     const { container } = render(
-      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
-    );
-    const b = [...container.querySelectorAll('[data-testid="side-payout"]')].find(
-      (e) => e.textContent === 'pays 1 Fund',
-    );
-    expect(b?.textContent).toBe('pays 1 Fund');
-    for (const absent of ['Clout', 'Media', 'Trust', '₹']) {
-      expect(b?.textContent ?? '', `${absent} must not be printed for a side that does not pay it`).not.toContain(absent);
-    }
-    // And a side that pays nothing at all says so, rather than printing an empty line.
-    const { container: flat } = render(
       <BlindAnswer
         question={QUESTION}
-        sideA={{ label: 'a', ideologue: 'supremo', pays: {} }}
-        sideB={{ label: 'b', ideologue: 'showstopper', pays: {} }}
+        sideA={{ label: 'Yes. Absolutely every one of them.', ideologue: 'idealist', pays: { funds: 9, media: 4 } }}
+        sideB={{ label: 'No. Not a single one of them.', ideologue: 'capitalist', pays: { trust: 7 } }}
         seed={1}
       />,
     );
-    expect(flat.querySelector('[data-testid="side-payout"]')?.textContent).toBe('pays nothing');
+    expect(container.textContent ?? '').not.toMatch(/Fund|Media|Trust|pays/);
+    // …and it IS reduced to the two words, which is the other half of the change.
+    // These labels open "Yes." and "No.", so both sides reduce; the generous payout
+    // above is what must not survive the reduction.
+    expect(
+      [...container.querySelectorAll('[data-testid="side-label"]')].map((e) => e.textContent).sort(),
+    ).toEqual(['NO', 'YES']);
+  });
+
+  it('names the full sentence to a screen reader, and the visible word inside it', () => {
+    // "YES" on its own is a bare polarity with no question attached in a screen
+    // reader's flat reading of the page. WCAG 2.5.3 (Label in Name) is satisfied
+    // because the card's prose always OPENS with the word on the button, so the
+    // accessible name contains the visible text rather than replacing it.
+    const { container } = render(
+      <BlindAnswer
+        question={QUESTION}
+        sideA={{ label: 'Yes. Every school, including the ones that would rather not.', ideologue: 'idealist', pays: {} }}
+        sideB={{ label: 'No. Teach it in some schools and it becomes a school trip.', ideologue: 'showstopper', pays: {} }}
+        seed={1}
+      />,
+    );
+    for (const side of [...container.querySelectorAll('.blind-answer__side')]) {
+      const shown = side.querySelector('[data-testid="side-label"]')?.textContent ?? '';
+      const named = side.getAttribute('aria-label') ?? '';
+      expect(['YES', 'NO']).toContain(shown);
+      expect(named, 'the accessible name carries the card\'s own sentence').toMatch(/\S/);
+      expect(
+        named.toUpperCase(),
+        'Label in Name: the accessible name must CONTAIN the visible word',
+      ).toContain(shown);
+    }
+  });
+
+  it('leaves the label alone when it is not a binary, rather than inventing a polarity', () => {
+    // A wrong binary is worse than a long one: one misleads, the other is merely
+    // verbose. `Sue them and stall the project for three years.` asserts nothing about
+    // polarity, so the prose is what goes on the button.
+    const { container } = render(
+      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+    );
+    for (const el of container.querySelectorAll('[data-testid="side-label"]')) {
+      expect(el.textContent).toMatch(/^(Sue them|Let it stand)/);
+      // And nothing pretends otherwise: no aria-label bolting on a name the visible
+      // word is not part of.
+      expect(el.closest('.blind-answer__side')?.getAttribute('aria-label')).toBeNull();
+    }
   });
 
   it('carries NO `order`, and no attribute or node that could stand in for it', () => {
@@ -458,23 +501,22 @@ describe('the whole card is on screen, and the `order` draw is not', () => {
     for (const forbidden of ['data-side', 'data-ideologue', 'data-pays', 'data-face']) {
       expect([...attrs], `${forbidden} would let CSS key the position's Ideologue`).not.toContain(forbidden);
     }
-    // The Ideologue and the payout are TEXT, so a per-side rule would need a selector
-    // over the text — which the stylesheet audit below forbids.
-    for (const el of container.querySelectorAll('.blind-answer__faction, .blind-answer__payout')) {
-      expect(el.className).toBe(el.className.trim());
+    // The choice itself is TEXT, so a per-side rule would need a selector over the
+    // text — which the stylesheet audit below forbids. It carries no `title`, which
+    // would be a second channel for the same content.
+    for (const el of container.querySelectorAll('.blind-answer__label')) {
       expect(el.getAttribute('style')).toBeNull();
       expect(el.getAttribute('title')).toBeNull();
     }
   });
 
-  it('has no element that could carry a value out of band: no icon, meter, bar or title', () => {
+  it('still has no element that could carry a value out of band: no icon, meter or title', () => {
     const { container } = render(
       <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
-    // UI-SPEC §9 anti-patterns 1 and 3 survive the reversal of the payout ban: there is
-    // still no icon, no meter and no `title` tooltip, because a graphical reading of a
-    // number is a number that can be compared between the two sides at a glance in a way
-    // prose is not — and the payout is the one thing both seats may read.
+    // UI-SPEC §9 anti-patterns 1 and 3. Unchanged by hiding the payout: there is now
+    // nothing to animate even if someone wanted to, and a graphical reading of a
+    // number is a number two sides could be compared on at a glance.
     expect(container.querySelector('svg')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('progress')).toBeNull();
@@ -898,30 +940,47 @@ describe('the stylesheet itself contains no side-differentiating rule', () => {
  * to come back. The measured proof that both answers are inside a 390px viewport
  * is a browser measurement, and it is recorded in the commit that landed this.
  */
-describe('the three lines of a side have three DIFFERENT types', () => {
+/**
+ * THE THREE-LINE HIERARCHY BELONGS TO `TableQuestion` NOW, and the measurements of it
+ * have MOVED there rather than been deleted.
+ *
+ * Everything in this describe used to be about the ANSWERER'S card, and it was all
+ * correct there. The answerer now sees the question and two choices — no Ideologue, no
+ * payout — while `TableQuestion` prints all three lines for every seat that is not
+ * answering, on the same classes. `app/tableQuestion.test.tsx` carries the typography
+ * assertions that used to live here, because that is where the elements render.
+ *
+ * They are not deleted, because the defect they guard against is real and hiding the
+ * lines does not fix it:
+ *
+ *   THE PAYOUT HAD NO RULE AT ALL. Full information added two unstyled `<span>`s
+ *   inside `.blind-answer__side`, and the stylesheet had no rule for
+ *   `.blind-answer__payout` or `.blind-answer__faction` — so both inherited the
+ *   answer label's every visual property: 17px, 700, INK_900, the display serif.
+ *   Inside a `flex-direction: row` that made the payout a 53px-wide, five-line ragged
+ *   strip reading "pays / 2 / Fund / · 1 / Media". The audit's closing judgement was
+ *   that this is "the least legible thing on the card".
+ *
+ *   WHY IT SURVIVED EVERY GATE. Each existing assertion is about the two sides being
+ *   EQUAL to each other. The payout and the Ideologue are perfectly symmetric — both
+ *   sides carry the same class with the same inherited style — and completely
+ *   unreadable. Symmetry and legibility are orthogonal and only the first was under
+ *   test. So the assertion is not "the payout is styled" but "the three lines are
+ *   styled DIFFERENTLY from each other", which is the property that was missing.
+ *
+ * What is asserted HERE is narrower, and it is the only thing this screen can still
+ * get wrong: that the two lines are gone from this markup, and that their rules
+ * survive un-narrowed for the panel that uses them.
+ *
+ * jsdom performs no layout, so nothing here can measure a box; these assertions are on
+ * the stylesheet and the markup, which is what would have to change for either defect
+ * to come back.
+ */
+describe('the payout and the Ideologue left this screen but kept their rules', () => {
   /**
-   * THE PAYOUT HAD NO RULE AT ALL.
-   *
-   * Full information added two unstyled `<span>`s inside `.blind-answer__side`, and
-   * the stylesheet had no rule for `.blind-answer__payout` or `.blind-answer__faction`
-   * — so both inherited the answer label's every visual property: 17px, 700, INK_900,
-   * the display serif. Inside a `flex-direction: row` that made the payout a 53px-wide,
-   * five-line ragged strip reading "pays / 2 / Fund / · 1 / Media", with the Ideologue
-   * as a second ragged strip beside it. The audit's closing judgement was that this is
-   * "the least legible thing on the card" — and it is the one datum the full-information
-   * ruling exists to publish.
-   *
-   * WHY IT SURVIVED EVERY GATE. Each existing assertion is about the two sides being
-   * EQUAL to each other. The payout and the Ideologue are perfectly symmetric — both
-   * sides carry the same class with the same inherited style — and completely
-   * unreadable. Symmetry and legibility are orthogonal and only the first was under
-   * test. So the assertion here is not "the payout is styled" but "the three lines
-   * are styled DIFFERENTLY from each other", which is the property that was missing.
-   *
-   * These are computed styles, so they read the stylesheet that actually reached the
-   * document — not a source regex. The values are literal px rather than a `font:`
-   * token because jsdom does not expand shorthands, and the reason the side rule is
-   * written in longhand is the same one.
+   * Computed styles for a rendered element. `TableQuestion`'s suite asserts the same
+   * three levels on its own copy of these classes, and the two deliberately do not
+   * share a constant — one edit to a shared list must not be able to weaken both.
    */
   function typeOf(container: HTMLElement, cls: string): Record<string, string> {
     const el = container.querySelector<HTMLElement>(`.${cls}`);
@@ -945,55 +1004,98 @@ describe('the three lines of a side have three DIFFERENT types', () => {
     return out;
   }
 
-  it('the payout has its own size, weight, leading and colour — not the label\'s', () => {
+  it('renders neither line here, on any side, for any card', () => {
+    // "The payout is absent" is trivially true for a card that pays nothing, so the
+    // fixture pays generously and names a faction with a capital letter in it. Three
+    // cards, because the claim is about the COMPONENT and not about one card.
+    for (const pays of [{ funds: 4, trust: 1 }, {}, { funds: 9, media: 4, clout: 2 }] as const) {
+      const { container, unmount } = render(
+        <BlindAnswer
+          question={QUESTION}
+          sideA={{ label: 'Yes. All of them.', ideologue: 'showstopper', pays }}
+          sideB={{ label: 'No. None of them.', ideologue: 'idealist', pays: {} }}
+          seed={1}
+        />,
+      );
+      const what = JSON.stringify(pays);
+      expect(container.querySelector('.blind-answer__faction'), `${what}: faction rendered`).toBeNull();
+      expect(container.querySelector('.blind-answer__payout'), `${what}: payout rendered`).toBeNull();
+      expect(container.innerHTML, `${what}: the class survives in the markup`).not.toMatch(
+        /blind-answer__(faction|payout)/,
+      );
+      // No faction NAME has leaked in as bare text either, which is the shape a partial
+      // reversion takes.
+      for (const name of ["the Capitalists'", "the Idealists'", "the Supremos'", "the Showstoppers'"]) {
+        expect(container.textContent ?? '', `${what}: ${name} reached the answerer`).not.toContain(name);
+      }
+      // …and it is reduced to the two words, which is the other half of the change.
+      // These labels open "Yes." and "No.", so both sides reduce; the payout above is
+      // what must not survive the reduction.
+      expect(
+        [...container.querySelectorAll('[data-testid="side-label"]')].map((e) => e.textContent).sort(),
+      ).toEqual(['NO', 'YES']);
+      unmount();
+    }
+  });
+
+  it('the label is the ONLY type on a side, and it is set as a verdict', () => {
+    // One child, so the side's own `font` is not competing with anything. 26px/800 is
+    // what makes a two-letter answer read as a decision rather than as a caption.
     const { container, unmount } = render(
-      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
+      <BlindAnswer
+        question={QUESTION}
+        sideA={{ label: 'Yes. All of them.', ideologue: 'showstopper', pays: { funds: 4 } }}
+        sideB={{ label: 'No. None of them.', ideologue: 'idealist', pays: {} }}
+        seed={1}
+      />,
     );
     const label = typeOf(container, 'blind-answer__label');
-    const payout = typeOf(container, 'blind-answer__payout');
-
-    // Real type, and not an accident of inheritance.
-    expect(payout['font-size'], 'the payout needs its own font-size').toBe('15px');
-    expect(payout['line-height'], 'and its own leading, or it is set solid').toBe('21px');
-    expect(payout['font-weight']).toBe('700');
-    // DIFFERENT from the answer's, which is the whole point: three lines, three
-    // levels. 17px/23px for the prose, 15px/21px for the figure.
-    expect(payout['font-size']).not.toBe(label['font-size']);
-    expect(payout['line-height']).not.toBe(label['line-height']);
-    // And a hairline above it, so it reads as a figure rather than as the last
-    // sentence of the answer.
-    expect(payout['border-top-width']).toBe('1px');
-    expect(payout['border-top-style']).toBe('solid');
-    expect(payout['text-align']).toBe('center');
-    // Tabular figures, so two payouts compare down the column without the numerals
-    // shifting when they differ in digit count. jsdom does not resolve
-    // `font-variant-numeric`, so this one is read from the source.
-    expect(CSS_RULES).toMatch(/\.blind-answer__payout\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/);
+    // 34px/800, so a two-letter answer is the largest glyph on the screen and reads
+    // as a decision rather than as a caption. Asserted as exact values because these
+    // ARE the design: "make the question more prominent" was a request about these
+    // two numbers, and a silent drift back down is how that request gets lost.
+    expect(label['font-size'], 'the choice is the largest thing on the card').toBe('34px');
+    expect(label['font-weight']).toBe('800');
+    expect(label['line-height']).toBe('38px');
+    expect(label['text-align']).toBe('center');
+    // Exactly one child per side, and it is the label. This is what makes the
+    // `flex-direction: column` assertion below load-bearing rather than decorative.
+    for (const side of sides(container)) {
+      expect(side.children).toHaveLength(1);
+      expect(side.children[0]?.className).toBe('blind-answer__label');
+    }
     unmount();
   });
 
-  it('the Ideologue reads as an attribution, not as a second clause of the answer', () => {
+  it('the question is the biggest prose on the screen, and it is bold', () => {
+    // THE CHANGE THAT MADE THE SCREEN LEGIBLE, and it has happened twice. It was
+    // 17px/400 — set SMALLER than the CHOOSE ONE eyebrow under it, which is an
+    // inverted reading order for a screen that exists to ask one question. It was
+    // then 24px/700, which was better and still not prominent enough. It is now
+    // 32px/700 at a 22ch measure.
     const { container, unmount } = render(
       <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
     );
-    const label = typeOf(container, 'blind-answer__label');
-    const faction = typeOf(container, 'blind-answer__faction');
-    const payout = typeOf(container, 'blind-answer__payout');
+    const cs = window.getComputedStyle(container.querySelector('[data-testid="scenario"]') as Element);
+    const px = (k: string): number => Number.parseFloat(cs.getPropertyValue(k));
+    expect(cs.getPropertyValue('font-weight'), 'the question is bold').toBe('700');
+    expect(px('font-size'), '32px, and it was 17px').toBe(32);
+    expect(px('line-height'), 'with leading to match').toBe(40);
+    expect(px('font-size'), 'and bigger than the CHOOSE ONE label below it').toBeGreaterThan(13);
 
-    expect(faction['font-size']).toBe('13px');
-    expect(faction['font-weight']).toBe('600');
-    expect(faction['line-height']).toBe('16px');
-    const px = (t: Record<string, string>, k: string): number =>
-      Number.parseFloat((t[k] ?? '').replace('px', ''));
-    // The three levels are strictly ordered, so the eye can rank them at a glance:
-    // the answer is the largest, the payout next, the attribution a caption.
-    expect(px(faction, 'font-size')).toBeLessThan(px(payout, 'font-size'));
-    expect(px(payout, 'font-size')).toBeLessThan(px(label, 'font-size'));
-    // Tracked and uppercased, which is what makes a fragment read as a name rather
-    // than as prose continuing the sentence above it.
-    expect(faction['text-transform']).toBe('uppercase');
-    expect(faction['letter-spacing']).not.toBe('normal');
-    expect(faction['letter-spacing']).not.toBe(label['letter-spacing']);
+    // The two CHOICES are 34px, so the question at 32px sits deliberately just under
+    // them: it is the longest run of prose on the screen and it is set at the weight
+    // that makes it read as a question, while the two words a thumb is aimed at are
+    // the largest glyphs. Asserted as a RANGE because either extreme is a bug — 17px
+    // was too small to be the subject of the screen, and 40px would push both
+    // answers below the fold on a phone.
+    const choice = Number.parseFloat(typeOf(container, 'blind-answer__label')['font-size'] ?? '0');
+    expect(px('font-size')).toBeGreaterThanOrEqual(28);
+    expect(px('font-size')).toBeLessThanOrEqual(choice);
+    // …and the measure keeps it a question rather than a paragraph.
+    expect(
+      Number.parseFloat(window.getComputedStyle(container.querySelector('[data-testid="scenario"]') as Element).maxWidth),
+    ).toBeGreaterThan(0);
     unmount();
   });
 
@@ -1010,24 +1112,26 @@ describe('the three lines of a side have three DIFFERENT types', () => {
     expect(base).toContain('align-items: center;');
   });
 
-  it('the payout and the Ideologue are the SAME on both sides, byte for byte', () => {
-    // The hierarchy above must not become a channel. Each line is a single class
-    // applied to both sides, so their computed styles are equal — and this is the
-    // assertion that would fail first if anyone ever styled one of them per side.
-    const { container, unmount } = render(
-      <BlindAnswer question={QUESTION} sideA={SIDE_A} sideB={SIDE_B} seed={1} />,
-    );
-    const each = sides(container).map((side) => [
-      typeOf(side, 'blind-answer__label'),
-      typeOf(side, 'blind-answer__faction'),
-      typeOf(side, 'blind-answer__payout'),
-    ]);
-    expect(each).toHaveLength(2);
-    for (const line of [0, 1, 2]) {
-      const [a, b] = each.map((e) => e[line]);
-      expect(a, `line ${line} differs between the two sides`).toEqual(b);
+  it('the rules for the two lines survive, and still belong to TableQuestion', () => {
+    // Not dead CSS. `TableQuestion` renders both classes, and `tableQuestion.test.tsx`
+    // asserts the typography that the tests above used to assert here. Deleting these
+    // rules while fixing the copy in that panel collapses the three lines back into the
+    // label's inherited style — which is the original defect, not a cosmetic change.
+    for (const cls of ['blind-answer__payout', 'blind-answer__faction']) {
+      expect(CSS_RULES, `${cls} must keep a rule for TableQuestion`).toContain(`.${cls} {`);
     }
-    unmount();
+    // Tabular figures survive too: two payouts have to compare down the column without
+    // the numerals shifting when they differ in digit count.
+    expect(CSS_RULES).toMatch(
+      /\.blind-answer__payout\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/,
+    );
+    // …and the label is a single unqualified rule, so the answerer's side and
+    // `TableQuestion`'s side are set identically even though they hold different
+    // content. A qualified label rule is how one panel would start styling itself.
+    expect(CSS_RULES).toMatch(/\.blind-answer__label\s*\{/);
+    expect(CSS_RULES, 'the label rule must not be qualified').not.toMatch(
+      /\.blind-answer__label[.:\[][^{]*\{/,
+    );
   });
 });
 

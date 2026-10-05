@@ -232,7 +232,23 @@ const ALL_ROWS: readonly PegRow[] = [
   'other-majority-volatile',
 ];
 
-/** The table exactly as §4.6 prints it, for a literal diff. */
+/**
+ * The table exactly as §4.6 prints it, for a literal diff.
+ *
+ * ONE CELL IS CORRECTED FROM THE PRINTED SPEC, and it is the test that noticed.
+ * `other-minority-normal` / `GERRY src` printed as `d+○` — dimmed, i.e. "not an
+ * option" — which contradicts `rules-reference.md:256` (p16): *"You may gerrymander
+ * ANY PLAYER'S voters, including your own."* The code implemented the printed cell,
+ * so this table and `BoardSvg` agreed and both denied a legal move; a player with
+ * rights in a zone of opponents' voters had no gerrymander. Reported as "I can't
+ * move anyone else's voters."
+ *
+ * §4.6 also contradicted itself: its row-8 note reasons from that same rule to fix
+ * the DESTINATION column while the SOURCE column refused the same voter. Row 7 is
+ * `⟲` now — the same dashed `SEAL` ring as an own peg, because it is the same legal
+ * move. Rows 8/9/10 stay dimmed, for the two reasons that are real rules: Volatile is
+ * permanent (p18) and majority does not move (p16).
+ */
 const SPEC_TABLE: Readonly<Record<PegRow, readonly string[]>> = {
   'empty-normal': ['w', '⌾', 'w+h', 'w+⌾*', 'd+w', '◈', 'w+h'],
   'empty-volatile': ['w▪', '⌾▪', 'w▪+h', 'w▪+⌾*', 'd+w▪', '◈▪', 'w▪+h'],
@@ -240,7 +256,7 @@ const SPEC_TABLE: Readonly<Record<PegRow, readonly string[]>> = {
   'own-minority-volatile': ['◇', '◇+⌾', '◇+✕', '◇+⌾*', '◇+✕', '◇+✕', '◇+✕'],
   'own-majority-normal': ['●', '●+✕', '●+✕', '●+✕', '●+✕', '●+✕', '●+✕'],
   'own-majority-volatile': ['●◇', '●◇+✕', '●◇+✕', '●◇+✕', '●◇+✕', '●◇+✕', '●◇+✕'],
-  'other-minority-normal': ['○', '○+✕', '○+✕', '○+✕', 'd+○', '○+◈', '○+✕'],
+  'other-minority-normal': ['○', '○+✕', '○+✕', '○+✕', '⟲', '○+◈', '○+✕'],
   'other-minority-volatile': ['◇', '◇+✕', '◇+✕', '◇+✕', 'd+◇', '◇+◈', '◇+✕'],
   'other-majority-normal': ['●', '●+✕', '●+✕', '●+✕', 'd+●', '●+◈', '●+✕'],
   'other-majority-volatile': ['●◇', '●◇+✕', '●◇+✕', '●◇+✕', 'd+●◇', '●◇+◈', '●◇+✕'],
@@ -339,6 +355,93 @@ describe('§4.6 peg state matrix', () => {
     expect(pegRow({ peg: { ...mine, majority: true }, volatile: true, isOwn: true })).toBe('own-majority-volatile');
     expect(pegRow({ peg: { ...mine, owner: 'p2' }, volatile: false, isOwn: false })).toBe('other-minority-normal');
     expect(pegRow({ peg: { ...mine, owner: 'p2' }, volatile: true, isOwn: false })).toBe('other-minority-volatile');
+  });
+
+  it('an OPPONENTs minority peg is an armable source, because p16 says ANY PLAYERS voter', () => {
+    /*
+      Reported: *"i cant move anyone elses voters"*.
+      
+      rules-reference.md:256, transcribing p16: *"You may gerrymander ANY PLAYER'S
+      voters, including your own."* The engine has always agreed —
+      `engine/test/gerrymander.test.ts:233` ("may gerrymander an OPPONENTs voter")
+      moves a `p2` peg and asserts it keeps its owner.
+      
+      The CLIENT did not, in two places that had to agree. `BoardSvg.slotInteraction`
+      returned `neutral` for any peg the active player did not own, and
+      `GameScreen.gerrySourceRefusal` refused the click with the string "you may
+      gerrymander any voter, but this board only arms your own" — a refusal that
+      quoted the rule it was breaking. §4.6's printed matrix backed it up
+      (`d+○` for row 7), so the bug was in the SPEC as well as the code and the
+      transcription test agreed with both.
+
+      So this asserts the whole chain from a peg's facts to the cell it draws,
+      because any one of the three layers could reintroduce it.
+    */
+    const opponentPeg = { owner: 'p2', majority: false } as const;
+
+    // Layer 1 — the peg renders as an own peg's twin: same dashed SEAL ring, no
+    // hatch, no dim. Ownership is not a condition on a gerrymander.
+    const armed = resolvePegVisual({
+      peg: opponentPeg,
+      volatile: false,
+      isOwn: false,
+      mode: 'gerry',
+      interaction: { legality: 'source', gerrySource: 'eligible' },
+      hasGerrySource: false,
+      resolveGerrySources: true,
+    });
+    expect(armed.code, "an opponent's voter does not read as a legal source").toBe('⟲');
+    expect(armed.hatch, "an opponent's voter is hatched, i.e. called unavailable").toBe(false);
+    expect(armed.dim, "an opponent's voter is dimmed, i.e. called context").toBe(false);
+    // `⟲` IS the dashed SEAL source ring — §6.2's "cursor: grab" affordance — so an
+    // armable source must carry exactly that one ring and no hatch.
+    expect(armed.rings, 'the source ring is missing or is not the SEAL one').toEqual([
+      { kind: 'source', token: 'var(--seal)', width: 3, dash: '4 3' },
+    ]);
+    // And it is the SAME cell as your own — that is the claim: same legal move.
+    const mine = resolvePegVisual({
+      peg: { owner: 'p1', majority: false },
+      volatile: false,
+      isOwn: true,
+      mode: 'gerry',
+      interaction: { legality: 'source', gerrySource: 'eligible' },
+      hasGerrySource: false,
+      resolveGerrySources: true,
+    });
+    expect(armed.code, "own and opponent sources do not resolve alike").toBe(mine.code);
+
+    // Layer 2 — the two refusals that ARE rules still bite, and they bite on
+    // opponents too. This is what stops the fix becoming "anyone's voter, always":
+    // Volatile is permanent (p18) and majority does not move (p16), regardless of
+    // who owns the peg.
+    const volatileOpponent = resolvePegVisual({
+      peg: opponentPeg,
+      volatile: true,
+      isOwn: false,
+      mode: 'gerry',
+      interaction: { legality: 'neutral', gerrySource: 'blocked' },
+      hasGerrySource: false,
+      resolveGerrySources: true,
+    });
+    expect(volatileOpponent.dim, "an opponent's Volatile voter is not held unavailable").toBe(true);
+    expect(volatileOpponent.code, 'an opponents volatile voter arms anyway').not.toBe('⟲');
+
+    const majorityOpponent = resolvePegVisual({
+      peg: { ...opponentPeg, majority: true },
+      volatile: false,
+      isOwn: false,
+      mode: 'gerry',
+      interaction: { legality: 'neutral', gerrySource: 'blocked' },
+      hasGerrySource: false,
+      resolveGerrySources: true,
+    });
+    expect(majorityOpponent.code, "an opponent's MAJORITY voter arms anyway").not.toBe('⟲');
+    // Opponent rows DIM rather than hatch (§4.6 rows 9/10 are `d+●`). The hatch is
+    // reserved for rows where a player owns something they still cannot use
+    // (rows 4 and 6) — §4.6's own justification for the stronger channel. So the
+    // assertion is that it is unavailable, not that it uses the hatch channel.
+    expect(majorityOpponent.dim, "an opponent's majority voter is not held unavailable").toBe(true);
+    expect(majorityOpponent.rings, "an opponent's majority voter shows a source ring").toEqual([]);
   });
 
   it('end-to-end: an armed gerrymander source in a volatile area is hatched, not offered', () => {
@@ -653,6 +756,56 @@ describe('<BoardSvg />', () => {
 
     // The POSITIVE adjacency seam on the source zone and its neighbours.
     expect(container.querySelectorAll('[data-testid="adjacency-seam"]').length).toBeGreaterThan(0);
+  });
+
+  it('offers an OPPONENTs voter as a pickable source, in the real DOM', () => {
+    /*
+      The DOM half of the p16 fix. The matrix test above proves the CELL, and
+      `resolvePegVisual` proves the mapping; this proves the thing a player clicks.
+
+      It is worth its own case because the defect had THREE layers that all agreed
+      with each other and were all wrong — the peg matrix, `slotInteraction`, and the
+      click handler — so a fix to any two would still ship a board where an
+      opponent's voter looks armable and cannot be picked up. Asserted here on the
+      rendered `data-cell` and the `aria-label`, which is what a player (and a
+      screen reader) actually receives.
+    */
+    const zones = putPegs(makeZones(), [
+      ['north-01', 'p1'],
+      ['north-02', 'p1'],
+      ['north-03', 'p1'],
+      ['north-04', 'p2'],
+    ]);
+    const { container } = render(
+// `resolveGerrySources` is a PROP on `BoardSvg`, not a field of `BoardState` —
+    // it is what §6.2 "Arm (hover)" turns on, so it is set here: this is the state a
+    // player is in once the board resolves sources.
+      <BoardSvg
+        state={stateFor({ zones, mode: 'gerry' })}
+        resolveGerrySources
+      />,
+    );
+
+    // An opponent's non-majority, non-volatile peg: row 7, `⟲`. Identical to an
+    // own peg's cell, because it is the same legal move.
+    const theirs = container.querySelector('g[data-area-id="north-04"]');
+    const mine = container.querySelector('g[data-area-id="north-03"]');
+    expect(theirs?.getAttribute('data-cell'), "an opponent's voter is not offered as a source").toBe('⟲');
+    expect(theirs?.getAttribute('data-cell'), 'own and opponent sources differ').toBe(
+      mine?.getAttribute('data-cell'),
+    );
+    // It must read as grabbable, not merely look grabbable: the cursor and the
+    // dashed SEAL ring are §6.2's arm affordance, and the label has to agree.
+    // `VoterSlot.buildSlotLabel` states "Gerrymanderable." on every non-volatile
+    // minority peg, so this is the accessibility half of the same claim: before the
+    // fix this slot was dimmed and inert, and its label described a voter the
+    // player was in fact forbidden to move.
+    expect(theirs?.querySelector('[data-testid="ring-source"]')).not.toBeNull();
+    expect(theirs?.getAttribute('style') ?? '').toContain('grab');
+    expect(theirs?.getAttribute('aria-label') ?? '').toMatch(/Gerrymanderable/i);
+    // Nothing that says "you cannot".
+    expect(theirs?.querySelector('[data-testid="hatch"]')).toBeNull();
+    expect((theirs?.getAttribute('style') ?? '')).not.toContain('0.42');
   });
 
   it('narrows placement to one zone once a sameZone group is locked (§6.1.2)', () => {

@@ -43,7 +43,8 @@ import type {
 import { BoardSvg } from '../board/BoardSvg.tsx';
 import type { AnswerPrompt, ClientStore } from '../net/index.ts';
 
-import { AnswerReveal, AnswerScreen } from './AnswerScreen.tsx';
+import { AnswerResolution, AnswerScreen, cardForResolution } from './AnswerScreen.tsx';
+import type { ResolvedCard } from './AnswerScreen.tsx';
 import { ChoiceResolver } from './ChoiceResolver.tsx';
 import { ConspiracyPicker, type PlayableConspiracy } from './ConspiracyPicker.tsx';
 import { ResponseWindow, type ResponsiveCard } from './ResponseWindow.tsx';
@@ -117,6 +118,7 @@ import {
   toBoardState,
   type BoardInteraction,
 } from './derive.ts';
+import { ResourceGlyph } from './ResourceGlyph.tsx';
 
 export type GameScreenProps = {
   readonly store: ClientStore;
@@ -663,18 +665,50 @@ export function GameScreen({ store }: GameScreenProps) {
   // for every player, so it always arrives, and reading it leaks nothing the other
   // players cannot already read.
   //
-  // Nothing counts up, nothing flips, and there is no "you would have got" line,
-  // because every one of those animates on a length that leaks to whoever watched it.
+  // This is also the TRIGGER for the resolution, and it is a trigger rather than a
+  // local flag on purpose: the resolution must not appear until the server has
+  // actually recorded the answer, or it would celebrate a dispatch the server
+  // refused. `answerCount` moving is the server saying so.
   const answerCount =
     state === null || you === null
       ? 0
       : state.log.filter((e) => e.kind === 'answer' && e.player === you).length;
 
-  // A reveal only for an answer that lands WHILE this player is watching. The first
-  // sighting is a baseline, so a refresh mid-turn does not replay the last payout —
-  // which matters on reconnect, where re-announcing a payout would also be noise.
+  /*
+    THE CARD, CAPTURED AT THE ONE INSTANT IT EXISTS.
+
+    `reduce.ts` sets `phase: 'actions'` and `_pendingCard: null` on the ANSWER branch,
+    and `broadcast.ts`'s `openQuestionFor` returns `null` unless `phase === 'answer'`.
+    So the moment the answer lands, the card is gone from the wire — there is no
+    "fetch the card after the fact" and `store.answer` is nulled by `net/store.ts` in
+    the same breath. The resolution screen needs the whole card, so it is snapshotted
+    HERE, in the callback that dispatches, which is the last moment it is readable.
+
+    It is a snapshot of something this player was just shown, not a new channel: it is
+    the server's own `AnswerPrompt`, and the Ideology corpus is public JSON.
+
+    A REF, not state, deliberately: this is written once at a commit and read by the
+    reveal, and putting it in state would mean a re-render at the exact moment the
+    phase flips and the answer screen unmounts. `committedCard` below is the state
+    that says "show the resolution"; this is what it shows.
+  */
+  const committedCard = useRef<{ prompt: ResolvedCard; chosenIndex: 0 | 1 } | null>(null);
+
+  /*
+    THE RESOLUTION, and it waits for a press rather than expiring on a timer.
+
+    It used to be a four-second sheet that faded in above the board and left on its
+    own. A screen that shows you what your answer was and what it paid, and then
+    removes itself before you have read it, is worse than not having it: and there is
+    no way to see it again, because the card is off the wire. So it is a takeover with
+    a CONTINUE button, and it is the only thing on screen until that button is pressed.
+
+    STILL SERVER-DRIVEN. `answerCount` moving is what sets this, so the resolution
+    cannot appear for an answer the server refused — which is the same defect the old
+    optimistic path would have had.
+  */
+  const [resolution, setResolution] = useState<ResolvedCard | null>(null);
   const seenAnswers = useRef<number | null>(null);
-  const [revealLive, setRevealLive] = useState(false);
   useEffect(() => {
     if (seenAnswers.current === null) {
       seenAnswers.current = answerCount;
@@ -685,15 +719,22 @@ export function GameScreen({ store }: GameScreenProps) {
       return;
     }
     seenAnswers.current = answerCount;
-    setRevealLive(true);
-    const t = window.setTimeout(() => setRevealLive(false), REVEAL_MS);
-    return () => window.clearTimeout(t);
+    const captured = committedCard.current;
+    // Only if we actually hold the card. A resolution without it would render an
+    // empty takeover the player cannot fill — so it is better not to mount at all.
+    if (captured !== null) setResolution(captured.prompt);
   }, [answerCount]);
 
-  const showReveal =
-    revealLive && you !== null && state !== null && state.phase === 'actions';
-  const answeredLabel =
-    showReveal && state !== null && you !== null ? lastAnswerText(state.log, you) : null;
+  // What the SERVER says the answer was, from the public log. This is the
+  // authoritative half of the resolution: `committedCard` is a local snapshot taken
+  // before the dispatch, and if the two ever disagree then the client's idea of which
+  // side was taken is wrong — which is the one bug in this area that would silently
+  // show a player the wrong payout. So the server's word is what the chosen card
+  // prints, and the snapshot only supplies the card's other half.
+  const loggedAnswer =
+    resolution !== null && state !== null && you !== null
+      ? lastAnswerText(state.log, you)
+      : null;
 
   const commitPlacement = useCallback(() => {
     if (me === null || app.placingGroupId === null) return;
@@ -792,17 +833,40 @@ export function GameScreen({ store }: GameScreenProps) {
     <div
       className="shell"
       data-testid="game-shell"
-      // The one-frame payout pushes the board down by ~192px, so the board's
-      // `max-height` reserve has to know. See the `.shell[data-reveal]` rule.
-      data-reveal={showReveal ? 'true' : 'false'}
+      /*
+        THE RESOLUTION IS A FULL-VIEWPORT TAKEOVER, so it does not push the board —
+        it covers it. The attribute is kept because the RESERVE rule it feeds is
+        load-bearing for the one case that still moves the board: the resolution is
+        only mounted while `phase === 'actions'`, and a Headline band or the response
+        window can be in the flow above the board at the same time. So this now tracks
+        "is the resolution up", which is what the 390px reserve below is for.
+      */
+      data-reveal={resolution !== null ? 'true' : 'false'}
       // G13: same reason, different cause — the response window's banner is in the
       // flow above the board, so the reserve has to know about that too.
       data-window={windowOpen ? 'true' : 'false'}
     >
       <TopBar state={state} store={store} you={you} role={role} />
 
-      {showReveal ? (
-        <AnswerReveal state={state} you={you as PlayerID} answeredLabel={answeredLabel} />
+      {/*
+        THE RESOLUTION, ABOVE EVERYTHING AND AFTER `AnswerScreen` in the tree.
+
+        It is a full-viewport takeover because it is the answer to the question the
+        player was just asked, and it must not be dismissible by a stray click on the
+        board behind it. `AnswerScreen` unmounts the moment the phase moves on, so
+        there is no ordering conflict in practice — but it is placed after it anyway,
+        because it is the later of the two in every sense that matters.
+      */}
+      {resolution !== null && you !== null ? (
+        <AnswerResolution
+          prompt={resolution}
+          chosenIndex={committedCard.current?.chosenIndex ?? 0}
+          serverText={loggedAnswer}
+          onContinue={() => {
+            setResolution(null);
+            committedCard.current = null;
+          }}
+        />
       ) : null}
 
       {/*
@@ -971,45 +1035,31 @@ export function GameScreen({ store }: GameScreenProps) {
         </div>
 
         <div className="shell__side">
-          <div className="tabs" data-tabpanel="mat" data-active={tab === 'mat'}>
-            <YourMat
-              state={state}
-              you={you as PlayerID}
-              pending={me?.pending ?? []}
-              placingGroupId={app.placingGroupId}
-              pickedCount={app.pickedAreaIds.length}
-              isMyTurn={isMyTurn}
-              link={app.link}
-              framed={isMyTurn && state.phase === 'actions'}
-              showControls={role === 'player' && you !== null && !windowOpen}
-              inertReason={inertReason}
-              onSelectGroup={(id) => beginPlacement(id)}
-              onTradeWith={(other) => openTrade(other)}
-              onGerry={() => {
-                if (you === null) return;
-                const zones = rightsZones(state, you);
-                if (zones.length === 0) {
-                  setRefusal('you hold Gerrymanding Rights in no constituency');
-                  return;
-                }
-                const first = zones[0];
-                if (first !== undefined) openGerry(first);
-              }}
-              onPower={(power) => onPower(state, you, power, app, dispatch)}
-              onEndTurn={() => dispatch(actions.endTurn())}
-            />
-          </div>
-
           {/*
-            §5.13's FOURTH TAB. The phone tab bar has always had four buttons —
-            Board · Mat · Market · Log — while the shell had only three tabpanels,
-            so MARKET matched nothing, every panel went `display:none`, and the
-            player got a blank screen under a working tab bar. Found by pressing
-            all four in a browser; no structural test can see it, because all four
-            buttons and all three panels are present in the DOM either way.
+            THE HQ MAT IS FIRST AND YOUR MAT IS SECOND, and this is a layout decision
+            with a defect behind it.
 
-            On a desktop this is simply the second panel in the side column, which
-            is what the mat's own header comment always claimed it was.
+            It used to be your mat, then the market — which put the three Voter Cards you
+            spend your resources on at the BOTTOM of a `position: sticky` column with
+            `overflow-y: auto`. On a short desktop window that made the market the first
+            thing below the fold and the powers tray the second. `YourMat`'s own header
+            records the same problem from the other side: when the market strip lived
+            INSIDE the mat, it pushed the powers tray down.
+
+            So the order is now by how often the eye needs it. The market is three cards
+            and a price, it is what you look at when you hold something to spend, and it
+            is the shortest panel on the screen. Your mat is longer, holds what you read
+            rather than what you press, and scrolls within the column.
+
+            Both are still in the same column and §5.13's tabs are untouched: below 600px
+            MARKET and MAT are separate tabs and neither order is visible.
+
+            §5.13's FOURTH TAB also used to be missing here entirely. The phone tab bar
+            has four buttons — Board · Mat · Market · Log — while the shell had only
+            three tabpanels, so MARKET matched nothing, every panel went `display:none`,
+            and the player got a blank screen under a working tab bar. Found by pressing
+            all four in a browser; no structural test could see it, because all four
+            buttons and all three panels were present in the DOM either way.
           */}
           <div className="tabs" data-tabpanel="market" data-active={tab === 'market'}>
             {role === 'player' && you !== null ? (
@@ -1061,6 +1111,36 @@ export function GameScreen({ store }: GameScreenProps) {
               </section>
             )}
           </div>
+
+          {/* §5.13's MAT TAB. On a desktop this is the second panel in the side
+              column, which is what the mat's own header comment always claimed. */}
+          <div className="tabs" data-tabpanel="mat" data-active={tab === 'mat'}>
+            <YourMat
+              state={state}
+              you={you as PlayerID}
+              pending={me?.pending ?? []}
+              placingGroupId={app.placingGroupId}
+              pickedCount={app.pickedAreaIds.length}
+              isMyTurn={isMyTurn}
+              link={app.link}
+              framed={isMyTurn && state.phase === 'actions'}
+              showControls={role === 'player' && you !== null && !windowOpen}
+              inertReason={inertReason}
+              onSelectGroup={(id) => beginPlacement(id)}
+              onTradeWith={(other) => openTrade(other)}
+              onGerry={() => {
+                if (you === null) return;
+                const zones = rightsZones(state, you);
+                if (zones.length === 0) {
+                  setRefusal('you hold Gerrymanding Rights in no constituency');
+                  return;
+                }
+                const first = zones[0];
+                if (first !== undefined) openGerry(first);
+              }}
+              onPower={(power) => onPower(state, you, power, app, dispatch)}
+            />
+          </div>
         </div>
       </div>
 
@@ -1090,6 +1170,28 @@ export function GameScreen({ store }: GameScreenProps) {
         ))}
       </div>
 
+      {/* END TURN, AND IT IS NOW REACHABLE AT EVERY WIDTH. This is a bug fix, and
+          it is the third of three that between them meant a desktop player could not
+          end a turn at all:
+
+            1. `.endturn-dock` was `display: none` outside the `max-width: 599px`
+               query, so the dock below was phone-only chrome.
+            2. The "END TURN on desktop" block that followed it was
+               `{isMyTurn && state.phase === 'actions' && !isMyTurn ? null : null}`
+               — `isMyTurn && !isMyTurn` is unsatisfiable, so it rendered nothing on
+               every width, forever. Dead code with a comment above it explaining a
+               button that was not there.
+            3. `YourMat` has taken an `onEndTurn` prop since the mat was split into
+               its own panel, and has never rendered it — §5.4 lists END TURN as mat
+               region 5 and the prop has sat unused ever since.
+
+          So the one live control is this dock, and it is now shown at every width
+          rather than only on a phone. It is a FIXED bar along the bottom for the same
+          reason it was fixed on a phone: it is the one control that must never require
+          a scroll, and it must never be the only way to do something the player
+          cannot find. Ending a turn is still a DECISION and never a default (§5.4) —
+          it is not auto-highlighted, and it is hidden outright when it is not the
+          player's turn, rather than shown dead. */}
       {isMyTurn && state.phase === 'actions' && !windowOpen ? (
         <div className="endturn-dock">
           <button
@@ -1102,13 +1204,13 @@ export function GameScreen({ store }: GameScreenProps) {
           >
             END TURN
           </button>
+          <p className="endturn-dock__note">
+            {placingGroup !== null
+              ? 'Placing voters — finish or cancel that first.'
+              : `${me?.pending.length ?? 0} group${(me?.pending.length ?? 0) === 1 ? '' : 's'} of voters still to place; anything left is discarded.`}
+          </p>
         </div>
       ) : null}
-
-      {/* END TURN on desktop, bottom-right of the mat column. It is never the
-          only enabled button and never auto-highlighted: ending a turn is a
-          decision, not a default (§5.4). */}
-      {isMyTurn && state.phase === 'actions' && !isMyTurn ? null : null}
 
       {/* ── Overlays, in priority order. ── */}
       {/*
@@ -1134,7 +1236,22 @@ export function GameScreen({ store }: GameScreenProps) {
           viewId={store.viewId}
           errorAt={store.error === null ? null : store.error.at}
           picker={app.picker}
-          onCommit={(displayIndex) => dispatch(actions.answer(displayIndex))}
+          onCommit={(displayIndex) => {
+            // SNAPSHOT THE CARD BEFORE DISPATCHING. This is the last instruction that
+            // runs while `store.answer` is still non-null, and it is the only place
+            // from which the whole card can still be read — see `committedCard`.
+            const prompt = store.answer;
+            const landed = dispatch(actions.answer(displayIndex));
+            if (landed && prompt !== null) {
+              // `cardForResolution` drops `order` on the way in — see its docstring.
+              // The snapshot is deliberately NOT the whole `AnswerPrompt`.
+              committedCard.current = {
+                prompt: cardForResolution(prompt),
+                chosenIndex: displayIndex,
+              };
+            }
+            return landed;
+          }}
           onRedrawRequest={() =>
             openPicker({ forKind: 'redraw', total: UI_RULES.redrawCost, pick: {} })
           }
@@ -1557,7 +1674,7 @@ function DeltaStepper({
         const have = pool[r];
         const have2 = value[r] ?? 0;
         return (
-          <div key={r} className="row row--tight" style={{ flexWrap: 'nowrap' }}>
+          <div key={r} className="row row--tight stepper" data-res={r} style={{ flexWrap: 'nowrap' }}>
             <button
               type="button"
               className="btn btn--sm"
@@ -1567,8 +1684,12 @@ function DeltaStepper({
             >
               +
             </button>
-            <span className="picker__count" style={{ fontSize: '18px' }}>
-              {have2}
+            <span className="stepper__col">
+              <ResourceGlyph resource={r} size={14} />
+              <span className="picker__count" style={{ fontSize: '18px' }}>
+                {have2}
+              </span>
+              <span className="picker__name">{r}</span>
             </span>
             <button
               type="button"
@@ -1734,10 +1855,27 @@ function buyMarketCard(
 /**
  * Is this slot a legal gerrymander SOURCE?
  *
- * Mirrors the engine's three conditions — yours, not a majority voter, not in a
- * Volatile Area — plus the rights question, because §6.2's "Arm (hover)" table
- * lists "You have no Gerrymanding Rights in North" as one of the reasons a peg
- * cannot be armed. A refusal that does not name its reason is a puzzle (§9.10).
+ * Mirrors the engine's conditions — not a majority voter, not in a Volatile Area —
+ * plus the rights question, because §6.2's "Arm (hover)" table lists "You have no
+ * Gerrymanding Rights in North" as one of the reasons a peg cannot be armed. A
+ * refusal that does not name its reason is a puzzle (§9.10).
+ *
+ * ## THE OWNER IS NOT ONE OF THE CONDITIONS
+ *
+ * This used to open with `if (a.peg.owner !== you) return '…'`, and its doc comment
+ * above used to claim the engine's conditions were "yours, not a majority voter, not
+ * in a Volatile Area". Both were wrong. rules-reference.md:256, transcribing p16:
+ * *"You may gerrymander ANY PLAYER'S voters, including your own."*
+ *
+ * The engine has always agreed — `engine/test/gerrymander.test.ts:233` asserts an
+ * opponent's voter moves and keeps its owner. The client did not, in two places
+ * that had to agree with each other: this handler refused the click, and
+ * `BoardSvg.tsx`'s source branch rendered the peg inert so there was no click to
+ * refuse. A player with rights in a zone full of someone else's voters was told the
+ * mechanic was unavailable. Reported as "I can't move anyone else's voters".
+ *
+ * `you` is still a parameter, and still load-bearing — for the rights check below.
+ * What it no longer does is decide WHOSE voter may move.
  */
 function gerrySourceRefusal(
   state: ClientState,
@@ -1750,7 +1888,6 @@ function gerrySourceRefusal(
     if (a === undefined) continue;
     if (a.peg === null) return 'there is no voter there';
     if (a.volatile) return 'Permanent — Volatile Area.';
-    if (a.peg.owner !== you) return 'you may gerrymander any voter, but this board only arms your own';
     if (a.peg.majority) return 'Majority voters do not move.';
     if (z.id !== rightsZoneId) {
       const rights = rightsZones(state, you);
@@ -1780,8 +1917,13 @@ function gerrySourceRefusal(
  * `derive.ts:powerAreaRefusal`.
  */
 
-/** How long the payout frame stays up before it retires. §9.3: one readable frame. */
-const REVEAL_MS = 4_000;
+/*
+ * `REVEAL_MS` USED TO BE HERE — 4000, the payout frame's self-retiring timer — and it
+ * is gone rather than retuned. A screen that shows you what your answer was and what
+ * it paid, and then removes itself after four seconds, cannot be read by a player who
+ * looked away for one, and there is no way to get it back: the card is off the wire
+ * by then. So the resolution waits for a press. See the `resolution` state above.
+ */
 
 /**
  * The answer the player committed, from the PUBLIC log.

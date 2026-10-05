@@ -1,0 +1,45 @@
+# Render blueprint — free Hobby plan.
+#
+# WHY THIS FILE IS THE WHOLE DEPLOYMENT: Render builds and runs the repo's
+# Dockerfile; there is no separate build or start command to keep in sync. The
+# image's CMD (`./node_modules/.bin/tsx packages/server/src/main.ts`) is the same
+# entrypoint verified locally.
+#
+# BEFORE THIS WORKS, TWO THINGS THAT ARE NOT IN THIS FILE:
+#
+#   1. Render deploys from a git repository, and this repo currently has NO
+#      remote (`git remote -v` is empty). You must add one and push.
+#
+#   2. THAT REPO MUST BE PRIVATE. README.md §17 records that no licence has been
+#      obtained, that the licensing email is still unsent, and that the project
+#      should not ship under the SHASN name — and it names the realistic
+#      exposure as "a DMCA takedown of the repository". Pushing this history to
+#      a *public* repo in order to obtain free hosting would do precisely the
+#      thing that section warns against. Render reads private repos on Hobby.
+#
+# The service `name` is deliberately not "shasn", for the same reason: it becomes
+# part of a public onrender.com URL.
+
+services:
+  - type: web
+    name: voter-board
+    runtime: docker
+    plan: free
+
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # The app already exposes GET /healthz (packages/server/src/index.ts:323).
+    # Wiring it here means Render routes its own health check to it, and a failed
+    # check fails the deploy instead of leaving a dead URL behind.
+    healthCheckPath: /healthz
+
+    envVars:
+      # Bind all interfaces. The image sets this too; repeating it here makes the
+      # requirement visible to anyone reading only this file.
+      - key: HOST
+        value: 0.0.0.0
+
+      # PORT is deliberately absent. Render injects it, and the Dockerfile no
+      # longer hardcodes a competing value — see the note there. Setting it here
+      # would reintroduce the exact shadowing bug that file documents.

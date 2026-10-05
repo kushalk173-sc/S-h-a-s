@@ -146,7 +146,6 @@ describe('exactly one redraw control exists, and it is the one that explains its
         onSelectGroup={noop}
         onGerry={noop}
         onPower={noop}
-        onEndTurn={noop}
         onTradeWith={noop}
       />,
     );
@@ -175,10 +174,23 @@ describe('exactly one redraw control exists, and it is the one that explains its
     const controls = redrawControls(container);
     expect(controls, 'the answer screen offers exactly one redraw').toHaveLength(1);
     expect(controls[0]?.getAttribute('data-testid')).toBe('redraw-offer');
-    // The price is in the label, and the sentence that gives the redraw its
-    // full-information meaning is on this screen and not on any other.
+    // The price is in the label, and the sentence that gives the redraw its meaning
+    // is on this screen and not on any other.
     expect(controls[0]?.textContent).toMatch(/4/);
-    expect(container.textContent ?? '').toMatch(/both payouts are printed/i);
+    // THE REDRAW IS A BET AGAIN, and the copy says so.
+    //
+    // This assertion used to require "both payouts are printed", because the answerer
+    // could see both payouts and a redraw was therefore a priced reroll you could
+    // compute rather than a gamble. The answerer no longer sees a payout, so §7.2
+    // step 2's own reasoning is back — "because the reading player does not know what
+    // the card pays, the redraw is a BET, not a decision" — and a screen that still
+    // advertised the old reading would be explaining a mechanic this seat cannot see.
+    const copy = container.textContent ?? '';
+    expect(copy).not.toMatch(/both payouts are printed/i);
+    expect(copy).toMatch(/bet/i);
+    // …and it must not imply the answerer can weigh the two payouts, which is the
+    // claim the old copy made.
+    expect(copy).not.toMatch(/payout/i);
   });
 
   it('the two screens together still offer one — the count is what a player sees', () => {
@@ -199,7 +211,6 @@ describe('exactly one redraw control exists, and it is the one that explains its
         onSelectGroup={noop}
         onGerry={noop}
         onPower={noop}
-        onEndTurn={noop}
         onTradeWith={noop}
       />,
     );

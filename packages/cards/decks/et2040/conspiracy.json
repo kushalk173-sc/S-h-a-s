@@ -4,7 +4,7 @@
   "cards": [
     {
       "id": "ct-et2040-001",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union â€” see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union — see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does.",
       "provenance": "adapted",
       "name": "A Grave Inheritance",
       "text": "Take 2 resources of your choice from a chosen opponent. Then evict 2 voters from the board.",
@@ -22,7 +22,7 @@
     },
     {
       "id": "ct-et2040-002",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' â€” a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' — a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource.",
       "provenance": "adapted",
       "name": "Eradicating Germs",
       "text": "Every face-up Voter Card is discarded and replaced with a fresh one. You then gain 1 resource of your choice.",
@@ -39,7 +39,7 @@
     },
     {
       "id": "ct-et2040-003",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist â€” see KNOWN-GAPS.md G6.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist — see KNOWN-GAPS.md G6.",
       "provenance": "adapted",
       "name": "Singularity",
       "text": "Gain 2 voters. They are not from a Voter Card, so you may place them in different zones.",
@@ -53,7 +53,7 @@
     },
     {
       "id": "ct-et2040-004",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag â€” see KNOWN-GAPS.md G7.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag — see KNOWN-GAPS.md G7.",
       "provenance": "adapted",
       "name": "The Psychohistorian",
       "text": "Gain 1 voter and 2 resources of your choice. The voter is not from a Voter Card.",
@@ -232,10 +232,10 @@
     },
     {
       "id": "ct-et2040-014",
-      "source": "REF 4.2.1 recovers BLOCK. SHIPS THE REACTIVE HALF, which G13 executes: out of turn it negates the staged resolution; one answer per window, so it cannot be reversed or deflected. 'Actions not aimed at you may also be blocked' is why target:any-card. DROPPED: 'Discard an open Conspiracy Card or Headline Card' (no op discards an open card); 'block a card stealing this card' (G20 moves Ideology Cards only); 'cleanse an already-active card' (no op removes a LiveEffect, G9/G22). WIDENED: a window also opens on a Headline resolving. 'Otherwise: gain 1 Clout' AUTHORED. G13d.",
+      "source": "REF 4.2.1 recovers BLOCK, clause by clause. Ships the reactive half, which G13 executes. DROPPED: discard an open card, block a card stealing this card (G20), cleanse an already-active card (G9/G22). WIDENED: a window also opens on a Headline. The 'Otherwise: gain 1 Clout' clause is AUTHORED and its text CORRECTED 2026-10-04: closeInterrupt applies the STAGED card's effects, never the responder's own, so a BLOCK paid nothing on the path the card describes. SOURCES.md 4.8; the effect list is kept because the schema requires one.",
       "provenance": "adapted",
       "name": "Block",
-      "text": "Play this IMMEDIATELY out of turn when an opponent plays a Conspiracy Card, or a Headline resolves, to negate that card's effect entirely. It cannot be reversed or deflected, and a card not aimed at you may also be blocked. Otherwise: gain 1 Clout.",
+      "text": "Play this IMMEDIATELY out of turn when an opponent plays a Conspiracy Card, or a Headline resolves, to negate that card's effect entirely. It cannot be reversed or deflected, and a card not aimed at you may also be blocked. Answering a window that way pays you nothing at all: the reactive half is the whole of this card, and its effect list resolves only if you instead play it as an ordinary Conspiracy Card on your own turn, which gains you 1 Clout.",
       "cost": 5,
       "effects": [
         {
@@ -253,10 +253,10 @@
     },
     {
       "id": "ct-et2040-015",
-      "source": "REF 4.2.1 recovers DEFLECT. SHIPS THE REACTIVE HALF (G13): out of turn it retargets the staged resolution onto any player who is neither actor nor responder. DEVIATIONS: 'only that partial effect is deflected' DROPPED - one target per effect list, so the WHOLE resolution is redirected (G20); the text says 'whole effect'. 'Affects you' WIDENED to target:any-card, because card-affecting-you resolves via reachesPastActor, which asks whether an effect aims past its OWNER (G1). 'It cannot be blocked' is not recovered but true. 'Otherwise: gain 1 Trust' AUTHORED. G13d.",
+      "source": "REF 4.2.1 recovers DEFLECT. Ships the reactive half (G13): out of turn it retargets the staged resolution to a third player. DEVIATIONS: 'only that partial effect' DROPPED, one target per effect list, so the WHOLE resolution is redirected (G20) and text says 'whole effect'; 'affects you' WIDENED to target:any-card (G1). The 'Otherwise: gain 1 Trust' clause is AUTHORED and its text CORRECTED 2026-10-04 on ct-et2040-014's finding: closeInterrupt never applies the responder's own effects. SOURCES.md 4.8; the effect list is kept because the schema requires one.",
       "provenance": "adapted",
       "name": "Deflect",
-      "text": "Play this IMMEDIATELY out of turn when an opponent plays a card, to redirect that card's whole effect onto a third player of your choosing - whoever it was aimed at. It cannot be blocked. Otherwise: gain 1 Trust.",
+      "text": "Play this IMMEDIATELY out of turn when an opponent plays a card, to redirect that card's whole effect onto a third player of your choosing - whoever it was aimed at. It cannot be blocked. Answering a window that way pays you nothing at all: the reactive half is the whole of this card, and its effect list resolves only if you instead play it as an ordinary Conspiracy Card on your own turn, which gains you 1 Trust.",
       "cost": 5,
       "effects": [
         {

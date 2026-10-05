@@ -4,7 +4,7 @@
   "cards": [
     {
       "id": "hl-et2040-001",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. Two clauses are not expressible: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state (REF 5.5), and 'every player' needs `target` on gerrymander (KNOWN-GAPS G8). reduce() now honours that target, so the card is free to say `target: 'everyone'` and mean it; it ships in the `you` reading until then. See KNOWN-GAPS.md G5 and G8.",
+      "source": "REF 4.3 recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. DROPPED: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state, and the lifetime of the grant is G9/G22. G8 landed, so `target: 'everyone'` IS honoured - and it still ships in the `you` reading, because the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player. See card-playback.test.ts and SOURCES.md 4.8.",
       "provenance": "adapted",
       "name": "New Face Who Dis",
       "text": "You may Gerrymander 1 of your majority or non-majority voters this turn, under the normal Gerrymandering rules. It does not have to happen now.",
@@ -20,7 +20,7 @@
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Red Blooded. DROPPED: (1) the scaling ('any 2 resources for EACH of their discarded voters') needs a per-unit iteration op, KNOWN-GAPS G4; (2) the real discard is 'any 2 voters' including your own, and reduce.ts resolveChoice rejects any area the chooser owns, so `discard-voter` strikes an OPPONENT's voter only. `text` states what the engine does; the fix is one condition in resolveChoice plus a target on the op.",
       "provenance": "adapted",
       "name": "Red Blooded",
-      "text": "You strike 2 of your opponents' voters from the board, permanently â€” voters in Volatile Areas cannot be struck, and your own voters are out of your reach. Each opponent then gains 2 resources of their choice from the Public Reserve.",
+      "text": "You strike 2 of your opponents' voters from the board, permanently — voters in Volatile Areas cannot be struck, and your own voters are out of your reach. Each opponent then gains 2 resources of their choice from the Public Reserve.",
       "effects": [
         {
           "op": "discard-voter",
@@ -142,7 +142,7 @@
     },
     {
       "id": "hl-et2040-009",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of The Four Horsemen. The real card is 'Choose and discard one of the following: 2 Funds OR 2 Clout OR 2 Media OR 2 Trust', which is a single `lose-any` of 2 â€” any two of one kind and one of each are both in that set, so the choice is expressed exactly. DROPPED: 'You can't make any purchases until you do so', which is a standing RESTRICTION on the player and needs PlayerState.restrictions (KNOWN-GAPS G5); a lasting clause also needs G9/G22. Without it this is a plain 2-resource tax rather than a soft-lock.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of The Four Horsemen. The real card is 'Choose and discard one of the following: 2 Funds OR 2 Clout OR 2 Media OR 2 Trust', which is a single `lose-any` of 2 — any two of one kind and one of each are both in that set, so the choice is expressed exactly. DROPPED: 'You can't make any purchases until you do so', which is a standing RESTRICTION on the player and needs PlayerState.restrictions (KNOWN-GAPS G5); a lasting clause also needs G9/G22. Without it this is a plain 2-resource tax rather than a soft-lock.",
       "provenance": "adapted",
       "name": "The Four Horsemen",
       "text": "Discard 2 resources of your choice to the Public Reserve. Any two of the same kind, or one of each.",
@@ -155,7 +155,7 @@
     },
     {
       "id": "hl-et2040-010",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Married With Bits. DROPPED: 'to 2 opponents' becomes every opponent, because the card can only be aimed at a target SET (`each-opponent`), not at a count of chosen players; and 'They can choose not to take it' has no expression at all â€” a granted voter is a pending group the opponent places. `text` states exactly what the engine does. See KNOWN-GAPS G1.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Married With Bits. DROPPED: 'to 2 opponents' becomes every opponent, because the card can only be aimed at a target SET (`each-opponent`), not at a count of chosen players; and 'They can choose not to take it' has no expression at all — a granted voter is a pending group the opponent places. `text` states exactly what the engine does. See KNOWN-GAPS G1.",
       "provenance": "adapted",
       "name": "Married With Bits",
       "text": "Every opponent gains 1 voter, which they may place in any zone on their own turn.",
@@ -201,7 +201,7 @@
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of As Clear As Water in full. This slot was `inferred` (THREE DAY WEEKEND, a reskin of hl-et2040-005, which stays); SOURCES.md 4 replaces an inferred placeholder BY the recovered card once the engine can perform it. DROPPED, both for the same reason: a REVEAL has no state consequence here, so reduce() has nothing to perform. SHIPPED: 'if any player does not have a Conspiracy Card, they receive 1 from the draw pile' is `onlyIfEmpty`, read off the RECIPIENT's hand - a fact hidden from every owner too, so it logs nothing.",
       "provenance": "adapted",
       "name": "As Clear As Water",
-      "text": "Every player who is holding no Conspiracy Card receives 1 from the draw pile, in turn order. A player already holding one takes nothing â€” and that includes you, unless the card you just played was your last.",
+      "text": "Every player who is holding no Conspiracy Card receives 1 from the draw pile, in turn order. A player already holding one takes nothing — and that includes you, unless the card you just played was your last.",
       "effects": [
         {
           "op": "draw-conspiracy",
@@ -280,7 +280,7 @@
       "source": "REF 4.3 recovers Fatality: 'Influence an open Voter Card for free and donate the voters to any opponent.' G1 LANDED: `target: chosen-player` raises a decision for the card's OWN actor, and a player holding nothing is STILL offered -- filtering the list by holdings would make it a readout of their Mat. DROPPED, named: 'for free' is a PURCHASE the engine cannot grant (G15's `price`); 'the voters' ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; 'right away' needs an 'immediately' placement. What ships is the DONATE.",
       "provenance": "adapted",
       "name": "Fatality",
-      "text": "Choose an opponent. They receive 1 voter, which they place on the board on their own turn.",
+      "text": "Choose an opponent. They receive 1 voter, which they place on the board on their own turn. The printed card has them place it right away, and has you influence a Voter Card for free first; neither is done here.",
       "effects": [
         {
           "op": "voters",

@@ -354,21 +354,62 @@ describe('every rule sits in the media query it is meant to be in', () => {
     expect(phoneSheets.length, 'exactly one .sheet rule may carry 100dvh').toBe(1);
     expect(phoneSheets[0]?.inMedia).toMatch(/max-width:\s*599px/);
 
-    // The tab bar and the END TURN dock are phone chrome: hidden by DEFAULT and
-    // switched on inside the phone query. That is the correct direction, and the
-    // bug to catch is the reverse — a rule that HIDES something globally which
-    // should be a desktop column. So assert the intended pair exists.
-    for (const selector of ['.tabbar', '.endturn-dock']) {
-      const rules = topLevelRules().filter((r) => r.selector === selector);
-      expect(rules.length, `${selector} must exist`).toBeGreaterThan(0);
-      const base = rules.find((r) => r.inMedia === null);
-      expect(base, `${selector} must have a base rule`).toBeDefined();
-      expect(base?.declarations, `${selector} is hidden by default on desktop`).toMatch(
+    // The tab bar is PHONE chrome: hidden by default and switched on inside the
+    // phone query. That is the correct direction, and the bug to catch is the
+    // reverse — a rule that HIDES something globally which should be a desktop
+    // column.
+    const tabbar = topLevelRules().filter((r) => r.selector === '.tabbar');
+    expect(tabbar.length, '.tabbar must exist').toBeGreaterThan(0);
+    const tabbarBase = tabbar.find((r) => r.inMedia === null);
+    expect(tabbarBase, '.tabbar must have a base rule').toBeDefined();
+    expect(tabbarBase?.declarations, '.tabbar is hidden by default on desktop').toMatch(
+      /display:\s*none/,
+    );
+    const tabbarPhone = tabbar.find((r) => r.inMedia !== null);
+    expect(tabbarPhone, '.tabbar must be switched on inside the phone query').toBeDefined();
+    expect(tabbarPhone?.declarations).toMatch(/display:\s*flex/);
+  });
+
+  it('the END TURN dock is NOT hidden on desktop — it was the missing control', () => {
+    // THIS ASSERTION IS INVERTED FROM WHAT IT WAS, and the reason is the bug.
+    //
+    // `.endturn-dock` used to carry `display: none` outside the `max-width: 599px`
+    // query, on the assumption that a desktop had an END TURN somewhere else. It did
+    // not: the "desktop" button in `GameScreen` was an unsatisfiable condition
+    // (`isMyTurn && … && !isMyTurn`) that rendered nothing at any width, and
+    // `YourMat`'s `onEndTurn` prop had never been rendered. So a desktop player had
+    // no way to end a turn at all, and this test asserted the invisibility that
+    // caused it.
+    //
+    // The dock is the ONE end-turn control now and it is fixed to the bottom at every
+    // width. What this test guards is the direction of the bug: a future `display:
+    // none` in a base rule, or a phone-only rule that no longer turns it on, is a
+    // regression straight back to "a desktop cannot end its turn".
+    const dock = topLevelRules().filter((r) => r.selector === '.endturn-dock');
+    expect(dock.length, '.endturn-dock must exist').toBeGreaterThan(0);
+
+    const base = dock.find((r) => r.inMedia === null);
+    expect(base, '.endturn-dock must have a base rule').toBeDefined();
+    expect(base?.declarations, 'the dock must be shown on a desktop').not.toMatch(
+      /display:\s*none/,
+    );
+    // …and it must be pinned, because `.shell__side` is a scrolling sticky column and
+    // a control you have to scroll to find is a control nobody presses.
+    expect(base?.declarations, 'the dock must be fixed to the bottom').toMatch(
+      /position:\s*fixed/,
+    );
+    expect(base?.declarations).toMatch(/bottom:\s*0/);
+
+    // The phone rule may only REPOSITION it — never hide it, and never put it back at
+    // `bottom: 0`, where it would sit on top of the 56px tab bar.
+    for (const rule of dock.filter((r) => r.inMedia !== null)) {
+      expect(rule.inMedia).toMatch(/max-width:\s*599px/);
+      expect(rule.declarations, 'the phone rule must not hide the dock').not.toMatch(
         /display:\s*none/,
       );
-      const phone = rules.find((r) => r.inMedia !== null);
-      expect(phone, `${selector} must be switched on inside the phone query`).toBeDefined();
-      expect(phone?.declarations).toMatch(/display:\s*flex|display:\s*block/);
+      expect(rule.declarations, 'the phone rule must lift it above the tab bar').toMatch(
+        /bottom:\s*56px/,
+      );
     }
   });
 

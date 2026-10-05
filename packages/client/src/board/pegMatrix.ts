@@ -72,7 +72,7 @@ export type PegCells = readonly [
 ];
 
 /**
- * The matrix, verbatim from §4.6. Index [row][column].
+ * The matrix, transcribed from §4.6. Index [row][column].
  *
  * Row 4 (`own` + minority + volatile) is `◇ + ✕` in EVERY `GERRY src`/`dest`
  * cell, and row 6 (`own` + majority + volatile) is `●◇ + ✕` in all of them —
@@ -81,6 +81,25 @@ export type PegCells = readonly [
  * (`other` + minority + volatile) is `◈` in `GERRY dest legal`, because you
  * may move an opponent's voter into a Volatile Area; the Headline it triggers
  * is surfaced in the tooltip and the confirm chip, not by making it illegal.
+ *
+ * ## ROW 7's `GERRY src` CELL WAS WRONG IN THE SPEC, AND IS CORRECTED HERE
+ *
+ * §4.6 printed `d + ○` for row 7 (`other` + minority + normal) in `GERRY src` —
+ * dimmed, i.e. "not an option" — and rows 8–10 likewise. The code copied that
+ * faithfully, so this table and `BoardSvg` agreed with each other and both were
+ * wrong: `rules-reference.md:256` (p16) says *"You may gerrymander ANY PLAYER'S
+ * voters, including your own."*
+ *
+ * The spec contradicted itself two rows later. Its own note on row 8 reasons from
+ * the rule that you may move an opponent's voter — using it to decide the
+ * DESTINATION column — while the SOURCE column said the same voter could not be
+ * picked up at all. Nothing about a gerrymander makes the source peg special; the
+ * player needs rights, not ownership.
+ *
+ * So row 7 is `⟲` now: same dashed `SEAL` source ring as row 3, because it is the
+ * same legal move. Rows 8, 9 and 10 stay dimmed/hatched, and for the two reasons
+ * that are actually rules — Volatile is permanent (p18) and majority does not move
+ * (p16) — not because a player owns them.
  */
 export const PEG_MATRIX: Readonly<Record<PegRow, PegCells>> = {
   'empty-normal': ['w', '⌾', 'w+h', 'w+⌾*', 'd+w', '◈', 'w+h'],
@@ -89,7 +108,7 @@ export const PEG_MATRIX: Readonly<Record<PegRow, PegCells>> = {
   'own-minority-volatile': ['◇', '◇+⌾', '◇+✕', '◇+⌾*', '◇+✕', '◇+✕', '◇+✕'],
   'own-majority-normal': ['●', '●+✕', '●+✕', '●+✕', '●+✕', '●+✕', '●+✕'],
   'own-majority-volatile': ['●◇', '●◇+✕', '●◇+✕', '●◇+✕', '●◇+✕', '●◇+✕', '●◇+✕'],
-  'other-minority-normal': ['○', '○+✕', '○+✕', '○+✕', 'd+○', '○+◈', '○+✕'],
+  'other-minority-normal': ['○', '○+✕', '○+✕', '○+✕', '⟲', '○+◈', '○+✕'],
   'other-minority-volatile': ['◇', '◇+✕', '◇+✕', '◇+✕', 'd+◇', '◇+◈', '◇+✕'],
   'other-majority-normal': ['●', '●+✕', '●+✕', '●+✕', 'd+●', '●+◈', '●+✕'],
   'other-majority-volatile': ['●◇', '●◇+✕', '●◇+✕', '●◇+✕', 'd+●◇', '●◇+◈', '●◇+✕'],

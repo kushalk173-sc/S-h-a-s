@@ -40,14 +40,42 @@
 }
 
 .blind-answer__scenario {
-  /* TYPE_CARD_SCENARIO: 17px / 27px = 1.59 leading, tuned to the display
-     serif's x-height. 27px of leading gives 4–8 lines of prose room without
-     the lines crowding. */
-  font: var(--type-card-scenario);
-  color: var(--ink-700);
+  /* `--type-card-question`: 24px / 32px / 700. This was 17px / 27px / 400, which
+     is `--type-card-scenario` and is now kept only for copy that asks for it.
+
+     The change is not decoration. The answer screen is the one place the game stops
+     for a decision, and at the old size the question sat above the fold of its own
+     panel as a paragraph of body text while the CHOOSE ONE eyebrow below it was
+     set LARGER than the thing being asked. The question is now the largest type on
+     the screen, which is the only honest reading order for "here is a question,
+     here are two answers".
+
+     32px of leading gives a two-line question room without the lines crowding, and
+     `text-wrap: pretty` keeps a last line from being a single short word.
+     TableQuestion shares this class, so the table reads the question at the size it
+     is being asked — which is what "one card, two panels" is supposed to mean.
+
+     IN LONGHAND, not as `font: var(--type-card-question)`, and the reason is the one
+     every other rule in this file gives: jsdom does not expand a shorthand into
+     computed style, so a shorthand here would leave the type of the most important
+     element on the screen permanently unassertable, and therefore unguarded. The
+     token is the one place the numbers are chosen; this rule is where they are
+     proved, and a test asserts both so the two cannot drift apart. */
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
+  color: var(--ink-900);
   margin: 0 0 var(--sp-8);
   text-align: center;
   text-wrap: pretty;
+  /* 22ch, not 26. At 32px a 26ch measure is a 640px line, which is a paragraph and
+     not a question; 22ch keeps it to two or three lines that a player reads as one
+     thought. `text-wrap: balance` would be even better here and is deliberately not
+     used: it is unsupported in the jsdom this file's tests run in, and a rule whose
+     effect cannot be asserted is a rule that will be changed by accident. */
+  max-width: 22ch;
+  margin-inline: auto;
 }
 
 /* One contiguous panel: one background, one border, both options in a single
@@ -168,42 +196,47 @@
 }
 
 .blind-answer__label {
-  /* TYPE_CARD_SIDE_LABEL: 17px / 700 / 1.35, INK_900, centred, 22ch max —
-     the same max-width on both, so a longer label wraps rather than widening
-     its own column. */
+  /* `--type-card-verdict`: 26px / 800, INK_900, centred.
+
+     THIS IS A YES/NO MOST OF THE TIME, and it is set like a verdict rather than
+     like prose. `BlindAnswer` reduces both sides through `verdictOf` and prints the
+     word; `TableQuestion` prints the card's full sentence on the same class, so a
+     long label wraps here rather than widening its own column, and `max-width` is
+     the same on both sides either way — which is what keeps the two cells equal
+     when one answer is two characters and the other is a paragraph.
+
+     The 22ch cap is the interesting number. A single word never reaches it, so for
+     the binary case it does nothing at all; for a full sentence it is the width the
+     sentence wraps at. One rule, both cases, no branching.
+
+     Written in LONGHAND rather than as a `font:` shorthand, for the reason the side
+     rule gives: jsdom does not expand a shorthand into computed style, so a
+     shorthand here would make the whole hierarchy unassertable and therefore
+     unguarded. */
   font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 38px;
   color: var(--ink-900);
   text-align: center;
   max-width: 22ch;
   text-decoration: none;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
 }
 
 /*
-   THE TWO LINES THAT HAD NO RULE AT ALL, and are now the two lines a player reads.
-   ═══════════════════════════════════════════════════════════════════════════════
-   Full information put the Ideologue and the payout on the card as two unstyled
-   `<span>`s, and `.blind-answer.css` had NO rule for either class. So they inherited
-   every visual property from the answer label — 17px, 700, INK_900, the display
-   serif — inside a `flex-direction: row`, which is how the payout became the
-   least legible thing on the card: the one datum the whole ruling exists to publish,
-   set at the same size and weight as the prose it was competing with, in a 53px
-   column.
+   THE TWO LINES BELOW ARE NO LONGER RENDERED BY `BlindAnswer`.
 
-   So there are now three levels, and the point of them is that they are all
-   DIFFERENT: the answer is what you read, the attribution says whose it is, and the
-   payout is a figure. Every declaration is in LONGHAND rather than a `font:`
-   shorthand, for the reason the side rule above gives — jsdom does not expand a
-   shorthand, so a shorthand here would make the hierarchy unassertable and therefore
-   unguarded.
+   They are not deleted, and they are not dead: `TableQuestion` — the panel every
+   seat except the answerer's reads — prints the Ideologue and the payout on these
+   two classes, because at a table the card is read ALOUD and the attribution and
+   the payoff are part of what is read. Same classes, same card, one panel with two
+   fewer lines on it.
 
-   NONE OF IT IS PER-SIDE. All three rules are single-class and both sides carry the
-   same three, so nothing here can publish which Ideologue or which payout is in a
-   given position; the stylesheet audit below fails the build on any selector that
-   narrows a side rule, and these do not narrow one.
+   So the rule below is about the TABLE's copy of the card and must keep working. The
+   only thing that changed on this screen is that these two spans are no longer in
+   `BlindAnswer`'s markup — and `blindAnswer.test.tsx` now asserts their ABSENCE
+   there, which is what keeps this component from quietly growing them back.
 */
 
 /* WHOSE ANSWER IT IS — identity, set as a caption rather than as more prose. */

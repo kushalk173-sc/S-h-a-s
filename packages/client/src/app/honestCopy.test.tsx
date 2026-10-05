@@ -127,23 +127,164 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     // error as one reading '23 funds': a number attached to a noun it does not agree
     // with, on the strip whose whole job is to be believed. Caught by a screenshot.
     expect(text, 'the count is pluralised wrongly').not.toMatch(/\b1\s*cards\b/i);
-    // THE IDEOLOGUE, not the resource: the card IS a Capitalist card.
+// THE IDEOLOGUE, not the resource: the card IS a Capitalist card.
     expect(text, 'the DOM text runs the count and the Ideologue together').toContain('Capitalist');
     // …and the resource survives, on the bonus line where it is what is being PAID.
     expect(text, 'the bonus no longer names what it pays').toMatch(/\+\d*\s*funds/i);
-    // The unlock requirement, which was a bare countdown to an unnamed threshold.
-    expect(text, 'the cell does not say how many more cards unlock a power').toMatch(
-      new RegExp(`${UI_RULES.level3 - 1}\\s+more`),
+    // The unlock requirement, which is no longer prose at all: it is the NOTCHED pip
+    // at `level3`. Asserted as a mark, because that is what a player now reads — see
+    // "the pip track ENCODES the thresholds" below for the geometry.
+    expect(text, 'the cell has no progress track to read the unlock from').toBeTruthy();
+    r.unmount();
+  });
+
+  it('the pip track ENCODES the thresholds, so no arithmetic is needed to read them', () => {
+    /*
+      The reported problem, one level up from the wording: *"Which makes me think the
+      UI doesn't feel super intuitive."* Fixing the sentence only moved the
+      arithmetic around. The strip has THREE thresholds — `passiveBonusPer` (2),
+      `level3` (3), `level5` (5) — and delivered all three as text the player
+      reconciles by hand, on a panel §5.4 calls "the main strategic read on the mat".
+
+      So the thresholds are now POSITIONS: a fixed 5-pip track, a wider gap after
+      every second pip (`passiveBonusPer`), and a taller pip at `level3`. A player
+      watching a pair close knows the `+1` is why, without reading anything.
+
+      These assert the encoding, because an encoding that is drawn but not load-bearing
+      would be decoration — and a decorative pip track is worse than the sentence it
+      replaced, since it would LOOK like the answer while saying nothing.
+    */
+    const r = render(
+      <ManifestoStrip
+        state={{ players: { [ME]: seat([]) } } as unknown as ClientState}
+        you={ME}
+      />,
+    );
+    const cell = r.container.querySelector('[data-testid=manifesto-capitalist]') as HTMLElement;
+    const track = cell.querySelector('.mani__track') as HTMLElement;
+    expect(track, 'the cell has no pip track').not.toBeNull();
+
+    const pips = [...track.querySelectorAll('.mani__pip')];
+    // Five slots, one per threshold up to `level5`. Not `count` slots: a track that
+    // grows would hide the fact that the 23rd card bought nothing new.
+    expect(pips.length, 'the track is not capped at level5').toBe(UI_RULES.level5);
+
+    // The cadence is DRAWN as a pair gap, on every `passiveBonusPer` boundary. Five pips
+    // at two per bonus is 2, 4 and then the track's own end at 5 — the last slot has no
+    // partner, so it terminates the row rather than starting a pair that never closes.
+    const pairEnds = pips
+      .map((p, i) => (p.getAttribute('data-pair-end') === 'true' ? i + 1 : null))
+      .filter((n): n is number => n !== null);
+    const expectedPairEnds: number[] = [];
+    for (let n = UI_RULES.passiveBonusPer; n < UI_RULES.level5; n += UI_RULES.passiveBonusPer) {
+      expectedPairEnds.push(n);
+    }
+    expectedPairEnds.push(UI_RULES.level5);
+    expect(pairEnds, 'the pair gap does not sit on the passiveBonusPer boundary').toEqual(
+      expectedPairEnds,
+    );
+
+    // The power threshold is a marked pip, permanently — legible whether or not the
+    // cell has reached it, which is the whole point of marking it.
+    const notched = pips.filter((p) => p.getAttribute('data-threshold') === 'power');
+    expect(notched.length, 'level3 is not marked on the track').toBe(1);
+    expect(
+      pips.indexOf(notched[0] as Element) + 1,
+      'the notch is not the level3rd pip',
+    ).toBe(UI_RULES.level3);
+
+    // …and the ARIA name restates the same thresholds, because a position is
+    // invisible to anyone not looking at it. The visual encoding must never be the
+    // ONLY place a rule is written down.
+    expect(track.getAttribute('aria-label') ?? '', 'the track has no accessible name').toContain(
+      `${UI_RULES.level5} pip slots`,
+    );
+    expect(track.getAttribute('aria-label') ?? '', 'the cadence is not in the track name').toContain(
+      'Every pair of pips pays +1',
+    );
+    r.unmount();
+  });
+
+  it('the bonus line states the INCOME, not the formula', () => {
+    /*
+      `+1 funds per 2` is a rule to apply; `+1 funds per turn` is a quantity to bank.
+      The strip's bottom line should be the number the player is actually accumulating,
+      because that is the only one of the three that survives into a score — and
+      stating the formula is what put `3` and `2` next to each other in the first place.
+    */
+    // Zero: it must say so plainly. "Nothing yet" is itself the strategic read — a
+    // player deciding whether to chase a third Capitalist needs to know that the
+    // SECOND card is what pays.
+    const none = render(
+      <ManifestoStrip
+        state={{ players: { [ME]: seat([]) } } as unknown as ClientState}
+        you={ME}
+      />,
+    );
+    const empty = none.container.querySelector('[data-testid=manifesto-capitalist]') as HTMLElement;
+    expect(empty.textContent ?? '', 'a zero-income cell does not say it pays nothing').toContain(
+      `+0 funds`,
+    );
+    expect(empty.textContent ?? '', 'the zero cell does not say when the next one pays').toContain(
+      `next in ${UI_RULES.passiveBonusPer}`,
+    );
+    // The formula itself is gone from the visible text — it lives in the pip gaps now.
+    expect(empty.textContent ?? '', 'the formula is back on the cell').not.toMatch(
+      /per\s*\d+\s*·/,
+    );
+    none.unmount();
+
+    // Earning: the income, at full strength, with the cadence still reachable.
+    const earning = render(
+      <ManifestoStrip
+        state={{
+          players: { [ME]: seat(Array.from({ length: 4 }, () => 'capitalist' as const)) },
+        } as unknown as ClientState}
+        you={ME}
+      />,
+    );
+    const paid =
+      earning.container.querySelector('[data-testid=manifesto-capitalist]') as HTMLElement;
+    // 4 cards at 2 per bonus = 2. Taken from `bonusPerTurn`, i.e. the same number the
+    // engine pays, so a rules change cannot leave the copy behind.
+    expect(paid.textContent ?? '', 'the earned income is wrong').toContain(
+      `+${Math.floor(4 / UI_RULES.passiveBonusPer)} funds per turn`,
+    );
+    earning.unmount();
+  });
+
+  it('the cadence is reachable from the cell text, because a screen reader cannot see a gap', () => {
+    // `cellName` states "every N cards" for exactly this reason. The pip track is the
+    // primary encoding, but a screen-reader user meets the sentence, not the geometry,
+    // so the sentence has to carry the rule on its own.
+    const r = render(
+      <ManifestoStrip
+        state={{ players: { [ME]: seat(['capitalist']) } } as unknown as ClientState}
+        you={ME}
+      />,
+    );
+    const cell = r.container.querySelector('[data-testid=manifesto-capitalist]') as HTMLElement;
+    const label = cell.getAttribute('aria-label') ?? '';
+    expect(label, 'the accessible name does not state the cadence').toContain(
+      `One extra funds for every ${UI_RULES.passiveBonusPer} cards.`,
+    );
+    // At one card the next bonus is the NEXT card — the fact that caused the report.
+    expect(label, 'the accessible name does not say the next card pays').toContain(
+      'Pays nothing yet, 1 more card for +1',
     );
     r.unmount();
   });
 
 it('the DOM TEXT runs the three facts apart, because textContent is what is read', () => {
-    // Found by a screenshot, not by reasoning: the cell's three spans are block-level,
-    // so they LOOKED like three lines — but `display: block` is a visual break only,
-    // and `textContent` still read "1cardCapitalist2 more · +1 funds per 2". That
-    // matters twice over: a screen reader concatenates the same string, and this
+    // Found by a screenshot, not by reasoning: the cell's spans are block-level, so
+    // they LOOKED like separate lines — but `display: block` is a visual break only,
+    // and `textContent` still ran "1cardCapitalist2 more · +1 funds per 2" together.
+    // That matters twice over: a screen reader concatenates the same string, and this
     // project's own harness reads the mat out of the DOM by exactly that route.
+    //
+    // The Ideologue line therefore has to be followed by a separator that EXISTS IN THE
+    // TEXT, not only in the layout. The bonus line is that separator now — the pip
+    // track adds no text at all, which is precisely why it cannot do this job.
     //
     // And the numeral has to agree with its noun. "1 cards" is the same class of error
     // as "23 funds" — a number attached to a noun it does not agree with, on the strip
@@ -164,8 +305,8 @@ it('the DOM TEXT runs the three facts apart, because textContent is what is read
       expect(text, `${label}: the count and the Ideologue are glued together`).toMatch(
         /\d card[s]? Capitalist/,
       );
-      expect(text, `${label}: the Ideologue and the forecast are glued together`).toMatch(
-        /Capitalist\s+\d+ more|Capitalist\s+L\d/,
+      expect(text, `${label}: the Ideologue and the income are glued together`).toMatch(
+        /Capitalist\s+\+\d|Capitalist\s+L\d/,
       );
       expect(text, `${label}: the count and its noun disagree`).not.toMatch(/\b1 cards\b/);
       r.unmount();
@@ -218,7 +359,6 @@ it('the DOM TEXT runs the three facts apart, because textContent is what is read
         onSelectGroup={() => undefined}
         onGerry={() => undefined}
         onPower={() => undefined}
-        onEndTurn={() => undefined}
         onTradeWith={() => undefined}
       />,
     );

@@ -34,6 +34,7 @@ import {
   poolTotal,
   shortfall,
 } from './derive.ts';
+import { ResourceGlyph } from './ResourceGlyph.tsx';
 import type { MarketPower, PowerFlow } from './store.ts';
 import { powerAreaCount, powerTargetsArea } from './store.ts';
 
@@ -195,10 +196,12 @@ function Prospecting({
             key={r}
             type="button"
             className={`picker__cell ${give === r ? 'picker__cell--max' : ''}`}
+            data-res={r}
             onClick={() => setGive(r)}
             aria-pressed={give === r}
             data-testid={`prospect-give-${r}`}
           >
+            <ResourceGlyph resource={r} />
             <span className="picker__count">{pool[r]}</span>
             <span className="picker__name">{r}</span>
           </button>
@@ -212,9 +215,11 @@ function Prospecting({
             <button
               type="button"
               className={`picker__cell ${(take[r] ?? 0) > 0 ? 'picker__cell--max' : ''}`}
+              data-res={r}
               onClick={() => bump(r, 1)}
               aria-label={`Take one ${r}. ${taken} of ${cap} chosen.`}
             >
+              <ResourceGlyph resource={r} />
               <span className="picker__count">{take[r] ?? 0}</span>
               <span className="picker__name">{r}</span>
             </button>
@@ -323,10 +328,12 @@ function SlotTarget({
                 key={r}
                 type="button"
                 className={`picker__cell ${cost === r ? 'picker__cell--max' : ''}`}
+                data-res={r}
                 onClick={() => setCost(r)}
                 aria-pressed={cost === r}
                 data-testid={`payback-pay-${r}`}
               >
+                <ResourceGlyph resource={r} />
                 <span className="picker__count">{owned[r]}</span>
                 <span className="picker__name">{r}</span>
               </button>
@@ -403,9 +410,11 @@ function Donations({ state, you, onSubmit }: PowerDialogProps) {
               key={r}
               type="button"
               className="picker__cell"
+              data-res={r}
               onClick={() => onSubmit({ kind: 'donations', from: victim.id, res: r })}
               data-testid={`donations-take-${r}`}
             >
+              <ResourceGlyph resource={r} />
               <span className="picker__count">{victim.resources[r]}</span>
               <span className="picker__name">{r}</span>
             </button>
