@@ -449,14 +449,16 @@ npm run balance  --workspace @shasn/cards   # exits 1 on any dominance error
 npm run balance --workspace @shasn/cards -- --strict   # warnings too
 ```
 
-`validate` also prints the provenance census. **⚠ The counts hard-coded here were stale as of
-2026-10-03** (`verbatim 0, adapted 19, inferred 45` over 64 cards); the corpus is now
-**151 cards — 0 `verbatim`, 41 `adapted`, 110 `inferred`**, **134** of them Ideology Cards
-(was 76 when this line was written). **The corpus total has since moved again** — `KNOWN-GAPS.md`
-§8 measures **221 cards** — and the `verbatim`/`adapted`/`inferred` split above has **not** been
-re-measured here. **Trust the command's own output over this sentence.** See
-`packages/cards/README.md`, `packages/cards/decks/SOURCES.md` (per-card audit trail) and
-`packages/cards/KNOWN-GAPS.md`.
+`validate` also prints the provenance census. **⚠ Two earlier counts were stale as of
+2026-10-03** (`verbatim 0, adapted 19, inferred 45` over 64 cards, then `0 / 41 / 110` over
+151); both are left in the record above as history. **The corpus is 222 cards — 0
+`verbatim`, 45 `adapted`, 177 `inferred`**, of which **134 are Ideology Cards** (92
+`in2020` + 42 `et2040`), plus 18 Voter, 31 Conspiracy and 39 Headline. Counted off
+`"id"` and `"provenance"` in `decks/**/*.json`; `decks/SOURCES.md` §3 and §7 carry the same
+census and the per-card audit trail. **`npm run playable` reports three verdicts, not one** —
+EXPRESSIBLE / IN THE CORPUS / SHIPPED AS AUTHORED — and prints its own denominator beside
+them. **Trust the commands' own output over this sentence.** See
+`packages/cards/README.md` and `packages/cards/KNOWN-GAPS.md`.
 
 > **One line to add to your reading of `balance` output, 2026-10-03.** The game is now
 > **full information** — both of a card's payouts are printed on the card before anyone

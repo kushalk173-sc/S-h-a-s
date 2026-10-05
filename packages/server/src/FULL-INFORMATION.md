@@ -191,6 +191,16 @@ decision did.**
 
 ## 6. The measurement that made §3's "sharpened" necessary
 
+**⚠ The block below is a CAPTURED `npm run balance` RUN, kept verbatim because rewriting a
+tool's output is fabrication.** It was taken when the corpus stood at **151 cards** with a
+20-card `et2040` Ideology deck, so `cards checked 151` and `deck "et2040" — 20 ideology
+cards` are **that run's** numbers and are history, not the current census. The corpus is now
+**222 cards** — 134 Ideology (92 `in2020` + 42 `et2040`), 18 Voter, 31 Conspiracy, 39
+Headline; 0 `verbatim` / 45 `adapted` / 177 `inferred` — so **re-run the command and read
+its own output.** The *finding* the measurement produced (a one-resource edge is visible
+under full information and is therefore a broken card rather than a smell) is unaffected by
+the corpus growing.
+
 `npm run balance --workspace packages/cards`, against the deck as shipped:
 
 ```

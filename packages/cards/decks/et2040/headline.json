@@ -387,7 +387,7 @@
     },
     {
       "id": "hl-et2040-026",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for FUELLING THE NEWS (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3: headlines are dealt from a QUEUE (`GameState.headlineQueue`) and there is no Headline hand and no Headline draw pile, so 'draw 3' has no referent and 'choose the order in which to resolve these Headlines' needs a resolution-order queue as well. Same JOB: a headline that lands on everybody at once, which is what handing out headlines actually feels like.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for FUELLING THE NEWS (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3. CORRECTION 2026-10-04, FACTUAL ONLY, RULING UNCHANGED: this used to claim 'no Headline hand and no Headline draw pile', and that was FALSE - `GameState._headlineDraw` exists and `reveal {kind:'headline'}` reads its TOP. What has no referent is the rest: a Headline HAND to keep one of three and give one to each of 2 opponents (G20; `move-card` is Ideology-only), and 'choose the order in which to resolve these Headlines' (G18). Same JOB: a headline that lands on everybody.",
       "provenance": "inferred",
       "name": "The Front Page",
       "text": "Every player discards 1 resource of their choice to the Public Reserve.",
@@ -397,6 +397,58 @@
           "n": 1,
           "target": "everyone"
         }
+      ]
+    },
+    {
+      "id": "hl-et2040-028",
+      "source": "REF 4.1 (Campaign: USA 2020) recovers POLO RETREAT: 'They can use each other's unlocked Level 3 Ideologue Powers in addition to their own.' No USA deck exists; filed beside its campaign-less §4.1 siblings. DEEP THOUGHTS' borrow with `until:'next-turn'`. DROPPED, four: 'each other's' - one decision names one DONOR, and a borrowed Restriction writes the CASTER as owner; 'Pick 2 players', because `applyEffect` computes ONE target per effect list; the 'any one Level 3 Power of their choice' fallback, which need not be UNLOCKED; 'You may pick yourself', which `resolveChoice` refuses.",
+      "provenance": "adapted",
+      "name": "Polo Retreat",
+      "text": "Choose a player. Until the start of your next turn, every one of their unlocked Level 3 Ideologue Powers is yours to use as well as your own, and their own powers are left alone. The printed card has two players swap with each other across their next turns; this names one opponent.",
+      "effects": [
+        { "op": "borrow-power", "target": "chosen-player", "until": "next-turn" }
+      ]
+    },
+    {
+      "id": "hl-et2040-029",
+      "source": "REF 4.1 (Campaign: Earth 2040) recovers SUBMERGED: 'Starting with you, every player can Gerrymander 1 voter immediately.' REF 4.3 calls it the SAME card as NEW FACE WHO DIS (hl-et2040-001): one archetype, two names. G8 closed, so `target:'everyone'` IS honoured. DROPPED, two: the Volatile-Area placement ban, a RESTRICTION the Effect union cannot state (G5); and the grant's LIFETIME (G9/G22): it lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player. That is why hl-et2040-001 ships the `you` reading; this card's `text` says so.",
+      "provenance": "adapted",
+      "name": "Submerged",
+      "text": "Starting with you, every player may Gerrymander 1 majority or non-majority voter with this card. It is not a lasting right: the extra Gerrymander is cleared when that player's own turn begins, so it is worth spending on the turn it lands. Voters in Volatile Areas are permanent and cannot be Gerrymandered at all.",
+      "effects": [
+        { "op": "gerrymander", "n": 1, "target": "everyone" }
+      ]
+    },
+    {
+      "id": "hl-et2040-030",
+      "source": "REF 4.1 (Rome) recovers A COWARD OR A JOURNALIST?: 'Starting from you, each player can donate 1 of their Ideology Cards.' Filed beside its campaign sibling hl-et2040-017 (NERO'S GUESTS, also Rome). `target:'player-after'` is ONE index into GameState.turnOrder from the actor, wrapping, which in a clockwise order IS 'the opponent on their left' - so it raises NO decision. DROPPED, four: 'starting from you, EACH player' is N donations; 'optional'; 'pass along a card you just received' (G20/G12); the card comes off the Ideology DRAW pile, not a HAND - `from:'hand'` is refused at the type level.",
+      "provenance": "adapted",
+      "name": "A Coward Or A Journalist?",
+      "text": "The player on your left receives the top Ideology Card from the draw pile, and 6 resources of their choice. One seat and one card, taken from the deck rather than from a hand: the printed card has every player starting with you donate one of their own Ideology Cards, optionally, and allows a card just received to be passed along.",
+      "effects": [
+        { "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "player-after" },
+        { "op": "gain-any", "n": 6, "target": "player-after" }
+      ]
+    },
+    {
+      "id": "hl-et2040-031",
+      "source": "REF 4.3 recovers CARD GAMES, which REF 4.3 itself records as a re-skin of A COWARD OR A JOURNALIST? (hl-et2040-030) - the same archetype under its own recovered name, not a second mechanism. The reduction is field-for-field that card's two clauses and every clause dropped or performed is identical, with ONE ADDITION: 'Can be blocked only at the beginning.' That is a rule about WHEN the response window opens, not what happens, and the existing window (GameState.interrupt, G13) opens for the whole resolution - so the narrowed timing is DROPPED and named.",
+      "provenance": "adapted",
+      "name": "Card Games",
+      "text": "The player on your left receives the top Ideology Card from the draw pile, and 6 resources of their choice. The printed card adds that it can be blocked only at the beginning; the response window here is open for the whole resolution, so that narrowing is not performed.",
+      "effects": [
+        { "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "player-after" },
+        { "op": "gain-any", "n": 6, "target": "player-after" }
+      ]
+    },
+    {
+      "id": "hl-et2040-033",
+      "source": "REF 4.3 recovers THE BIG FREEZE: 'Reduce your resource cap to 10.' PERFORMED whole, via `set-cap` on `PlayerState.capOverride` - a FIELD not a `restrict` kind, because a cap is a NUMBER, not a gate. NO DEADLOCK, which is why the earlier refusal was wrong: enforceCap raises overCap = max(0, total - cap), excess <= total ALWAYS, so the target is REACHABLE (proof: cap-override.test.ts). DROPPED, two: the '[OR] Pick an opponent every turn and donate any 1 resource' branch, a recurring donation to a chosen opponent (G5 + G9) and so a DIFFERENT card; and the reduced cap being visible on the mat.",
+      "provenance": "adapted",
+      "name": "The Big Freeze",
+      "text": "Your resource cap falls to 10 for the rest of the game, and if you are already over it you discard down to it at once - the discard is always affordable, because you are never asked for more than you hold. A second freeze takes the lower of the two caps. Your reduced cap is not yet shown as a number on your Mat.",
+      "effects": [
+        { "op": "set-cap", "to": 10, "until": "rest-of-game" }
       ]
     }
   ]

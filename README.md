@@ -110,21 +110,23 @@ the one `order` value that identifies which face is which.
 The shipped decks are **original work**, written against the mechanics but not copied
 from any published card. Counted off the deck files:
 
-> ### 🔴 151 cards — 0 verbatim, 41 adapted, 110 inferred. And the honest version.
+> ### 🔴 222 cards — 0 verbatim, 45 adapted, 177 inferred. And the honest version.
 >
 > | | count | |
 > |---|---:|---|
 > | `verbatim` | **0** | Deliberate and structurally unreachable: reproducing a recovered card's rules text word-for-word would print a clause the engine does not implement. |
-> | `adapted` | **41** | Recovered material, played as a reconstruction. Each names what it dropped. |
-> | `inferred` | **110** | **Authored here.** |
+> | `adapted` | **45** | Recovered material, played as a reconstruction. Each names what it dropped. |
+> | `inferred` | **177** | **Authored here.** |
 
-> **⚠ The provenance split above is measured on a corpus that has since grown.** It is left
-> as counted, because it was correct when counted and a README that silently rewrites its own
-> history is not a README. What is known to have moved since: the corpus reached **221 cards**
-> (`KNOWN-GAPS.md` §8, which added nine original substitutes for the recovered names it ruled
-> out), and the Ideology deck is now **134 cards**, not 76. The `verbatim`/`adapted`/
-> `inferred` split has **not** been re-measured — re-run `npm run validate --workspace
-> @shasn/cards` and trust its output over this block, exactly as `docs/RUNNING.md` says.
+> By deck: Ideology **134** (92 `in2020` + 42 `et2040`) · Voter **18** · Conspiracy **31**
+> (18 `et2040` + 13 `in2020`) · Headline **39** (25 `et2040` + 14 `in2020`).
+>
+> **⚠ Re-measured, not inherited.** The figures in the block above are counted off
+> `decks/**/*.json` and are what `npm run validate --workspace @shasn/cards` prints now. Two
+> earlier counts are kept further down as **history**, clearly marked: the `21%` fidelity
+> figure was a proportion of a 151-card corpus and is not recomputed here, and `KNOWN-GAPS.md`
+> §8's `31 → 34` / `23 → 26` movement is that iteration's before-and-after. Trust the
+> validator's output over any number in this file, exactly as `docs/RUNNING.md` says.
 
 **The part that should be impossible to miss: zero real Ideology Cards were ever recovered.**
 The 55 real cards recovered from Memesys' own official player-aids are almost all Conspiracy
@@ -133,23 +135,33 @@ and Headline. The Ideology deck — **the 134 cards players see every single tur
 no answer side of any real Ideology Card was ever recovered. YouTube, Reddit and BGG were
 all unreachable during the research session.
 
-**The fidelity number, counted off the deck files on 2026-10-04:**
+**The fidelity number, counted off the deck files:**
 
-- **Only 31 of the 151 shipped cards — 21% — are recovered real material.** Those are the 31
+- **Only 35 of the 222 shipped cards — 16% — are recovered real material.** Those are the 35
   Conspiracy and Headline Cards tagged `adapted`. The other 10 `adapted` cards are Ideology
   Cards carrying a recovered question stem and nothing else, so the whole recovered corpus
-  reaches **31 playable-looking cards**. **⚠ Superseded in part:** `KNOWN-GAPS.md` §8 measures
-  the corpus-resident recovered cards at **34** (and shipped-as-authored at **26**) after three
-  more were built and nine substitutes filed. The `21%` is a proportion of a corpus that has
-  since grown, so it has not been recomputed.
+  reaches **35 playable-looking cards**. **⚠ Superseded in part, and the history is kept:**
+  this bullet was first written as *"31 of the 151 shipped cards — 21%"*, and
+  `KNOWN-GAPS.md` §8 then measured the corpus-resident recovered cards at **34** (and
+  shipped-as-authored at **26**). Both earlier figures are that corpus's, not this one's.
 - **All 134 Ideology Cards are authored.** That is the deck a player handles on every single
   turn, and it is authored end to end.
-- **23 of the 54 named recovered cards are absent from the corpus entirely** — 17 not
-  representable, 3 expressible and played but not yet shipped, 1 played and held back on a
-  ruling (LAB-GROWN EARWORM), and 2 recovered as names with no effect. **Superseded in part:
-  all 14 of the inexpressible recovered cards now carry a ruling** (`KNOWN-GAPS.md` §8) — 3
-  built, 8 ruled out with an original substitute filed, 2 blocked on a named decision, and 1
-  (CHAI-PAANI) ruled never to have been a gap at all.
+- **19 of the 54 named recovered cards are absent from the corpus entirely** — **10 are not
+  representable at all**, and **9 are expressible and played but in no deck file** (DEEP
+  THOUGHTS, THE GRETA EFFECT, POLO RETREAT, A COWARD OR A JOURNALIST? / CARD GAMES,
+  SUBMERGED, SNOOP B-O-DOUBLE-T, THE BIG FREEZE, and LAB-GROWN EARWORM, which is played and
+  held back on a ruling rather than merely unwritten). 35 ship, so 35 + 19 = 54. **This
+  supersedes the earlier *"23 of 54 — 17 not representable, 3 expressible but unshipped,
+  1 held back, 2 names with no effect"*, which was written when the probe reported a single
+  verdict; the probe now reports three (EXPRESSIBLE / IN THE CORPUS / SHIPPED AS AUTHORED)
+  and the 54 decomposes against them without a remainder.** The two names recovered with no
+  effect (CRUSHED UNDER BELLY, IFTAR PARTY) are counted inside the 54 rather than beside it.
+  All 14 of the recovered cards that were inexpressible now carry a ruling
+  (`KNOWN-GAPS.md` §8) — 4 built or part-built, 8 ruled out with an original substitute
+  filed, 1 blocked on a named decision, and 1 (CHAI-PAANI) ruled never to have been a gap at
+  all. `npm run playable` today reads **54 probed, 44 EXPRESSIBLE, 35 IN THE CORPUS, 33
+  SHIPPED AS AUTHORED, 10 inexpressible** — the second of those two numbers is the headline,
+  and the probe prints its own denominator rather than leaving it to a reader.
 - **X-card coverage:** Earth 2040 ships 25 of its 35 distinct named cards; India ships 6 of
   the 18 named rows §4 lists. The gap is a schema gap, not a research gap, for everything
   except the Ideology deck.

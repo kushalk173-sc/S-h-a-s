@@ -13,9 +13,11 @@
     "start": "node scripts/start.mjs",
     "preflight": "node scripts/preflight.mjs",
     "kill-stale": "node scripts/kill-stale.mjs",
-    "check": "npm run typecheck && npm test",
+    "check": "npm run typecheck && npm run validate && npm run balance && npm test",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "validate": "npm run validate --workspaces --if-present",
+    "balance": "npm run balance --workspaces --if-present"
   },
   "engines": {
     "node": ">=20"

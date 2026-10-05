@@ -290,7 +290,7 @@
     },
     {
       "id": "ct-et2040-020",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for QUANTUM WRISTBAND (REF 4.2.1), RULED OUT in KNOWN-GAPS.md 8.3: its auction is the same cost as A CALL FROM KARACHI's, AND headlines are a QUEUE rather than a pile, so there is no _headlineDraw to search and no top-of-pile to take - meaning even the first branch cannot be a choose-card, and the printed OR leaves the card no honest reduced form. Same JOB: a Volatile Area that pays the player who took the risk.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for QUANTUM WRISTBAND (REF 4.2.1), RULED OUT in KNOWN-GAPS.md 8.3. CORRECTION 2026-10-04, FACTUAL ONLY, RULING UNCHANGED: this used to claim 'there is no _headlineDraw to search and no top-of-pile to take', and that was FALSE - `GameState._headlineDraw` exists and `reveal {kind:'headline'}` reads its TOP. Still refused: the SEARCH (`pick` is limited to `_conspiracyDiscard`), the 3-item auction (G13) and self-immunity, so the printed OR still has no honest reduced form. Same JOB: a Volatile Area that pays whoever took the risk.",
       "provenance": "inferred",
       "name": "Feed the Ticker",
       "cost": 4,
@@ -309,5 +309,39 @@
       "effects": [
         { "op": "gain-any", "n": 2, "target": "you", "per": { "of": "volatile-voters" }, "read": "chosen-player" }
       ]
-    }  ]
+    },
+    {
+      "id": "ct-et2040-022",
+      "source": "REF 4.2.1 recovers DEEP THOUGHTS: 'Select an opponent and use all their Level 3 Ideologue Powers this turn.' PERFORMED: `target:'chosen-player'` raises the choose-player decision for the card's OWN actor, so the donor is NAMED. `until` is ABSENT on purpose - the borrow-power arm defaults to 'this-turn', the printed clause. DROPPED, one: 'You cannot use the same Ideologue Power twice' - a per-power use COUNTER, and a borrowed Restriction carries none (value/remaining 0, read as a yes/no). NARROWED: Level 5 is never borrowed.",
+      "provenance": "adapted",
+      "name": "Deep Thoughts",
+      "text": "Choose an opponent. Until the end of this turn, every one of their unlocked Level 3 Ideologue Powers is yours to use as well as your own. The same Ideologue Power cannot be used twice, and a Level 5 Power is never borrowed.",
+      "cost": 5,
+      "effects": [
+        { "op": "borrow-power", "target": "chosen-player" }
+      ]
+    },
+    {
+      "id": "ct-et2040-023",
+      "source": "REF 4.2.1 recovers LAB-GROWN EARWORM: 'Every time they influence a Voter Card, they will choose and give you 1 of their spent resources.' G14 fires the hook. WIDER THAN PRINTED: the chosen-opponent binding is G1, so the hook fires on ANY influence and YOU name the victim. DROPPED, three: the fixed victim is that G1 binding; 'their SPENT resources' needs a per-turn spend LEDGER on PlayerState, so `steal-any` reads the current pool; the self-discard is a copy COUNTER (G10: `GameState.counters`, `add-tokens`, `when:'tokens-reach'`), so 'there are two such cards' is a deck fact it cannot enforce.",
+      "provenance": "adapted",
+      "name": "Lab-Grown Earworm",
+      "text": "For the rest of the game, every time ANY player influences a Voter Card - your own influences included - you take 1 resource of your choice from a player you name at that moment. The printed card fixes one opponent up front instead, takes only from what they have just spent, and is discarded when a second copy is played.",
+      "cost": 5,
+      "effects": [
+        { "op": "steal-any", "n": 1, "when": "on-voter-influenced", "until": "rest-of-game" }
+      ]
+    },
+    {
+      "id": "ct-et2040-024",
+      "source": "REF 4.2.1 recovers THE GRETA EFFECT: 'Pick up to 2 opponents. They will get 1 less voter on the next 2 Voter Cards that they influence.' PERFORMED: `value:1` is voters lost per card, `owed:2` is the number of CARDS, so `remaining` means something different here than for Khaki Terror's lock. INFLUENCE subtracts it AFTER Going Viral and FLOORS AT ZERO - the purchase still succeeds, because an ILLEGAL influence would freeze the table on a card that cannot be unbought. DROPPED, two: 'up to 2 opponents' and '2 different players' are N TARGETS and `applyEffect` computes ONE target per effect list.",
+      "provenance": "adapted",
+      "name": "The Greta Effect",
+      "text": "Choose an opponent. On each of the next 2 Voter Cards they influence, they get 1 less voter than it prints. The influence still succeeds - a 1-Voter Card under this pays out nothing at all - and the two are counted one card at a time. The printed card spreads this over 2 opponents at once.",
+      "cost": 4,
+      "effects": [
+        { "op": "restrict", "kind": "voter-shortfall", "value": 1, "owed": 2, "target": "chosen-player" }
+      ]
+    }
+  ]
 }

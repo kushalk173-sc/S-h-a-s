@@ -396,7 +396,19 @@ describe('the tests play the shipped corpus, not a synthetic one', () => {
       'choose-player',
       'choose-peg-dest',
     ];
-    const SEEDS = Array.from({ length: 12 }, (_, i) => i + 1);
+    //
+    // **THE RANGE IS NOW SEEDS 1..15, and nine filed X-cards are why.** Filing DEEP
+    // THOUGHTS, LAB-GROWN EARWORM, THE GRETA EFFECT (Conspiracy) and POLO RETREAT,
+    // SUBMERGED, A COWARD OR A JOURNALIST?, CARD GAMES, SNOOP B-O-DOUBLE-T, THE BIG
+    // FREEZE (Headline) moved the shared shuffle stream again — the same paragraph
+    // above, one corpus addition later — and `choose-peg-dest` fell out of reach
+    // at FIVE seats inside seeds 1..12, even though it is still raised at 2, 3 and 4.
+    // Measured rather than guessed, at every seat count over seeds 1..40: `choose-peg-dest`
+    // is raised at seeds 5/15/18/20/22/34/38 (2 seats), 5/15/18/20/22/28/34/38 (3),
+    // 5/15/20/22/34/38 (4) and 15/18/34/38 (5), so 15 is the first width at which every
+    // one of the eight kinds is reached at ALL FOUR seat counts. The width moved instead
+    // of the list, which is the remedy this file already documents for exactly this event.
+    const SEEDS = Array.from({ length: 15 }, (_, i) => i + 1);
     for (const n of [2, 3, 4, 5]) {
       const kinds = new Set<string>();
       for (const seed of SEEDS) {

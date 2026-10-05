@@ -723,10 +723,38 @@ export function MarketStrip({
                  * same reason: the test splits on them.
                  */
                 const initial = (r: Resource) => r[0]!.toUpperCase();
-                const runs: { res: Resource; text: string }[] =
+                /*
+                  THE KEY IS NOT THE RESOURCE, AND THE REASON IS THE TAX.
+
+                  `runs` used to be keyed by `run.res`, which is unique for the
+                  printed cost — `RESOURCE_ORDER` holds each of the four once. But
+                  the surcharge is denominated in FUNDS (`reduce.ts` adds it to
+                  `funds`, and it sums), so it pushed a SECOND run whose `res` is
+                  `'funds'`. Any card that cost Funds AND carried a surcharge —
+                  `funds` is the first of the four, so most of them — rendered two
+                  `<span key="funds">` siblings, and React said so, 225 times
+                  across the client suite:
+
+                      Warning: Encountered two children with the same key, `funds`.
+
+                  That is not tidiness. Duplicate keys mean React cannot tell those
+                  two elements apart across an update, so anything stateful
+                  mounted under them can reattach to the wrong node — and it made
+                  the suite unreadable, which is the worse of the two because a
+                  gate you cannot read is not a gate.
+
+                  So `runs` carries its own key, and the two families are
+                  namespaced: `cost-<res>` for the printed price, `tax-funds` for
+                  the surcharge. Uniqueness is by CONSTRUCTION rather than by luck
+                  of which denominations a card happens to cost, both are stable
+                  across updates, and `res` stays as the data attribute because
+                  the tax really does take the Funds ink.
+                */
+                const runs: { key: string; res: Resource; text: string }[] =
                   RESOURCE_ORDER.filter((r) => (slot.cost[r] ?? 0) > 0).map((r) => {
                     const left = Math.max(0, (slot.cost[r] ?? 0) - (waived.has(r) ? 1 : 0));
                     return {
+                      key: `cost-${r}`,
                       res: r,
                       text: waived.has(r)
                         ? left === 0
@@ -738,10 +766,10 @@ export function MarketStrip({
                 // The surcharge is a Funds tax, so it takes the Funds ink — it is
                 // money, and a player reading a price should see which resource
                 // the extra is denominated in before they read how much.
-                if (tax > 0) runs.push({ res: 'funds', text: `+${tax} F tax` });
+                if (tax > 0) runs.push({ key: 'tax-funds', res: 'funds', text: `+${tax} F tax` });
                 if (runs.length === 0) return 'free';
                 return runs.map((run, i) => (
-                  <span key={run.res}>
+                  <span key={run.key}>
                     {i > 0 ? ' · ' : null}
                     <span className="cost" data-res={run.res}>
                       <ResourceGlyph resource={run.res} size={12} />

@@ -583,7 +583,14 @@ function clauseEffect(whole: GameState, without: GameState, caster: PlayerID): C
     restrictionKindsAdded: kindsAdded,
     liveEffectDelta: a.liveEffects - b.liveEffects,
     majorsDelta: a.majors - b.majors,
-    capDelta: mapDelta<number | null>(b.caps, a.caps, (x, y) => (x ?? 0) - (y ?? 0)),
+    // `null` MEANS THE PRINTED CAP, not zero. `snapshot` records `capOverride?.to ??`
+  // null, so `(x ?? 0)` read an absent override as a cap of 0 and every set-cap card
+  // came out as a cap that went UP by 12 — the obligation below could only be
+  // satisfied by a card lowering an override that was already there. The op had no
+  // shipped card until hl-et2040-033 (THE BIG FREEZE) and the checker had never been
+  // wrong in a way a test could see; this is the same defect `corpus-drift.test.ts`
+  // describes, wearing a different hat.
+  capDelta: mapDelta<number | null>(b.caps, a.caps, (x, y) => (x ?? RULES.resourceCap) - (y ?? RULES.resourceCap)),
     helpingHandsDelta: mapDelta(b.helpingHands, a.helpingHands, (x, y) => y - x),
     gerrymanderedDelta: mapDelta(b.gerrymandered, a.gerrymandered, (x, y) => y - x),
     marketChanged: a.market.join('|') !== b.market.join('|'),
@@ -1155,13 +1162,15 @@ describe('semantic agreement — every clause of every shipped card does what it
     // …and the obligations that no Conspiracy Card reaches are exactly those named.
     // `reveal` is the sixth: no shipped card uses it, because it is an author-facing
     // primitive and adding a card to use it is a design decision rather than part of
-    // landing the op. What stops that from making its obligation decorative is the
+    // landing the op. `borrow-power` LEFT this list when DEEP THOUGHTS shipped as
+    // `ct-et2040-022`, which is the assertion working: the list is a measurement of the
+    // corpus rather than a memory, so a card landing removes itself from it. What
+    // stopped that from making its obligation decorative is the
     // behavioural probe in the `reveal` block below, which drives a real `reveal` card
     // through the same `clauseEffect` measurement the corpus sweep uses — the same
     // arrangement `move-peg` has, and for the same reason: an obligation nothing runs
     // is a claim, and a claim nothing checks is what this whole file exists to prevent.
     expect(Object.keys(OBLIGATIONS).filter((op) => !used.has(op as Effect['op'])).sort()).toEqual([
-      'borrow-power',
       'convert-voter',
       'gerrymander',
       'move-peg',

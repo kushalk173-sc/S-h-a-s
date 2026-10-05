@@ -121,51 +121,60 @@ the playability count; a table here that disagrees with the decks is worse than 
 |---|---:|---:|
 | Recovered X-card rows probed (REF §4.1–§4.3) | 54 | **54** |
 | …distinct after de-duplicating the campaign reskins | 51 | **51** |
-| …**PLAYED**, measured by driving each through `reduce()` | 14 | **40** |
-| …shipped `adapted`, dropped clause named in `source` | 7 | **31** |
+| …**EXPRESSIBLE** — measured by driving each through `reduce()` | 14 | **44** |
+| …**IN THE CORPUS** — the conjunction, and the probe's headline | 14 | **35** |
+| …**SHIPPED AS AUTHORED** — the deck file's own `effects` are what was played | 14 | **33** |
+| …shipped `adapted`, dropped clause named in `source` | 7 | **35** |
 | …playable but **held back on a ruling** (LAB-GROWN EARWORM) | 0 | **1** |
-| …**not representable at all** | 43 | **14** |
-| Cards shipped in the corpus | 60 | **151** |
-| `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 41 / 110** |
-| `inferred` placeholders retired for a recovered card | 0 | **9** |
+| …**not representable at all** | 43 | **10** |
+| Cards shipped in the corpus | 60 | **222** |
+| `verbatim` / `adapted` / `inferred` | 0 / 11 / 45 | **0 / 45 / 177** |
+| `inferred` placeholders retired or substituted for a recovered card | 0 | **9** |
 
-Of the 51 distinct recovered cards, **31 ship as `adapted`** — which is exactly the 31
-Conspiracy and Headline Cards the deck files tag `adapted` — **1** (LAB-GROWN EARWORM)
-plays and is held back on a ruling, and the remainder are not representable. `npm run
-playable` measures the ENGINE rather than the decks and reads **54 rows probed, 40 played,
-0 refused, 0 played-but-no-op, 14 inexpressible** (the three campaign reskin pairs are
-probed under both names, because a duplicate is cheaper to keep visible than to
-deduplicate by hand). The two counts differ for the reason §0bis states repeatedly: the
-probe writes its own reduction, so a card can be playable without being in the corpus.
-**Corpus composition, counted off `decks/**/*.json` and not paraphrased:** 76 Ideology /
-18 Voter / 27 Conspiracy / 30 Headline; **41 `adapted`, split 31 Conspiracy-and-Headline
-reconstructions and 10 Ideology Cards carrying a recovered question stem only**; 110
-`inferred`; **0 `verbatim`**.
+Of the 54 probed rows, **35 ship as `adapted`** — which is exactly the 35 Conspiracy and
+Headline Cards the deck files tag `adapted` — **9 are expressible but in no deck file**, and
+the remaining **10 are not representable**. `npm run playable` measures the ENGINE rather
+than the decks and now prints **THREE verdicts, not one**: 54 rows probed, **44
+EXPRESSIBLE, 35 IN THE CORPUS, 33 SHIPPED AS AUTHORED**, 0 refused at play time, 0
+expressible-but-unexecutable, **10 inexpressible**. (The three campaign reskin pairs are
+probed under both names, because a duplicate is cheaper to keep visible than to deduplicate
+by hand.) The counts differ from the corpus count for the reason §0bis states repeatedly:
+the probe writes its own reduction, so a card can be playable without being in the corpus.
+**Corpus composition, counted off `decks/**/*.json` and not paraphrased:** 134 Ideology
+(92 `in2020` + 42 `et2040`) / 18 Voter / 31 Conspiracy (18 `et2040` + 13 `in2020`) / 39
+Headline (25 `et2040` + 14 `in2020`); **45 `adapted`, split 35 Conspiracy-and-Headline
+reconstructions and 10 Ideology Cards carrying a recovered question stem only**; 177
+`inferred`; **0 `verbatim`**. 134 + 18 + 31 + 39 = **222**.
 
 ### 0.1 THE FIDELITY FACT, stated once, because no other document states it
 
-Counted off `decks/**/*.json` and `decks/SOURCES.md` §4 on 2026-10-04. Every figure here is
+Counted off `decks/**/*.json` and `decks/SOURCES.md` §4. Every figure here is
 a count, not an estimate.
 
-- **151 cards ship. 41 are `adapted`; 110 are `inferred`.** Only **31 of 151 — 21% — are
-  recovered real material**: the 31 Conspiracy and Headline Cards the decks tag `adapted`.
+- **222 cards ship. 45 are `adapted`; 177 are `inferred`.** Only **35 of 222 — 16% — are
+  recovered real material**: the 35 Conspiracy and Headline Cards the decks tag `adapted`.
   The other 10 `adapted` cards are Ideology Cards carrying a recovered question stem and
-  nothing else.
-- **All 76 Ideology Cards are authored**, and that is the deck a player handles on every
-  single turn. They rest on **ten recovered question stems** (`ig-in2020-001…008`, `-031`,
-  `-032`); every Ideology Card past `ig-in2020-032` is authored outright, and **no answer
-  side of any real Ideology Card was ever recovered** — REF §2.4 and §10 item 1.
-- **23 of the 54 named recovered cards are absent from the corpus entirely**: 17 rows in
-  `SOURCES.md` §4 are not representable, 3 (DEEP THOUGHTS, THE GRETA EFFECT, POLO RETREAT)
-  are expressible and played but not yet in `decks/`, 1 (LAB-GROWN EARWORM) plays and is
-  held back on a ruling, and 2 more are names recovered without an effect (CRUSHED UNDER
-  BELLY, IFTAR PARTY).
+  nothing else. 35 + 10 = 45, and 45 + 177 = 222.
+- **All 134 Ideology Cards are authored**, and that is the deck a player handles on every
+  single turn (92 `in2020` + 42 `et2040`). They rest on **ten recovered question stems**
+  (`ig-in2020-001…008`, `-031`, `-032`); every Ideology Card past `ig-in2020-032` is
+  authored outright, and **no answer side of any real Ideology Card was ever recovered** —
+  REF §2.4 and §10 item 1.
+- **19 of the 54 named recovered cards are absent from the corpus entirely**: **10 rows are
+  not representable** (each in `SOURCES.md` §4 with the gap that blocks it) and **9 are
+  expressible and played but in no deck file** — DEEP THOUGHTS, THE GRETA EFFECT, POLO
+  RETREAT, A COWARD OR A JOURNALIST? / CARD GAMES, SUBMERGED, SNOOP B-O-DOUBLE-T, THE BIG
+  FREEZE, and LAB-GROWN EARWORM, which is held back on a ruling rather than merely
+  unwritten. 35 ship, so 35 + 19 = 54. The two names recovered **without an effect**
+  (CRUSHED UNDER BELLY, IFTAR PARTY) are counted inside the 54 rather than beside it.
 - **X-card coverage**, by §4's own sections: Earth 2040 Conspiracy **11 of 16** rows and
   Earth 2040 Headline **14 of 20** rows ship, which is **25 of the 35 distinct Earth 2040
   names**; India Conspiracy **1 of 3** and the all-campaign Headline section **7 of 15**,
-  which is **6 of 18 named India rows**. `SOURCES.md` §6 note 3 records that REF §4.1's
-  own heading claims 19 Headline Cards where only 15 are listed, so a denominator of 22 for
-  India is reachable only by counting cards REF never printed.
+  which is **6 of 18 named India rows**. These are REF §4's own row counts and are
+  properties of the reference document, not of the corpus, so they do not move when the
+  corpus does. `SOURCES.md` §6 note 3 records that REF §4.1's own heading claims 19
+  Headline Cards where only 15 are listed, so a denominator of 22 for India is reachable
+  only by counting cards REF never printed.
 
 The `verbatim` tier is **0** and that is the rule, not an oversight — `README.md` states it
 and §0's `verbatim` row is measured. Dropping no clause is not reproducing text, which is
@@ -912,10 +921,12 @@ which is the unsatisfiable-choice bug class, so a card using it would freeze som
 says *"1 of your MAJORITIES"*, and `'chosen-zone'` offers any constituency holding a
 voter of yours. The deck card's `text` and `source` both say so.
 
-### G17 — no deck search, and no rewind from the discard pile
+### G17 — deck search, and rewind from the discard pile — **CLOSED ON BOTH HALVES**
 
-**State: (c).** Cards: SELECTIVE ACCESS MEMORY, AS CLEAR AS WATER, GOOD GIG WELL
-PLAYED, FUELLING THE NEWS.
+**State: (a) for both halves as of the current iteration; the reasoning below is kept
+because the fix had to satisfy it.** Cards: SELECTIVE ACCESS MEMORY (ships `adapted` as
+`ct-et2040-018`), and the Voter Card market via the new `take-voter` op. See **§9.2** for
+the pool rule, the four third-set disqualifiers, and the 13% correction.
 
 **What this iteration bought:** GOOD GIG WELL PLAYED (`hl-et2040-011`) ships on its
 *keep one for yourself* branch — `draw-conspiracy` of 1, which is exactly that branch.
@@ -962,18 +973,64 @@ order"* needs a `'choose-card'` `Choice` kind, and the client handshake that use
 block it is now PAID: `derive.ts` handles every `Choice` kind and proves it with
 `assertNever`, so the wire-format cost of a new kind is gone.
 
-**What blocks it now is the LEAK, and that is a refusal rather than a cost.** A
-`'choose-card'` decision has to be RENDERED, and rendering it means listing the cards
+**⚠ G17 IS NOW CLOSED ON BOTH HALVES, and the paragraph below is what the refusal USED to
+be. It is kept because the reasoning is what the fix had to satisfy.**
+
+A `'choose-card'` decision has to be RENDERED, and rendering it means listing the cards
 in the pile. The Ideology draw pile is `GameState._ideologyDraw` and `playerView`
 strips every `_` key, so a client that could list the pile would be a client holding
-the ordered deck - the D25 failure `docs/ARCHITECTURE.md` 8.1.1 names. A Conspiracy
+the ordered deck — the D25 failure `docs/ARCHITECTURE.md` 8.1.1 names. A Conspiracy
 discard pile is the same shape BY NAME (`_conspiracyDiscard`) even though its cards are
 individually public, because the rule is about the field, not about what the field
 happens to contain today. **An option list is as revealing as a value**, so the option
-list would BE the leak. `'choose-card'` is therefore refused at the type level and
-absent from the `Choice` union, which `test/g16-zone.test.ts` asserts. The top of the
-pile remains the honest subset. A CALL FROM KARACHI, FUELLING THE NEWS and BLESSINGS OF PARENTS PAST
-each need the choice on top of G20 card movement, and none of them moves.
+list would BE the leak. `'choose-card'` was therefore refused at the type level and was
+absent from the `Choice` union.
+
+**THE RESOLUTION, and it moved the line rather than deleting it.** The refusal was against
+*hidden piles*, not against the decision. `Choice`'s `choose-card` arm now exists and
+carries a **required `pool`**, typed `CardPool = 'conspiracy-recycle' | 'voter-market'`,
+where the union is the whole allow-list:
+
+- **`'conspiracy-recycle'`** — the Conspiracy discard list is **public by DERIVATION** from
+  the public log. `Played "NAME".` puts a card on it; `Picked "NAME".` takes one off, in
+  order. **This is the substantive correction.** The first projection's stated derivation
+  was **false in 13% of real states**, because a card left the pile **silently** on both
+  `draw-conspiracy` take paths, which remove by index rather than from an end and so
+  reorder what remains. A published list that omitted a departure, or listed them in an
+  order the log could not reproduce, is the leak the refusal was protecting against. The
+  fix was to make departures **public**: both take paths now emit `Picked "<NAME>"` by the
+  recipient (`announcedPick` in `reduce.ts`), after which replaying `Played` and `Picked`
+  over the log yields the published list exactly, order included.
+  `packages/server/test/secret-state.test.ts` asserts that equality by **re-deriving it
+  from the log rather than from the pile**, which is the only form of the assertion that
+  would have caught the 13%.
+- **`'voter-market'`** — the Voter Card market is **public outright**. p10 keeps three
+  Voter Cards face up on the HQ Mat and the rulebook has no hidden phase, so
+  `GameState.market` is unprefixed, is not in `PRIVATE_PLAYER_KEYS`, and reaches every
+  payload with its slot order intact. It passes because it is **already public**, not
+  because the decision published it — which is why it needs no server projection.
+
+**WHAT WOULD DISQUALIFY A THIRD SET** — the four disqualifiers, so the next author does
+not re-derive them: contents not already on every payload (any `_`-prefixed pile); it is a
+hand (`PRIVATE_PLAYER_KEYS` hides `conspiracies` and `ideologyCards` from every viewer
+**including the holder**); its **order** is not public (offering an unordered set in the
+engine's order discloses that order, and both members are public *in order*, which is a
+stronger claim than "public"); or it becomes public only **because** the decision would
+publish it. `revealedCards` is the named near-miss: it passes three of the four and fails
+the second only because it is a **window**, not a set. Full statement in **§9.2**.
+
+**Cards gained, and they are the two decks the allow-list names.** SELECTIVE ACCESS MEMORY
+(`ct-et2040-018`, `adapted`) ships both halves of its clause — `draw-conspiracy` carries
+`from: 'discard'` **and** `pick: true`, and a two-card take is **two** decisions, each
+offering what is left, which is how *"it can be in any order"* becomes expressible rather
+than dropped. It stays `adapted`, not `verbatim`: the clause is **paraphrased into schema
+ops**, and every clause now *executing* is a different property from the text being
+*reproduced* — the same reasoning that keeps `ct-et2040-017` and `ct-et2040-021` at
+`adapted` despite dropping nothing. The **second** set is reached by the new `take-voter`
+op rather than by widening `draw-conspiracy`'s `pick`, because `pick` is welded to Conspiracy
+Cards and a Voter Card filed in `PlayerState.conspiracies` would be a card the engine could
+never resolve. **A CALL FROM KARACHI and FUELLING THE NEWS still do not move**, and still
+do not need to: they are §8.3's auctions and headline-queue problems, not this one.
 
 ### G18 — no control over the draw-and-answer phase
 
@@ -1720,12 +1777,14 @@ board ⇒ less slack for the driver on the seeds that were already marginal.
   suite for a corpus reason rather than a design one. Nothing was deleted here.
 - **The pre-existing `ig-in2020-006` unequal payout was left alone**, and is named in
   `test/ideology-variety.test.ts` rather than fixed, for the same reason.
-- **The 17 recovered-card rows §4 lists as not representable were not touched.** Every
-  one is blocked on a mechanism in `reduce()` / `state.ts` - G1, G5, G11, G12, G13, G15,
-  G17, G18, G20 - and none of this iteration moved any of them. `npm run playable` reads
-  **40 of 54** with **14 inexpressible**, which is the measurement that says so; the gap
-  against §4's 17 is A COWARD OR A JOURNALIST? / CARD GAMES, which §3.1 below records as
-  playing since.
+- **The recovered-card rows §4 listed as not representable were not touched by THIS pass.**
+  Every one was blocked on a mechanism in `reduce()` / `state.ts` — G1, G5, G11, G12, G13,
+  G15, G17, G18, G20 — and this iteration moved none of them. **At the end of this pass**
+  `npm run playable` read **40 of 54** with **14 inexpressible**; the gap against §4's then-17
+  was A COWARD OR A JOURNALIST? / CARD GAMES, which §3.1 below records as playing since.
+  **Both figures here are that pass's and are left as history** — the probe reads **44
+  EXPRESSIBLE / 35 IN THE CORPUS / 33 SHIPPED AS AUTHORED / 10 inexpressible** today, and
+  three of §4's `not representable` rows have since been built or part-built.
 
 ---
 
@@ -1754,16 +1813,25 @@ Recorded so the next iteration does not waste time on them.
 
 ## 8. THE FOURTEEN RULINGS — one decision per inexpressible recovered card
 
-**What this section is.** `npm run playable` reads **14 inexpressible** recovered cards.
-A gap list that says "these fourteen are blocked" is a to-do list; a gap list that says
-"these fourteen will never be built, and here is what replaces each of them" is a
-decision. This section is the decision, taken per card, and it is the handoff.
+**What this section is.** It was written when `npm run playable` read **14 inexpressible**
+recovered cards. A gap list that says "these fourteen are blocked" is a to-do list; a gap
+list that says "these fourteen will never be built, and here is what replaces each of them"
+is a decision. This section is the decision, taken per card, and it is the handoff.
+
+**What the measurement says NOW, because the fourteen are not fourteen any more.**
+`npm run playable` reads **10 inexpressible** rows today, not 14: **44 EXPRESSIBLE, 35 IN
+THE CORPUS, 33 SHIPPED AS AUTHORED, 0 refused, 0 expressible-but-unexecutable, 10
+inexpressible** out of 54 probed rows. The fourteen decisions below are all still the right
+record — a ruling does not expire because an engine moved — but three of them have since
+been *implemented* and one is now a *partial* build, so §8.0's status column has been
+corrected to say which. **The figures in the next paragraph are that iteration's
+before-and-after and are left as history.**
 
 **Measured, not remembered.** 54 rows probed. **Before this iteration: 40 PLAYED, 0
 refused, 0 no-op, 14 inexpressible. After: 43 PLAYED, 0 refused, 0 no-op, 11
 inexpressible.** `IN THE CORPUS` rose **31 → 34** and `SHIPPED AS AUTHORED` **23 → 26**.
-The eleven still inexpressible are exactly the eleven this section rules out or blocks —
-`npm run playable` and §8.0 are the same list, which is the point of writing the ruling
+The eleven still inexpressible were exactly the eleven this section rules out or blocks —
+`npm run playable` and §8.0 were the same list, which is the point of writing the ruling
 down before implementing it. The brief's list names thirteen of the original fourteen and
 omits **DOSTI BANI RAHE**, which is inexpressible and is ruled on here too, so all
 fourteen appear.
@@ -1824,7 +1892,7 @@ about**. The exact asks are in §8.6.
 | 9 | **ON THE "HIGH" SEAS** | G11 | **RULE OUT** — G11, costed in §8.3 | substitute filed |
 | 10 | **CULT-IVATING OBEDIENCE** | G-new/G20 | **RULE OUT** — the gap label is wrong twice over and the card is G11's cousin; §8.3 | substitute filed |
 | 11 | **FUELLING THE NEWS** | G17/G20 | **RULE OUT** — there is no Headline draw pile to search; §8.3 | substitute filed |
-| 12 | **BLESSINGS OF PARENTS PAST** | G17/G20 | **BLOCKED ON A NAMED DECISION** — §8.2, question (b) | substitute filed |
+| 12 | **BLESSINGS OF PARENTS PAST** | G17/G20 | **PART-BUILT since this ruling** — ships as `hl-et2040-027` on its **first sentence alone**: `reveal {kind:'voter', n:2}` publishes both cards face up, which is the setup clause and not the payoff. One clause of four; the other three are named on the row. The sweep-order question in §8.2(b) is still open, which is why the card's `text` says outright that it keeps none, donates none and influences none | no substitute needed — **the recovered name itself ships** as `hl-et2040-027`, which is why the nine substitutes in §8.3 are nine and not ten |
 | 13 | **DOSTI BANI RAHE** | G15/G22 | **RULE OUT** — a turn trigger on a seat other than the owner, §8.3 | substitute filed |
 | 14 | **CHAI-PAANI** | unknown | **NOT A GAP AND NOT FIXABLE** — §7; only a re-application clause was recovered and inventing the base effect is forbidden | substitute filed |
 
@@ -2114,3 +2182,173 @@ server owner's to re-pick, and it is named here rather than left to be discovere
 `secret-state.test.ts:1794`'s *"no corpus `CardID` in any `PendingChoice`"* assertion passes
 unchanged — the `choose-card` narrowing does not need re-arguing for this kind, because
 this kind never names a card at all.
+
+---
+
+## 9. `reveal`, `take-voter`, and the soft-lock gate — the three things §0's counts do not explain
+
+This section exists because the corpus numbers in §0 moved for reasons that are not
+recovered-card rulings, and a ledger that only explains the corpus it recovered is a ledger
+that cannot be trusted when the next corpus moves.
+
+### 9.1 `reveal` — a new op, and the defect it shipped with
+
+**The mechanic.** `{ op: 'reveal', kind, n, target? }` turns the **top** `n` cards of a draw
+pile face up for the rest of the resolution, onto `GameState.revealedCards`. It is
+commit-then-publish: the member is `pile[0]`, chosen by position before anything is
+written, so the op reads a hidden set without ever placing that set's contents in a
+client-visible value. There is deliberately **no `pick`** — see §2bis and the `$comment` on
+`effectProperties.reveal` in `schema/card.schema.json`.
+
+**THE DEFECT, and it is the reason this subsection exists.** `reveal` originally took cards
+**off** a draw pile, and the turn-boundary backstop simply **cleared** the set — and a
+cleared list is not a returned card. So every resolved `reveal` **permanently deleted** the
+cards it published, from every game, forever. On a deck that can run out, that is a table
+which can never finish.
+
+**THE EVIDENCE, and it is one number.** `packages/server/test/corpus-response-window.test.ts`,
+seed 35 at two seats, went from **finishing inside the 1200-action budget to still running
+at turn 3975**, with nobody able to be dealt a card to answer. The mechanism is
+`hl-et2040-027` BLESSINGS OF PARENTS PAST (`{op:'reveal', kind:'voter', n:2}`), which took
+two Voter Cards off an **18-card** deck every time it resolved and put nothing back. It was
+caught only because a corpus test happened to walk that seed — which is luck, not a guard.
+
+**THE FIX — a turn-boundary settle, not a `reveal` change.** `settleRevealedCards` in
+`packages/engine/src/reduce.ts` runs as the boundary's first act and gives **every
+unresolved revealed card back to the front of the pile it was read from**, in `turnOrder`
+then list order. Because `reveal` takes from `pile[0]`, putting the ids back at the front
+in the order they were taken restores the deck **byte-identically across the resolution**,
+whatever else happened in between. The two refusals are both *"do not create a second
+copy"*: a card the engine has already placed elsewhere is not returned, and a card the
+index cannot place (`deckOf` returns `null`) is not returned either — putting it in a
+guessed pile would be worse than losing it.
+
+**Why "still listed" is exactly "never moved", which is what makes the fix sound.** The set
+is the record of the resolution, so membership is the test: `move-card { from: 'revealed' }`
+removes a card from the set in the same write that files it elsewhere, so a card still
+listed when the boundary runs is one nothing has taken anywhere. Nothing has to guess which
+pile a card came from by looking at the world, because the card is on **no** pile right
+now; `deckOf` asks the card index, which is the one thing that still says what a card is.
+
+**One consequence worth naming.** `_conspiracyDraw`'s length and its top card's **cost** are
+public fields, so returning a Conspiracy Card onto that pile changes both — including
+*which* card is on top. The settle calls `syncConspiracyTop` when the affected deck is the
+conspiracy pile, for exactly that reason.
+
+### 9.2 `take-voter`, and the second public set — G17's resolution
+
+**The op.** `{ op: 'take-voter', n, target, pick? }` is a Voter Card off the HQ Mat.
+`draw-conspiracy`'s `pick` is welded to Conspiracy Cards — the card it names is filed in
+`PlayerState.conspiracies`, and a Voter Card filed there would be a card the engine could
+never resolve — so the market needed a **second op** rather than a widening that lies about
+what it moves. There is **no `to`**: a taken card goes onto the Voter discard through
+`discardTo`, exactly as the card in a slot emptied by `INFLUENCE` does, and `refillMarket`
+deals a fresh one. No voters are granted, because a free influence is precisely the clause
+G15 refuses.
+
+**The pool, and why two and not one.** `Choice`'s `choose-card` arm now carries a required
+`pool`, typed `CardPool = 'conspiracy-recycle' | 'voter-market'`, and **the union is the
+whole allow-list**. The rule those two members satisfy is worth stating in the form an
+implementer can be held to:
+
+> **A mechanism may READ a hidden set only by committing to one member of it before
+> anything is published, and may never place that set's CONTENTS in any value that reaches
+> a client. An OPTION LIST is as revealing as a value.**
+
+- **`conspiracy-recycle`** — `ClientState.conspiracyRecycle`. Its membership is **public by
+  DERIVATION from the public log**: `Played "NAME".` puts a card on it and `Picked "NAME".`
+  takes one off, in order, so a client holding nothing else can rebuild the list and its
+  order. `packages/server/test/secret-state.test.ts` asserts that equality by **re-deriving
+  it from the log rather than from the pile**.
+- **`voter-market`** — `GameState.market`. p10 keeps three Voter Cards face up on the HQ
+  Mat and the rulebook has no hidden phase, so the field is unprefixed, is not in
+  `PRIVATE_PLAYER_KEYS`, and reaches every payload **with its slot order intact**. The
+  market passes because it is **already public**, not because this decision published it —
+  which is the whole reason it needs no server projection.
+
+**THE CORRECTION, and it is the substance of the resolution.** The *first* projection
+stated that derivation and the derivation was **false in 13% of real states**: a card left
+the Conspiracy discard pile **silently**, on both `draw-conspiracy` take paths, which remove
+by index rather than from an end and so reorder what remains. A published list that omitted
+a departed card, or listed them in an order the log could not reproduce, is a leak of
+exactly the kind §2bis exists to prevent. **The fix is to make the departures public** —
+both take paths now emit `Picked "<NAME>"` by the **recipient** (`announcedPick` in
+`reduce.ts`) — after which replaying `Played` and `Picked` over the public log yields the
+published list exactly. The 13% figure is a measurement, not an estimate, and it is
+recorded here rather than deleted because it is the reason the rule reads the way it does.
+
+**WHAT WOULD DISQUALIFY A THIRD SET**, so the next author does not re-derive it. A set is
+disqualified by **any one** of these, and each is a fact about the wire rather than about
+how careful the implementation is:
+
+1. **Its contents are not already on every payload.** A `_`-prefixed pile (`_voterDraw`
+   beneath the market, `_ideologyDraw`, `_ideologyDiscard`, `_headlineDraw`,
+   `_conspiracyDraw`) is stripped by `playerView`, so an option list over one is the ordered
+   deck on the wire. `_conspiracyDiscard` is the interesting case: every card in it is
+   individually public and the answer is still **no**, because the rule is about the
+   **channel** and not about what the field happens to hold today.
+2. **It is a hand.** `PRIVATE_PLAYER_KEYS` hides `conspiracies` and `ideologyCards` from
+   every viewer **including the holder**, with no viewer-scoped branch, so listing one
+   publishes a set the holder is not allowed to know either.
+3. **Its order is not public.** A set every client holds as an unordered collection cannot
+   be offered in an order, and offering it in the engine's order discloses that order. Both
+   members here are public *in order*, which is a stronger claim than "public".
+4. **It becomes public only because the decision would publish it.** A set derivable from
+   state a client does not have is not public, however well documented the derivation is —
+   that is the difference between the recycle list (derived from the log, which is on the
+   wire) and a pile whose order is the shuffle.
+
+`revealedCards` is the near-miss worth naming: every entry has been turned face up, so it
+passes (1), (3) and (4), and fails (2) only because it is not a set at all but a **window**
+the turn boundary empties (§9.1). It is in this union's future, not in its present.
+
+### 9.3 The permanent soft-lock gate — `packages/server/test/liveness.test.ts`
+
+**Why a scripted sweep is not enough.** Every completion sweep in that package drives
+`playInProcess` from `test/driver.ts`, and `playInProcess` is a competent player. That is
+the problem, not the reassurance: a driver that always finds a legal move is a driver that
+**cannot find a soft-lock**. `nextAction` ends in an unconditional `{ type: 'END_TURN' }`,
+so a soft-lock is a state the driver's own policy never visits. It became visible once only
+when the driver was randomized away from its own choices — and the `reveal` deletion bug in
+§9.1 was caught by exactly that kind of accident, which is luck, not a guard.
+
+**The probe is omniscient, deliberately.** At every decision point, for the seat the table
+is waiting on, it builds a candidate action set and asks `reduce` — the rules engine, the
+only authority on legality — whether **any** candidate is legal. Legality is therefore never
+inferred from the driver, and the candidate set is generated from authoritative `GameState`
+including `state.players[seat].conspiracies`: the driver reads `playerView`, and
+`PRIVATE_PLAYER_KEYS` strips that field for every viewer including the owner, so the driver
+is **structurally incapable of naming a BLOCK**. The probe can. The driver's own action goes
+first in the candidate list — not deference, but because a sweep then costs the same number
+of reducer calls while still answering the question at every decision point.
+
+**The four classes, kept apart, because they are four different bugs.** (a) REAL
+SOFT-LOCK — no seat has any legal action. (b) DRIVER LIMITATION. (c) DRIVER/ENGINE
+DISAGREE. (d) RUN-DOWN — a legal action always existed and no ending was reached inside the
+budget; a livelock, not a lock. **Only (a) and (c) are asserted.** (b) and (d) are printed.
+
+**MEASURED, not remembered — but measured by RUNNING IT, not by reading it.** The sweep is
+**250 seeds × 4 seat counts = 1000 runs**, and it prints its own header each time:
+*"LIVENESS SWEEP: 1000 runs, seeds 1..250 … N decision points probed"* followed by a
+per-seat-count table. **The last recorded reading was: 272,435 decision points, 0
+soft-locks (a), 0 driver/engine disagreements (c), 999 of 1000 completions** — i.e. one
+run-down, class (d). **These figures are the sweep's output, not constants in the file, so
+read them off a run rather than quoting this paragraph**; nothing in the test hard-codes
+them, which is the same discipline the corpus census in §0 follows.
+
+**COMPLETION IS DELIBERATELY NOT A THRESHOLD, and the reason is the point.** Two seeds hit
+the action budget for a **pre-existing, separately understood** reason (§6bis: an uninformed
+driver running out of budget one zone short of the cliff, not a lock). Asserting a
+completion threshold here would therefore be a gate that is **false on day one** — and *a
+gate that is false on day one teaches a team to add a tolerated list*, and a tolerated list
+is how the `reveal` bug got shipped in the first place. So the budget stays
+`ACTION_BUDGET = 1200`, the same value every shipped-corpus sweep passes
+(`winnable.test.ts`, `corpus.test.ts`, `endgame-scoreboard.test.ts`,
+`interrupt-window.test.ts`) — a completion number from this file and one from
+`winnable.test.ts` have to be comparable or neither means anything — and class (d) is
+**reported, not asserted**.
+
+**No card count, no op count, no deck size is written down in that file.**
+`test/corpus-drift.ts` enforces that across the directory, and the gate adds nothing to its
+`ALLOWED` list. That is deliberate: this document's §0 counts will move again, and a gate
+that hard-codes them would be red on the day they do.

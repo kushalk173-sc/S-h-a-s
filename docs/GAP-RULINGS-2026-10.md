@@ -28,7 +28,7 @@ refusals are intact: a player hand, `_ideologyDraw`, `_ideologyDiscard`, `_headl
 
 | this document says | the truth |
 |---|---|
-| §1.3, §2.2, §5 Step 1, §7: SELECTIVE ACCESS MEMORY is *"the first verbatim card in the corpus"* and the **0 verbatim** count becomes **1** | **It is `adapted`, and the corpus count is unchanged at 0 `verbatim`.** Dropping no clause is not reproducing text — the same reasoning this document applies to `IF YOU LIKE PIÑA COLADA`, which also drops nothing and stays `adapted`. A Conspiracy Card also needs a `cost` the recovered text does not print. The card's clauses now all *execute*; the card's *text* is still paraphrased into schema ops. The corpus is **151 cards, 0 `verbatim`, 41 `adapted`, 110 `inferred`** (`KNOWN-GAPS.md` §0.1). |
+| §1.3, §2.2, §5 Step 1, §7: SELECTIVE ACCESS MEMORY is *"the first verbatim card in the corpus"* and the **0 verbatim** count becomes **1** | **It is `adapted`, and the corpus count is unchanged at 0 `verbatim`.** Dropping no clause is not reproducing text — the same reasoning this document applies to `IF YOU LIKE PIÑA COLADA`, which also drops nothing and stays `adapted`. A Conspiracy Card also needs a `cost` the recovered text does not print. The card's clauses now all *execute*; the card's *text* is still paraphrased into schema ops. The corpus was **151 cards, 0 `verbatim`, 41 `adapted`, 110 `inferred`** when this row was written; it is **222 cards, 0 `verbatim`, 45 `adapted`, 177 `inferred`** now (`packages/cards/KNOWN-GAPS.md` §0.1). |
 | §5 Step 1 acceptance: **`npm run playable` 40 → 41** | **40 → 40.** SELECTIVE ACCESS MEMORY already reported PLAYED at HEAD via deterministic top-of-pile, so the probe's verdict was already positive and the change moved nothing. The `G17 → none` tag is the probe no longer finding an inexpressible clause, and is **not** a claim that G17 is closed. |
 | §5 Step 1 and §7: the plan's ceiling is *"one card's first-`verbatim` status"* | There is no first-`verbatim` status to deliver. The ceiling is 40 → 40 on the probe, plus one card's dropped clause becoming expressible. |
 | §1.3: `_conspiracyDiscard` has **exactly three writers** | **Four assignment sites in `reduce.ts`, reached by six write paths**: `PLAY_CONSPIRACY` and `RESPOND_INTERRUPT` (both log `Played "NAME"`), `draw-conspiracy { to: 'discard' }` (no log line, and none needed — a byte-identical round trip), the two `draw-conspiracy` take paths (which now log `Picked "NAME"` by the recipient), and `draw()`'s reshuffle, which empties the pile and has no caller for `'conspiracy'` today. The old "3" was counting a ternary in a conditional expression. |
@@ -321,11 +321,12 @@ not, and the count is still 0.** Executing every clause is a different property 
 reproducing the text, which is the same argument §1 of `decks/SOURCES.md` makes about
 BLOCK and DEFLECT and about `IF YOU LIKE PIÑA COLADA` — a card that drops nothing and stays
 `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print.
-**Say that out loud instead: the corpus is 151 cards, 0 `verbatim`, 41 `adapted`, 110
+**Say that out loud instead: the corpus was 151 cards, 0 `verbatim`, 41 `adapted`, 110
 `inferred`, and this card moved one clause from dropped to executed.**
-*(⚠ 151 was the count when this was written; the corpus is **221 cards** today
-(`KNOWN-GAPS.md` §8) and the provenance split has not been re-measured. The `0 verbatim`
-count is the load-bearing half of this sentence and it has never moved.)*
+*(⚠ 151 was the count when this was written. The corpus is **222 cards** today — 0
+`verbatim`, 45 `adapted`, 177 `inferred`, of which 134 are Ideology Cards — counted off
+`decks/**/*.json`; see `decks/SOURCES.md` §3 and §7. **The `0 verbatim` count is the
+load-bearing half of this sentence and it has never moved**.)*
 
 **Two design calls this ruling makes, because they are cheaper than the alternatives:**
 

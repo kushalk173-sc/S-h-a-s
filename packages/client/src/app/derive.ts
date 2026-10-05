@@ -1867,6 +1867,66 @@ export function placementConsequence(
 // ─────────────────────────── gerrymander legality ───────────────────────────
 
 /**
+ * Is this slot a legal gerrymander SOURCE?
+ *
+ * The sibling of `gerrymanderRefusal` above: that one judges the whole MOVE once a
+ * source is armed, this one judges the SOURCE alone, which is the first click of the
+ * two. They were split across two files until now — this one was a private function
+ * in `GameScreen.tsx` — and that split is the same defect the comment above
+ * `powerAreaRefusal` describes for the slot powers: a rule the board needs in order
+ * to know what to HIGHLIGHT, held somewhere the board cannot reach, so it gets
+ * restated beside the rule it should have been derived from.
+ *
+ * It was also restated WRONG. It opened with `if (a.peg.owner !== you)`, and its own
+ * doc comment claimed the engine's conditions were "yours, not a majority voter, not
+ * in a Volatile Area". Both were false: rules-reference.md:256 (p16) says *"You may
+ * gerrymander ANY PLAYER'S voters, including your own"*, and the engine has always
+ * agreed — `engine/test/gerrymander.test.ts:233` moves a `p2` peg and asserts it
+ * keeps its owner. Reported as "I can't move anyone else's voters".
+ *
+ * Ownership is therefore NOT a condition. The two that remain are rules, not
+ * ownership: a Volatile voter is permanent (p18) and a majority voter does not move
+ * (p16). Both apply equally to your own pegs and an opponent's, which is why they
+ * are stated without reference to `player` — the parameter is here for the RIGHTS
+ * question, and for nothing else.
+ *
+ * §6.2's "Arm (hover)" table lists "You have no Gerrymanding Rights in North" as a
+ * reason a peg cannot be armed, so the rights check is included rather than left to
+ * the confirm bar. A refusal that does not name its reason is a puzzle (§9.10).
+ */
+export function gerrySourceRefusal(
+  state: ClientState,
+  player: PlayerID,
+  rightsZoneId: ZoneID,
+  areaId: string,
+): string | null {
+  const idx = indexAreas(state);
+  const from = idx.get(areaId);
+  if (from === undefined) return 'that slot does not exist';
+  if (from.peg === null) return 'there is no voter there';
+  if (from.volatile) return 'Permanent — Volatile Area.';
+  if (from.peg.majority) return 'Majority voters do not move.';
+
+  // p16: the right is scoped to moves "into that zone, out of it, or between it and
+  // an adjacent zone" — so a source outside the rights zone must at least be
+  // NEAR one you hold rights in. Same shape as the engine's `touchesRightsZone`
+  // plus its neighbour test, and deliberately the same two clauses in the same
+  // order: this is the highlight, and a highlight that disagrees with the click it
+  // invites is worse than no highlight.
+  if (from.zoneId !== rightsZoneId) {
+    const rights = rightsZones(state, player);
+    const near = rights.some((r) =>
+      state.zones.find((x) => x.id === r)?.neighbours.includes(from.zoneId),
+    );
+    if (!rights.includes(from.zoneId) && !near) {
+      const z = state.zones.find((x) => x.id === from.zoneId);
+      return `you hold no rights in ${z?.name ?? from.zoneId} or next to it`;
+    }
+  }
+  return null;
+}
+
+/**
  * Is this move legal, and if not, why?
  *
  * The same posture as `placementRefusal`: the engine decides, this names the

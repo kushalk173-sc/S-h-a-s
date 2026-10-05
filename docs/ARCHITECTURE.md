@@ -67,15 +67,17 @@
 > carry ⛔ markers at their own location.
 >
 > **Three corrections that are *not* about the reversal and are drift like any other:**
-> - **"60 cards ship"** (this header, §6, §6.5, §9, M2's row in §7.2, and **D14**) is
->   **now 151** — 0 `verbatim`, 41 `adapted`, 110 `inferred`, of which **76 are Ideology
->   Cards**. `packages/cards/decks/SOURCES.md` §3 is the per-card audit trail. **`D14`'s
->   threshold argument is unchanged and its decision stands**; only its counts are stale,
+> - **"60 cards ship"** (this header, §6, §6.5, §9, M2's row in §7.2, and **D14**) was
+>   **151** — 0 `verbatim`, 41 `adapted`, 110 `inferred`, of which 76 were Ideology Cards.
+>   `packages/cards/decks/SOURCES.md` §3 is the per-card audit trail. **`D14`'s
+>   threshold argument is unchanged and its decision stands**; only its counts were stale,
 >   and `D14`'s own "the caveat that now dominates" is now outranked by `PLAN.md` §9
 >   **risk #2 (dominance)**, which did not exist as a live risk on 2026-09-30.
->   **⚠ And those counts have drifted again since (2026-10-04): the corpus is 221 cards and
->   the Ideology deck is 134** (92 `in2020` + 42 `et2040`, `decks/SOURCES.md` §3). The
->   `verbatim`/`adapted`/`inferred` split has not been re-measured. **No decision changes.**
+>   **⚠ And those counts have drifted again since (2026-10-04): the corpus is 222 cards —
+>   0 `verbatim`, 45 `adapted`, 177 `inferred`, of which 134 are Ideology Cards** (92
+>   `in2020` + 42 `et2040`; Conspiracy 31, Headline 39, Voter 18;
+>   `decks/SOURCES.md` §3 and §7, counted off `"id"` and `"provenance"` in the deck files).
+>   **No decision changes.**
 > - **"the client does not compile — 14 errors in `GameScreen.tsx`"** (this header, §7.7)
 >   is **historical**. `AnswerScreen.tsx` and `TableQuestion.tsx` are live shipped code that
 >   quotes and depends on the current wire types, which is not consistent with a package
@@ -3273,22 +3275,26 @@ past M7.
 | **D13** | **One Postgres JSONB row per match** | Relational `matches` + `match_actions` | ~2 appends/min, ~1 MB at 2,400 actions. The relational split is a 30-minute change later. | Whole-row rewrite per append. Listed in §9. |
 | **D14** | **Ship a bounded corpus; 60 cards ship, not 40 and not 100+** | Wait for 100+ | PLAN.md risk #1 is the corpus, and it is writing that does not parallelise. **Corrected 2026-09-30:** the plan said "ship with 40"; the corpus that actually landed is **60 cards across 3 decks** (15 `adapted`, 45 `inferred`, 0 verbatim). The threshold argument is unchanged — 60 is a complete, playable game with replay value; 100 is a content track with a reviewer, not an engineering gate. | Shallower replay variety. **And the caveat that now dominates: 43 of the 50 real recovered cards (86%) cannot be expressed in the schema at all** — `KNOWN-GAPS.md`, §6.5. More cards is not the constraint; **schema coverage is.** |
 
-> ⛔ **D14's counts are stale; its decision is not — corrected 2026-10-03.** The corpus is now
+> ⛔ **D14's counts are stale; its decision is not — corrected 2026-10-03.** The corpus was then
 > **151 cards across 7 deck files — 0 `verbatim`, 41 `adapted`, 110 `inferred`** — of which
-> **76 are Ideology Cards**, the deck players see every turn. **The threshold argument is
+> **76 were Ideology Cards**, the deck players see every turn. **The threshold argument is
 > untouched and this row is not being reopened:** a bounded corpus is still a complete,
 > playable game; 100+ was always a content track rather than an engineering gate.
 >
-> **⚠ Corrected again, 2026-10-04, numbers only.** The Ideology deck is **134 cards**, not 76
+> **⚠ Corrected again, 2026-10-04, numbers only. The Ideology deck is **134 cards**, not 76
 > (`decks/SOURCES.md` §3: 92 `in2020` + 42 `et2040`), and the corpus has grown again to
-> **221 cards** (`KNOWN-GAPS.md` §8, which filed nine original substitutes for the recovered
-> names it ruled out). The `verbatim`/`adapted`/`inferred` split above has **not** been
-> re-measured — re-run `npm run validate --workspace @shasn/cards` rather than trusting it.
+> **222 cards** — **0 `verbatim`, 45 `adapted`, 177 `inferred`**, Conspiracy 31, Headline 39,
+> Voter 18 — counted off `"id"` and `"provenance"` in the deck files. Nine of the growth was
+> original substitutes filed for recovered names `KNOWN-GAPS.md` §8 ruled out; four was
+> recovered cards built or part-built.
 > **The decision, and the threshold argument, are still exactly as stated.**
 >
 > **What has changed is which caveat dominates, and it is now two of them:**
-> 1. **Schema coverage** — unchanged and still true. `KNOWN-GAPS.md` §2 and
->    `packages/cards/KNOWN-GAPS.md` remain the handoff for M2b.
+> 1. **Schema coverage** — much improved and no longer the whole story. `KNOWN-GAPS.md` §2 and
+>    `packages/cards/KNOWN-GAPS.md` remain the handoff for M2b. **G17 is closed on both
+>    halves**, `reveal` and `take-voter` have landed, and `npm run playable` reads **54 probed
+>    / 44 EXPRESSIBLE / 35 IN THE CORPUS / 33 SHIPPED AS AUTHORED / 10 inexpressible** — the
+>    *second* of those is the headline, and the probe prints its own denominator.
 > 2. **⚠ Dominance — new, and outranking the first for the Ideology deck.** Under full
 >    information a one-resource edge between a card's two sides is **visible to every player at
 >    the table** and the player is expected to act on it. One dominated card exists today

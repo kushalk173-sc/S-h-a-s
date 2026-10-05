@@ -457,6 +457,52 @@ near `SEAT_FILL_2` (cobalt). Mitigations, all mandatory:
    market, and in the log — never inside a zone polygon. This removes the collision surface
    entirely rather than managing it.
 
+> ⚠️ **AMENDED — 2026-10-04. The inks are now applied on every resource surface, and the
+> glyphs that made that legal have shipped.**
+>
+> **What was wrong.** The four `IDEO_INK_*` tokens were declared here and used in exactly
+> one place in the client — the manifesto pip track. Every surface where a player actually
+> assesses Funds/Clout/Media/Trust rendered four grey numerals, and two of them rendered
+> something actively unreadable:
+>
+> | Surface | What it rendered |
+> |---|---|
+> | Market card price | `2 F · 3 T · +1 F tax` — four single letters, and F/C/M/T are the four least-ordered letters on the board |
+> | Trade composer (`DeltaStepper`) | four `+ n −` steppers with **no denomination on any of them**; column position was doing the work of an identity channel |
+>
+> The trade panel is the worse of the two and it is not close: it is the one screen where
+> the player is explicitly deciding what they hold and what they want, and it required
+> already knowing that column 2 was Clout.
+>
+> **Why mitigation 1 was not the obstacle it looked like.** Mitigation 1 says identity is
+> an icon, not a colour. That is a constraint on *ordering*, not a prohibition: the glyph
+> had to exist before the ink could be spread, because the inks are desaturated and two of
+> them sit near seat colours. §3.4's glyph set was specced and never built. It is built
+> now (`packages/client/src/app/ResourceGlyph.tsx`), and it is what makes wide ink use
+> legal rather than a violation of the three mitigations.
+>
+> **What changed, precisely.** Any element carrying `data-res="funds|clout|media|trust"`
+> publishes `--res-ink`, and the ink appears in exactly three places: the glyph's stroke,
+> the denomination's name, and a 2px rule on the cell's bottom edge. Never as a fill —
+> mitigation 2 is unchanged and is now asserted by a test, because a tinted wash behind a
+> numeral is the obvious way to "mark them more" and it is exactly what mitigation 2
+> forbids. The colour is the *redundant* channel; the glyph is the one that survives
+> greyscale.
+>
+> **A side effect worth stating.** The name was `INK_500` (4.85) and now carries the ink,
+> which measures 5.44 / 8.30 / 7.40 / 6.64 on `PAPER_100` and 6.16 / 9.40 / 7.52 / 8.38 on
+> `PAPER_000`. Every denomination label got a *higher* contrast ratio and a different hue.
+> This was a legibility fix, not a concession.
+>
+> **Nothing else moved.** Mitigation 3 is untouched: no resource ink renders on the board.
+> The market card keeps its letters, because `marketCharge.test.tsx` parses them to prove
+> the printed price equals the charged price. Prose (the log, refusal lines, `deltaText`)
+> is untouched — §9.11 requires sentences, not an icon-delta feed.
+>
+> **Enforced by** `packages/client/src/app/resourceIdentity.test.tsx` (15 tests): the four
+> inks resolve to four distinct hexes, the ink is never a background, all four glyphs are
+> distinct `currentColor` strokes, and all seven surfaces publish `data-res`.
+
 ### 2.8 Volatile Areas — colour is deliberately *not* the channel
 
 There are 11 Volatile Areas and every zone has at least one (`rules-reference.md:267`).
@@ -622,6 +668,42 @@ came off the same press.
 | Trust | Idealist | clasped hands | two mirrored 4px mitten arcs overlapping |
 
 Rendered at 18px inside the 22px token disc, 2px stroke, `stroke-linecap: round`.
+
+> ⚠️ **IMPLEMENTED — 2026-10-04, with two of the four rows redrawn. `ResourceGlyph.tsx`.**
+>
+> This table had been normative and unbuilt since it was written; the §2.7 amendment above
+> is what finally forced it, because wide ink use is only legal once the glyph exists. The
+> construction rules all held — 20×20 viewBox, 2px stroke, `currentColor`, no fill, round
+> caps, and no sparkles on Media.
+>
+> **Funds — built as specced, one correction.** The rupee's leg is a *cubic* that leaves
+> the lower bar going down and only then hooks left, not a straight diagonal. Both were
+> rendered at 12/14/18px; the straight diagonal reads as a "7", and the hook is the whole
+> glyph. It is also drawn as paths rather than set as a character, because `--font-display`
+> (Bitter/Georgia) has no reliable `₹` and tofu on a payment screen is a lie.
+>
+> **Clout — "four 3px knuckle arcs" did not survive 18px, and became three bumps on the
+> silhouette.** Four *interior* arcs plus a rounded-rect palm were drawn first, as
+> specified, and at 18px the arcs and the palm merged into one rounded blob with no
+> interior detail left. Two interior-feature alternatives were measured and rejected at
+> 18px: a vertical block with finger divisions reads as a filing cabinet, a scalloped
+> closed palm reads as a crate. Bumps *on the outline* survive because they change the
+> shape; interior arcs do not, because they only change the fill. Three bumps, not four —
+> a fourth is not resolvable at 18px.
+>
+> **Trust — "clasped hands" was attempted and abandoned; this row ships as two interlocking
+> links.** A mitten needs a palm, a thumb and a finger division to read as a mitten, and at
+> 18px with a 2px stroke those three features sit within one stroke-width of each other.
+> Every construction tried resolved into a different object at 18px: two mitten arcs into a
+> moustache, a rounded palm into an arch, five fingers into a **bar chart**. Six candidates
+> were rendered at 110px, 18px, 14px and 12px in a browser before this was chosen — the
+> same harness that caught the other three.
+>
+> The links keep the specified *construction* ("two mirrored arcs overlapping") and drop
+> only the noun, and they survive 12px. "Bound together" is also the truer reading of the
+> Idealist's resource: Trust in Shasn is a commitment you are held to, not a sentiment you
+> are feeling. **If a mitten is wanted back, the fix is a heavier stroke or a 28px token,
+> not a redrawn path** — at 18px there is no path that works.
 
 ### 3.5 Board SVG text
 

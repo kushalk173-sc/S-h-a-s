@@ -100,6 +100,32 @@ const MINIMAL_EFFECT: Readonly<Record<string, Effect>> = {
    * invariant checker reason about an op", not "what does the real card say".
    */
   reveal: { op: 'reveal', kind: 'voter', n: 1 },
+  /**
+   * G14a. `target` is REQUIRED and has exactly one legal value on this op, so the minimal
+   * effect has to carry it rather than default it — and `until` is left off, which is
+   * what `borrow-power`'s own arm defaults anyway. The row arrived with POLO RETREAT
+   * (`hl-et2040-028`) and DEEP THOUGHTS (`ct-et2040-022`), the first headline and the
+   * first Conspiracy Card to use it; before them this op had no shipped card at all and
+   * this table could not tell whether the checker could reason about it.
+   */
+  'borrow-power': { op: 'borrow-power', target: 'chosen-player' },
+  /**
+   * G12/G20. `from`, `to` and `n` are all REQUIRED by the schema, so a minimal example
+   * carries all three; `draw —> hand` is the one pair a headline can be dealt and
+   * still resolve, and it is the pair A COWARD OR A JOURNALIST? (`hl-et2040-030`) and
+   * CARD GAMES (`hl-et2040-031`) ship. The row arrived with those two rather than with the
+   * op, for the reason `reveal` and `move-peg` name: an op no shipped card uses is an op
+   * this suite cannot be shown to reason about.
+   */
+  'move-card': { op: 'move-card', from: 'draw', to: 'hand', n: 1 },
+  /**
+   * G15. `to` is the only other required field, and 10 is BELOW the printed cap of 12 so
+   * the case has something to do — a `to` at or above the printed cap is a documented
+   * no-op, and a minimal example that exercised the no-op branch would prove nothing. No
+   * `until`, because the op's arm defaults it to 'rest-of-game'. The row arrived with THE BIG
+   * FREEZE (`hl-et2040-033`), the first shipped card to use it.
+   */
+  'set-cap': { op: 'set-cap', to: 10 },
 };
 
 /**

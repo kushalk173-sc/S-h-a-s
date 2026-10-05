@@ -279,11 +279,14 @@ the constant itself in `src/balance.ts`):
 - **The band could only ever be 0 or 1.** It is an integer count of resources and 1 is the
   smallest non-zero one, so there is no third option. A band that permits a non-zero total
   difference permits exactly the quantity being measured.
-- **CORPUS IMPACT, MEASURED: ONE CARD.** Over the 76 Ideology Cards, `|total skew|` is 75
-  zeros and one 1. That one is `ig-in2020-006` (`{trust 2, funds 2}` vs `{media 2,
-  funds 1}`), which had been named in `test/ideology-variety.test.ts` as a known unequal
-  card rather than fixed. Its side 1 is now `{media 2, funds 2}`: one resource, on one
-  card, and the two compositions stay incomparable.
+- **CORPUS IMPACT, MEASURED OVER THE 76-CARD IDEOLOGY DECK: ONE CARD.** At the time of
+  that measurement `|total skew|` was 75 zeros and one 1. **The 76 is that measurement's
+  deck size and is left as history; the Ideology deck is 134 today and this has not been
+  re-measured over it.** The one card was `ig-in2020-006` (`{trust 2, funds 2}` vs `{media
+  2, funds 1}`), which had been named in `test/ideology-variety.test.ts` as a known unequal
+  card rather than fixed. Its side 1 is now `{media 2, funds 2}`: one resource, on one card,
+  and the two compositions stay incomparable — so the corpus-level claim that survives is
+  **zero** unequal cards, asserted by `test/ideology-variety.test.ts`, not "one".
 - **D1 and D3 name the same class of defect from two directions**, and with D2 also an
   error all three agree. A 1-resource `PURE_UPGRADE`, a 1-resource `TOTAL_SKEW` and a
   1-resource `POWER_THRESHOLD_CLIFF` are all worse than a symmetric card, because they
@@ -380,21 +383,36 @@ Every card carries two fields the engine types do not have:
 
 ### Current provenance
 
+**Counted off `decks/**/*.json`, not remembered.** `npm run validate` prints the same
+census.
+
 | | count |
 |---|---:|
-| `verbatim` | 0 |
-| `adapted` | 19 |
-| `inferred` | 45 |
-| **total** | **64** |
+| `verbatim` | **0** |
+| `adapted` | **45** — 35 Conspiracy/Headline X-cards + 10 Ideology stems |
+| `inferred` | **177** |
+| **total** | **222** |
 
-**Zero cards are `verbatim`, and that is deliberate.** A `verbatim` card would have to
-reproduce Memesys' published rules text word-for-word in a competing product, which
-`docs/AUTHENTIC-SHASN-REFERENCE.md` §9.1–§9.2 identifies as the primary legal exposure in
-this repository (DMCA is the realistic risk, not a lawsuit; card names alone are the
-most-searchable item). The 19 `adapted` cards are here because the task brief asked for
-recovered material and they are useful as *fidelity evidence* — the `source` field on each
-names the exact clause that could not be represented, and those clauses are the substance
-of `KNOWN-GAPS.md`.
+By deck: Ideology **134** (92 `in2020` + 42 `et2040`) · Voter **18** · Conspiracy **31**
+(18 `et2040` + 13 `in2020`) · Headline **39** (25 `et2040` + 14 `in2020`).
+
+**Zero cards are `verbatim`, and that is deliberate, and it stays zero.** A `verbatim` card
+would have to reproduce Memesys' published rules text word-for-word in a competing product,
+which `docs/AUTHENTIC-SHASN-REFERENCE.md` §9.1–§9.2 identifies as the primary legal exposure
+in this repository (DMCA is the realistic risk, not a lawsuit; card names alone are the
+most-searchable item). It is also *structurally* unreachable while `reduce()` holds a fixed
+op count: the schema says `text` "must describe exactly what `effects` does", and for every
+recovered X-card the inexpressible clause sits **inside** the printed text, so reproducing
+that text would print a sentence describing something the engine does not do —
+`KNOWN-GAPS.md` §0 state (b), *"a card that lies."* BLOCK and DEFLECT were the two
+legitimate counter-examples and they ship `adapted` too, with every dropped clause named;
+`decks/SOURCES.md` §1 tabulates all eight of BLOCK's recovered clauses against what
+`reduce()` performs. **Dropping no clause is not reproducing text** — which is why
+`ct-et2040-017`, `-018` and `-021` all drop nothing and all stay `adapted`.
+
+The 45 `adapted` cards are here because the task brief asked for recovered material and
+they are useful as *fidelity evidence* — the `source` field on each names the exact clause
+that could not be represented, and those clauses are the substance of `KNOWN-GAPS.md`.
 
 **The open decision is recorded, not resolved, here.** `PLAN.md` §8 offers two paths
 (licence, or original decks on Shasn-derived mechanics) and says "pick before M2";

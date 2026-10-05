@@ -141,6 +141,22 @@
       ]
     },
     {
+      "id": "hl-in2020-033",
+      "source": "REF 4.3 recovers SNOOP B-O-DOUBLE-T: 'For the rest of the game, you have to pay an extra resource for every Conspiracy Card that you buy.' REF 4.3 calls this the SAME card as PYTHONPOST (hl-in2020-015); SOURCES.md 4.5 dispositions it there: the same mechanism under its own recovered name, NOT a second archetype. Beside hl-in2020-015 a table can draw the same tax twice; if that is a balance problem the fix is to retire one NAME, not to change either reduction. WIDER THAN PRINTED: the tax falls on EVERY purchase - `surchargeFor` is read by both INFLUENCE and BUY_CONSPIRACY. DROPPED, none.",
+      "provenance": "adapted",
+      "name": "Snoop B-O-Double-T",
+      "text": "For the rest of the game, every purchase you make costs 1 extra Funds - Conspiracy Cards and Voter Cards alike, where the printed card taxed Conspiracy Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it, and it stacks with Pythonpost.",
+      "effects": [
+        {
+          "op": "restrict",
+          "kind": "surcharge",
+          "value": 1,
+          "target": "you",
+          "until": "rest-of-game"
+        }
+      ]
+    },
+    {
       "id": "hl-in2020-032",
       "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for DOSTI BANI RAHE (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its grant must land on SOMEBODY ELSE'S turn, and both installLiveEffects and fireTriggers require fire.actor === le.owner for on-turn-start, so there is no event to hook - a new EffectTrigger member plus a re-derivation of the trigger registry would buy no card. This card does the same JOB, giving OTHER people the benefit, with a lifetime the engine can actually bound.",
       "provenance": "inferred",

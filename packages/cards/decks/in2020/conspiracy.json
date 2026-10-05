@@ -67,7 +67,7 @@
     },
     {
       "id": "ct-in2020-008",
-      "source": "original; register per REF 8.2 rule 5. COUGH IT UP (REF 4.1, scribd 814006944) is recorded as NOT REPRESENTABLE in decks/SOURCES.md: `evict` has no `target`, and the conditional bonus is G2.",
+      "source": "original; register per REF 8.2 rule 5. Does NOT restate COUGH IT UP (REF 4.1), which SHIPS recovered as hl-in2020-013: `evict` carries target, so its printed eviction is performed, and only its conditional bonus is DROPPED - 'if a player breaks a majority using this action, all other players gain 1 resource of their choice' (G2 - no op reads board state to decide a payout). This card takes only that bonus's JOB, as an unconditional payout.",
       "provenance": "inferred",
       "name": "Kharcha Uthao",
       "text": "Every opponent gains 1 resource of their choice from the Public Reserve. You then gain 2 Media.",

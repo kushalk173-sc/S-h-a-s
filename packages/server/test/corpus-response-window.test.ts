@@ -108,14 +108,33 @@ const ctx: Ctx = loadCtx();
 const SEATS = [2, 3, 4, 5] as const;
 
 /**
- * THE PINNED REACHABILITY SEED, re-picked on 2026-10-04 because twelve X-cards moved.
+ * THE PINNED REACHABILITY SEED, re-picked on 2026-10-04 because twelve X-cards moved,
+ * and again on 2026-10-04 because nine more did.
  *
  * It was 20. It is now **21**, and the reason is a measurement rather than a preference.
  * Swept over seeds 1..120 at every seat count, exactly **two** seeds open a window that
  * is then ANSWERED with the reactive card at all four seat counts: **21 and 101**. Seed
- * 21 is the lower of the two and is pinned; seed 101 is the measured spare, and it is
- * named here so the next person whose deck move loses seed 21 does not have to sweep
- * 120 seeds to find the replacement.
+ * 21 is the lower of the two and was pinned; seed 101 was the measured spare.
+ *
+ * **IT IS NOW 3, because nine more cards moved the shuffle again.** Filing DEEP THOUGHTS,
+ * LAB-GROWN EARWORM, THE GRETA EFFECT (Conspiracy) and POLO RETREAT, SUBMERGED, A COWARD
+ * OR A JOURNALIST?, CARD GAMES, SNOOP B-O-DOUBLE-T, THE BIG FREEZE (Headline) changed the
+ * Conspiracy deck from 31 cards to 34 and the Headline deck from 39 to 45, so which
+ * reactive card a granting headline hands out is decided differently at every seed and
+ * seed 21 no longer opens a window at any seat count. Re-swept over seeds 1..120 at
+ * every seat count: exactly **three** seeds open a window that is then ANSWERED and
+ * closes cleanly at ALL FOUR — **3, 4 and 79**. Seed 3 is the lowest and is pinned;
+ * 4 and 79 are the measured spares, named here so the next person whose deck move loses
+ * seed 3 does not have to sweep 120 seeds to find the replacement. Window-open rates
+ * over 1..120 are 6/7/13/15 at 2/3/4/5 seats, so the mechanism is still RARE.
+ *
+ * **THE RE-PICK IS A CORPUS CONSEQUENCE AGAIN, NOT A LOOSENING, and the two re-picks are
+ * the evidence that the file is measuring rather than remembering.** Nothing here was
+ * relaxed to accommodate it: the reachability tests still require an ANSWER
+ * (`closedByAnswer >= 1`) rather than a survive, still require nine majorities, still
+ * forbid the deck-cliff ending, and still run the hand-blind twin at every seat count.
+ * A seed is re-picked because the corpus moved; if a re-pick ever arrives with a
+ * SOFTER assertion attached, that is the day this file stopped being a measurement.
  *
  * **THE RE-PICK IS A CORPUS CONSEQUENCE, NOT A LOOSENING.** `draw-conspiracy` takes the
  * TOP of the Conspiracy draw pile, so which reactive card a granting headline hands out
@@ -129,7 +148,7 @@ const SEATS = [2, 3, 4, 5] as const;
  * survive, still require nine majorities, still forbid the deck-cliff ending, and still
  * run the hand-blind twin at every seat count.
  */
-const REACHABILITY_SEED = 21;
+const REACHABILITY_SEED = 3;
 
 /**
  * The measured sweep, and WHY IT IS 60 SEEDS AND NOT 20.

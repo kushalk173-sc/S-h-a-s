@@ -1,6 +1,6 @@
 # Digital Shasn — Build Plan
 
-Status: **engine ✅ · server ✅ · cards ✅ (151 shipped) · board ✅ · client ✅ compiles and
+Status: **engine ✅ · server ✅ · cards ✅ (222 shipped) · board ✅ · client ✅ compiles and
 runs · schema evolution ⬜ not started · the game is FULL INFORMATION**
 Owner: kushalk
 Last updated: 2026-10-03
@@ -37,17 +37,18 @@ Last updated: 2026-10-03
 > | figure | as stated above | today |
 > |---|---|---|
 > | `npm test` | 1088 passing | **1452** (engine 461 / server 336 / client 418 / cards 237) |
-> | corpus size | 151 cards | **221 cards** (`KNOWN-GAPS.md` §8) |
+> | corpus size | 151 cards | **222 cards** — 134 Ideology / 18 Voter / 31 Conspiracy / 39 Headline; **0 `verbatim` / 45 `adapted` / 177 `inferred`** (counted off `decks/**/*.json`; `decks/SOURCES.md` §3 and §7) |
 > | Ideology deck | 76 | **134** (`decks/SOURCES.md` §3: 92 `in2020` + 42 `et2040`) |
-> | `npm run playable` | 25 of 54 (ship-log rows 45, and §6.5) | **43 PLAYED of 54 probed, 0 refused, 0 no-op, 11 inexpressible** |
-> | the inexpressible recovered cards | 14, undecided | **all 14 ruled on** — 3 built, 8 ruled out with an original substitute filed, 2 blocked on a named decision, 1 ruled never to have been a gap (`KNOWN-GAPS.md` §8.0) |
+> | `npm run playable` | 25 of 54 (ship-log rows 45, and §6.5) | **three verdicts, not one: 54 probed, 44 EXPRESSIBLE, 35 IN THE CORPUS, 33 SHIPPED AS AUTHORED, 0 refused, 10 inexpressible.** The headline is **35 of 54** |
+> | the inexpressible recovered cards | 14, undecided | **all 14 ruled on** — 4 built or part-built, 8 ruled out with an original substitute filed, 1 blocked on a named decision, 1 ruled never to have been a gap (`KNOWN-GAPS.md` §8.0) |
 >
-> **What I could not check, and am not claiming:** this pass had **no shell**, so none of the
-> above was measured by me. The 221 / 134 / 43 figures are read off
-> `packages/cards/KNOWN-GAPS.md` §8 and `decks/SOURCES.md` §3, which state they are measured;
-> the 1452 test
-> count is carried on report. **`npm run playable`, `npm run balance` and `npm run validate`
-> must be re-run before any of these is treated as current**, and in particular the positional
+> **What I could not check, and am not claiming:** the pass that wrote this block had **no
+> shell**, and neither had the reconciliation pass that last edited it, so none of the above
+> was measured by execution. The 222 / 134 / 44 / 35 figures are read off
+> `packages/cards/decks/SOURCES.md` §3, §7 and §4.7 and re-counted directly from the deck
+> files' `"id"` and `"provenance"` fields; the 1452 test count is carried on report.
+> **`npm run playable`, `npm run balance`, `npm run validate` and `npm run check` must be
+> re-run before any of these is treated as current**, and in particular the positional
 > skew and dominance measurements quoted in §9 risk #2 are **76-card measurements that have
 > never been re-run over 134 cards.**
 >
@@ -1131,8 +1132,10 @@ the architect independently relies on it** — §3 above exists because of #5, a
 
    **What is measured, right now** (`npm run balance --workspace packages/cards`, against
    the deck as shipped when this was written — 151 cards checked, **76** of them Ideology;
-   **⚠ the deck is 134 Ideology Cards and the corpus 221 today, and this has NOT been
-   re-measured — re-run the command rather than trusting these numbers**):
+   **⚠ the deck is 134 Ideology Cards and the corpus 222 today — 0 `verbatim`, 45
+   `adapted`, 177 `inferred` — and this has NOT been re-measured, so re-run the command
+   rather than trusting these numbers**. The 151/76 above are that run's, kept because
+   rewriting a captured tool output is fabrication):
 
    ```
    DOMINATED CARDS: ONE, and it is a single resource.
@@ -1245,7 +1248,7 @@ Short version, because §9 risk #1 is the project and this is the state of its i
 >
 > | Recovered | Shipped | Unshippable |
 > |---:|---:|---:|
-> | **50** real X-cards with complete official text | **151** cards (41 adapted, 110 inferred, **0 verbatim**) | **most of the 50** |
+> | **50** real X-cards with complete official text | **222** cards (45 adapted, 177 inferred, **0 verbatim**) | **most of the 50** |
 >
 > **The recovery effort worked and it bought us less than it looks like.** We have
 > verbatim text for 50 real cards and we can only *use* a handful of them. §9 risk #1 is no
@@ -1253,7 +1256,7 @@ Short version, because §9 risk #1 is the project and this is the state of its i
 > a schema problem, not a writing problem, and a much more tractable one. The gaps are
 > enumerated in `packages/cards/KNOWN-GAPS.md`; the milestone is **M2b**.
 
-> ### 🔴 THE CORPUS HONESTY NOTE — 151 shipped, and almost none of it is Memesys'
+> ### 🔴 THE CORPUS HONESTY NOTE — 222 shipped, and almost none of it is Memesys'
 >
 > **Read this before showing the game to anyone.** The numbers are exact, counted off
 > `"provenance"` across `packages/cards/decks/**/*.json`, with the per-card audit trail in
@@ -1261,9 +1264,11 @@ Short version, because §9 risk #1 is the project and this is the state of its i
 >
 > | | count | what it means |
 > |---|---:|---|
-> | `verbatim` | **0** | **Deliberate and structurally unreachable, not an oversight.** While `reduce()` holds at 13 ops, reproducing a recovered card's text word-for-word would print a clause describing something the engine does not do — a card that lies (`SOURCES.md` §1, `KNOWN-GAPS.md` §0 state (b)). BLOCK and DEFLECT were the two legitimate counter-examples and they ship `adapted` too, with every dropped clause named |
-> | `adapted` | **41** | Recovered material, played as a reconstruction. Each names what it dropped in its `source` field |
-> | `inferred` | **110** | **Authored here.** Register copied from `AUTHENTIC-SHASN-REFERENCE` §8.2; the content is not Memesys' |
+> | `verbatim` | **0** | **Deliberate and structurally unreachable, not an oversight.** While `reduce()` holds a fixed op set, reproducing a recovered card's text word-for-word would print a clause describing something the engine does not do — a card that lies (`SOURCES.md` §1, `KNOWN-GAPS.md` §0 state (b)). BLOCK and DEFLECT were the two legitimate counter-examples and they ship `adapted` too, with every dropped clause named. **Dropping no clause is not reproducing text**, which is why `ct-et2040-017`, `-018` and `-021` drop nothing and stay `adapted` |
+> | `adapted` | **45** | Recovered material, played as a reconstruction: 35 Conspiracy/Headline X-cards + 10 Ideology question stems. Each names what it dropped in its `source` field |
+> | `inferred` | **177** | **Authored here.** Register copied from `AUTHENTIC-SHASN-REFERENCE` §8.2; the content is not Memesys' |
+>
+> By deck: Ideology **134** · Voter **18** · Conspiracy **31** · Headline **39**.
 >
 > **And the fact that should be impossible to miss, stated plainly: the 55 real cards
 > recovered from Memesys' own official player-aids are almost all Conspiracy and Headline.

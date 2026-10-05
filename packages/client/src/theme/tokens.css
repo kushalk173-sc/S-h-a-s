@@ -91,8 +91,12 @@
      actually live): 5.44 / 8.30 / 7.40 / 6.64 — all AA. On --paper-000:
      6.16 / 9.40 / 7.52 / 8.38.
 
-     These tokens are declared for completeness of the sheet. Per §2.7
-     mitigation 3, no resource token ever renders on the board. */
+     These four were declared here for a year and used in exactly one place
+     (the manifesto pip track), while every resource surface rendered grey.
+     They are now applied across all seven resource surfaces via the
+     `data-res` attribute in app.css. Mitigation 3 still holds: no resource
+     ink renders on the board. Mitigation 2 still holds: the ink is a stroke,
+     a text colour and a 2px rule — never a fill. See UI-SPEC §2.7. */
   --ideo-capitalist: #6f5a1e; /* Funds */
   --ideo-supremo: #5b3550; /* Clout */
   --ideo-showstopper: #2f5560; /* Media */

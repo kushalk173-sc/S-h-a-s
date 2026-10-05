@@ -605,10 +605,20 @@ describe('a public field is not "public" until it is proven to be on the wire', 
     ]) {
       if ('effects' in card && card.effects.some((e) => e.op === 'set-cap')) installers.push(card.id);
     }
+    // INVERTED because filing THE BIG FREEZE (`hl-et2040-033`) made the old claim FALSE
+    // rather than because the wire moved: the corpus now HAS a card that lowers a cap, so
+    // the ceiling a client cannot see is reachable and this stopped being a statement about
+    // an unreachable state. Asserting the absence now would be asserting a KNOWN-GAPS ruling
+    // as a property of the corpus, which is the mistake this suite exists to catch. What is
+    // asserted instead is that the "present" half of the wire assertion above is REACHABLE
+    // at all — a projection bug in the `capOverride` branch is invisible while no card
+    // ever writes one, which is exactly how long it stayed invisible. The installers are
+    // still DERIVED from the op rather than counted, and the client-side rendering gap is
+    // named by the card itself: the cap is on the wire and is still not drawn on the Mat.
     expect(
       installers,
-      `a shipped card now installs a cap override (${installers.join(', ')}) — the claim above is stale and the wire assertion above is the one that matters`,
-    ).toEqual([]);
+      `no shipped card installs a cap override (hl-et2040-033 does), so the "present" half of the wire assertion above is vacuous`,
+    ).not.toEqual([]);
   });
 
   it('liveEffects is on the payload for every viewer, and is the whole list', () => {
