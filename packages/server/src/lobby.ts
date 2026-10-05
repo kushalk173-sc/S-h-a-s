@@ -24,7 +24,7 @@ import { PLAYER_COLOURS, setup, type Ctx, type PlayerID } from '@shasn/engine';
 import { newId, newPlayerId, Room, type Seat } from './room.ts';
 import type { Lobby, LobbySeat, LobbySummary, SeatCount } from './protocol.ts';
 import { decksOf, type MatchStore } from './store.ts';
-import { ctxsForModes, type ModeCards, type ModeId } from './modes.ts';
+import { ctxsForModes, MODES, type ModeCards, type ModeId } from './modes.ts';
 
 export type LobbyErrorCode = 'LOBBY_FULL' | 'LOBBY_CLOSED' | 'NOT_IN_LOBBY' | 'NOT_HOST' | 'SEAT_TAKEN';
 
@@ -51,7 +51,13 @@ export type LobbyRecord = {
   readonly lobbyId: string;
   name: string;
   readonly isPrivate: boolean;
-  readonly hostId: PlayerID;
+  /**
+   * Mutable, and deliberately NOT `readonly`: `leaveLobby` hands the room to the
+   * next-longest-present member when the host leaves. The `readonly` here was a
+   * latent bug — an assignment to a readonly field that tsc had not been reached to
+   * report while other errors were outstanding.
+   */
+  hostId: PlayerID;
   readonly maxPlayers: SeatCount;
   /**
    * The mode this room was opened in, decided once by the host at creation.
@@ -225,6 +231,8 @@ export class LobbyHub {
         seated: l.members.size,
         maxPlayers: l.maxPlayers,
         inProgress: l.members.size > 0 && [...l.members.values()].some((m) => m.matchId !== null),
+        mode: l.mode,
+        modeLabel: MODES[l.mode].label,
       });
     }
     return out;
@@ -245,6 +253,8 @@ export class LobbyHub {
       isPrivate: lobby.isPrivate,
       hostId: lobby.hostId,
       maxPlayers: lobby.maxPlayers,
+      mode: lobby.mode,
+      modeLabel: MODES[lobby.mode].label,
       seats,
       matchId: [...lobby.members.values()].find((m) => m.matchId !== null)?.matchId ?? null,
     };
@@ -364,7 +374,7 @@ export class LobbyHub {
       const stored = await this.#store.get(id);
       if (stored === null) continue;
       try {
-        const room = await Room.restore({ matchId: id, ctx: this.#ctx, store: this.#store, stored });
+        const room = await Room.restore({ matchId: id, ctx: this.#ctx, modeCtx: this.#modeCtx, store: this.#store, stored });
         this.#rooms.set(id, room);
         restored += 1;
       } catch (err) {

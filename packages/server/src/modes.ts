@@ -141,3 +141,30 @@ export function ctxsForModes(rules: Rules, cards: ModeCards): Readonly<Record<Mo
   for (const id of MODE_IDS) out[id] = ctxForMode(rules, cards, id);
   return out;
 }
+
+/**
+ * Every mode backed by ONE card index — the state of the world before Azadi has
+ * cards of its own.
+ *
+ * This is what `LobbyHub`'s constructor defaults to, and what tests want when they
+ * are exercising replay or the store rather than the mode system itself: they care
+ * that the plumbing is wired, not that the modes differ. It is a real helper rather
+ * than a test fixture because it is a genuinely meaningful state — "all modes play
+ * the same cards" is what the registry says today, and asserting against it should
+ * not require assembling the record by hand.
+ */
+export function uniformModeCtx(ctx: Ctx): Readonly<Record<ModeId, Ctx>> {
+  return ctxsForModes(ctx.rules, uniformModeCards(ctx.cards));
+}
+
+/**
+ * Every mode backed by ONE card index.
+ *
+ * The cards-shaped sibling of `uniformModeCtx`, and what a server whose `ctx` was
+ * injected uses for its modes: the injected corpus is the whole world, so no mode
+ * quietly plays a different one. See `ShasnServer`'s constructor for why that
+ * distinction matters.
+ */
+export function uniformModeCards(cards: CardIndex): ModeCards {
+  return { standard: cards, azadi: cards };
+}

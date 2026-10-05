@@ -93,15 +93,15 @@ describe('the decoder rejects malformed frames', () => {
   it('rejects a lobby:create with an out-of-range seat count', () => {
     for (const n of [0, 1, 6, -1, 2.5, NaN, '3', null]) {
       expect(
-        decodeMessage({ t: 'lobby:create', name: 'x', maxPlayers: n, isPrivate: false }).ok,
+        decodeMessage({ t: 'lobby:create', name: 'x', maxPlayers: n, isPrivate: false, mode: 'standard' }).ok,
         `accepted maxPlayers=${String(n)}`,
       ).toBe(false);
     }
   });
 
   it('rejects control characters in names and tokens', () => {
-    expect(decodeMessage({ t: 'lobby:create', name: 'a\u0000b', maxPlayers: 2, isPrivate: false }).ok).toBe(false);
-    expect(decodeMessage({ t: 'lobby:create', name: 'a\nb', maxPlayers: 2, isPrivate: false }).ok).toBe(false);
+    expect(decodeMessage({ t: 'lobby:create', name: 'a\u0000b', maxPlayers: 2, isPrivate: false, mode: 'standard' }).ok).toBe(false);
+    expect(decodeMessage({ t: 'lobby:create', name: 'a\nb', maxPlayers: 2, isPrivate: false, mode: 'standard' }).ok).toBe(false);
     expect(decodeMessage({ t: 'session:resume', resumeToken: 'a\u0007b' }).ok).toBe(false);
     expect(decodeMessage({ t: 'session:resume', resumeToken: '' }).ok).toBe(false);
     expect(decodeMessage({ t: 'session:resume', resumeToken: 'a'.repeat(200) }).ok).toBe(false);
@@ -279,7 +279,7 @@ let matchId: string;
 beforeAll(async () => {
   harness = await startHarness({ dispatchRate: 200, messageRate: 200 });
   alice = await TestClient.connect(harness.url);
-  alice.send({ t: 'lobby:create', name: 'Host', maxPlayers: 2, isPrivate: false });
+  alice.send({ t: 'lobby:create', name: 'Host', maxPlayers: 2, isPrivate: false, mode: 'standard' });
   const created = await alice.expect(alice.is('lobby:state'), 'lobby:state');
   matchId = 'pending';
   void created;

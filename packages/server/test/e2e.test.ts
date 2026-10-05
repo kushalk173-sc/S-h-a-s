@@ -49,6 +49,7 @@ import { TestClient, advance, digest, startHarness, type Harness } from './fixtu
 import { BOARD } from './corpus-facts.ts';
 import { discardKeepingReserve, driverPly, targetZone } from './driver.ts';
 import type { ClientState } from '@shasn/engine';
+import { uniformModeCtx } from '../src/modes.ts';
 
 let h: Harness;
 let ada: TestClient;
@@ -63,7 +64,7 @@ beforeAll(async () => {
   h = await startHarness({ dispatchRate: 4000, messageRate: 4000 });
 
   ada = await TestClient.connect(h.url);
-  ada.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+  ada.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
   const lobby = await ada.expect(ada.is('lobby:state'), 'lobby');
   const lobbyId = lobby.lobby.lobbyId;
 
@@ -359,7 +360,7 @@ let actions = 0;
     // that could not reproduce a reshuffle would restore a match into a subtly
     // different game — the exact failure `cardsVersion` exists to prevent.
     const { replay } = await import('../src/store.ts');
-    const rebuilt = replay({ stored, ctx: h.ctx });
+    const rebuilt = replay({ stored, ctx: h.ctx, modeCtx: uniformModeCtx(h.ctx) });
     expect(rebuilt.viewId).toBe(room.viewId);
     expect(digest(rebuilt.state), 'the replayed state differs from the live one').toBe(digest(room.state));
   });

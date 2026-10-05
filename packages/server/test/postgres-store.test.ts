@@ -86,6 +86,7 @@ const newMatch = (resumeHash: string): NewMatch => ({
   seed: 12345,
   rules: RULES,
   cards,
+  mode: 'standard',
   players: [{ id: 'p_1', name: 'A', colour: '#fff', resumeHash }],
   now: 1_700_000_000_000,
 });
@@ -131,6 +132,7 @@ describe('PostgresMatchStore against a recording driver', () => {
         seed: 12345,
         rules: RULES,
         cards,
+        mode: 'standard',
         players: [{ id: 'p_1', name: 'A', colour: '#fff', resumeHash: sha('tok-a') }],
         now,
       },
@@ -163,6 +165,7 @@ describe('PostgresMatchStore against a recording driver', () => {
         seed: 1,
         rules: RULES,
         cards,
+        mode: 'standard',
         // A seat is created before the socket that will hold its credential is
         // even connected, so an empty hash is the normal case, not an error.
         players: [{ id: 'p_1', name: 'A', colour: '#fff', resumeHash: '' }],

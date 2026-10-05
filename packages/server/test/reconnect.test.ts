@@ -29,6 +29,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { CardIndex, GameState, Resource } from '@shasn/engine';
 import { RESOURCES } from '@shasn/engine';
 
+import { uniformModeCtx } from '../src/modes.ts';
 import { replay, InMemoryMatchStore, cardsVersion, rulesVersion } from '../src/store.ts';
 import { advance, digest, TestClient, bigCards, startHarness, type Harness } from './fixtures.ts';
 import type { ServerMessage, Session } from '../src/protocol.ts';
@@ -60,7 +61,7 @@ async function seatedGame(h: Harness): Promise<{
 }> {
   const a = await TestClient.connect(h.url);
   clients.push(a);
-  a.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+  a.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
   const aLobby = await a.expect(a.is('lobby:state'), 'a lobby');
   const lobbyId = aLobby.lobby.lobbyId;
 
@@ -202,7 +203,7 @@ describe('A — a room rebuilt from the action log is identical', () => {
     // Rehydrate from the store alone — a fresh Room, no reference to the live one.
     const stored = await h.store.get(matchId);
     if (stored === null) throw new Error('nothing stored');
-    const rebuilt = replay({ stored, ctx: h.ctx });
+    const rebuilt = replay({ stored, ctx: h.ctx, modeCtx: uniformModeCtx(h.ctx) });
 
     expect(rebuilt.viewId).toBe(liveViewId);
     // `JSON.stringify` rather than `toEqual`, because a snapshot-cache refactor
@@ -283,7 +284,7 @@ describe('A — a room rebuilt from the action log is identical', () => {
     };
 
     expect(cardsVersion(h.ctx.cards)).not.toBe(cardsVersion(revised));
-    expect(() => replay({ stored, ctx: { rules: h.ctx.rules, cards: revised } })).toThrow(
+    expect(() => replay({ stored, ctx: { rules: h.ctx.rules, cards: revised }, modeCtx: uniformModeCtx({ rules: h.ctx.rules, cards: revised }) })).toThrow(
       /different card corpus/,
     );
   });
@@ -302,7 +303,7 @@ describe('A — a room rebuilt from the action log is identical', () => {
 
     const tweaked = { ...h.ctx.rules, resourceCap: 99 };
     expect(rulesVersion(tweaked)).not.toBe(rulesVersion(h.ctx.rules));
-    expect(() => replay({ stored, ctx: { rules: tweaked, cards: h.ctx.cards } })).toThrow(
+    expect(() => replay({ stored, ctx: { rules: tweaked, cards: h.ctx.cards }, modeCtx: uniformModeCtx({ rules: tweaked, cards: h.ctx.cards }) })).toThrow(
       /different rule set/,
     );
   });
@@ -388,7 +389,7 @@ describe('B — a resume token cannot be guessed, reused, or moved between rooms
     // A second, independent game in the same process.
     const a2 = await TestClient.connect(h.url);
     clients.push(a2);
-    a2.send({ t: 'lobby:create', name: 'Cy', maxPlayers: 2, isPrivate: false });
+    a2.send({ t: 'lobby:create', name: 'Cy', maxPlayers: 2, isPrivate: false, mode: 'standard' });
     const l2 = await a2.expect(a2.is('lobby:state'), 'second lobby');
     const b2 = await TestClient.connect(h.url);
     clients.push(b2);

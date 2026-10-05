@@ -43,6 +43,7 @@ import { reduce, type Action, type Ctx, type GameEvent, type GameState, type Pla
 import { answerSideFor, answerPromptFor, viewFor } from './broadcast.ts';
 import type { AnswerPrompt } from './protocol.ts';
 import { pegDestRefusal } from './validate.ts';
+import { modeOf, type ModeId } from './modes.ts';
 import {
   cardsVersion,
   rulesVersion,
@@ -154,14 +155,25 @@ export class Room {
   static async restore(
     opts: Omit<RoomOptions, 'state' | 'seed' | 'seats' | 'now'> & {
       stored: StoredMatch;
+      /**
+       * Every mode's context. The restored room rebuilds under the mode it was
+       * CREATED in, not the server's standard one — `stored.mode` is the only record
+       * of that, and the cards a match was dealt from are exactly what replay has to
+       * reproduce.
+       */
+      modeCtx: Readonly<Record<ModeId, Ctx>>;
     },
   ): Promise<Room> {
     const { replay } = await import('./store.ts');
     const stored = opts.stored;
-    const rebuilt = replay({ stored, ctx: opts.ctx });
+    // Resolved once and used for BOTH the replay and the Room's own ctx. A room
+    // that rebuilt under one context and then reduced under another would pass
+    // replay and still diverge on the next action.
+    const ctx = opts.modeCtx[modeOf(stored)] ?? opts.ctx;
+    const rebuilt = replay({ stored, ctx: opts.ctx, modeCtx: opts.modeCtx });
     const room = new Room({
       matchId: opts.matchId,
-      ctx: opts.ctx,
+      ctx,
       store: opts.store,
       seed: stored.seed,
       state: rebuilt.state,

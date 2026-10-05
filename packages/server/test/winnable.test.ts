@@ -354,7 +354,7 @@ describe('a real-corpus game runs to completion over a real socket, at every sea
 
     const host = await TestClient.connect(harness.url);
     clients.push(host);
-    host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: n as 2, isPrivate: false });
+    host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: n as 2, isPrivate: false, mode: 'standard' });
     const lobby = await host.expect(host.is('lobby:state'), 'lobby');
     const lobbyId = lobby.lobby.lobbyId;
 

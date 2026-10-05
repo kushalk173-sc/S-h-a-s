@@ -154,7 +154,7 @@ async function liveMatch(): Promise<Live> {
   const h = await boot();
   const host = await TestClient.connect(h.url);
   clients.push(host);
-  host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+  host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
   const created = await host.expect(host.is('lobby:state'), 'the lobby');
 
   const other = await TestClient.connect(h.url);
@@ -272,7 +272,7 @@ describe('a SEATED client cannot spectate its own seat away', () => {
     for (const frame of [
       { t: 'lobby:spectate', lobbyId: '' },
       { t: 'match:spectate', matchId: '' },
-      { t: 'lobby:create', name: 'Ada', maxPlayers: 2 as const, isPrivate: false },
+      { t: 'lobby:create', name: 'Ada', maxPlayers: 2 as const, isPrivate: false, mode: 'standard' },
       { t: 'lobby:join', lobbyId: 'l_nope', name: 'Ada' },
     ]) {
       const { h, matchId, seats } = await liveMatch();
@@ -450,7 +450,7 @@ describe('no session replacement leaks the record it displaced', () => {
     const h = await boot();
     const a = await TestClient.connect(h.url);
     clients.push(a);
-    a.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 5, isPrivate: false });
+    a.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 5, isPrivate: false, mode: 'standard' });
     const created = await a.expect(a.is('lobby:state'), 'the lobby');
     const firstSessionId = a.latestSession().sessionId;
     const firstToken = a.latestSession().resumeToken;
@@ -458,7 +458,7 @@ describe('no session replacement leaks the record it displaced', () => {
 
     const b = await TestClient.connect(h.url);
     clients.push(b);
-    b.send({ t: 'lobby:create', name: 'Cy', maxPlayers: 5, isPrivate: false });
+    b.send({ t: 'lobby:create', name: 'Cy', maxPlayers: 5, isPrivate: false, mode: 'standard' });
     await b.expect(b.is('lobby:state'), 'the other lobby');
     const otherLobby = b.latestSession().lobbyId;
     if (otherLobby === null) throw new Error('the second lobby named no lobby — fixture is wrong');
@@ -579,7 +579,7 @@ describe('no session replacement leaks the record it displaced', () => {
     const seatIn = async (): Promise<{ token: string; playerId: string; matchId: string }> => {
       const host = await TestClient.connect(h.url);
       clients.push(host);
-      host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+      host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
       const created = await host.expect(host.is('lobby:state'), 'a lobby');
       const guest = await TestClient.connect(h.url);
       clients.push(guest);

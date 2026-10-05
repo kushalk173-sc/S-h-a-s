@@ -231,6 +231,16 @@ export type Lobby = {
   readonly isPrivate: boolean;
   readonly hostId: PlayerID;
   readonly maxPlayers: SeatCount;
+  /**
+   * The mode this room is played in, plus its display label.
+   *
+   * Both travel together because the client cannot derive one from the other: it
+   * holds a mirror of the mode IDS (it must not import the server's registry) but not
+   * of the labels, and a label is presentation, not policy. The id is what the server
+   * trusts; the label is only ever printed.
+   */
+  readonly mode: ModeId;
+  readonly modeLabel: string;
   readonly seats: readonly LobbySeat[];
   readonly matchId: MatchId | null;
 };
@@ -242,4 +252,6 @@ export type LobbySummary = {
   readonly seated: number;
   readonly maxPlayers: SeatCount;
   readonly inProgress: boolean;
+  readonly mode: ModeId;
+  readonly modeLabel: string;
 };

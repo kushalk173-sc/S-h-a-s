@@ -68,6 +68,8 @@ export function renderAll(state: GameState, ctx: Ctx, viewer: PlayerID | null = 
       isPrivate: false,
       hostId: state.turnOrder[0] ?? '',
       maxPlayers: 5,
+      mode: 'standard',
+      modeLabel: 'Shasn',
       seats: state.turnOrder.map((id) => ({
         seatId: id,
         playerId: id,

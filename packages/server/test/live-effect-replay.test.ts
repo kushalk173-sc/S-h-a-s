@@ -58,6 +58,7 @@ import {
   type PlayerID,
 } from '@shasn/engine';
 
+import { uniformModeCtx } from '../src/modes.ts';
 import { cardsVersion, InMemoryMatchStore, ReplayMismatch, replay, rulesVersion, type StoredMatch } from '../src/store.ts';
 import { nextAction } from './driver.ts';
 
@@ -243,6 +244,7 @@ async function recordGame(extraActions: number): Promise<{ store: InMemoryMatchS
       seed: SEED,
       rules: RULES,
       cards,
+      mode: 'standard',
       players: [
         { id: P1, name: 'Ada', colour: 'a', resumeHash: 'h1' },
         { id: 'p2', name: 'Bo', colour: 'b', resumeHash: 'h2' },
@@ -349,7 +351,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
     // asserted up front: an effect is in flight, standing or hooked, and if it is a
     // rest-of-game one it has no expiry.
     const { stored, state } = await recordGame(6);
-    const live = replay({ stored, ctx }).state.liveEffects;
+    const live = replay({ stored, ctx, modeCtx: uniformModeCtx(ctx) }).state.liveEffects;
     expect(live.length, 'the fixture no longer installs live effects; this file would pass vacuously').toBeGreaterThan(0);
     expect(live.length, 'the fixture installed no live effects at all').toBeGreaterThan(0);
     // The shape: an id from the state's own counter, an owner, the card it came from,
@@ -378,9 +380,9 @@ describe('a persisted, in-flight live effect survives replay', () => {
     // Path 2 of `replay`: `setup()` then `reduce()` over the whole log. The snapshot is
     // discarded so this really is the derivation path and not the cache.
     const { stored } = await recordGame(6);
-    const derived = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx });
+    const derived = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx, modeCtx: uniformModeCtx(ctx) });
     expect(derived.state.liveEffects, 'a full replay lost or altered a live effect').toEqual(
-      replay({ stored, ctx }).state.liveEffects,
+      replay({ stored, ctx, modeCtx: uniformModeCtx(ctx) }).state.liveEffects,
     );
     // The ids are minted from a counter that lives in the STATE rather than at module
     // scope, so a replay cannot re-mint them differently — and a trigger hook is keyed
@@ -405,7 +407,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
     ).toBe(true);
     // And the replay mints the same ones, which is the whole claim.
     expect(derived.state.liveEffects.map((le) => le.id), 'a replay re-minted different live effect ids').toEqual(
-      replay({ stored, ctx }).state.liveEffects.map((le) => le.id),
+      replay({ stored, ctx, modeCtx: uniformModeCtx(ctx) }).state.liveEffects.map((le) => le.id),
     );
   });
 
@@ -420,15 +422,15 @@ describe('a persisted, in-flight live effect survives replay', () => {
     // it, so a `LiveEffect` field that was a `Map`, a `Set`, `undefined` or a class
     // instance would pass every in-memory test and lose data in production.
     const { stored } = await recordGame(6);
-    const fromCache = replay({ stored, ctx });
-    const fromScratch = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx });
+    const fromCache = replay({ stored, ctx, modeCtx: uniformModeCtx(ctx) });
+    const fromScratch = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx, modeCtx: uniformModeCtx(ctx) });
     expect(fromCache.state.liveEffects, 'the cached path and the derived path disagree').toEqual(fromScratch.state.liveEffects);
     expect(fromCache.viewId).toBe(fromScratch.viewId);
 
     // What the Postgres store does to a row body: serialise, and read it back either
     // as a parsed object or as a string (`store-postgres.ts` accepts both).
     const roundTripped: StoredMatch = JSON.parse(JSON.stringify(stored)) as StoredMatch;
-    const viaJson = replay({ stored: roundTripped, ctx });
+    const viaJson = replay({ stored: roundTripped, ctx, modeCtx: uniformModeCtx(ctx) });
     expect(viaJson.state.liveEffects, 'a live effect did not survive a JSON round trip').toEqual(fromScratch.state.liveEffects);
     expect(JSON.stringify(viaJson.state.liveEffects)).toBe(JSON.stringify(fromScratch.state.liveEffects));
   });
@@ -451,8 +453,8 @@ describe('a persisted, in-flight live effect survives replay', () => {
       'the cached snapshot was taken before the effect was installed, so this proves nothing',
     ).toBeGreaterThan(installAt);
 
-    const derived = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx });
-    const cached = replay({ stored, ctx });
+    const derived = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx, modeCtx: uniformModeCtx(ctx) });
+    const cached = replay({ stored, ctx, modeCtx: uniformModeCtx(ctx) });
     expect(derived.state.liveEffects.length, 'a long game lost its live effects').toBeGreaterThan(0);
     expect(cached.state.liveEffects, 'the cache and the derivation disagree after a long game').toEqual(derived.state.liveEffects);
     // And the cached snapshot ON ITS OWN already contains them, which is the
@@ -468,7 +470,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
     // exactly what a single end-of-game comparison misses, and "the final state
     // matches" is the shape of the assertion that misses it.
     const { stored } = await recordGame(6);
-    const fromScratch = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx });
+    const fromScratch = replay({ stored: { ...stored, snapshot: null, snapshotAtSeq: 0 }, ctx, modeCtx: uniformModeCtx(ctx) });
 
     // Replay the log by hand and check the list at every step.
     let s = startState();
@@ -516,11 +518,11 @@ describe('a persisted, in-flight live effect survives replay', () => {
     const after = cardsVersion(retuned);
     expect(after, 'changing a lasting clause did not change the corpus hash').not.toBe(before);
 
-    expect(() => replay({ stored, ctx: { rules: RULES, cards: retuned } })).toThrow(ReplayMismatch);
+    expect(() => replay({ stored, ctx: { rules: RULES, cards: retuned }, modeCtx: uniformModeCtx({ rules: RULES, cards: retuned }) })).toThrow(ReplayMismatch);
     // And the refusal is about the CARDS, specifically, not a generic failure.
     let message = '';
     try {
-      replay({ stored, ctx: { rules: RULES, cards: retuned } });
+      replay({ stored, ctx: { rules: RULES, cards: retuned }, modeCtx: uniformModeCtx({ rules: RULES, cards: retuned }) });
     } catch (err) {
       message = err instanceof Error ? err.message : String(err);
     }
@@ -538,7 +540,7 @@ describe('a persisted, in-flight live effect survives replay', () => {
     // future secrecy pass treats `liveEffects` as sensitive and filters it, the
     // client would be wrong rather than merely less informed.
     const { stored } = await recordGame(6);
-    const state = replay({ stored, ctx }).state;
+    const state = replay({ stored, ctx, modeCtx: uniformModeCtx(ctx) }).state;
     expect(Object.keys(state), 'liveEffects should be unprefixed so it reaches clients').toContain('liveEffects');
     expect(Object.keys(state).some((k) => k.includes('liveEffect') && k.startsWith('_')), 'liveEffects is prefixed as server-only, so clients would render a stale board').toBe(false);
   });

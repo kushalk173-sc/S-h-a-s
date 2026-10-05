@@ -80,7 +80,7 @@ async function fullTable(seats: SeatCount): Promise<Table> {
   const host = await TestClient.connect(h.url);
   clients.push(host);
   players.push(host);
-  host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: seats, isPrivate: false });
+  host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: seats, isPrivate: false, mode: 'standard' });
   const created = await host.expect(host.is('lobby:state'), 'the host lobby');
   const lobbyId = created.lobby.lobbyId;
 

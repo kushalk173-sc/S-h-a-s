@@ -130,7 +130,7 @@ describe('the connection ceilings are enforced at the upgrade', () => {
     const h = await boot({ maxConnections: 2, maxConnectionsPerIp: 12 });
     const host = await TestClient.connect(h.url);
     clients.push(host);
-    host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+    host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
     const created = await host.expect(host.is('lobby:state'), 'the lobby');
 
     const guest = await TestClient.connect(h.url);
@@ -205,7 +205,7 @@ describe('the connection ceilings are enforced at the upgrade', () => {
 async function runningMatch(h: Harness): Promise<{ matchId: string; host: TestClient }> {
   const host = await TestClient.connect(h.url);
   clients.push(host);
-  host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+  host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
   const created = await host.expect(host.is('lobby:state'), 'the lobby');
   const guest = await TestClient.connect(h.url);
   clients.push(guest);

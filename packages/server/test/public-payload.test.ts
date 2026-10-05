@@ -247,7 +247,7 @@ beforeAll(async () => {
   h = await startHarness({ cards: CARDS, dispatchRate: 4000, messageRate: 4000 });
 
   ada = await TestClient.connect(h.url);
-  ada.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false });
+  ada.send({ t: 'lobby:create', name: 'Ada', maxPlayers: 2, isPrivate: false, mode: 'standard' });
   const lobby = await ada.expect(ada.is('lobby:state'), 'lobby');
   const lobbyId = lobby.lobby.lobbyId;
 

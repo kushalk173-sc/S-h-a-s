@@ -42,7 +42,7 @@ import { newPlayerId, Room, RoomError } from './room.ts';
 import { SessionStore, type SessionRecord } from './session.ts';
 import { InMemoryMatchStore, sha, type MatchStore } from './store.ts';
 import { decodeFrame, isSeatCount, MAX_PAYLOAD_BYTES } from './validate.ts';
-import { ctxsForModes, loadModeCards, MODES, MODE_IDS, type ModeCards, type ModeId } from './modes.ts';
+import { ctxsForModes, MODES, MODE_IDS, uniformModeCards, type ModeCards, type ModeId } from './modes.ts';
 import type { ClientMessage, ErrorCode, Lobby, ServerMessage, SeatCount } from './protocol.ts';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -112,6 +112,11 @@ export type ServerConfig = {
   readonly graceMs?: number;
   readonly ctx?: Ctx;
   readonly store?: MatchStore;
+  /**
+   * Per-mode card indexes. Injected by tests that want a mode whose decks differ;
+   * production leaves it unset and `loadModeCards` builds every mode at boot.
+   */
+  readonly modeCards?: ModeCards;
   /** Skip replaying stored matches at boot. Tests that seed the store want this. */
   readonly skipRestore?: boolean;
 };
@@ -217,6 +222,16 @@ export class ShasnServer {
   readonly sessions: SessionStore;
   readonly store: MatchStore;
   readonly ctx: Ctx;
+  /**
+   * Every mode's card index, built once at boot and shared with the hub.
+   *
+   * Kept on the server as well as inside the hub because the replay path needs it:
+   * `Room.restore` has to hand `replay` the same mode→context map the deal used, and
+   * it is reached from the hub rather than from the server field.
+   */
+  readonly modeCards: ModeCards;
+  /** One context per mode, resolved once. The single source of "what is this mode". */
+  readonly modeCtx: Readonly<Record<ModeId, Ctx>>;
   readonly #cfg: {
     port: number;
     host: string;
@@ -250,7 +265,17 @@ export class ShasnServer {
     // set. The hub resolves a mode's context in its own constructor and never
     // re-decides which decks a mode means, so the live deal and the replay rebuild
     // read the same answer from the same map.
-    this.modeCards = cfg.modeCards ?? loadModeCards();
+    //
+    // The default depends on whether `ctx` was INJECTED, and this is load-bearing
+    // rather than cosmetic. A caller that hands us a `ctx` is saying "this server
+    // plays exactly these cards" — usually a test with a synthetic corpus. Loading
+    // the real corpus for the modes anyway would make the DEAL read the real cards
+    // while everything else read the injected ones, and every game would diverge
+    // from the fixture that set it up. So an injected ctx implies every mode is
+    // backed by that ctx's cards, and a caller who genuinely wants modes to differ
+    // under an injected ctx says so by passing `modeCards` explicitly.
+    this.modeCards = cfg.modeCards ?? (cfg.ctx === undefined ? loadModeCards() : uniformModeCards(cfg.ctx.cards));
+    this.modeCtx = ctxsForModes(this.ctx.rules, this.modeCards);
     this.hub = new LobbyHub(this.ctx, this.store, now, this.modeCards);
     this.sessions = new SessionStore(now);
     this.#cfg = {

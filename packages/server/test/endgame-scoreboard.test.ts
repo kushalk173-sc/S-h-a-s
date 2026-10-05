@@ -456,7 +456,7 @@ describe('the ending survives the wire, with a spectator watching', () => {
 
     const host = await TestClient.connect(harness.url);
     clients.push(host);
-    host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: n as 2, isPrivate: false });
+    host.send({ t: 'lobby:create', name: 'Ada', maxPlayers: n as 2, isPrivate: false, mode: 'standard' });
     const created = await host.expect(host.is('lobby:state'), 'the lobby');
     const lobbyId = created.lobby.lobbyId;
 
