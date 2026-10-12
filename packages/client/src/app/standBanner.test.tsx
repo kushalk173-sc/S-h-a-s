@@ -488,7 +488,7 @@ describe('an affordable Voter Card is never a dead button', () => {
       />,
     );
     const text = screen.getByTestId('market-card').textContent ?? '';
-    expect(text).toContain('1 F (waived)');
+    expect(text).toContain('1 Funds (waived)');
     expect(text).toContain('2 T');
     unmount();
   });

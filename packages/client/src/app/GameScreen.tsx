@@ -53,7 +53,7 @@ import { TableQuestion } from './TableQuestion.tsx';
 import { StandBanner } from './StandBanner.tsx';
 import { RefusalLine } from './RefusalLine.tsx';
 import { windowLiveMessage } from './interrupt.ts';
-import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, Scoreboard } from './Panels.tsx';
+import { ErrorToast, HeadlineDialog, LinkDot, LogRail, ReconnectScreen, RulesPanel, Scoreboard } from './Panels.tsx';
 import { GerryBar, PlacementBar } from './BoardBars.tsx';
 import { ResourcePicker } from './ResourcePicker.tsx';
 import { YourMat, MarketPanel } from './YourMat.tsx';
@@ -108,6 +108,7 @@ import {
   gerrymanderRefusal,
   gerrySourceRefusal,
   lockedZoneFor,
+  majorityCount,
   marketCharge,
   pegMovePick,
   placementRefusal,
@@ -150,6 +151,12 @@ export function GameScreen({ store }: GameScreenProps) {
   // the board is the default, because a cold load should show the board rather
   // than a wall of numbers.
   const [tab, setTab] = useState<'board' | 'mat' | 'market' | 'log'>('board');
+  // VIEW BOARD on the scoreboard. It was wired to `() => undefined`, so the one
+  // button that offered to show the final board did nothing at all.
+  const [reviewingBoard, setReviewingBoard] = useState(false);
+  // END TURN with voters still on the mat discards them. The first press now asks;
+  // the second press (or the turn changing) settles it.
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   // A new turn clears the local interaction state. Without this, a player who
   // disconnects mid-placement comes back to picks for a group the engine has
@@ -573,6 +580,32 @@ export function GameScreen({ store }: GameScreenProps) {
         return;
       }
 
+      // 3b. CLICKING THE BOARD STARTS A PLACEMENT. Voters waiting on the mat used to
+      //     need a trip to the mat first — find "Voters to place", press the group,
+      //     come back to the board — and a click on a highlighted area before that
+      //     did nothing. Now the click itself picks the first waiting group that can
+      //     legally go there, starts placing it, and makes this the first pick.
+      if (
+        app.placingGroupId === null &&
+        app.gerryZoneId === null &&
+        app.powerTarget === null &&
+        me !== null &&
+        isMyTurn &&
+        state.phase === 'actions' &&
+        me.pending.length > 0
+      ) {
+        const fits = me.pending.find((g) => placementRefusal(state, g, [], areaId) === null);
+        const group = fits ?? me.pending[0];
+        if (group === undefined) return;
+        beginPlacement(group.id);
+        if (fits !== undefined) {
+          addPick(areaId);
+        } else {
+          setRefusal(placementRefusal(state, group, [], areaId) ?? 'those voters cannot go there');
+        }
+        return;
+      }
+
       // 4. A power that targets slots. Deliberately LAST: placement and an owed
       //    choice both outrank a power, because both are commitments the engine is
       //    already blocking on, while a power can always be cancelled.
@@ -737,6 +770,49 @@ export function GameScreen({ store }: GameScreenProps) {
       ? lastAnswerText(state.log, you)
       : null;
 
+  /*
+    BUYING A CARD GOES STRAIGHT TO PLACING IT. A purchase used to leave the voters
+    sitting in the mat's tray, and the player had to find them, press the group, and
+    then find the board — on a phone, by switching tabs. When a NEW group appears on
+    your turn and nothing else is in progress, placement starts with it and the board
+    is brought forward. Only new ids count, so a refresh mid-turn does not grab a group
+    the player had deliberately left.
+  */
+  const seenGroups = useRef<Set<string> | null>(null);
+  const pendingIds = (me?.pending ?? []).map((g) => g.id).join(',');
+  useEffect(() => {
+    const ids = new Set(pendingIds === '' ? [] : pendingIds.split(','));
+    const before = seenGroups.current;
+    seenGroups.current = ids;
+    if (before === null) return;
+    if (!isMyTurn || state === null || state.phase !== 'actions') return;
+    if (app.placingGroupId !== null || app.gerryZoneId !== null || app.powerTarget !== null) return;
+    if (state.choices.some((c) => c.player === you)) return;
+    const fresh = [...ids].find((id) => !before.has(id));
+    if (fresh === undefined) return;
+    beginPlacement(fresh);
+    setTab('board');
+  }, [pendingIds, isMyTurn, state, app.placingGroupId, app.gerryZoneId, app.powerTarget, you]);
+
+  useEffect(() => {
+    setConfirmEnd(false);
+  }, [isMyTurn, pendingIds]);
+
+  // THE TAB TITLE SAYS WHOSE TURN IT IS, so a player who switched to another tab
+  // while an opponent played can see from the tab strip that the table is waiting.
+  useEffect(() => {
+    if (state === null) return;
+    const active = state.players[state.activePlayer]?.name ?? '';
+    document.title = state.finished
+      ? 'Game over — Shasn'
+      : isMyTurn
+        ? '● Your turn — Shasn'
+        : `${active}'s turn — Shasn`;
+    return () => {
+      document.title = 'Shasn';
+    };
+  }, [state, isMyTurn]);
+
   const commitPlacement = useCallback(() => {
     if (me === null || app.placingGroupId === null) return;
     const group = me.pending.find((g) => g.id === app.placingGroupId);
@@ -748,6 +824,24 @@ export function GameScreen({ store }: GameScreenProps) {
     dispatch(actions.placeVoters(group.id, app.pickedAreaIds));
     endPlacement();
   }, [me, app.placingGroupId, app.pickedAreaIds, dispatch]);
+
+  // Enter confirms a complete placement and Escape cancels it, so a placement can
+  // be finished without travelling to the bar at the bottom of the screen.
+  useEffect(() => {
+    if (app.placingGroupId === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t !== null && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (e.key === 'Escape') {
+        endPlacement();
+      } else if (e.key === 'Enter' && (t === null || t.tagName !== 'BUTTON')) {
+        const group = me?.pending.find((g) => g.id === app.placingGroupId);
+        if (group !== undefined && app.pickedAreaIds.length === group.count) commitPlacement();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [app.placingGroupId, app.pickedAreaIds, me, commitPlacement]);
 
   const commitGerry = useCallback(() => {
     if (you === null || state === null || app.gerryZoneId === null) return;
@@ -774,13 +868,13 @@ export function GameScreen({ store }: GameScreenProps) {
   }
 
   // The scoreboard replaces the shell entirely (§5: only Lobby and Scoreboard do).
-  if (state.finished) {
+  if (state.finished && !reviewingBoard) {
     return (
       <Scoreboard
         state={state}
         you={you}
         winners={store.winners}
-        onViewBoard={() => undefined}
+        onViewBoard={() => setReviewingBoard(true)}
         onNewMatch={() => {
           clearTurnInteraction();
           connection().forget();
@@ -797,9 +891,9 @@ export function GameScreen({ store }: GameScreenProps) {
      The powers tray, the market and GERRYMANDER were all disabled by the same
      boolean and all said nothing, so a player watching `Land Grab 3 of 3 left` sit
      there refusing every press had no way to tell "not my turn" from "a card is
-     being answered" from "the connection dropped" � a moment, this instant, and a
+     being answered" from "the connection dropped" — a moment, this instant, and a
      reconnect respectively. That is what item 3's "unlocked, had uses left, and
-     were untappable" turned out to be, and �9.2's rule is that the reason is
+     were untappable" turned out to be, and §9.2's rule is that the reason is
      adjacent to the control.
 
      Ordered so the most transient cause wins: a window open right now is a better
@@ -808,9 +902,9 @@ export function GameScreen({ store }: GameScreenProps) {
      already computed above, so none of it can go stale.
   */
   const inertReason = !isMyTurn
-    ? `Waiting for ${state.players[state.activePlayer]?.name ?? 'the table'} � your powers and the HQ Mat come alive on your turn.`
+    ? `Waiting for ${state.players[state.activePlayer]?.name ?? 'the table'} — your powers and the HQ Mat come alive on your turn.`
     : windowOpen
-      ? 'A card is being answered � answer it or decline first.'
+      ? 'A card is being answered — answer it or decline first.'
       : app.link !== 'live'
         ? 'Not connected to the table yet.'
         : null;
@@ -846,6 +940,9 @@ export function GameScreen({ store }: GameScreenProps) {
       // G13: same reason, different cause — the response window's banner is in the
       // flow above the board, so the reserve has to know about that too.
       data-window={windowOpen ? 'true' : 'false'}
+      // Lets the stylesheet tell "you cannot do this" (your turn, hatched) from
+      // "nothing to do yet" (somebody else's turn, quiet). See `polish.css`.
+      data-turn={isMyTurn ? 'yours' : 'theirs'}
     >
       <TopBar state={state} store={store} you={you} role={role} />
 
@@ -1008,6 +1105,23 @@ export function GameScreen({ store }: GameScreenProps) {
             />
           </div>
 
+          {/* THE KEY TO THE BOARD. Every constituency prints two fractions — `6/11`
+              large and `0/11` small — and nothing said which was which, so the most
+              important number on the board (how many voters a majority takes) read
+              the same as a fill count. */}
+          <p className="board__legend" aria-label="Board key">
+            <span>
+              <b>6/11</b> voters needed for a majority / areas in the constituency
+            </span>
+            <span>
+              <b className="board__legend-small">0/11</b> areas filled
+            </span>
+            <span>
+              <b aria-hidden="true">✳</b> Volatile area — a voter there is permanent and triggers a
+              Headline
+            </span>
+          </p>
+
           {placingGroup !== null && !windowOpen ? (
             <PlacementBar
               state={state}
@@ -1105,7 +1219,7 @@ export function GameScreen({ store }: GameScreenProps) {
                  market panel says nothing at all rather than rendering three dead
                  slots. */
               <section className="panel" aria-label="HQ market">
-                <h2 className="panel__title">HQ MAT · MARKET</h2>
+                <h2 className="panel__title">Voter Cards</h2>
                 <p className="panel__note panel__note--quiet">
                   You are watching. The market is the players&apos; to buy from.
                 </p>
@@ -1143,13 +1257,20 @@ export function GameScreen({ store }: GameScreenProps) {
             />
           </div>
         </div>
-      </div>
 
-      {/* §5.13: the log becomes a bottom sheet / tab below 600px. The attributes are
-          constant and the CSS decides what to do with them — swapping the class in
-          JS meant the desktop and phone rules were reading different elements. */}
-      <div className="tabs" data-tabpanel="log" data-active={tab === 'log'}>
-        <LogRail state={state} />
+        {/* §5.13: the log becomes a tab below 600px. The attributes are constant and
+            the CSS decides what to do with them — swapping the class in JS meant the
+            desktop and phone rules were reading different elements.
+
+            IT IS INSIDE THE BODY GRID NOW. It used to be a 132px strip after the
+            body, so on a desktop it sat below the bottom of the board and below the
+            whole side column: the record of what just happened was the one thing on
+            the page you could only reach by scrolling past everything else. In the
+            grid it is a column of its own on a wide screen and sits under the mat on
+            a narrower one (`polish.css`). */}
+        <div className="tabs shell__logcell" data-tabpanel="log" data-active={tab === 'log'}>
+          <LogRail state={state} />
+        </div>
       </div>
 
       {/* The phone tab bar. `END TURN` is a persistent bar pinned above it,
@@ -1166,7 +1287,14 @@ export function GameScreen({ store }: GameScreenProps) {
             onClick={() => setTab(t)}
             data-testid={`tab-${t}`}
           >
-            {t}
+            {TAB_LABEL[t]}
+            {/* A count on the tab that has something waiting, so a phone player on
+                the board tab can see their mat needs them without opening it. */}
+            {t === 'mat' && isMyTurn && (me?.pending.length ?? 0) > 0 ? (
+              <span className="tabbar__badge" aria-label={`${me?.pending.length} groups to place`}>
+                {me?.pending.length}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -1195,21 +1323,128 @@ export function GameScreen({ store }: GameScreenProps) {
           player's turn, rather than shown dead. */}
       {isMyTurn && state.phase === 'actions' && !windowOpen ? (
         <div className="endturn-dock">
+          {/* THE NEXT STEP, IN ONE SENTENCE. The dock used to say only
+              "0 groups of voters still to place", which is a consequence of the
+              button rather than a guide to the turn — and a new player at the start
+              of the actions phase had nothing on screen telling them that the
+              market is how you get voters. `turnGuide` reads the same state the
+              mat and market render, so it cannot disagree with them. */}
+          <div className="endturn-dock__lead">
+            <p className="endturn-dock__guide" data-testid="turn-guide">
+              {turnGuide(state, you, placingGroup !== null)}
+            </p>
+            {/* THE GUIDE CAN DO THE STEP IT NAMES. Telling a player "choose a group
+                under Voters to place" and leaving them to find it is half a guide. */}
+            {(() => {
+              if (placingGroup !== null || me === null) return null;
+              const first = me.pending[0];
+              if (first !== undefined) {
+                return (
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => {
+                      beginPlacement(first.id);
+                      setTab('board');
+                    }}
+                    data-testid="guide-place"
+                  >
+                    PLACE VOTERS
+                  </button>
+                );
+              }
+              const affordable = state.market.some((slot) =>
+                canAfford(me.resources, marketCharge(state, you as PlayerID, slot, [])),
+              );
+              if (!affordable) {
+                const hint = you === null ? null : tradeHint(state, you);
+                if (hint === null) return null;
+                return (
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => {
+                      openTrade(hint.partner);
+                      setTradeReceive(hint.need);
+                    }}
+                    data-testid="guide-trade"
+                  >
+                    TRADE WITH {(state.players[hint.partner]?.name ?? '').toUpperCase()}
+                  </button>
+                );
+              }
+              return (
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={() => {
+                    setTab('market');
+                    document
+                      .querySelector('[data-testid=market-panel]')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  data-testid="guide-market"
+                >
+                  SHOW VOTER CARDS
+                </button>
+              );
+            })()}
+          </div>
+          <div className="endturn-dock__end">
+            {/* Only when it is true and matters: "0 groups of voters still to place"
+                was printed on every turn, including the turns with nothing to place. */}
+            {placingGroup !== null ? (
+              <p className="endturn-dock__note">Placing voters — finish or cancel that first.</p>
+            ) : (me?.pending.length ?? 0) > 0 ? (
+              <p className="endturn-dock__note">
+                {me?.pending.length} group{me?.pending.length === 1 ? '' : 's'} of voters still to
+                place; ending the turn discards them.
+              </p>
+            ) : null}
+            {confirmEnd ? (
+              <button type="button" className="btn btn--sm" onClick={() => setConfirmEnd(false)}>
+                KEEP PLAYING
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`btn endturn-dock__btn ${confirmEnd ? 'endturn-dock__btn--confirm' : ''}`}
+              onClick={() => {
+                const waiting = (me?.pending ?? []).reduce((n, g) => n + g.count, 0);
+                if (waiting > 0 && !confirmEnd) {
+                  setConfirmEnd(true);
+                  return;
+                }
+                setConfirmEnd(false);
+                dispatch(actions.endTurn());
+              }}
+              disabled={!live}
+              aria-disabled={!live}
+              data-testid="end-turn"
+            >
+              {confirmEnd
+                ? (() => {
+                    const n = (me?.pending ?? []).reduce((sum, g) => sum + g.count, 0);
+                    return `DISCARD ${n} VOTER${n === 1 ? '' : 'S'} & END TURN`;
+                  })()
+                : 'END TURN'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {state.finished && reviewingBoard ? (
+        <div className="endturn-dock endturn-dock--review" data-testid="review-dock">
+          <p className="endturn-dock__guide endturn-dock__guide--plain">
+            The game is over. This is the final board.
+          </p>
           <button
             type="button"
-            className="btn btn--primary btn--wide"
-            onClick={() => dispatch(actions.endTurn())}
-            disabled={!live}
-            aria-disabled={!live}
-            data-testid="end-turn"
+            className="btn endturn-dock__btn"
+            onClick={() => setReviewingBoard(false)}
           >
-            END TURN
+            BACK TO RESULTS
           </button>
-          <p className="endturn-dock__note">
-            {placingGroup !== null
-              ? 'Placing voters — finish or cancel that first.'
-              : `${me?.pending.length ?? 0} group${(me?.pending.length ?? 0) === 1 ? '' : 's'} of voters still to place; anything left is discarded.`}
-          </p>
         </div>
       ) : null}
 
@@ -1445,50 +1680,189 @@ function TopBar({
   role: 'player' | 'spectator';
 }) {
   const app = useApp();
+  const [help, setHelp] = useState(false);
   const me = you === null ? null : state.players[you] ?? null;
+  const active = state.players[state.activePlayer]?.name ?? '—';
+  const yours = you !== null && state.activePlayer === you;
+  // THE PHASE, SAID AS A SENTENCE. This used to print the engine's own word —
+  // `answer`, `actions`, `headlines` — in the corner, which told a player nothing
+  // they could act on. The raw phase stays on `data-phase` for drivers and tests.
+  const status =
+    state.phase === 'finished'
+      ? 'Game over'
+      : state.phase === 'answer'
+        ? yours
+          ? 'Your turn · answer your card'
+          : `${active} is answering`
+        : state.phase === 'headlines'
+          ? 'Headlines are being read'
+          : yours
+            ? 'Your turn'
+            : `${active}'s turn`;
   return (
     <header className="shell__top">
       <span className="shell__wordmark">SHASN</span>
-      <span className="shell__meta">Round {state.round}</span>
-      <span className="shell__meta">TURN {state.turn}</span>
-
-      {/* Turn order as seat-coloured dots, so "whose turn" is a glance. */}
-      <span className="row row--tight" aria-label="Turn order">
-        {state.turnOrder.map((id) => (
-          <span
-            key={id}
-            className={`seat seat--${seatIndex(state.turnOrder, id)}`}
-            style={{ padding: '0 4px', borderLeftWidth: 6 }}
-            title={state.players[id]?.name ?? id}
-          >
-            <span className="seat__name">
-              {id === state.activePlayer ? '● ' : ''}
-              {state.players[id]?.name ?? '—'}
-            </span>
-          </span>
-        ))}
+      <span className="shell__meta shell__round">
+        Round {state.round} · Turn {state.turn}
       </span>
+
+      {/* THE TABLE, in turn order: seat colour, name, and score — the number of
+          majority voters, which is the only thing that wins. The active seat is
+          marked by shape (▶ and a ring) as well as by colour. */}
+      <ol className="players" aria-label="Turn order">
+        {state.turnOrder.map((id) => {
+          const p = state.players[id];
+          const score = majorityCount(state, id);
+          const isActive = id === state.activePlayer;
+          return (
+            <li
+              key={id}
+              className={`player seat--${seatIndex(state.turnOrder, id)}`}
+              data-active={isActive ? 'true' : undefined}
+              data-you={id === you ? 'true' : undefined}
+              title={`${p?.name ?? id}: ${score} majority voter${score === 1 ? '' : 's'}${isActive ? ' · playing now' : ''}`}
+            >
+              <span className="player__name">
+                {isActive ? <span aria-hidden="true">▶ </span> : null}
+                {p?.name ?? '—'}
+                {id === you ? <span className="player__you"> (you)</span> : null}
+              </span>
+              <span className="player__score" aria-label={`${score} majority voters`}>
+                ★ {score}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
 
       <span className="shell__spacer" />
 
+      <span
+        className="shell__status"
+        data-testid="phase-readout"
+        data-phase={state.phase}
+        data-yours={yours ? 'true' : undefined}
+      >
+        {status}
+      </span>
+
       {role === 'spectator' ? (
-        <span className="shell__meta" data-testid="spectator-badge">
+        <span className="shell__meta badge" data-testid="spectator-badge">
           SPECTATING
         </span>
       ) : null}
 
-      <span className="shell__meta">
-        {me === null ? '' : `You: ${me.name.toUpperCase()}`}
-      </span>
+      {me === null ? null : <span className="sr-only">You: {me.name}</span>}
 
       <LinkDot link={app.link} attempts={app.attempts} />
 
-      <span className="shell__meta" data-testid="phase-readout">
-        {state.phase}
-      </span>
+      {/* THE RULES, MID-GAME. They were only reachable from the lobby, so a player
+          who forgot what a power did or how a majority scores had to remember it. */}
+      <button
+        type="button"
+        className="btn btn--sm shell__help"
+        onClick={() => setHelp(true)}
+        aria-haspopup="dialog"
+        data-testid="open-help"
+      >
+        ? How to play
+      </button>
+      {help ? (
+        <div className="scrim" onClick={() => setHelp(false)}>
+          <div
+            className="sheet sheet--wide"
+            role="dialog"
+            aria-modal="true"
+            aria-label="How to play"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setHelp(false);
+            }}
+          >
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <h2 className="sheet__title">How to play</h2>
+              <button type="button" className="btn btn--sm" onClick={() => setHelp(false)} autoFocus>
+                CLOSE
+              </button>
+            </div>
+            <RulesPanel />
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }
+
+/**
+ * THE WAY OUT OF "NOTHING IS AFFORDABLE". When no Voter Card can be bought, find
+ * the card you are closest to, the resources you are missing for it, and an
+ * opponent who holds all of them — so the guide can say who to trade with, and
+ * for what, instead of only that you are stuck.
+ */
+function tradeHint(
+  state: ClientState,
+  you: PlayerID,
+): { readonly partner: PlayerID; readonly need: Partial<Record<Resource, number>>; readonly text: string } | null {
+  const me = state.players[you];
+  if (me === undefined) return null;
+  let best: { need: Partial<Record<Resource, number>>; missing: number } | null = null;
+  for (const slot of state.market) {
+    const cost = marketCharge(state, you, slot, []);
+    const need: Partial<Record<Resource, number>> = {};
+    let missing = 0;
+    for (const r of RESOURCE_ORDER) {
+      const gap = (cost[r] ?? 0) - me.resources[r];
+      if (gap > 0) {
+        need[r] = gap;
+        missing += gap;
+      }
+    }
+    if (missing > 0 && (best === null || missing < best.missing)) best = { need, missing };
+  }
+  if (best === null) return null;
+  const want = best.need;
+  const partner = state.turnOrder.find(
+    (id) =>
+      id !== you &&
+      RESOURCE_ORDER.every((r) => (state.players[id]?.resources[r] ?? 0) >= (want[r] ?? 0)),
+  );
+  if (partner === undefined) return null;
+  const words = RESOURCE_ORDER.filter((r) => (want[r] ?? 0) > 0)
+    .map((r) => `${want[r]} ${r[0]!.toUpperCase()}${r.slice(1)}`)
+    .join(' + ');
+  return {
+    partner,
+    need: want,
+    text: `You are ${words} short of a Voter Card, and ${state.players[partner]?.name ?? 'another player'} holds that. Try a trade.`,
+  };
+}
+
+/**
+ * What to do next on your own turn, as one sentence. Order matters: a placement in
+ * progress beats voters waiting, which beat buying more.
+ */
+function turnGuide(state: ClientState, you: PlayerID | null, placing: boolean): string {
+  if (you === null) return '';
+  const me = state.players[you];
+  if (me === undefined) return '';
+  if (placing) return 'Click the highlighted areas on the board, then press CONFIRM.';
+  const waiting = me.pending.reduce((n, g) => n + g.count, 0);
+  if (waiting > 0) {
+    return `You have ${waiting} voter${waiting === 1 ? '' : 's'} to place — choose a group under Pending voters, then click areas on the board.`;
+  }
+  const affordable = state.market.filter((slot) =>
+    canAfford(me.resources, marketCharge(state, you, slot, [])),
+  ).length;
+  if (affordable > 0) {
+    return `You can afford ${affordable} Voter Card${affordable === 1 ? '' : 's'} on the HQ Mat — buy one to get voters to place.`;
+  }
+  const hint = tradeHint(state, you);
+  if (hint !== null) return hint.text;
+  return 'Nothing on the HQ Mat is affordable and no one holds what you are missing. Use a power if you can, or end your turn.';
+}
+
+/** The phone tab bar's labels — words, capitalised, not the internal tab ids. */
+const TAB_LABEL = { board: 'Board', mat: 'My mat', market: 'Market', log: 'Log' } as const;
 
 function seatIndex(order: readonly string[], id: string): 1 | 2 | 3 | 4 | 5 {
   const i = order.indexOf(id);
@@ -1603,6 +1977,20 @@ function TradeComposer({
   const theyCanGive = canAfford(them.resources, t.receive);
   const valid = giveTotal >= 1 && receiveTotal >= 1 && iCanGive && theyCanGive;
 
+  // NOTHING CHOSEN YET IS NOT AN ERROR. The dialog used to open with a red
+  // "add at least 1 resource to your side · ask for at least 1 resource" before the
+  // player had touched anything — scolding them for the state it put them in.
+  const untouched = giveTotal === 0 && receiveTotal === 0;
+  // An empty side is a step still to take, not a mistake: say the step. Red is kept
+  // for the one thing that is actually wrong — a side that cannot be paid.
+  const nextStep =
+    untouched
+      ? 'Choose what you offer, and what you want in return.'
+      : giveTotal < 1 && iCanGive && theyCanGive
+        ? `Now choose what you give ${them.name} in return.`
+        : receiveTotal < 1 && iCanGive && theyCanGive
+          ? `Now choose what you want from ${them.name}.`
+          : null;
   const problems: string[] = [];
   if (giveTotal < 1) problems.push('add at least 1 resource to your side');
   if (receiveTotal < 1) problems.push('ask for at least 1 resource');
@@ -1611,32 +1999,33 @@ function TradeComposer({
 
   return (
     <div className="scrim">
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Propose a trade">
+      <div className="sheet sheet--trade" role="dialog" aria-modal="true" aria-label="Propose a trade">
         <h2 className="sheet__title">Trade with {them.name}</h2>
         <p className="sheet__body">
-          Any ratio, at least one resource exchanged by both parties. Ideology Cards cannot be
-          traded.
+          Swap any of your resources for any of {them.name}&apos;s — any ratio, at least one each
+          way. <strong>The trade happens the moment you press MAKE TRADE</strong>; there is no
+          accept step, so agree it with {them.name} first. Ideology Cards cannot be traded.
         </p>
 
         <div className="row" style={{ alignItems: 'stretch' }}>
           <div className="col" style={{ flex: 1 }}>
             <span className="field__label">YOU GIVE</span>
-            <DeltaStepper pool={me.resources} value={t.give} onChange={onGive} />
+            <DeltaStepper pool={me.resources} value={t.give} onChange={onGive} holder="you" />
           </div>
           <div className="col" style={{ flex: 1 }}>
             <span className="field__label">YOU GET</span>
-            <DeltaStepper pool={them.resources} value={t.receive} onChange={onReceive} />
+            <DeltaStepper pool={them.resources} value={t.receive} onChange={onReceive} holder={them.name} />
           </div>
         </div>
 
         <p
-          className={`picker__status ${valid ? '' : 'picker__status--short'}`}
+          className={`picker__status ${valid || nextStep !== null ? '' : 'picker__status--short'}`}
           role="status"
           data-testid="trade-status"
         >
           {valid
             ? `${giveTotal} for ${receiveTotal}. Both sides exchange at least one resource.`
-            : problems.join(' · ')}
+            : (nextStep ?? problems.join(' · '))}
         </p>
 
         <div className="row">
@@ -1648,7 +2037,7 @@ function TradeComposer({
             aria-disabled={!valid}
             data-testid="trade-send"
           >
-            SEND OFFER
+            MAKE TRADE
           </button>
           <button type="button" className="btn" onClick={onCancel}>
             CANCEL
@@ -1664,10 +2053,13 @@ function DeltaStepper({
   pool,
   value,
   onChange,
+  holder,
 }: {
   pool: import('@shasn/engine').Pool;
   value: Readonly<Record<string, number>>;
   onChange: (v: Readonly<Record<string, number>>) => void;
+  /** Whose pool this side draws from, for the "holds N" line. */
+  holder: string;
 }) {
   return (
     <div className="picker__grid">
@@ -1687,10 +2079,13 @@ function DeltaStepper({
             </button>
             <span className="stepper__col">
               <ResourceGlyph resource={r} size={14} />
-              <span className="picker__count" style={{ fontSize: '18px' }}>
+              <span className="picker__count stepper__count">
                 {have2}
               </span>
               <span className="picker__name">{r}</span>
+              <span className="stepper__have">
+                {holder === 'you' ? 'you hold' : `${holder} holds`} {have}
+              </span>
             </span>
             <button
               type="button"

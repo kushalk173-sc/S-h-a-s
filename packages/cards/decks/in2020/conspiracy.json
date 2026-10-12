@@ -4,72 +4,72 @@
   "cards": [
     {
       "id": "ct-in2020-001",
-      "source": "original; register per REF 8.2 rule 5 — the India deck's card NAMES use romanised Hindi/Urdu, chosen because the jargon is itself the joke. The effect is the A Grave Inheritance archetype (REF 4.2.1) with the unexpressible conditional removed.",
+      "source": "original; register per REF 8.2 rule 5 — the India deck's card NAMES use romanised Hindi/Urdu, chosen because the jargon is itself the joke. The effect is the A Grave Inheritance archetype (REF 4.2.1) with the unexpressible conditional removed. 2026-10-05: renamed from 'Jumlai Dafaar'.",
       "provenance": "inferred",
-      "name": "Jumlai Dafaar",
+      "name": "Jugaad",
       "text": "Gain 2 resources of your choice. Then get 1 discount on a purchase this turn.",
       "cost": 4,
       "effects": [{ "op": "gain-any", "n": 2 }, { "op": "discount", "n": 1 }]
     },
     {
       "id": "ct-in2020-002",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Chai Aur Files'.",
       "provenance": "inferred",
-      "name": "Chai Aur Files",
+      "name": "Aashirwad",
       "text": "Gain 2 Trust and 1 Funds from the Public Reserve. Then gain 1 voter.",
       "cost": 4,
       "effects": [{ "op": "gain", "res": { "trust": 2, "funds": 1 } }, { "op": "voters", "n": 1 }]
     },
     {
       "id": "ct-in2020-003",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Budget Hai, Patra Nahi'.",
       "provenance": "inferred",
-      "name": "Budget Hai, Patra Nahi",
+      "name": "Hawala",
       "text": "Gain 3 Funds from the Public Reserve, then discard 1 resource of your choice to it.",
       "cost": 5,
       "effects": [{ "op": "gain", "res": { "funds": 3 } }, { "op": "lose-any", "n": 1 }]
     },
     {
       "id": "ct-in2020-004",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Gumasta Nahi, Salaam Nahi'.",
       "provenance": "inferred",
-      "name": "Gumasta Nahi, Salaam Nahi",
+      "name": "Hafta Vasooli",
       "text": "Take 1 resource of your choice from a chosen opponent. Then get 2 discounts on purchases this turn.",
       "cost": 4,
       "effects": [{ "op": "steal-any", "n": 1 }, { "op": "discount", "n": 2 }]
     },
     {
       "id": "ct-in2020-005",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Khel Adhoora Chhodo'.",
       "provenance": "inferred",
-      "name": "Khel Adhoora Chhodo",
+      "name": "Parivartan",
       "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 1 Media and 1 Trust.",
       "cost": 4,
       "effects": [{ "op": "refresh-market" }, { "op": "gain", "res": { "media": 1, "trust": 1 } }]
     },
     {
       "id": "ct-in2020-006",
-      "source": "original; register per REF 8.2 rule 5. The extra-voter branch of the recovered Singularity (REF 4.2.1).",
+      "source": "original; register per REF 8.2 rule 5. The extra-voter branch of the recovered Singularity (REF 4.2.1). 2026-10-05: renamed from 'Baap Rekho'.",
       "provenance": "inferred",
-      "name": "Baap Rekho",
+      "name": "Vote Bank",
       "text": "Gain 2 voters, which you may place in different zones. Then gain 1 resource of your choice.",
       "cost": 5,
       "effects": [{ "op": "voters", "n": 2 }, { "op": "gain-any", "n": 1 }]
     },
     {
       "id": "ct-in2020-007",
-      "source": "original; register per REF 8.2 rule 5. The A Grave Inheritance archetype (REF 4.2.1) reduced to the eviction alone, because the conditional payment and the per-opponent iteration are G2.",
+      "source": "original; register per REF 8.2 rule 5. The A Grave Inheritance archetype (REF 4.2.1) reduced to the eviction alone, because the conditional payment and the per-opponent iteration are G2. 2026-10-05: renamed from 'Sadak Ka Hisab'.",
       "provenance": "inferred",
-      "name": "Sadak Ka Hisab",
+      "name": "Tabadla",
       "text": "Evict 2 voters from the board, and gain 1 resource of your choice from the Public Reserve.",
       "cost": 4,
       "effects": [{ "op": "evict", "n": 2 }, { "op": "gain-any", "n": 1 }]
     },
     {
       "id": "ct-in2020-008",
-      "source": "original; register per REF 8.2 rule 5. Does NOT restate COUGH IT UP (REF 4.1), which SHIPS recovered as hl-in2020-013: `evict` carries target, so its printed eviction is performed, and only its conditional bonus is DROPPED - 'if a player breaks a majority using this action, all other players gain 1 resource of their choice' (G2 - no op reads board state to decide a payout). This card takes only that bonus's JOB, as an unconditional payout.",
+      "source": "original; register per REF 8.2 rule 5. Does NOT restate COUGH IT UP (REF 4.1), which SHIPS recovered as hl-in2020-013: `evict` carries target, so its printed eviction is performed, and only its conditional bonus is DROPPED - 'if a player breaks a majority using this action, all other players gain 1 resource of their choice' (G2 - no op reads board state to decide a payout). This card takes only that bonus's JOB, as an unconditional payout. 2026-10-05: renamed from 'Kharcha Uthao'.",
       "provenance": "inferred",
-      "name": "Kharcha Uthao",
+      "name": "Lifafa",
       "text": "Every opponent gains 1 resource of their choice from the Public Reserve. You then gain 2 Media.",
       "cost": 4,
       "effects": [
@@ -79,28 +79,28 @@
     },
     {
       "id": "ct-in2020-009",
-      "source": "original; register per REF 8.2 rule 5. The QUIET REDRAFTING archetype (ct-et2040-006) reskinned, per REF 8.2 rule 7.",
+      "source": "original; register per REF 8.2 rule 5. The QUIET REDRAFTING archetype (ct-et2040-006) reskinned, per REF 8.2 rule 7. 2026-10-05: renamed from 'Chhoti Si Chori'.",
       "provenance": "inferred",
-      "name": "Chhoti Si Chori",
+      "name": "Cut Money",
       "text": "Take 1 resource of your choice from a chosen opponent. Then get 2 discounts on purchases this turn.",
       "cost": 4,
       "effects": [{ "op": "steal-any", "n": 1 }, { "op": "discount", "n": 2 }]
     },
     {
       "id": "ct-in2020-010",
-      "source": "original; register per REF 8.2 rule 5. The Singularity branch of REF 4.2.1 at a smaller count, so the deck does not hand out 2 free voters every third draw.",
+      "source": "original; register per REF 8.2 rule 5. The Singularity branch of REF 4.2.1 at a smaller count, so the deck does not hand out 2 free voters every third draw. 2026-10-05: renamed from 'Pet Ka Register'.",
       "provenance": "inferred",
-      "name": "Pet Ka Register",
+      "name": "Note Ke Badle Vote",
       "text": "Gain 2 Funds from the Public Reserve. Then gain 2 voters, which you may place in different zones.",
       "cost": 5,
       "effects": [{ "op": "gain", "res": { "funds": 2 } }, { "op": "voters", "n": 2 }]
     },
     {
       "id": "ct-in2020-011",
-      "source": "REF 4.2.2 (scribd 814006944) recovers Jumla verbatim. SHIPS ON ITS FIRST SENTENCE ALONE - 'This is an extra Ideology Card' - put to you at your next turn. DROPPED for NAMED gaps: 'of your choice' is G17; the price an opponent pays is G15's price field; re-filing under another Ideologue is G23. Same archetype as HOLO SAPIENS per REF 4.2.2: one template, two skins, one reduction. Argument in KNOWN-GAPS.md G20.",
+      "source": "REF 4.2.2 (scribd 814006944) recovers Jumla verbatim. SHIPS ON ITS FIRST SENTENCE ALONE - 'This is an extra Ideology Card' - put to you at your next turn. DROPPED for NAMED gaps: 'of your choice' is G17; the price an opponent pays is G15's price field; re-filing under another Ideologue is G23. Same archetype as HOLO SAPIENS per REF 4.2.2: one template, two skins, one reduction. Argument in KNOWN-GAPS.md G20. 2026-10-05: renamed from 'Jumla'.",
       "provenance": "adapted",
-      "name": "Jumla",
-      "text": "This is an extra Ideology Card. You will be put it at the start of your next turn, face down, and you will not be told which one.",
+      "name": "Chhupa Rustam",
+      "text": "This is an extra Ideology Card. You will be given it at the start of your next turn, face down, and you will not be told which one.",
       "cost": 5,
       "effects": [{ "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "you" }]
     }
@@ -108,9 +108,9 @@
 
     {
       "id": "ct-in2020-012",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for CULT-IVATING OBEDIENCE (REF 4.2.2), RULED OUT in KNOWN-GAPS.md 8.3 - and its gap label is wrong twice over: the card itself is the object that is captured, so it is G11 and NOT G20, because no move-card reaches it. A capture also needs the protected majority to SURVIVE it, so it is a persisted per-zone protection plus a transfer, and the engine has no per-zone flag. Same JOB, the half that survives: protection the table can feel. The 'somebody may buy it' half is DROPPED and named.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for CULT-IVATING OBEDIENCE (REF 4.2.2), RULED OUT in KNOWN-GAPS.md 8.3 - and its gap label is wrong twice over: the card itself is the object that is captured, so it is G11 and NOT G20, because no move-card reaches it. A capture also needs the protected majority to SURVIVE it, so it is a persisted per-zone protection plus a transfer, and the engine has no per-zone flag. Same JOB, the half that survives: protection the table can feel. The 'somebody may buy it' half is DROPPED and named. 2026-10-05: renamed from 'The Quiet Room'.",
       "provenance": "inferred",
-      "name": "The Quiet Room",
+      "name": "Nazarbandi",
       "cost": 5,
       "text": "For the rest of this round, no opponent may use an unlocked Ideologue Power.",
       "effects": [
@@ -119,13 +119,59 @@
     },
     {
       "id": "ct-in2020-013",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for CHAI-PAANI, which KNOWN-GAPS.md section 7 rules is NOT A GAP AT ALL: only a re-application clause was recovered ('A second Chai-Paani card can be applied on the same player. The first one will get deactivated'), the base effect was never recovered, and inventing one is forbidden. Same JOB - one protection at a time, the newest replacing the oldest - expressed as a rule with a deadline rather than as persistent state.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for CHAI-PAANI, which KNOWN-GAPS.md section 7 rules is NOT A GAP AT ALL: only a re-application clause was recovered ('A second Chai-Paani card can be applied on the same player. The first one will get deactivated'), the base effect was never recovered, and inventing one is forbidden. Same JOB - one protection at a time, the newest replacing the oldest - expressed as a rule with a deadline rather than as persistent state. 2026-10-05: renamed from 'Second Helping'.",
       "provenance": "inferred",
-      "name": "Second Helping",
-      "cost": 4,
+      "name": "Hukka Paani Band",
+"cost": 4,
       "text": "Until the end of your turn, no opponent receives any resources for answering an Ideology Card - neither the answer's resources nor their passive bonus. Their answer still succeeds.",
       "effects": [
         { "op": "restrict", "kind": "no-income", "value": 0, "target": "each-opponent", "until": "this-turn" }
       ]
-    }  ]
+    },
+    {
+      "id": "ct-in2020-014",
+      "source": "docs/recovered/conspiracy-headline-india.md recovers FOUR PILLARS from the official Memesys PDF (https://drive.usercontent.google.com/download?id=1shn3HEGC9QXwuYEIU29Y4KpViSjhGem_&export=download), rules text read verbatim from the pdftotext layer: 'This is a Four Pillars card. Get any 4 resources of your choice. OR Collect and use 3 Four Pillars cards to select a 6/11 zone and convert all its voters into yours.' SHIPS THE FIRST BRANCH ALONE, and 'of your choice' IS performed - `gain-any` is not a flat grant, it raises the denomination decision. DROPPED, named: the OR-branch, which is a SET COLLECTION - 'collect and use 3' copies to make one action - and a set-collection op does not exist, which is the same gap that took SINGULARITY's second branch (ct-et2040-003, KNOWN-GAPS G6); and the immunity rider 'Four Pillars x3 cannot be affected by Reverse/Ditto/Deflect/Block', which is a property of a three-card stack that never forms here. A Conspiracy Card also needs a `cost` the recovered text does not print, which is the standing reason a card that drops nothing is still `adapted` rather than `verbatim` (cf. ct-et2040-017).",
+      "provenance": "adapted",
+      "name": "Maal-Paani",
+      "cost": 4,
+      "text": "Take 4 resources of your choice from the Public Reserve. The printed card's other half - three copies played together to seize a 6/11 constituency and convert every voter in it - is not performed here, and neither is the immunity those three copies carry.",
+      "effects": [{ "op": "gain-any", "n": 4 }]
+    },
+    {
+      "id": "ct-in2020-015",
+      "source": "docs/recovered/conspiracy-headline-india.md recovers BHARAT JODO YATRA verbatim from the official Memesys PDF: 'At the end of your turn, evict 5 voters and place them on any opponent's Player Mats. They may place those voters anywhere in their turn.' SHIPS THE MAIN VERB AND IT IS THE PRINTED VERB - `evict 5` with no `target`, which is the board-wide reading reduce.ts already performs (the second clause of ct-et2040-001), and the bullets' '5 majority or non-majority voters belonging to any player' is exactly what an untargeted eviction reaches. DROPPED, three, all one mechanism: 'place them on any opponent's Player Mats' is a HANDOFF, and every voter op in the union resolves to a pool, to the caster's own Mat, or to the discard - nothing carries a peg to ANOTHER player and holds it there, which is the same missing referent that ruled out ON THE \"HIGH\" SEAS and its hostage; 'They may place those voters anywhere in their turn' is that same peg waiting on somebody else's turn, a queue no op has; 'at the end of your turn' is a between-turns anchor `installLiveEffects` has no queue for. WITHOUT THE HANDOFF THE EVICTION IS STRICTLY SMALLER THAN PRINTED - the voters come back to their own owners rather than becoming an opponent's problem - so the card says so on its face.",
+      "provenance": "adapted",
+      "name": "Resort Politics",
+      "cost": 5,
+      "text": "Evict 5 voters from the board - majority or non-majority, belonging to anybody at the table. Each goes back to its owner's Mat, where it can be influenced again. The printed card instead lays them on an opponent's Player Mat for that opponent to place on their own turn; that handover is not performed here.",
+      "effects": [{ "op": "evict", "n": 5 }]
+    },
+    {
+      "id": "ct-in2020-016",
+      "source": "docs/recovered/conspiracy-headline-india.md recovers SHOW ME YOUR DOCUMENTS verbatim from the official Memesys PDF: 'Discard a voter in up to 4 zones where you have Gerrymandering Rights', with the author's own gloss 'You can discard a majority or a non-majority voter in up to 4 zones where you have Gerrymandering Rights.' SHIPS THE DISCARD - `discard-voter 4` with `target:'you'`, so all four are your own and they leave the board permanently, which is the printed verb. DROPPED, two, and BOTH make this card WIDER, so both are named here and on the card's face: 'in up to 4 ZONES' is a per-constituency SPREAD, and G16's zone selector offers only 'this-zone', 'your-strongest' and 'chosen-zone' - ONE of them, per effect list - so all four voters may come out of a single constituency; and 'where you have Gerrymandering Rights' is a READ of p16's per-zone rights used to GATE a target, which nothing in the union does. `per:{of:'your-gerrymander-rights'}` is the closest vocabulary and it is not this: it COUNTS moves still available and never says where a peg may be struck, so the four may come from anywhere you hold a voter. Neither `voter-shortfall` nor any `restrict` kind states a placement ban either.",
+      "provenance": "adapted",
+      "name": "Balidaan",
+      "cost": 4,
+      "text": "Discard 4 of your own voters from the board, permanently - they leave the game and nothing brings them back. Voters in Volatile Areas cannot be discarded. The printed card allows only 1 per constituency and only in up to 4 constituencies where you hold Gerrymandering Rights; here all 4 may come out of one place.",
+      "effects": [{ "op": "discard-voter", "n": 4, "target": "you" }]
+    },
+    {
+      "id": "ct-in2020-017",
+      "source": "docs/recovered/conspiracy-headline-india.md recovers NAYI SOCH verbatim from the official Memesys PDF: 'The next 3 voters you Gerrymander will get discarded instantly', with the bullet 'Mark a voter discarded this way by placing it on this card.' THIS IS THE SAME CARD AS MOVEMENT ANXIETY DISORDER (hl-et2040-015) under its own India name, and the reduction is field-for-field that card's single clause. That is a deliberate re-file and not drift: SOURCES.md section 4 says in so many words to dedupe by EFFECT, not by name, the three names already filed that way (SUBMERGED, SNOOP B-O-DOUBLE-T, CARD GAMES) all say so on their own faces, and if a table drawing the same tax twice is ever judged a balance problem the fix is to retire one NAME rather than to change either reduction. DROPPED, named, and identical on hl-et2040-015: 'the next 3' ships as the next ONE, because ending the rule 'when 3 voters have been discarded' is a COUNTER ON THE CARD - G10's `GameState.counters`, an `add-tokens` op and a `when:'tokens-reach'` trigger - and no engine state can enforce it; 'Mark a voter discarded this way by placing it on this card' is that same counter with a printed face; and 'instantly' is an ordering claim between the gerrymander and the discard that no clock in `state.ts` can observe. THE TRIGGER IS PERFORMED (G14 + G22): the hook fires on `on-gerrymander`, `movedMyVoter` IS 'a voter of yours is Gerrymandered', and `until:'next-turn'` bounds the lifetime the way `durationExpiry` and `expireRestrictions` were built to.",
+      "provenance": "adapted",
+      "name": "Daav Ulta Pada",
+      "cost": 4,
+      "text": "Before the end of your next turn, the next time one of your own voters is Gerrymandered, you must discard 1 voter of your own from the board. Voters in Volatile Areas cannot be discarded. The printed card counts three of these and marks each one by placing it on the card; the count is not enforced here.",
+      "effects": [
+        {
+          "op": "discard-voter",
+          "n": 1,
+          "target": "you",
+          "when": "on-gerrymander",
+          "until": "next-turn",
+          "condition": { "movedMyVoter": true }
+        }
+      ]
+    }
+  ]
 }

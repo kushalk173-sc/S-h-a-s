@@ -198,6 +198,31 @@ export function ResourcePicker({
    * point: the player learns this widget once (§5.4's reasoning applied to
    * choices), so `nested` must not change a single thing inside it.
    */
+  /*
+    PICK FOR ME. Paying "any 4" or discarding down to the cap is usually a chore,
+    not a decision: you spend what you hold most of. This fills the rest of the
+    choice one resource at a time from whatever you have the most of left, which
+    keeps your pool as balanced as it can be. The player can still adjust it, and
+    nothing is sent until they confirm.
+  */
+  const autoFill = (): void => {
+    const next: Record<string, number> = { ...pick };
+    let left = total - chosen;
+    while (left > 0) {
+      let best: Resource | null = null;
+      for (const r of RESOURCE_ORDER) {
+        const spare = pool[r] - (next[r] ?? 0);
+        if (spare <= 0) continue;
+        if (best === null || spare > pool[best] - (next[best] ?? 0)) best = r;
+      }
+      if (best === null) break;
+      next[best] = (next[best] ?? 0) + 1;
+      left -= 1;
+    }
+    onPick(next);
+  };
+  const canAutoFill = !isGain && chosen < total && held >= total;
+
   const body = (
     <>
       <h2 className="sheet__title">{heading}</h2>
@@ -233,7 +258,7 @@ export function ResourcePicker({
                   {/* A gain has no `want / have` fraction — the numerator is not
                       drawn from the denominator. It states the holding instead, so
                       the cell still answers "what will I end up with". */}
-                  <span className="picker__name"> {isGain ? `· hold ${have}` : `/ ${have}`}</span>
+                  <span className="picker__name"> {isGain ? `· hold ${have}` : `/ ${have} held`}</span>
                 </span>
                 <span className="picker__name">{r}</span>
               </button>
@@ -286,7 +311,13 @@ export function ResourcePicker({
       {/* The status line sits directly above the confirm, because §9.2's rule is
           that the reason is always adjacent to the disabled control. */}
       <p
-        className={`picker__status ${valid ? '' : 'picker__status--short'}`}
+        // Untouched is not wrong: a dialog that opens in red is scolding the player
+        // for the state it put them in. Red is for a choice that cannot be completed.
+        className={`picker__status ${
+          valid || (chosen === 0 && shortText === '' && (isGain || held >= total))
+            ? ''
+            : 'picker__status--short'
+        }`}
         role="status"
         data-testid="picker-status"
       >
@@ -315,6 +346,16 @@ export function ResourcePicker({
         >
           {confirmLabel}
         </button>
+        {canAutoFill ? (
+          <button type="button" className="btn" onClick={autoFill} data-testid="picker-auto">
+            PICK FOR ME
+          </button>
+        ) : null}
+        {chosen > 0 ? (
+          <button type="button" className="btn btn--ghost" onClick={() => onPick({})}>
+            Clear
+          </button>
+        ) : null}
         {onCancel === undefined ? null : (
           <button type="button" className="btn" onClick={onCancel}>
             Cancel

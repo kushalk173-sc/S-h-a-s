@@ -4,7 +4,7 @@
  * Two lines over `Zone.areas`, duplicated for the same reason the geometry is:
  * the engine does not currently compile, and the board needs this to draw the
  * per-zone tally chip and the progress rule. See `./types.ts` for the
- * structural-compatibility note — this takes the mirrored `BoardZone`, so an
+ * structural-compatibility note â€” this takes the mirrored `BoardZone`, so an
  * engine `Zone` is assignable without a cast.
  *
  * `pegsOf` and `slotsFree` (`state.ts:286` and `:294`) are deliberately NOT

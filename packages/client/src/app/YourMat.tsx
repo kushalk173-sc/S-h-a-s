@@ -39,6 +39,7 @@ import {
   marketCharge,
   marketLockout,
   poolTotal,
+  rightsZones,
   freeSlotsIn,
   standOf,
   strandedSentence,
@@ -160,9 +161,9 @@ export function ResourceStrip({
   const caption = reduced
     ? `Held to ${cap} by a card, not ${UI_RULES.resourceCap}`
     : total > cap
-      ? `OVER your cap of ${cap} — discard ${total - cap} down to it`
+      ? `Over your cap of ${cap} — discard ${total - cap} to get back to it`
       : total === cap
-        ? `AT your cap of ${cap} — full; the next resource you take comes back as a discard`
+        ? `At your cap of ${cap} — the next resource you gain comes back as a discard`
         : overSoon
           ? `Over your cap of ${cap} after your next gain — you must discard`
           : `Cap ${cap} combined`;
@@ -512,7 +513,14 @@ export function PowersTray({
   const cells = manifestoCells(p);
   const byIdeologue = new Map(cells.map((c) => [c.ideologue, c]));
 
-  const rows: { id: string; name: string; need: string; unlocked: boolean; uses: number; max: number }[] = [
+  const rows: {
+    id: string;
+    name: string;
+    need: string;
+    unlocked: boolean;
+    uses: number;
+    max: number;
+  }[] = [
     {
       id: 'prospecting',
       name: 'Prospecting',
@@ -578,7 +586,8 @@ export function PowersTray({
           {disabledReason}
         </p>
       ) : null}
-      {rows.map((r) => {
+      {(() => {
+      const renderRow = (r: (typeof rows)[number]) => {
         const left = r.unlocked ? Math.max(0, r.max - r.uses) : 0;
         /*
          * THE LOCKED AND SPENT STATES GET DIFFERENT WORDS, and both are visible
@@ -588,6 +597,8 @@ export function PowersTray({
          * and the tray's own `disabledReason` above covers that case — so a player
          * can always tell "not mine yet" from "not now" from "not ever again".
          */
+        const [ideo, threshold] = r.need.split(' ') as [string, string];
+        const have = byIdeologue.get(ideo.toLowerCase() as ManifestoCell['ideologue'])?.count ?? 0;
         const why = !r.unlocked
           ? `Unlocks at ${r.need}`
           : left <= 0
@@ -598,16 +609,66 @@ export function PowersTray({
             key={r.id}
             type="button"
             className={`btn btn--sm power ${r.unlocked ? '' : 'power--locked'}`}
+            data-spent={r.unlocked && left <= 0 ? 'true' : undefined}
             disabled={disabled || !r.unlocked || left <= 0}
             aria-disabled={disabled || !r.unlocked || left <= 0}
             onClick={() => onPower(r.id)}
             data-testid={`power-${r.id}`}
           >
-            <span>{r.name}</span>
-            <span className="power__uses">{why}</span>
+            <span className="power__head">
+              <span className="power__name">
+                {r.unlocked ? null : <span aria-hidden="true">🔒 </span>}
+                {r.name}
+              </span>
+              <span className="power__uses">
+                {why}
+                {/* Progress toward a locked power, so "Unlocks at Capitalist 5" is a
+                    target with a distance rather than a label. */}
+                {r.unlocked ? null : ` · ${Math.min(have, Number(threshold))}/${threshold}`}
+              </span>
+            </span>
+            {/* WHAT IT DOES. The tray used to be seven names — Prospecting, Payback,
+                Tough Love — and nothing anywhere in the client said what any of them
+                did, so a player could not aim at one or decide to use one. */}
+            <span className="power__desc">{POWER_TEXT[r.id]}</span>
           </button>
         );
-      })}
+      };
+      /*
+        LOCKED POWERS FOLD AWAY. Seven rows, all locked, were the tallest thing on
+        the mat for the whole opening of every game. The powers you HAVE stay in
+        view; the rest sit behind one line that names the closest one to unlock,
+        so the target is still visible without the list.
+      */
+      const unlocked = rows.filter((r) => r.unlocked);
+      const locked = rows.filter((r) => !r.unlocked);
+      const distance = (r: (typeof rows)[number]): number => {
+        const [ideo, threshold] = r.need.split(' ') as [string, string];
+        const have = byIdeologue.get(ideo.toLowerCase() as ManifestoCell['ideologue'])?.count ?? 0;
+        return Number(threshold) - have;
+      };
+      const closest = [...locked].sort((x, y) => distance(x) - distance(y))[0];
+      return (
+        <>
+          {unlocked.length === 0 ? (
+            <p className="panel__note panel__note--quiet">No powers unlocked yet.</p>
+          ) : (
+            unlocked.map(renderRow)
+          )}
+          {locked.length === 0 ? null : (
+            <details className="powers__locked">
+              <summary>
+                {locked.length} locked power{locked.length === 1 ? '' : 's'}
+                {closest === undefined
+                  ? ''
+                  : ` · closest: ${closest.name}, ${distance(closest)} more ${closest.need.split(' ')[0]} card${distance(closest) === 1 ? '' : 's'}`}
+              </summary>
+              <div className="powers">{locked.map(renderRow)}</div>
+            </details>
+          )}
+        </>
+      );
+      })()}
     </div>
   );
 }
@@ -657,6 +718,16 @@ export function MarketStrip({
   const p = state.players[you];
   if (p === undefined) return null;
   return (
+    <>
+    {/* §9.2: the reason the cards are inert is stated next to them — ONCE. It used
+        to be printed inside every card, so a three-card market carried the same
+        four-line red paragraph three times over, in columns ~80px wide, and the
+        thing a player came to read (the price) was the smallest text on the card. */}
+    {disabled && disabledReason !== null ? (
+      <p className="market__inert" data-testid="market-inert">
+        {disabledReason}
+      </p>
+    ) : null}
     <div className="market" data-testid="market">
       {state.market.map((slot, i) => {
         /*
@@ -694,7 +765,7 @@ export function MarketStrip({
           <button
             key={`${slot.cardId}-${i}`}
             type="button"
-            className={`mkt ${unavailable ? 'mkt--unavail' : ''}`}
+            className={`mkt ${unavailable ? 'mkt--unavail' : ''} ${disabled ? 'mkt--idle' : ''}`}
             disabled={unavailable}
             aria-disabled={unavailable}
             onClick={() => onBuy(i)}
@@ -722,7 +793,17 @@ export function MarketStrip({
                  * The `·` separators stay as literal text between the runs for the
                  * same reason: the test splits on them.
                  */
-                const initial = (r: Resource) => r[0]!.toUpperCase();
+                /*
+                 * FULL NAMES NOW, and the parse still holds. The surface printed
+                 * `2 C · 1 M`, and a new player has no way to know C is Clout and
+                 * M is Media. `marketCharge.test.tsx` reads `/^(\d+) ([FCMT])/`
+                 * per ` · `-separated run, which matches the FIRST LETTER of the
+                 * word exactly as it matched the letter, so the printed-equals-
+                 * charged invariant is untouched. The separators survive as text
+                 * (the test splits on them) and are hidden by CSS, which lays the
+                 * runs out one per line.
+                 */
+                const initial = (r: Resource) => RESOURCE_NAME[r];
                 /*
                   THE KEY IS NOT THE RESOURCE, AND THE REASON IS THE TAX.
 
@@ -766,29 +847,25 @@ export function MarketStrip({
                 // The surcharge is a Funds tax, so it takes the Funds ink — it is
                 // money, and a player reading a price should see which resource
                 // the extra is denominated in before they read how much.
-                if (tax > 0) runs.push({ key: 'tax-funds', res: 'funds', text: `+${tax} F tax` });
+                if (tax > 0) runs.push({ key: 'tax-funds', res: 'funds', text: `+${tax} Funds tax` });
                 if (runs.length === 0) return 'free';
                 return runs.map((run, i) => (
-                  <span key={run.key}>
-                    {i > 0 ? ' · ' : null}
+                  <span key={run.key} className="cost__run">
+                    {i > 0 ? <span className="cost__sep"> · </span> : null}
                     <span className="cost" data-res={run.res}>
-                      <ResourceGlyph resource={run.res} size={12} />
+                      <ResourceGlyph resource={run.res} size={14} />
                       {run.text}
                     </span>
                   </span>
                 ));
               })()}
             </span>
-            <span className="mkt__voters">◈ {slot.voters}</span>
-            {/* §9.2: the reason is stated, next to the control, in a colour
-                that is still readable, so the player can plan around it. The
-                NOT-MY-TURN reason is stated too, for the reason above. */}
-            {disabled && disabledReason !== null ? (
-              <span className="mkt__short" data-testid="market-inert">
-                {disabledReason}
-              </span>
-            ) : null}
+            <span className="mkt__voters">
+              <span className="mkt__voters-n">{slot.voters}</span>{' '}
+              voter{slot.voters === 1 ? '' : 's'}
+            </span>
             {miss.length > 0 ? <span className="mkt__short">{miss.join(' · ')}</span> : null}
+            {!unavailable ? <span className="mkt__buy" aria-hidden="true">BUY</span> : null}
             {stranded ? (
               <span className="mkt__short" data-testid="market-stranded">
                 NO ROOM FOR THESE — they will be discarded
@@ -798,8 +875,28 @@ export function MarketStrip({
         );
       })}
     </div>
+    </>
   );
 }
+
+/** What each Ideologue power does, in one line (rules-reference.md, p29–32). */
+const POWER_TEXT: Readonly<Record<string, string>> = {
+  prospecting: 'Pay 1 resource to take up to 2 of your choice. Once a turn.',
+  'land-grab': 'Send any voter back to its owner, outside Volatile Areas. 3 times a turn.',
+  donations: 'Take 1 resource from another player. Twice a turn.',
+  payback: "Pay 1 resource to discard an opponent's voter. Twice a turn.",
+  'going-viral': '+1 voter on a Voter Card you buy. Twice a turn.',
+  'helping-hands': '1 resource off a Voter or Conspiracy Card. Twice a turn.',
+  'tough-love': "Pay 2 Trust + any 2 to take 2 of an opponent's voters in one zone. Once a turn.",
+};
+
+/** A resource's name as a player reads it on a price. */
+const RESOURCE_NAME: Readonly<Record<Resource, string>> = {
+  funds: 'Funds',
+  clout: 'Clout',
+  media: 'Media',
+  trust: 'Trust',
+};
 
 /** The whole mat, framed or not. Framing is the ONE `SEAL` region at a time. */
 export function YourMat(props: YourMatProps) {
@@ -824,6 +921,7 @@ export function YourMat(props: YourMatProps) {
    * four. `GameScreen` is the only component that holds all of them.
    */
   const inertReason = actionable ? null : props.inertReason;
+  const rightsCount = rightsZones(state, you).length;
 
   return (
     <section
@@ -832,19 +930,22 @@ export function YourMat(props: YourMatProps) {
       data-testid="your-mat"
     >
       <h2 className="panel__title">
-        {showControls ? 'YOUR MAT' : `${me.name.toUpperCase()}'S MAT — READ ONLY`}
+        {showControls ? 'Your mat' : `${me.name}'s mat (read only)`}
       </h2>
 
       <ResourceStrip pool={me.resources} cap={effectiveCap(me)} />
 
-      <h3 className="panel__title" style={{ marginTop: 'var(--sp-3)' }}>
-        MANIFESTO
-      </h3>
+      <h3 className="panel__title mat__h">Manifesto</h3>
+      {/* The three thresholds, said once in words. The pips encode them, but a new
+          player meeting four cells of "+0 MEDIA · NEXT IN 2" had nothing to tell them
+          what a Manifesto is for. */}
+      <p className="mat__hint">
+        Every answer files a card under its Ideologue. Each pair pays +1 of that resource every
+        turn; 3 cards unlock its first power, 5 its second.
+      </p>
       <ManifestoStrip state={state} you={you} />
 
-      <h3 className="panel__title" style={{ marginTop: 'var(--sp-3)' }}>
-        PENDING VOTERS
-      </h3>
+      <h3 className="panel__title mat__h">Voters to place</h3>
       <PendingGroups
         state={state}
         groups={me.pending}
@@ -856,9 +957,7 @@ export function YourMat(props: YourMatProps) {
 
       {showControls ? (
         <>
-          <h3 className="panel__title" style={{ marginTop: 'var(--sp-3)' }}>
-            POWERS
-          </h3>
+          <h3 className="panel__title mat__h">Powers</h3>
           <PowersTray
             state={state}
             you={you}
@@ -869,9 +968,12 @@ export function YourMat(props: YourMatProps) {
 
           {/* §5.7: a trade is with a NAMED person. One button per opponent, and a
               spectator or a solo player gets the reason rather than no buttons. */}
+          <h3 className="panel__title mat__h">Other actions</h3>
           {state.turnOrder.filter((id) => id !== you).length === 0 ? null : (
-            <div className="row" style={{ marginTop: 'var(--sp-2)' }}>
-              <span className="field__label">TRADE</span>
+            <div className="row mat__action">
+              <span className="mat__action-label">
+                <strong>Trade</strong> resources with
+              </span>
               {state.turnOrder
                 .filter((id) => id !== you)
                 .map((id) => (
@@ -910,12 +1012,26 @@ export function YourMat(props: YourMatProps) {
             with GERRYMANDER alone rather than padded with a second way to do
             something already on screen.
           */}
-          <div className="row" style={{ marginTop: 'var(--sp-3)' }}>
+          <div className="row mat__action">
+            <span className="mat__action-label">
+              <strong>Gerrymander</strong> — move one voter, in a constituency where you have the
+              most voters
+              {/* Said BEFORE the press. It used to be a live button that answered
+                  "you hold Gerrymandering Rights in no constituency" after you
+                  pressed it — the rule was only ever discoverable by failing it. */}
+              {rightsCount === 0 ? (
+                <span className="mat__action-why" data-testid="gerry-why">
+                  {' '}
+                  You do not have the most voters anywhere yet.
+                </span>
+              ) : null}
+            </span>
             <button
               type="button"
-              className="btn"
+              className="btn btn--sm"
               onClick={props.onGerry}
-              disabled={!actionable}
+              disabled={!actionable || rightsCount === 0}
+              aria-disabled={!actionable || rightsCount === 0}
               data-testid="enter-gerry"
             >
               GERRYMANDER
@@ -1017,7 +1133,9 @@ export function MarketPanel({
   const lockout = marketLockout(state, you);
   return (
     <section className="panel" aria-label="HQ market" data-testid="market-panel">
-      <h2 className="panel__title">HQ MAT · MARKET</h2>
+      <h2 className="panel__title">
+        Voter Cards <span className="panel__kicker">HQ Mat · buy one to get voters</span>
+      </h2>
       <MarketStrip
         state={state}
         you={you}

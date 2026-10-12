@@ -1289,12 +1289,15 @@ async listen(): Promise<{ port: number; host: string }> {
   #broadcastLobby(lobbyId: string): void {
     const lobby = this.hub.getLobby(lobbyId);
     if (lobby === undefined) return;
-    const view: Lobby = this.hub.lobbyView(lobby, null);
     for (const conn of this.#conns.values()) {
       const rec = conn.session;
       if (rec === null || rec.lobbyId !== lobbyId) continue;
-      // Each viewer gets their own `you` flag; the seat list itself is public.
-      this.#send(conn.socket, { t: 'lobby:state', lobby: { ...view, seats: view.seats } });
+      // Each viewer gets their own `you` flag; the seat list itself is public. This
+      // used to build ONE view with no viewer and send it to everybody, so no seat
+      // was ever marked `(you)` and a player could not tell which row was theirs.
+      const viewer = rec.role === 'spectator' ? null : rec.playerId;
+      const view: Lobby = this.hub.lobbyView(lobby, viewer);
+      this.#send(conn.socket, { t: 'lobby:state', lobby: view });
     }
   }
 

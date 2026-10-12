@@ -98,6 +98,7 @@ function table(): ClientState {
     log: [],
     deckSizes: { ideology: 40, voter: 60, conspiracy: 10, headline: 8 },
     awaitingAnswer: true,
+    zones: [],
   } as unknown as ClientState;
 }
 

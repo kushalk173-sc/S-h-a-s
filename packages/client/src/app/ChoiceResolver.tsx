@@ -212,7 +212,7 @@ So an area-shaped choice gets a scrim variant that does NOT cover the board:
         aria-labelledby="choice-headline"
         data-testid="choice-dialog"
       >
-        <h2 className="eyebrow">A DECISION IS OWED</h2>
+        <h2 className="eyebrow">BEFORE YOU CONTINUE</h2>
         <h3 className="sheet__title" id="choice-headline">
           {headline}
         </h3>

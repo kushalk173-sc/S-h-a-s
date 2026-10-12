@@ -4,9 +4,9 @@
   "cards": [
     {
       "id": "hl-in2020-001",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Bhaag, Koi Nahi Rukega'.",
       "provenance": "inferred",
-      "name": "Bhaag, Koi Nahi Rukega",
+      "name": "Chanda",
       "text": "Every opponent discards 1 resource of their choice to the Public Reserve. You gain 1 Media and 1 Funds.",
       "effects": [
         { "op": "lose-any", "n": 1, "target": "each-opponent" },
@@ -15,33 +15,33 @@
     },
     {
       "id": "hl-in2020-002",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Chai-Paani, Dobara'.",
       "provenance": "inferred",
-      "name": "Chai-Paani, Dobara",
+      "name": "Jan Sampark",
       "text": "Gain 1 voter and 1 resource of your choice.",
       "effects": [{ "op": "voters", "n": 1 }, { "op": "gain-any", "n": 1 }]
     },
     {
       "id": "hl-in2020-003",
-      "source": "original; register per REF 8.2 rule 5. The discard-voters branch of the recovered Ain't No Cure For Love (REF 4.3). NOTE: `text` used to read 'Discard 2 of your OWN voters', which reduce.ts does not do — resolveChoice rejects any area the chooser owns, so `discard-voter` reaches opponents' voters only. Corrected here, and the same correction was applied to hl-et2040-002 and hl-et2040-003.",
+      "source": "original; register per REF 8.2 rule 5. The discard-voters branch of the recovered Ain't No Cure For Love (REF 4.3). NOTE: `text` used to read 'Discard 2 of your OWN voters', which reduce.ts does not do — resolveChoice rejects any area the chooser owns, so `discard-voter` reaches opponents' voters only. Corrected here, and the same correction was applied to hl-et2040-002 and hl-et2040-003. 2026-10-05: renamed from 'Aakhri Pehchaan'.",
       "provenance": "inferred",
-      "name": "Aakhri Pehchaan",
+      "name": "Naam Kat Gaya",
       "text": "You strike 2 of your opponents' voters from the board, permanently. Voters in Volatile Areas cannot be struck, and your own voters cannot be.",
       "effects": [{ "op": "discard-voter", "n": 2 }]
     },
     {
       "id": "hl-in2020-005",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Aadha Kisan, Poora Bazaar'.",
       "provenance": "inferred",
-      "name": "Aadha Kisan, Poora Bazaar",
+      "name": "Muft Ki Revdi",
       "text": "Every opponent gains 2 Funds and 1 Trust from the Public Reserve.",
       "effects": [{ "op": "gain", "res": { "funds": 2, "trust": 1 }, "target": "each-opponent" }]
     },
     {
       "id": "hl-in2020-006",
-      "source": "original; register per REF 8.2 rule 5.",
+      "source": "original; register per REF 8.2 rule 5. 2026-10-05: renamed from 'Chuppi Ke Baad'.",
       "provenance": "inferred",
-      "name": "Chuppi Ke Baad",
+      "name": "Haath Ki Safai",
       "text": "Take 1 resource of your choice from a chosen opponent.",
       "effects": [{ "op": "steal-any", "n": 1 }]
     },
@@ -49,15 +49,15 @@
       "id": "hl-in2020-007",
       "source": "REF 4.1 recovers Khaki Terror; the donation is represented exactly. DROPPED, named: 'You cannot make any purchases until you do so' - the real card's punchline is its four resources sitting ON it until handed over, so the real lock lasts until a LATER donation. NOT G5, which is DONE for the purchase locks: the vocabulary carries the lock but not its LIFETIME, which is G10 and always was (KNOWN-GAPS 2 G5a). CORRECTED: this field previously blamed G5 and claimed 'what remains is a one-turn tax'; both are wrong - no lock and no tax remain, only a plain donation of one of each.",
       "provenance": "adapted",
-      "name": "Khaki Terror",
+      "name": "Notebandi",
       "text": "Donate 1 Funds, 1 Clout, 1 Media and 1 Trust to the Public Reserve. Anything you are not holding is simply not donated.",
       "effects": [{ "op": "lose", "res": { "funds": 1, "clout": 1, "media": 1, "trust": 1 } }]
     },
     {
       "id": "hl-in2020-008",
-      "source": "original; register per REF 8.2 rule 5. The QUIETLY THE CEILING MOVED archetype (hl-et2040-004) reskinned, per REF 8.2 rule 7.",
+      "source": "original; register per REF 8.2 rule 5. The QUIETLY THE CEILING MOVED archetype (hl-et2040-004) reskinned, per REF 8.2 rule 7. 2026-10-05: renamed from 'Bijli Ka Hisaab'.",
       "provenance": "inferred",
-      "name": "Bijli Ka Hisaab",
+      "name": "Rangdaari",
       "text": "Every opponent discards 1 Funds to the Public Reserve. You then gain 2 Clout.",
       "effects": [
         { "op": "lose", "res": { "funds": 1 }, "target": "each-opponent" },
@@ -66,25 +66,25 @@
     },
     {
       "id": "hl-in2020-012",
-      "source": "REF 4.1 recovers STAY IN YOUR LIMITS. G-new unblocked it, not G18: a convert-voter with no target reaches the caster (voterScope returns 'others' when chooser === source), so the conversion is PERFORMED. DROPPED, named: 'every player' (only the resolving player acts) and 'to their left' (any opponent may donate, which is WIDER). Also dropped: 'each player that doesn't break a majority gets 2 resources' — G2, no op reads board state to decide a payout. Refires the inferred GHADI KA AAKHRI GHANTA, itself a reskin of hl-et2040-004.",
+      "source": "REF 4.1 recovers STAY IN YOUR LIMITS. G-new unblocked it, not G18: a convert-voter with no target reaches the caster (voterScope returns 'others' when chooser === source), so the conversion is PERFORMED. DROPPED, named: 'every player' (only the resolving player acts) and 'to their left' (any opponent may donate, which is WIDER). Also dropped: 'each player that doesn't break a majority gets 2 resources' — G2, no op reads board state to decide a payout. Refires the inferred GHADI KA AAKHRI GHANTA, itself a reskin of hl-et2040-004. 2026-10-05: renamed from 'Stay In Your Limits'.",
       "provenance": "adapted",
-      "name": "Stay In Your Limits",
+      "name": "Aaya Ram Gaya Ram",
       "text": "Convert 2 of an opponent's voters into your own. Voters in Volatile Areas cannot be converted. The printed card has EVERY player convert 2 voters of the player to their left, and pays 2 resources to each player who breaks no majority; neither of those is performed here.",
       "effects": [{ "op": "convert-voter", "n": 2 }]
     },
     {
       "id": "hl-in2020-013",
-      "source": "REF 4.1 recovers COUGH IT UP. The eviction is PERFORMED exactly: 'evict' carries target and the case loops resolveTargets, so 'all your opponents' is the faithful reading, and 'evict' is the printed verb — unlike NERO'S GUESTS and JUST BREATHE, this card loses nothing to a move-for-evict approximation. DROPPED, named: the conditional bonus, 'if a player breaks a majority using this action, all other players gain 1 resource of their choice' (G2). Refires the inferred CHHOTI SI KASAM, a steal-and-payout reskin of hl-in2020-006.",
+      "source": "REF 4.1 recovers COUGH IT UP. The eviction is PERFORMED exactly: 'evict' carries target and the case loops resolveTargets, so 'all your opponents' is the faithful reading, and 'evict' is the printed verb — unlike NERO'S GUESTS and JUST BREATHE, this card loses nothing to a move-for-evict approximation. DROPPED, named: the conditional bonus, 'if a player breaks a majority using this action, all other players gain 1 resource of their choice' (G2). Refires the inferred CHHOTI SI KASAM, a steal-and-payout reskin of hl-in2020-006. 2026-10-05: renamed from 'Cough It Up'.",
       "provenance": "adapted",
-      "name": "Cough It Up",
+      "name": "Gherao",
       "text": "Every opponent evicts 1 voter from the board. Evicted voters go back to their owner's Mat, where they can be influenced again. Voters in Volatile Areas cannot be evicted. Nobody is paid for breaking a majority with this card.",
       "effects": [{ "op": "evict", "n": 1, "target": "each-opponent" }]
     },
     {
       "id": "hl-in2020-014",
-      "source": "REF 4.1 recovers GROWING DISSENT, and it is the G9 + G14 card with nothing approximated: the hook fires on on-gerrymander, movedMyVoter IS 'any opponent Gerrymanders your voters', and 'for 1 round' is the round lifetime computed in state.ts. DROPPED, named: 'gained voters are placed immediately' — the engine grants the voter to your Mat and you place it, so the printed card's immediacy is not performed. Refires the inferred PANI KI KAMMI, a reskin of hl-et2040-007.",
+      "source": "REF 4.1 recovers GROWING DISSENT, and it is the G9 + G14 card with nothing approximated: the hook fires on on-gerrymander, movedMyVoter IS 'any opponent Gerrymanders your voters', and 'for 1 round' is the round lifetime computed in state.ts. DROPPED, named: 'gained voters are placed immediately' — the engine grants the voter to your Mat and you place it, so the printed card's immediacy is not performed. Refires the inferred PANI KI KAMMI, a reskin of hl-et2040-007. 2026-10-05: renamed from 'Growing Dissent'.",
       "provenance": "adapted",
-      "name": "Growing Dissent",
+      "name": "Sahanubhuti Lehar",
       "text": "Starting now and for one full round, every time an opponent Gerrymanders one of your voters, you gain 1 voter. The voter goes to your Mat, so you place it yourself rather than on the spot.",
       "effects": [
         {
@@ -98,9 +98,9 @@
     },
     {
       "id": "hl-in2020-015",
-      "source": "REF 4.1 recovers PYTHONPOST; REF 4.3 records SNOOP B-O-DOUBLE-T as the SAME card, so this one name covers both and neither is counted as a second mechanism. G5's surcharge is EXECUTED. WIDER THAN PRINTED: 'every Conspiracy Card that you buy' becomes every purchase, because surchargeFor is one function read by INFLUENCE and BUY_CONSPIRACY and no field says which kind of purchase a restriction prices. The stacking ruling is on Restriction in state.ts. Refires the inferred SARKAR KI CHARCHA.",
+      "source": "REF 4.1 recovers PYTHONPOST; REF 4.3 records SNOOP B-O-DOUBLE-T as the SAME card, so this one name covers both and neither is counted as a second mechanism. G5's surcharge is EXECUTED. WIDER THAN PRINTED: 'every Conspiracy Card that you buy' becomes every purchase, because surchargeFor is one function read by INFLUENCE and BUY_CONSPIRACY and no field says which kind of purchase a restriction prices. The stacking ruling is on Restriction in state.ts. Refires the inferred SARKAR KI CHARCHA. 2026-10-05: renamed from 'Pythonpost'.",
       "provenance": "adapted",
-      "name": "Pythonpost",
+      "name": "Lagaan",
       "text": "For the rest of the game, every purchase you make costs 1 extra Funds — Conspiracy Cards and Voter Cards alike, where the printed card taxed Conspiracy Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it, and two of these stack with each other.",
       "effects": [
         {
@@ -114,9 +114,9 @@
     },
     {
       "id": "hl-in2020-030",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for A CALL FROM KARACHI (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its auction needs `PlayerState.debts`, a CAP RULING on bidding resources you do not hold, negative-resource support in the pool reads, four new Actions and a second window protocol - and its first sentence needs a `reveal` set, a server + client change. Same JOB: it deals Conspiracy Cards off the top of the pile to the whole table, which is the shape a real player's 'draw the top 3' makes at a table.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for A CALL FROM KARACHI (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its auction needs `PlayerState.debts`, a CAP RULING on bidding resources you do not hold, negative-resource support in the pool reads, four new Actions and a second window protocol - and its first sentence needs a `reveal` set, a server + client change. Same JOB: it deals Conspiracy Cards off the top of the pile to the whole table, which is the shape a real player's 'draw the top 3' makes at a table. 2026-10-05: renamed from 'Call from the Editor's Desk'.",
       "provenance": "inferred",
-      "name": "Call from the Editor's Desk",
+      "name": "Mili Bhagat",
       "text": "Every player, including you, receives 1 Conspiracy Card from the draw pile.",
       "effects": [
         {
@@ -128,9 +128,9 @@
     },
     {
       "id": "hl-in2020-031",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for NEXT BILLION DATA POINTS (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its ballot needs a no-self-vote rule and a re-vote-on-tie loop, which is the unbounded-cascade class section 4 refuses ('two opponents who always tie is a table that never finishes'), and its payoff - the next Conspiracy Card handed to a chosen player - is G20 plus G17, so the ballot alone buys nothing. This card does the same JOB: table-wide CONTENTION with a known owner, which is what a vote is for once the machinery is gone.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for NEXT BILLION DATA POINTS (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its ballot needs a no-self-vote rule and a re-vote-on-tie loop, which is the unbounded-cascade class section 4 refuses ('two opponents who always tie is a table that never finishes'), and its payoff - the next Conspiracy Card handed to a chosen player - is G20 plus G17, so the ballot alone buys nothing. This card does the same JOB: table-wide CONTENTION with a known owner, which is what a vote is for once the machinery is gone. 2026-10-05: renamed from 'The People's Vote'.",
       "provenance": "inferred",
-      "name": "The People's Vote",
+      "name": "Kursi Ka Khel",
       "text": "Take 2 resources of your choice from the player who currently holds the most majority voters.",
       "effects": [
         {
@@ -144,8 +144,8 @@
       "id": "hl-in2020-033",
       "source": "REF 4.3 recovers SNOOP B-O-DOUBLE-T: 'For the rest of the game, you have to pay an extra resource for every Conspiracy Card that you buy.' REF 4.3 calls this the SAME card as PYTHONPOST (hl-in2020-015); SOURCES.md 4.5 dispositions it there: the same mechanism under its own recovered name, NOT a second archetype. Beside hl-in2020-015 a table can draw the same tax twice; if that is a balance problem the fix is to retire one NAME, not to change either reduction. WIDER THAN PRINTED: the tax falls on EVERY purchase - `surchargeFor` is read by both INFLUENCE and BUY_CONSPIRACY. DROPPED, none.",
       "provenance": "adapted",
-      "name": "Snoop B-O-Double-T",
-      "text": "For the rest of the game, every purchase you make costs 1 extra Funds - Conspiracy Cards and Voter Cards alike, where the printed card taxed Conspiracy Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it, and it stacks with Pythonpost.",
+      "name": "Chungi",
+      "text": "For the rest of the game, every purchase you make costs 1 extra Funds - Conspiracy Cards and Voter Cards alike, where the printed card taxed Conspiracy Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it, and it stacks with Lagaan.",
       "effects": [
         {
           "op": "restrict",
@@ -158,10 +158,10 @@
     },
     {
       "id": "hl-in2020-032",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for DOSTI BANI RAHE (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its grant must land on SOMEBODY ELSE'S turn, and both installLiveEffects and fireTriggers require fire.actor === le.owner for on-turn-start, so there is no event to hook - a new EffectTrigger member plus a re-derivation of the trigger registry would buy no card. This card does the same JOB, giving OTHER people the benefit, with a lifetime the engine can actually bound.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for DOSTI BANI RAHE (REF 4.1), RULED OUT in KNOWN-GAPS.md 8.3: its grant must land on SOMEBODY ELSE'S turn, and both installLiveEffects and fireTriggers require fire.actor === le.owner for on-turn-start, so there is no event to hook - a new EffectTrigger member plus a re-derivation of the trigger registry would buy no card. This card does the same JOB, giving OTHER people the benefit, with a lifetime the engine can actually bound. 2026-10-05: renamed from 'Open Mic'.",
       "provenance": "inferred",
-      "name": "Open Mic",
-      "text": "Every opponent receives 1 voter, and may use one Helping Hands discount on each purchase until the start of your next turn.",
+      "name": "Mehman Nawazi",
+      "text": "Every opponent receives 1 voter, and gets 1 Helping Hands discount on a purchase until the start of your next turn.",
       "effects": [
         {
           "op": "voters",
@@ -173,6 +173,38 @@
           "n": 1,
           "target": "each-opponent",
           "when": "on-turn-start",
+          "until": "next-turn"
+        }
+      ]
+    },
+    {
+      "id": "hl-in2020-034",
+      "source": "docs/recovered/conspiracy-headline-india.md recovers TOO MUCH FREEDOM verbatim from the official Memesys PDF: 'All Voter Cards cost any 1 extra resource in your next turn', with the bullet 'This applies only to your next turn.' That is TWO of the four tokens of DON'T KISS THE BABIES (hl-et2040-021) and nothing else, so this is filed as a deliberate re-file of that archetype's India half rather than as a second mechanism - SOURCES.md section 4 says to dedupe by EFFECT, and the three names already filed that way each say so on their face. G5's `surcharge` is EXECUTED and `surchargeFor` is one function read by both INFLUENCE and BUY_CONSPIRACY, so the tax is really imposed. WIDER THAN PRINTED, in both directions, and both are named: 'any 1 extra resource' is a surcharge in FUNDS because `surchargeFor` totals a number and adds it to Funds (a card could not choose the denomination - cf. G17's 'of your choice'), and the printed card taxed VOTER Cards only while this reaches EVERY purchase, Conspiracy Cards included, which is `hl-et2040-021`'s own disclosed deviation and is shared rather than fixed. DROPPED, none of the card's own clauses: 'in your next turn' is `target:'you'` with `until:'next-turn'`, and on a `restrict` that field is the DEADLINE OF THE RULE BEING WRITTEN NOW rather than a hook's lifetime - `isScoped` in reduce.ts carves `restrict` out of the scoping test for exactly that reason. Stays `adapted` because the printed scope is widened, not reproduced.",
+      "provenance": "adapted",
+      "name": "Suvidha Shulk",
+      "text": "Every purchase you make until the start of your next turn costs 1 extra Funds on top of its printed cost - Conspiracy Cards and Voter Cards alike, where the printed card taxed Voter Cards only. The surcharge is always Funds; there is no denomination to choose. It stacks on top of a Helping Hands discount rather than being reduced by it.",
+      "effects": [
+        {
+          "op": "restrict",
+          "kind": "surcharge",
+          "value": 1,
+          "target": "you",
+          "until": "next-turn"
+        }
+      ]
+    },
+    {
+      "id": "hl-in2020-035",
+      "source": "docs/recovered/conspiracy-headline-india.md recovers IT RAID verbatim from the official Memesys PDF: 'You will not receive the resources denoted on your next Ideology Card', with the bullet 'You will still receive the Ideology Card and use your Ideologue Powers as usual, including any new Ideologue Power you unlock.' THAT SECOND SENTENCE IS THE ONE THAT HAD TO BE PERFORMED, and it is why this card ships where ON THE \"HIGH\" SEAS could not. G18's `no-income` is read in exactly ONE place - the ANSWER payout in reduce.ts - and there p13's resources and p28's passive bonus are credited together and SUPPRESSED, never refused: the answer still succeeds, still joins `manifesto`, and a newly unlocked Ideologue Power is still the player's. So 'you do not lose the card and you do not lose the power' is true here, not merely asserted. `until:'next-turn'` IS 'your NEXT Ideology Card': `durationExpiry` returns `ownerNextTurn + 1` and `expireRestrictions` keeps a restriction while `expiresTurn > state.turn`, so the rule is live for the whole of the owner's next turn - which is the turn the answer happens on - and gone at the boundary after it. WIDER THAN PRINTED, and named: the printed card withholds only the resources DENOTED on the card, while this withholds the passive bonus too, because both are credited at one consult point and a second one could drift. DROPPED, nothing else; the card has one clause and that clause executes.",
+      "provenance": "adapted",
+      "name": "Chhapemari",
+      "text": "The next Ideology Card you answer pays you nothing: none of the resources it denotes reach your Mat, and neither does your passive bonus, which the printed card leaves alone. The card is still answered as usual - you keep it, any new Ideologue Power it unlocks is yours, and the rule is gone once that turn ends.",
+      "effects": [
+        {
+          "op": "restrict",
+          "kind": "no-income",
+          "value": 0,
+          "target": "you",
           "until": "next-turn"
         }
       ]

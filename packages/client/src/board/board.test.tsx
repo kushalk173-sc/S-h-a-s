@@ -853,7 +853,7 @@ describe('<BoardSvg />', () => {
  * THE ZONE LABEL MUST CLEAR THE INK, NOT THE SLOT'S CENTRE.
  *
  * A defect found by cropping the real render at 4x and reading the pixels:
- * NORTH's tally chip `0/21` had a Volatile rosette drawn straight through it �
+ * NORTH's tally chip `0/21` had a Volatile rosette drawn straight through it —
  * the cog's ring cutting `0/2`, its asterisk sitting on the `1`. The printed
  * fraction is the board's primary information, so a cog through it is an
  * unreadable board, not a cosmetic overlap.

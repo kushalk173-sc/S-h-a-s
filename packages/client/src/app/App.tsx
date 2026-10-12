@@ -30,6 +30,7 @@ import { connection, netState, requestSync, resumeIfHeld, subscribeNetStore } fr
 import { useApp } from './store.ts';
 
 import './app.css';
+import './polish.css';
 
 export function App() {
   const store = useSyncExternalStore(subscribeNetStore, netState, netState);

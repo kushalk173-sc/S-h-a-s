@@ -42,12 +42,19 @@ export type Session = {
   readonly name: string;
 };
 
+/**
+ * The game modes a room can be created in — a mirror of the IDS in
+ * `packages/server/src/modes.ts`, never its registry (the registry names decks, and
+ * the browser must not learn which decks exist). The parity test keeps the two in step.
+ */
+export type ModeId = 'standard' | 'azadi';
+
 // ─────────────────────────── client → server ───────────────────────────
 
 export type ClientMessage =
   | { readonly t: 'ping'; readonly nonce?: string }
   | { readonly t: 'lobby:list' }
-  | { readonly t: 'lobby:create'; readonly name: string; readonly maxPlayers: SeatCount; readonly isPrivate: boolean }
+  | { readonly t: 'lobby:create'; readonly name: string; readonly maxPlayers: SeatCount; readonly isPrivate: boolean; readonly mode: ModeId }
   | { readonly t: 'lobby:join'; readonly lobbyId: LobbyId; readonly name: string }
   | { readonly t: 'lobby:leave' }
   | { readonly t: 'lobby:ready'; readonly ready: boolean }
@@ -151,6 +158,8 @@ export type Lobby = {
   readonly isPrivate: boolean;
   readonly hostId: PlayerID;
   readonly maxPlayers: SeatCount;
+  readonly mode: ModeId;
+  readonly modeLabel: string;
   readonly seats: readonly LobbySeat[];
   readonly matchId: MatchId | null;
 };
@@ -162,4 +171,6 @@ export type LobbySummary = {
   readonly seated: number;
   readonly maxPlayers: SeatCount;
   readonly inProgress: boolean;
+  readonly mode: ModeId;
+  readonly modeLabel: string;
 };

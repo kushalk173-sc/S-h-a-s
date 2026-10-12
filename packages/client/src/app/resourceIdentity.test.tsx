@@ -206,19 +206,20 @@ describe('resource identity — every surface, all seven', () => {
     });
   }
 
-  it('the market price keeps its LETTERS, because a test prices the purchase off them', () => {
+  it('the market price names its resources in full, and the price parse still holds', () => {
     /*
-     * The glyph is an `<svg>` and contributes nothing to `textContent`, so
-     * `marketCharge.test.tsx`'s `/^(\d+) ([FCMT])/` parse of this string is
-     * untouched — and that parse is the invariant that proves the printed price
-     * equals the charged price when Helping Hands waives a denomination and a
-     * surcharge is added. Trading the letter for the full name would break it, so
-     * the letter stays and the glyph was added beside it rather than instead.
+     * The price used to print single letters (`2 C · 1 M`), kept because
+     * `marketCharge.test.tsx` prices the purchase off `/^(\d+) ([FCMT])/`. A new
+     * player cannot know that C is Clout and M is Media, so the price now prints
+     * the word — and the word STARTS WITH the same capital letter, so that parse
+     * reads `2 Clout` exactly as it read `2 C`. The printed-equals-charged
+     * invariant is untouched, and that test still fails if the two diverge.
      *
-     * If someone "tidies" the abbreviation away, this fails and the pricing test
-     * fails with it — which is the correct outcome.
+     * Pinned here so the names cannot quietly become something the parse does not
+     * read (a lower-case word, or an icon alone).
      */
-    expect(yourMatSource).toContain('r[0]!.toUpperCase()');
-    expect(yourMatSource).toContain('`+${tax} F tax`');
+    expect(yourMatSource).toContain('RESOURCE_NAME[r]');
+    expect(yourMatSource).toContain("funds: 'Funds'");
+    expect(yourMatSource).toContain('`+${tax} Funds tax`');
   });
 });

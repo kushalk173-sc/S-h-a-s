@@ -4,9 +4,9 @@
   "cards": [
     {
       "id": "ct-et2040-001",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union — see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the full effect of A Grave Inheritance. The per-opponent iteration and the conditional 'evict 2 voters belonging to every player who FAILS TO PAY' are not expressible in the Effect union — see KNOWN-GAPS.md G2. `text` therefore describes only what `effects` does. 2026-10-05: renamed from 'A Grave Inheritance'.",
       "provenance": "adapted",
-      "name": "A Grave Inheritance",
+      "name": "Hostile Takeover",
       "text": "Take 2 resources of your choice from a chosen opponent. Then evict 2 voters from the board.",
       "cost": 5,
       "effects": [
@@ -22,9 +22,9 @@
     },
     {
       "id": "ct-et2040-002",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' — a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and effect of Eradicating Germs. DROPPED: the mandatory RECURRING obligation ('Discard an open Voter Card every turn' — a per-turn duty on a player, needs PlayerState.obligations, KNOWN-GAPS G3) and the denomination ('any 1 resource denoted on it', which needs the discarded card's cost surfaced as a Choice, G17). An earlier revision said 'gain 1 resource, discard 1 resource', which is not this card; the single resolution is the market refresh plus the resource. 2026-10-05: renamed from 'Eradicating Germs'.",
       "provenance": "adapted",
-      "name": "Eradicating Germs",
+      "name": "Market Correction",
       "text": "Every face-up Voter Card is discarded and replaced with a fresh one. You then gain 1 resource of your choice.",
       "cost": 4,
       "effects": [
@@ -39,9 +39,9 @@
     },
     {
       "id": "ct-et2040-003",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist — see KNOWN-GAPS.md G6.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of Singularity ('Get 2 voters'). The second branch ('Collect and use 3 Singularity cards to permanently unlock any Level 5 Ideologue Power', 4 copies in the deck) is a set-collection op that does not exist — see KNOWN-GAPS.md G6. 2026-10-05: renamed from 'Singularity'.",
       "provenance": "adapted",
-      "name": "Singularity",
+      "name": "Deepfake Rally",
       "text": "Gain 2 voters. They are not from a Voter Card, so you may place them in different zones.",
       "cost": 5,
       "effects": [
@@ -53,9 +53,9 @@
     },
     {
       "id": "ct-et2040-004",
-      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag — see KNOWN-GAPS.md G7.",
+      "source": "REF 4.2.1 (scribd 915391788/2040-Deck-CC) recovers the name and the first branch of The Psychohistorian ('Get 1 voter (not card) and any 2 resources'). The second branch is a hidden three-action combo detector ('Trade resources with an opponent. Break one of their majorities. Play another Conspiracy Card on them') which needs a set-combo op and a secrecy flag — see KNOWN-GAPS.md G7. 2026-10-05: renamed from 'The Psychohistorian'.",
       "provenance": "adapted",
-      "name": "The Psychohistorian",
+      "name": "Predictive Polling",
       "text": "Gain 1 voter and 2 resources of your choice. The voter is not from a Voter Card.",
       "cost": 4,
       "effects": [
@@ -71,9 +71,9 @@
     },
     {
       "id": "ct-et2040-005",
-      "source": "original; register per REF 8.1 (the name puns on the mechanic) and REF 8.2.",
+      "source": "original; register per REF 8.1 (the name puns on the mechanic) and REF 8.2. 2026-10-05: renamed from 'Confidential Annex'.",
       "provenance": "inferred",
-      "name": "Confidential Annex",
+      "name": "Tax Haven",
       "text": "Gain 2 Funds and 1 Trust from the Public Reserve. Then get 2 discounts on purchases this turn.",
       "cost": 4,
       "effects": [
@@ -92,9 +92,9 @@
     },
     {
       "id": "ct-et2040-006",
-      "source": "original; register per REF 8.2. The steal-then-voter shape is the same archetype as the recovered A Grave Inheritance (REF 4.2.1) with the conditional clause removed.",
+      "source": "original; register per REF 8.2. The steal-then-voter shape is the same archetype as the recovered A Grave Inheritance (REF 4.2.1) with the conditional clause removed. 2026-10-05: renamed from 'Quiet Redrafting'.",
       "provenance": "inferred",
-      "name": "Quiet Redrafting",
+      "name": "Data Harvest",
       "text": "Take 1 resource of your choice from a chosen opponent. Then gain 1 voter.",
       "cost": 4,
       "effects": [
@@ -110,9 +110,9 @@
     },
     {
       "id": "ct-et2040-007",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: renamed from 'The Wet Season Argument'.",
       "provenance": "inferred",
-      "name": "The Wet Season Argument",
+      "name": "Rising Tides",
       "text": "Evict 2 voters from the board. Then gain 1 resource of your choice.",
       "cost": 5,
       "effects": [
@@ -128,9 +128,9 @@
     },
     {
       "id": "ct-et2040-008",
-      "source": "original; register per REF 8.2. refresh-market is the only op in the union with no payload; the market is never allowed below RULES.marketSize, so dealing three is always legal (RULES p10).",
+      "source": "original; register per REF 8.2. refresh-market is the only op in the union with no payload; the market is never allowed below RULES.marketSize, so dealing three is always legal (RULES p10). 2026-10-05: renamed from 'Filed Under Normal'.",
       "provenance": "inferred",
-      "name": "Filed Under Normal",
+      "name": "Clearance Sale",
       "text": "Get 1 discount on a purchase this turn. Then discard every face-up Voter Card and deal three fresh ones.",
       "cost": 4,
       "effects": [
@@ -164,9 +164,9 @@
     },
     {
       "id": "ct-et2040-017",
-      "source": "REF 4.2.1 recovers If You Like Pina Colada: 'Double all the resources on your player mat. Your current resource cap still applies.' G4 + G15 landed for exactly this shape: a res of 1 in EACH resource times held-of-each-resource IS a doubling of the mat, and the cap is enforced by the same gain path, which is the card's own second sentence. Still `adapted`, not `verbatim`, only because the recovered text carries an accent the deck's title casing does not. Refires the inferred THE LONG COMMUTE.",
+      "source": "REF 4.2.1 recovers If You Like Pina Colada: 'Double all the resources on your player mat. Your current resource cap still applies.' G4 + G15 landed for exactly this shape: a res of 1 in EACH resource times held-of-each-resource IS a doubling of the mat, and the cap is enforced by the same gain path, which is the card's own second sentence. Still `adapted`, not `verbatim`, only because the recovered text carries an accent the deck's title casing does not. Refires the inferred THE LONG COMMUTE. 2026-10-05: renamed from 'If You Like Pina Colada'.",
       "provenance": "adapted",
-      "name": "If You Like Pina Colada",
+      "name": "Compound Interest",
       "text": "Double every resource on your Mat: you gain one extra Funds, one extra Clout, one extra Media and one extra Trust for each one you are already holding. Your resource cap still applies, so a Mat already at the cap cannot be doubled.",
       "cost": 5,
       "effects": [
@@ -179,10 +179,10 @@
     },
     {
       "id": "ct-et2040-011",
-      "source": "original; register per REF 8.2. Budget Hai Patra Nahi archetype (ct-in2020-003) reskinned: the card spends as much as it takes, so the resource count nets to zero against a cap of 12.",
+      "source": "original; register per REF 8.2. Budget Hai Patra Nahi archetype (ct-in2020-003) reskinned: the card spends as much as it takes, so the resource count nets to zero against a cap of 12. 2026-10-05: renamed from 'Load Shedding, Properly Explained'.",
       "provenance": "inferred",
-      "name": "Load Shedding, Properly Explained",
-      "text": "Pay 2 Funds to the Public Reserve to keep the district dark for one night, then take 2 resources of your choice from it.",
+      "name": "Crypto Swap",
+      "text": "Pay 2 Funds to the Public Reserve, then take 2 resources of your choice from it.",
       "cost": 4,
       "effects": [
         {
@@ -201,7 +201,7 @@
       "id": "ct-et2040-018",
       "source": "REF 4.2.1 recovers SELECTIVE ACCESS MEMORY. A RECONSTRUCTION, so `adapted`: the clause is paraphrased into schema ops, not reproduced word-for-word - cf. ct-et2040-017, also `adapted` with NOTHING dropped. `pick:true` raises one 'choose-card' per card over the recycle list, and 'in ANY ORDER' is that raised m times, each offering what is left. Public by DERIVATION is that set's MEMBERSHIP, not its ORDER: every card there was already logged as 'Played NAME', but a card can leave silently - both take paths remove by index, not an end - which reorders the rest. Refires SERVER SPACE.",
       "provenance": "adapted",
-      "name": "Selective Access Memory",
+      "name": "Dumpster Dive",
       "text": "Pick any Conspiracy Card from the discard pile. It can be in any order from the discard pile.",
       "cost": 4,
       "effects": [
@@ -215,10 +215,10 @@
     },
     {
       "id": "ct-et2040-013",
-      "source": "REF 4.2.1 (scribd 915391788) recovers Holo Sapiens. SHIPS ON ITS FIRST SENTENCE ALONE - 'This is an extra Ideology Card' - put to you at your next turn. Same template as Jumla per REF 4.2.2, so the identical reduction to ct-in2020-011 and the identical omissions: G17, G15's price field, G23, and G12 for expiry-on-purchase. Not counted twice as an archetype. Argument in KNOWN-GAPS.md G20.",
+      "source": "REF 4.2.1 (scribd 915391788) recovers Holo Sapiens. SHIPS ON ITS FIRST SENTENCE ALONE - 'This is an extra Ideology Card' - put to you at your next turn. Same template as Jumla per REF 4.2.2, so the identical reduction to ct-in2020-011 and the identical omissions: G17, G15's price field, G23, and G12 for expiry-on-purchase. Not counted twice as an archetype. Argument in KNOWN-GAPS.md G20. 2026-10-05: renamed from 'Holo Sapiens'.",
       "provenance": "adapted",
-      "name": "Holo Sapiens",
-      "text": "This is an extra Ideology Card. You will be put it at the start of your next turn, face down, and you will not be told which one.",
+      "name": "Blind Box",
+      "text": "This is an extra Ideology Card. You will be given it at the start of your next turn, face down, and you will not be told which one.",
       "cost": 5,
       "effects": [
         {
@@ -276,7 +276,7 @@
       "id": "ct-et2040-016",
       "source": "REF 4.2.1 recovers Cut, Copy, and Paste: 'select 1 of your majorities. Discard all your voters in that zone. If any empty area is left at the start of your next turn, convert all its voters into yours'. G16 landed for the SELECTOR: `zone: chosen-zone` raises a decision, and only when a constituency holds a voter the effect could name, so nobody is frozen by one. DROPPED, named: the second turn (G22); '1 of your MAJORITIES' (the selector offers any constituency holding a voter of yours, the one clause this card is WIDER on); 'all your voters' as a count. G16.",
       "provenance": "adapted",
-      "name": "Cut, Copy, and Paste",
+      "name": "Hard Delete",
       "text": "Select one constituency. Discard 2 of your voters from it -- they leave the board permanently, and voters in Volatile Areas cannot be discarded.",
       "cost": 5,
       "effects": [
@@ -301,9 +301,9 @@
     },
     {
       "id": "ct-et2040-021",
-      "source": "REF 4.3 recovers Thoughts and Prayers: 'Pick a player and get any 2 resources for each of their voters inside a Volatile Area.' G4's read-vs-target SPLIT landed and the card is WHOLE: 'any 2 resources' is `gain-any`, 'for each' is `per`, and 'Pick a player' is `read`, so `target` keeps naming the RECIPIENT and `read` names whose board the multiplier comes off. NOTHING IS DROPPED - and it still ships `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print.",
+      "source": "REF 4.3 recovers Thoughts and Prayers: 'Pick a player and get any 2 resources for each of their voters inside a Volatile Area.' G4's read-vs-target SPLIT landed and the card is WHOLE: 'any 2 resources' is `gain-any`, 'for each' is `per`, and 'Pick a player' is `read`, so `target` keeps naming the RECIPIENT and `read` names whose board the multiplier comes off. NOTHING IS DROPPED - and it still ships `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print. 2026-10-05: renamed from 'Thoughts and Prayers'.",
       "provenance": "adapted",
-      "name": "Thoughts and Prayers",
+      "name": "Disaster Tourism",
       "cost": 5,
       "text": "Pick a player. You receive 2 resources of your choice for each of their voters in a Volatile Area.",
       "effects": [
@@ -312,9 +312,9 @@
     },
     {
       "id": "ct-et2040-022",
-      "source": "REF 4.2.1 recovers DEEP THOUGHTS: 'Select an opponent and use all their Level 3 Ideologue Powers this turn.' PERFORMED: `target:'chosen-player'` raises the choose-player decision for the card's OWN actor, so the donor is NAMED. `until` is ABSENT on purpose - the borrow-power arm defaults to 'this-turn', the printed clause. DROPPED, one: 'You cannot use the same Ideologue Power twice' - a per-power use COUNTER, and a borrowed Restriction carries none (value/remaining 0, read as a yes/no). NARROWED: Level 5 is never borrowed.",
+      "source": "REF 4.2.1 recovers DEEP THOUGHTS: 'Select an opponent and use all their Level 3 Ideologue Powers this turn.' PERFORMED: `target:'chosen-player'` raises the choose-player decision for the card's OWN actor, so the donor is NAMED. `until` is ABSENT on purpose - the borrow-power arm defaults to 'this-turn', the printed clause. DROPPED, one: 'You cannot use the same Ideologue Power twice' - a per-power use COUNTER, and a borrowed Restriction carries none (value/remaining 0, read as a yes/no). NARROWED: Level 5 is never borrowed. 2026-10-05: renamed from 'Deep Thoughts'.",
       "provenance": "adapted",
-      "name": "Deep Thoughts",
+      "name": "Borrowed Brilliance",
       "text": "Choose an opponent. Until the end of this turn, every one of their unlocked Level 3 Ideologue Powers is yours to use as well as your own. The same Ideologue Power cannot be used twice, and a Level 5 Power is never borrowed.",
       "cost": 5,
       "effects": [
@@ -325,7 +325,7 @@
       "id": "ct-et2040-023",
       "source": "REF 4.2.1 recovers LAB-GROWN EARWORM: 'Every time they influence a Voter Card, they will choose and give you 1 of their spent resources.' G14 fires the hook. WIDER THAN PRINTED: the chosen-opponent binding is G1, so the hook fires on ANY influence and YOU name the victim. DROPPED, three: the fixed victim is that G1 binding; 'their SPENT resources' needs a per-turn spend LEDGER on PlayerState, so `steal-any` reads the current pool; the self-discard is a copy COUNTER (G10: `GameState.counters`, `add-tokens`, `when:'tokens-reach'`), so 'there are two such cards' is a deck fact it cannot enforce.",
       "provenance": "adapted",
-      "name": "Lab-Grown Earworm",
+      "name": "Subscription Model",
       "text": "For the rest of the game, every time ANY player influences a Voter Card - your own influences included - you take 1 resource of your choice from a player you name at that moment. The printed card fixes one opponent up front instead, takes only from what they have just spent, and is discarded when a second copy is played.",
       "cost": 5,
       "effects": [
@@ -336,7 +336,7 @@
       "id": "ct-et2040-024",
       "source": "REF 4.2.1 recovers THE GRETA EFFECT: 'Pick up to 2 opponents. They will get 1 less voter on the next 2 Voter Cards that they influence.' PERFORMED: `value:1` is voters lost per card, `owed:2` is the number of CARDS, so `remaining` means something different here than for Khaki Terror's lock. INFLUENCE subtracts it AFTER Going Viral and FLOORS AT ZERO - the purchase still succeeds, because an ILLEGAL influence would freeze the table on a card that cannot be unbought. DROPPED, two: 'up to 2 opponents' and '2 different players' are N TARGETS and `applyEffect` computes ONE target per effect list.",
       "provenance": "adapted",
-      "name": "The Greta Effect",
+      "name": "Shrinkflation",
       "text": "Choose an opponent. On each of the next 2 Voter Cards they influence, they get 1 less voter than it prints. The influence still succeeds - a 1-Voter Card under this pays out nothing at all - and the two are counted one card at a time. The printed card spreads this over 2 opponents at once.",
       "cost": 4,
       "effects": [

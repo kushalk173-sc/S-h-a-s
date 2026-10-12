@@ -17,9 +17,10 @@ import { useEffect, useState } from 'react';
 
 import type { ClientStore, Lobby, SeatCount } from '../net/index.ts';
 
-import { LobbyScreen } from './Panels.tsx';
-import { send } from './session.ts';
+import { ErrorToast, LobbyScreen } from './Panels.tsx';
+import { connection, send } from './session.ts';
 import { useApp, type Link } from './store.ts';
+import { clearError } from '../net/index.ts';
 
 export type LobbyScreenHarnessProps = {
   readonly store: ClientStore;
@@ -45,8 +46,39 @@ export function shouldPollRoomList(lobby: Lobby | null, link: Link): boolean {
   return lobby === null && link === 'live';
 }
 
+/** Where the last name typed is remembered, so a returning player does not retype it. */
+const NAME_KEY = 'shasn:name';
+
+function rememberedName(): string {
+  try {
+    return window.localStorage.getItem(NAME_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** The room id in this page's `?room=` invite link, if there is one. */
+function invitedRoomId(): string | null {
+  try {
+    return new URL(window.location.href).searchParams.get('room');
+  } catch {
+    return null;
+  }
+}
+
 export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
-  const [name, setName] = useState('Player');
+  // The name STARTS EMPTY (or remembered). It used to start as the literal
+  // "Player", so typing a name appended to it and the first player became
+  // "PlayerAlice" — and every unnamed room in the list was called "Player".
+  const [name, setNameState] = useState(rememberedName);
+  const setName = (next: string) => {
+    setNameState(next);
+    try {
+      window.localStorage.setItem(NAME_KEY, next);
+    } catch {
+      /* storage blocked: the name simply is not remembered */
+    }
+  };
   const { lobby } = store;
   const link = useApp().link;
 
@@ -112,6 +144,44 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
 
   const lobbyId = lobby?.lobbyId ?? null;
 
+  // A RESUME THE SERVER NO LONGER HONOURS IS NOT AN ERROR THE PLAYER CAN ACT ON.
+  // It happens on every server restart (matches are in memory) and whenever a held
+  // seat has expired, and it used to surface as `that resume token is not valid ·
+  // RESUME_INVALID` on the landing screen. The token is dropped so it is not asked
+  // again, and the player is told what actually happened, in their words.
+  const [notice, setNotice] = useState<string | null>(null);
+  const errorCode = store.error?.code ?? null;
+  useEffect(() => {
+    if (errorCode !== 'RESUME_INVALID') return;
+    setNotice('Your previous game is no longer running, so you are back in the lobby.');
+    connection().forget();
+  }, [errorCode, store.error?.at]);
+
+  // THE ADDRESS BAR IS THE INVITE. While seated in a room the page's own URL carries
+  // `?room=`, so "share the link" means the link in the address bar as well as the
+  // one on screen; leaving the room takes it back off.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (lobbyId !== null) url.searchParams.set('room', lobbyId);
+      else if (store.lobby === null && url.searchParams.get('room') !== null && invitedGone) {
+        url.searchParams.delete('room');
+      }
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      /* history API unavailable: the on-screen link still works */
+    }
+  });
+
+  const inviteId = invitedRoomId();
+  const invited =
+    lobby === null && inviteId !== null
+      ? (store.lobbies.find((l) => l.lobbyId === inviteId) ?? null)
+      : null;
+  // An invite to a room the server no longer lists is dropped from the URL once the
+  // list has actually arrived, so a stale link does not linger in the address bar.
+  const invitedGone = inviteId !== null && store.lobbies.length > 0 && invited === null;
+
   /**
    * THE HANDOFF FROM "WATCHING A ROOM" TO "WATCHING THE MATCH".
    *
@@ -157,6 +227,7 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
   const canStart = lobby !== null && lobby.seats.length >= 2;
 
   return (
+    <>
     <LobbyScreen
       lobbies={store.lobbies}
       lobby={lobby}
@@ -183,6 +254,16 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
       }}
       onWatchRoom={(id) => send((c) => c.watchRoom(id))}
       spectator={store.session?.role === 'spectator'}
+      invited={invited}
     />
+    {/* THE SERVER'S REFUSALS, SAID. A `lobby:create` the server rejected used to
+        leave the screen exactly as it was — the error reached the store and no
+        lobby component rendered it, so CREATE ROOM looked like a dead button. */}
+    {notice !== null ? (
+      <ErrorToast code="" message={notice} onDismiss={() => setNotice(null)} />
+    ) : store.error !== null && store.error.code !== 'RESUME_INVALID' ? (
+      <ErrorToast code={store.error.code} message={store.error.message} onDismiss={clearError} />
+    ) : null}
+    </>
   );
 }

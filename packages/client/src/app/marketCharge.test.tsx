@@ -239,7 +239,7 @@ describe('the numerals on the card are the numerals the engine charges', () => {
   /**
    * Pull the chargeable numerals back out of the rendered string.
    *
-   * The waivers are annotations, not amounts, and the tax is printed as `+N F tax`
+   * The waivers are annotations, not amounts, and the tax is printed as `+N Funds tax`
    * rather than as a bare number, so both are excluded here and asserted
    * separately. Everything left is a price the player will be charged.
    */
@@ -247,7 +247,7 @@ describe('the numerals on the card are the numerals the engine charges', () => {
     const out: Record<string, number> = {};
     for (const part of text.split('·')) {
       const seg = part.trim();
-      const tax = /^\+(\d+) F tax$/.exec(seg);
+      const tax = /^\+(\d+) Funds tax$/.exec(seg);
       if (tax) {
         out.funds = (out.funds ?? 0) + Number(tax[1]);
         continue;
@@ -302,8 +302,8 @@ describe('the numerals on the card are the numerals the engine charges', () => {
       />,
     );
     const text = screen.getByTestId('market-charge').textContent ?? '';
-    expect(text).toContain('F waived');
-    expect(text).toContain('T waived');
+    expect(text).toContain('Funds waived');
+    expect(text).toContain('Trust waived');
     expect(printedNumbers(text)).toEqual({});
     unmount();
   });
@@ -322,7 +322,7 @@ describe('the numerals on the card are the numerals the engine charges', () => {
     );
     const text = screen.getByTestId('market-charge').textContent ?? '';
     expect(printedNumbers(text)).toEqual({ funds: 2 });
-    expect(text).toContain('2 F (waived)');
+    expect(text).toContain('2 Funds (waived)');
     unmount();
   });
 
@@ -341,7 +341,7 @@ describe('the numerals on the card are the numerals the engine charges', () => {
       />,
     );
     const text = screen.getByTestId('market-charge').textContent ?? '';
-    expect(text).toContain('+2 F tax');
+    expect(text).toContain('+2 Funds tax');
     expect(printedNumbers(text)).toEqual({ funds: 4 });
     unmount();
   });
@@ -421,7 +421,7 @@ describe('the strip is live exactly when the engine would accept', () => {
     const card = screen.getByTestId('market-card');
     expect(card.hasAttribute('disabled')).toBe(true);
     expect(card.textContent).toContain('1 funds short');
-    expect(screen.getByTestId('market-charge').textContent).toContain('+2 F tax');
+    expect(screen.getByTestId('market-charge').textContent).toContain('+2 Funds tax');
     // …and one more Fund and it is live, which is what makes it a plan and not a wall.
     unmount();
     const richer = table({ funds: 2, clout: 2, media: 0, trust: 2 }, [marketSlot], [

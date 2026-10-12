@@ -50,6 +50,8 @@ const ROOM_A: LobbySummary = {
   seated: 1,
   maxPlayers: 3,
   inProgress: false,
+  mode: 'standard',
+  modeLabel: 'Shasn',
 };
 const ROOM_B: LobbySummary = {
   lobbyId: 'l_Qk7mR2wXc',
@@ -58,6 +60,8 @@ const ROOM_B: LobbySummary = {
   seated: 3,
   maxPlayers: 3,
   inProgress: false,
+  mode: 'standard',
+  modeLabel: 'Shasn',
 };
 
 function lobby(
@@ -198,6 +202,7 @@ describe('the Headline sheet speaks to the player', () => {
       headlineQueue: [{ areaId: 'north-01' }, { areaId: 'north-02' }],
       activePlayer: 'p1',
       players: { p1: { id: 'p1', name: 'RIA' } },
+      zones: [{ id: 'north', name: 'North', areas: [{ id: 'north-01' }, { id: 'north-02' }] }],
     }) as unknown as ClientState;
 
   it('renders no developer note about the wire view', () => {

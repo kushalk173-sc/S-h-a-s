@@ -60,6 +60,7 @@ export type {
   Lobby,
   LobbySeat,
   LobbySummary,
+  ModeId,
   MatchId,
   SeatCount,
   ServerMessage,

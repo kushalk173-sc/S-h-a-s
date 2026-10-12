@@ -127,7 +127,7 @@ export function PlacementBar(props: PlacementBarProps) {
               }`}
               title={`${z.name}: ${free} free`}
             >
-              {z.name.slice(0, 3)} {free}
+              {zoneInitials(z.name)} {free}
             </span>
           );
         })}
@@ -306,3 +306,17 @@ function areaOf(
 }
 
 export { placementRefusal };
+
+/**
+ * A constituency as compass initials — `North West` → `NW`, `Central` → `C`.
+ *
+ * The strip used to print the first three letters, and six of the nine names start
+ * with `Nor` or `Sou`: the strip read `Nor 11 · Nor 21 · Nor 11`, three different
+ * zones that looked identical. Initials are unique for all nine and fit the cell.
+ */
+export function zoneInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}

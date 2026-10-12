@@ -51,6 +51,9 @@
      Ideologue ink. These three never trade jobs. */
   --seal: #a8341f;
   --seal-deep: #7a2416; /* ASSUMED ≈8.5 — not measured (B.9). */
+  /* SEAL for text on the dark table: `--seal` is ~2.9:1 on --table-900, this is
+     ~7:1. Same hue, for the few red sentences that sit on the table. */
+  --seal-on-table: #e8836f;
 
   /* ── Seats — RENDER fills (UI-SPEC §2.5) ───────────────────────────────
      These are the *identity* colours' parallel render set, NOT the engine's
@@ -60,6 +63,11 @@
   --seat-3: #b87a0c; /* amber    · 3.34 on paper-000 ✅ · ink-900 text 4.66 */
   --seat-4: #5f4b9b; /* violet   · 6.56 on paper-000 ✅ · paper-000 text 6.56 */
   --seat-5: #2b9d78; /* jade     · 3.14 on paper-000 ✅ · ink-900 text 4.95 */
+  /* Seat spines on the DARK table (topbar chips, log). The printed amber is the
+     on-table colour the note below already names; violet is lifted so it clears
+     3:1 against --table-800. The other three seats read on the table as they are. */
+  --seat-3-on-table: #e0a020;
+  --seat-4-on-table: #8b77c9;
 
   /* --seat-3 is a DELIBERATE divergence from the engine.
      `PLAYER_COLOURS[2]` in the engine is the printed amber #E0A020, which
@@ -132,15 +140,15 @@
   --map-well-ring: #c4c4c4; /* printed voter-area dot ring      */
 
   /* ── Typography families (UI-SPEC §3.1) ─────────────────────────────────
-     All three are SIL OFL and self-hostable as WOFF2. The font files are NOT
-     yet vendored (ASSUMED, B.9), so these are the spec's fallback stacks.
-     The fallback is a deliberate, documented state — not a placeholder to
-     be "fixed" by dropping in a webfont without re-checking line-heights
-     (§3.6.2: TYPE_CARD_SCENARIO 1.59 and TYPE_LOG 1.5 are tuned to the
-     display serif's x-height). */
+     All three are SIL OFL and are now VENDORED: `main.tsx` imports the
+     @fontsource packages (Bitter 400/700/800, Inter variable, Roboto Mono
+     500/700), so the first family in each stack is the one that renders. The
+     line-heights (§3.6.2) were re-checked against the rendered fonts on the
+     lobby, answer, table and mat screens when they were switched on. The rest
+     of each stack is the fallback for a font that fails to load. */
   --font-display: Bitter, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
   --font-numeric: 'Roboto Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  --font-ui: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* ── Type scale (UI-SPEC §3.2) ──────────────────────────────────────────
      DOM sizes are the rendered px at the reference display. The three
@@ -200,6 +208,10 @@
   --sp-4: 16px;
   --sp-5: 20px;
   --sp-6: 24px;
+  /* `--sp-7` was used by the answer screen (the question's bottom margin and the
+     commit button's `margin: auto`) and never defined, so both declarations were
+     invalid: the answers crowded the question and COMMIT sat hard left. */
+  --sp-7: 28px;
   --sp-8: 32px;
   --sp-10: 40px;
   --sp-12: 48px;

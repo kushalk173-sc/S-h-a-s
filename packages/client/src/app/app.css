@@ -1205,7 +1205,7 @@
   padding: var(--sp-2) var(--sp-4);
   border-left: 3px solid var(--warn-volatile);
   background: var(--paper-050);
-  color: var(--ink-100);
+  color: var(--ink-900);
   line-height: 1.45;
 }
 

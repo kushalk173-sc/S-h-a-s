@@ -1,0 +1,1569 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   The UI/UX polish pass, loaded AFTER app.css.
+
+   Kept in its own file so the pass is reviewable as one diff: every rule below
+   either styles a component the pass introduced (the lobby cards, the segmented
+   seat-count control, badges, the invite link) or corrects a rule in app.css
+   that a browser walkthrough showed was wrong. Each correction says what it
+   fixes. Tokens only — no new colours.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── shared primitives ───────────────────────────────────────────────────── */
+
+/* A quiet button for secondary actions (LEAVE, REFRESH, the rules toggle), so the
+   primary action on a screen is the only loud one. */
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-700);
+  text-decoration: underline;
+  text-decoration-color: var(--ink-300);
+  text-underline-offset: 3px;
+}
+.btn--ghost:hover:not(:disabled):not([aria-disabled='true']) {
+  background: var(--paper-050);
+  color: var(--ink-900);
+}
+
+/* Small status labels: host, ready, away. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font: var(--type-log-meta);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-300);
+  color: var(--ink-700);
+  background: var(--paper-000);
+  white-space: nowrap;
+}
+.badge--ok {
+  border-color: var(--positive);
+  color: var(--positive);
+}
+.badge--warn {
+  border-color: var(--warn-volatile);
+  color: var(--warn-volatile);
+}
+
+/* A segmented control: one choice of several, visibly one group. */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--paper-400);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--paper-000);
+  align-self: flex-start;
+}
+.seg__btn {
+  font: var(--type-button);
+  min-width: 52px;
+  min-height: 44px;
+  border: 0;
+  border-right: 1px solid var(--paper-300);
+  background: transparent;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+.seg__btn:last-child {
+  border-right: 0;
+}
+.seg__btn:hover {
+  background: var(--paper-050);
+}
+.seg__btn[aria-pressed='true'] {
+  background: var(--ink-900);
+  color: var(--paper-000);
+}
+.seg__btn:focus-visible {
+  outline: 2px solid var(--focus-outer);
+  outline-offset: -4px;
+  box-shadow: inset 0 0 0 4px var(--focus-inner);
+}
+
+/* ── the lobby ───────────────────────────────────────────────────────────── */
+
+.lobby {
+  align-items: center;
+}
+.lobby__sheet {
+  max-width: 880px;
+  gap: var(--sp-5);
+}
+.lobby__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--paper-300);
+}
+.lobby__h1 {
+  font: var(--type-display-xl);
+  letter-spacing: 0.18em;
+}
+.lobby__sub {
+  max-width: 60ch;
+}
+.field--name {
+  font: 600 18px/24px var(--font-ui);
+  min-height: 48px;
+}
+.field::placeholder {
+  color: var(--ink-500);
+  opacity: 1;
+}
+
+.lobby__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+.lobby__card {
+  background: var(--paper-050);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.lobby__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.lobby__card-title {
+  font: var(--type-display-m);
+  color: var(--ink-900);
+  margin: 0;
+}
+.lobby__empty {
+  font: var(--type-tooltip);
+  color: var(--ink-500);
+  margin: 0;
+  padding: var(--sp-4);
+  border: 1px dashed var(--paper-400);
+  border-radius: var(--r-sm);
+  text-align: center;
+}
+
+.rooms,
+.seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.room {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--paper-000);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+}
+.room[data-invited='true'] {
+  border-color: var(--seal);
+  box-shadow: inset 4px 0 0 var(--seal);
+}
+.room__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-right: auto;
+}
+.room__name {
+  font: 700 15px/20px var(--font-ui);
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room__meta {
+  margin-left: 0;
+}
+.room__key {
+  color: var(--ink-500);
+  opacity: 0.85;
+}
+
+.seats .seat {
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--paper-000);
+}
+.seats .seat__name {
+  font: 700 15px/20px var(--font-ui);
+}
+.seat--empty .seat__name {
+  color: var(--ink-500);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.lobby__invite {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-md);
+  background: var(--paper-000);
+}
+.lobby__invite--hero {
+  align-items: center;
+  justify-content: space-between;
+  border: 2px solid var(--seal);
+}
+.lobby__invite-title {
+  font: var(--type-display-m);
+  margin: 0;
+}
+.lobby__invite-body {
+  flex: 1;
+  min-width: 0;
+}
+.field--link {
+  font: var(--type-log-meta);
+  font-size: 13px;
+  color: var(--ink-700);
+  background: var(--paper-050);
+}
+.lobby__status {
+  font: 600 15px/22px var(--font-ui);
+  color: var(--ink-900);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--seal);
+  background: var(--paper-050);
+}
+.lobby__actions .btn--primary {
+  min-width: 180px;
+}
+.lobby__rules-toggle {
+  align-self: flex-start;
+}
+
+/* How to play. */
+.rules {
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.rules__h {
+  font: var(--type-display-m);
+  font-size: 16px;
+  margin: var(--sp-2) 0 0;
+}
+.rules__h:first-child {
+  margin-top: 0;
+}
+.rules__steps {
+  margin: 0;
+  padding-left: var(--sp-6);
+  font: var(--type-log);
+  color: var(--ink-700);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.rules__steps strong {
+  color: var(--ink-900);
+}
+.rules__zones {
+  list-style: none;
+  padding: 0;
+  margin: var(--sp-2) 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--sp-1);
+}
+
+@media (max-width: 599px) {
+  .lobby__sheet {
+    padding: var(--sp-4);
+  }
+  .lobby__invite,
+  .lobby__invite--hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .room {
+    flex-wrap: wrap;
+  }
+}
+
+/* `.field` is `width: 100%` with padding and a border, and nothing set its box
+   model, so every text input poked out of its card by 26px. */
+.field {
+  box-sizing: border-box;
+}
+
+/* The toast: a sentence first, its code small beneath, and a way to close it
+   rather than waiting six seconds for it to go. */
+.toast {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: var(--sp-3);
+  align-items: start;
+  padding-right: var(--sp-2);
+}
+.toast__msg {
+  grid-column: 1;
+}
+.toast__code {
+  grid-column: 1;
+}
+.toast__close {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  border: 0;
+  background: transparent;
+  color: var(--ink-700);
+  font: 700 20px/1 var(--font-ui);
+  min-width: 32px;
+  min-height: 32px;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.toast__close:hover {
+  background: var(--paper-200);
+}
+
+/* ── the card, wherever it sits on the dark table ────────────────────────── */
+
+/* THE QUESTION WAS INVISIBLE. `.blind-answer__scenario` and
+   `.resolution__question` are set in `--ink-900`, which is right on paper and is
+   #241c14 on the #141110 table — 1.2:1. The answer screen, the resolution and the
+   table's copy of the card all put the question straight on the table, so the one
+   sentence the game stops for could not be read on any of them. `--table-text` on
+   `--table-900` is 15.13:1. */
+.scrim--answer .blind-answer__scenario,
+.table-question .blind-answer__scenario,
+.resolution__question {
+  color: var(--table-text);
+}
+
+/* The quieter copy on the same dark surface: eyebrows, the commit status line and
+   the redraw note were `--ink-500` (#7a6a52) on #141110, about 3.6:1 and hard to
+   read at 13px. `--paper-400` is the same warm hue, lifted to roughly 9:1. */
+.scrim--answer .eyebrow,
+.scrim--answer .blind-answer__status,
+.scrim--answer .redraw-note,
+.scrim--answer .panel__note,
+.table-question .eyebrow,
+.table-question .panel__note {
+  color: var(--paper-400);
+}
+.scrim--answer .redraw-note__short {
+  color: var(--seal-on-table);
+}
+
+/* ── the top bar ─────────────────────────────────────────────────────────── */
+
+.shell__top {
+  gap: var(--sp-3);
+  position: sticky;
+  top: 0;
+  z-index: 12;
+}
+.shell__round {
+  color: var(--paper-400);
+}
+.players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+/* A player chip: a 4px seat-colour spine on the dark table (the `.seat--n` rule
+   supplies the colour), name, then score. */
+.player {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 3px var(--sp-2) 3px var(--sp-2);
+  border: 1px solid var(--table-600);
+  border-left: 4px solid var(--paper-300);
+  border-radius: var(--r-sm);
+  background: var(--table-800);
+  white-space: nowrap;
+}
+.player.seat--1 { border-left-color: var(--seat-1); }
+.player.seat--2 { border-left-color: var(--seat-2); }
+.player.seat--3 { border-left-color: var(--seat-3-on-table); }
+.player.seat--4 { border-left-color: var(--seat-4-on-table); }
+.player.seat--5 { border-left-color: var(--seat-5); }
+.player[data-active='true'] {
+  background: var(--table-600);
+  border-color: var(--paper-400);
+  box-shadow: 0 0 0 1px var(--paper-400);
+}
+.player__name {
+  font: 600 13px/18px var(--font-ui);
+  color: var(--table-text);
+}
+.player__you {
+  color: var(--paper-400);
+  font-weight: 400;
+}
+.player__score {
+  font: var(--type-log-meta);
+  color: var(--paper-300);
+}
+.shell__status {
+  font: 600 14px/20px var(--font-ui);
+  color: var(--table-text);
+  white-space: nowrap;
+  padding: 4px var(--sp-3);
+  border-radius: 999px;
+  border: 1px solid var(--table-600);
+}
+.shell__status[data-yours='true'] {
+  background: var(--seal);
+  border-color: var(--seal);
+  color: var(--paper-000);
+}
+
+/* ── the card on the table, for every seat that is not answering ─────────── */
+
+/* IT WAS A SECOND ANSWER SCREEN IN THE PAGE FLOW. The table's copy reused the
+   answerer's 40px verdict type for full-sentence answers, so each side wrapped to
+   five huge lines, the card was ~480px tall, and the board started below the fold
+   on a 768px screen for the whole of every opponent's answer. It is now a compact
+   strip: the question on the left, the two answers on the right at reading size.
+   Every rule here targets BOTH sides through the shared class — nothing positional —
+   so the §1.2 symmetry contract (the two sides compute identically) still holds. */
+.table-question {
+  max-width: none;
+  margin: var(--sp-3) var(--sp-3) 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--table-800);
+  border: 1px solid var(--table-600);
+  border-radius: var(--r-md);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  column-gap: var(--sp-5);
+  row-gap: 2px;
+  align-items: start;
+}
+.table-question > .eyebrow {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  line-height: 18px;
+  margin: 0;
+}
+.table-question > p:nth-of-type(2) {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+}
+.table-question .blind-answer__scenario {
+  grid-column: 1;
+  grid-row: 3;
+  font-size: 20px;
+  line-height: 27px;
+  max-width: none;
+  margin: var(--sp-2) 0 0;
+}
+.table-question .blind-answer__panel {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  gap: var(--sp-3);
+}
+.table-question > p:last-child {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  margin-top: var(--sp-2);
+}
+.table-question .blind-answer__side {
+  min-height: 0;
+  padding: var(--sp-3) var(--sp-4);
+  justify-content: flex-start;
+}
+.table-question .blind-answer__label {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+  max-width: none;
+}
+.table-question .blind-answer__faction {
+  font-size: 11px;
+  line-height: 14px;
+}
+.table-question .blind-answer__payout {
+  font-size: 14px;
+  line-height: 19px;
+}
+@media (max-width: 899px) {
+  .table-question {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .table-question .blind-answer__panel {
+    grid-column: 1;
+    grid-row: 4;
+    margin-top: var(--sp-2);
+  }
+  .table-question > p:last-child {
+    grid-row: 5;
+  }
+}
+
+/* ── the game layout ─────────────────────────────────────────────────────── */
+
+/* BOARD | SIDE, with the log under the side column, and from 1440px a third column
+   for the log. The board column is STICKY rather than the side column: the side
+   (market, mat, powers) is the long thing a player scrolls through, and the board
+   is what they need to keep in view while they do. It used to be the other way
+   round — a sticky side column with its own scrollbar nested inside the page's —
+   and at 1024px the side column was squeezed to ~260px, which wrapped every market
+   card into a narrow tower of red text. */
+@media (min-width: 900px) {
+  .shell__body {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+    grid-template-areas:
+      'board side'
+      'board log';
+    grid-template-rows: auto 1fr;
+    column-gap: var(--sp-4);
+    row-gap: var(--sp-3);
+    align-items: start;
+  }
+  .shell__board {
+    grid-area: board;
+    position: sticky;
+    top: 68px;
+  }
+  .shell__side {
+    grid-area: side;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .shell__logcell {
+    grid-area: log;
+    min-width: 0;
+  }
+}
+@media (min-width: 1440px) {
+  .shell__body {
+    grid-template-columns: minmax(0, 1fr) 440px 320px;
+    grid-template-areas: 'board side log';
+    grid-template-rows: auto;
+  }
+  .shell__logcell {
+    position: sticky;
+    top: 68px;
+  }
+  .shell__logcell .shell__log {
+    max-height: calc(100vh - 160px);
+  }
+}
+
+/* The log as a panel on the table rather than a strip at the page's foot. */
+.shell__log {
+  height: auto;
+  max-height: 340px;
+  border: 1px solid var(--table-600);
+  border-radius: var(--r-md);
+  background: var(--table-800);
+  padding: var(--sp-3);
+}
+.shell__log-title {
+  font: var(--type-button-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-300);
+  margin: 0 0 var(--sp-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.shell__log-hint {
+  font: var(--type-log-meta);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--paper-500);
+}
+.shell__log .panel__note--quiet {
+  color: var(--paper-400);
+}
+.log {
+  gap: var(--sp-2);
+}
+.log__row {
+  flex-direction: column;
+  gap: 0;
+  padding: 2px 0 2px var(--sp-2);
+}
+.log__row:first-child .log__text {
+  color: var(--paper-000);
+  font-weight: 600;
+}
+.log__meta {
+  color: var(--paper-500);
+}
+.log__row[data-seat='3'] { border-left-color: var(--seat-3-on-table); }
+.log__row[data-seat='4'] { border-left-color: var(--seat-4-on-table); }
+
+/* ── the HQ Mat market ───────────────────────────────────────────────────── */
+
+.market__inert {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--paper-050);
+  border-left: 3px solid var(--ink-300);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+.mkt {
+  min-height: 132px;
+  padding: var(--sp-3);
+  gap: var(--sp-2);
+  background: var(--paper-000);
+  border: 1px solid var(--paper-400);
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--dur-90) var(--ease-board), transform var(--dur-90) var(--ease-board);
+}
+.mkt:not(:disabled):hover {
+  border-color: var(--seal);
+  transform: translateY(-1px);
+}
+/* The card reads top-down as "what you get, what it costs": voters first. */
+.mkt__voters {
+  order: -1;
+  margin-top: 0;
+  font: 600 13px/18px var(--font-ui);
+  color: var(--ink-700);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.mkt__voters-n {
+  font: var(--type-resource-num);
+  color: var(--ink-900);
+}
+.mkt__cost {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 700 14px/20px var(--font-ui);
+}
+.cost__sep {
+  display: none;
+}
+.cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-bottom: 0;
+  color: var(--res-ink, var(--ink-700));
+}
+.mkt__short {
+  font: 600 12px/16px var(--font-ui);
+  margin-top: auto;
+}
+.mkt__buy {
+  margin-top: auto;
+  align-self: stretch;
+  text-align: center;
+  font: var(--type-button-sm);
+  color: var(--paper-000);
+  background: var(--seal);
+  border-radius: var(--r-sm);
+  padding: 4px 0;
+}
+/* Unaffordable on YOUR turn keeps the hatch: it is the one state you can act on
+   by getting resources. Inert because it is somebody else's turn is a calm card
+   with no hatch — the market is not "broken", it is waiting — and the one note
+   above the cards says why. */
+.mkt--idle,
+.mkt--idle.mkt--unavail {
+  background-color: var(--paper-050);
+  background-image: none;
+  box-shadow: none;
+  opacity: 0.85;
+}
+.mkt--idle .mkt__short {
+  color: var(--ink-500);
+}
+@media (max-width: 420px) {
+  .market {
+    grid-template-columns: 1fr;
+  }
+  .mkt {
+    min-height: 0;
+  }
+}
+.scrim--answer .resolution__payout-label {
+  color: var(--paper-400);
+}
+
+/* ── your mat ────────────────────────────────────────────────────────────── */
+
+.mat__h {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--paper-300);
+}
+.mat__hint {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+  margin: 0 0 var(--sp-2);
+}
+.mat__action {
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  padding: var(--sp-2) 0;
+}
+.mat__action + .mat__action {
+  border-top: 1px dashed var(--paper-300);
+}
+.mat__action-label {
+  font: var(--type-tooltip);
+  color: var(--ink-700);
+  margin-right: auto;
+}
+.mat__action-label strong {
+  color: var(--ink-900);
+}
+
+/* Powers: a name, what it does, and its state. Locked powers are QUIET, not
+   hatched — seven hatched slabs made the mat look broken for the whole opening of
+   every game, when "locked" is simply the normal state of a power you have not
+   earned yet. */
+.powers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.power {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 0;
+}
+.power__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.power__name {
+  font: 700 14px/18px var(--font-ui);
+}
+.power__uses {
+  font: var(--type-log-meta);
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+.power__desc {
+  font: 400 12px/16px var(--font-ui);
+  color: var(--ink-700);
+  text-align: left;
+}
+.power.power--locked,
+.power.power--locked:disabled {
+  background: transparent;
+  background-image: none;
+  border-style: dashed;
+  border-color: var(--paper-400);
+  cursor: default;
+}
+.power.power--locked .power__name,
+.power.power--locked .power__desc {
+  color: var(--ink-500);
+}
+.power:not(.power--locked):not(:disabled) {
+  border-color: var(--seal);
+  background: var(--paper-000);
+}
+.power:not(.power--locked):not(:disabled) .power__uses {
+  color: var(--positive);
+}
+
+/* NOT YOUR TURN IS NOT "BROKEN". Every disabled control on the mat side used the
+   unavailable hatch, so while anybody else played, the whole right-hand column was
+   striped grey. The hatch now means "you cannot do this on your turn" only; while
+   it is somebody else's turn, disabled controls are simply quiet. */
+.shell[data-turn='theirs'] .btn:disabled {
+  background-image: none;
+  background-color: var(--paper-050);
+  border-color: var(--paper-300);
+  color: var(--ink-500);
+}
+
+/* ── the END TURN dock ───────────────────────────────────────────────────── */
+
+/* A slim bar, the next step on the left and END TURN on the right. It was a
+   full-width red slab: the loudest thing on the screen, on every turn, for the
+   one action the spec says must never be the default (§5.4 — ending a turn is a
+   decision). It is now a plain, solid button, and the colour goes to the guide. */
+.endturn-dock {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 2px solid var(--seal);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 35%);
+}
+.endturn-dock__guide {
+  font: 600 15px/21px var(--font-ui);
+  color: var(--paper-000);
+  margin: 0;
+  max-width: 70ch;
+}
+.endturn-dock__guide::before {
+  content: 'YOUR TURN';
+  display: inline-block;
+  font: var(--type-button-sm);
+  letter-spacing: 0.06em;
+  color: var(--paper-000);
+  background: var(--seal);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+  margin-right: var(--sp-2);
+  vertical-align: 1px;
+}
+.endturn-dock__end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: none;
+}
+.endturn-dock__note {
+  max-width: 28ch;
+  text-align: right;
+  font-size: 12px;
+  line-height: 16px;
+}
+.endturn-dock__btn {
+  min-width: 150px;
+  text-align: center;
+  font: var(--type-button);
+  letter-spacing: 0.04em;
+  background: var(--paper-000);
+  border-color: var(--paper-000);
+}
+@media (max-width: 899px) {
+  .endturn-dock {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .endturn-dock__guide {
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .endturn-dock__end {
+    justify-content: space-between;
+  }
+  .endturn-dock__note {
+    text-align: left;
+    max-width: none;
+  }
+}
+
+/* THE BOARD COLUMN IS AS WIDE AS THE BOARD. The board is height-bound
+   (`.board__canvas` is 2:3 and capped at `100vh - 190px`), so a `1fr` column
+   letterboxed it with ~250px of empty table on each side while the side column
+   was squeezed. The column now tracks the board's own width, and the space it
+   frees goes to the side column — which lays the market and the mat side by side
+   once it is wide enough for both. */
+@media (min-width: 900px) {
+  .shell__body {
+    grid-template-columns: minmax(0, calc((100vh - 230px) * 2 / 3)) minmax(360px, 1fr);
+  }
+  .shell__side {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    align-items: start;
+    gap: var(--sp-3);
+  }
+  .shell__side > .tabs {
+    min-width: 0;
+  }
+}
+@media (min-width: 1440px) {
+  .shell__body {
+    grid-template-columns: minmax(0, calc((100vh - 230px) * 2 / 3)) minmax(380px, 1fr) 340px;
+  }
+}
+
+/* ── the placement and gerrymander bars ──────────────────────────────────── */
+
+/* THE BAR THAT NARRATES A BOARD DECISION WAS BELOW THE FOLD. It rendered under the
+   board, the board is sized to the viewport, so on a 768px screen the bar started
+   at y≈660 — and the fixed END TURN dock sat on top of it. CONFIRM, UNDO and
+   CANCEL were all hidden while the player was in the middle of placing voters.
+   The bar is now pinned to the bottom of the screen as a compact strip, and the
+   END TURN dock steps aside while it is open (ending a turn mid-placement is not
+   something the dock should be offering anyway). */
+.shell__board > .bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 17;
+  border-radius: 0;
+  border-top: 3px solid var(--seal);
+  box-shadow: 0 -6px 20px rgb(0 0 0 / 40%);
+  padding: var(--sp-2) var(--sp-4);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--sp-4);
+  row-gap: 2px;
+  align-items: center;
+}
+.shell__board > .bar > * {
+  grid-column: 1;
+  margin: 0;
+}
+.shell__board > .bar > .bar__actions {
+  grid-column: 2;
+  grid-row: 1 / span 4;
+  flex-wrap: nowrap;
+  align-self: center;
+}
+.shell__board > .bar .bar__head {
+  font: 700 15px/20px var(--font-ui);
+}
+.shell__board > .bar .zones-strip {
+  max-width: 720px;
+}
+.shell:has(.shell__board > .bar) .endturn-dock {
+  display: none;
+}
+@media (max-width: 899px) {
+  .shell__board > .bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell__board > .bar > .bar__actions {
+    grid-column: 1;
+    grid-row: auto;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 599px) {
+  .shell__board > .bar {
+    bottom: 56px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
+
+/* ── the resource picker (cap discard, redraw, conspiracy, trade) ─────────── */
+
+/* The cell IS the control (a press adds one), so it should look pressable: a
+   hover state, a stronger chosen state, and the count large. The +/−/ALL row
+   below becomes one even strip under each cell instead of three loose 32px
+   squares with no gap logic. A cell with nothing to give (you hold none) is
+   quiet rather than hatched. */
+.picker__cell {
+  min-height: 84px;
+  padding: var(--sp-2);
+  transition: border-color var(--dur-90) var(--ease-board), background var(--dur-90) var(--ease-board);
+}
+.picker__cell:not(:disabled):hover {
+  border-color: var(--seal);
+  background: var(--paper-050);
+}
+.picker__cell--max {
+  outline: 0;
+  border: 2px solid var(--seal);
+  background: var(--paper-050);
+}
+.picker__cell:disabled {
+  background-image: none;
+  background-color: var(--paper-100);
+  opacity: 0.7;
+}
+.picker__grid .row--tight {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr;
+  gap: 2px;
+  margin-top: 2px;
+}
+.picker__grid .row--tight .btn {
+  min-height: 34px;
+  padding: 0;
+  text-align: center;
+  font: 700 15px/1 var(--font-ui);
+}
+.picker__grid .row--tight .btn:disabled {
+  background-image: none;
+  background-color: var(--paper-100);
+  border-color: var(--paper-300);
+  color: var(--ink-300);
+}
+.picker__status {
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+.sheet .eyebrow {
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--ink-500);
+}
+
+/* ── the board key ───────────────────────────────────────────────────────── */
+.board__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--sp-4);
+  margin: 0;
+  padding: 0 var(--sp-1);
+  font: 400 12px/17px var(--font-ui);
+  color: var(--paper-400);
+}
+.board__legend b {
+  font: 700 13px/17px var(--font-numeric);
+  color: var(--paper-100);
+}
+.board__legend .board__legend-small {
+  font-size: 11px;
+  color: var(--paper-300);
+}
+/* The key takes ~40px under the board, so the board gives that back. */
+.board__canvas {
+  max-height: calc(100vh - 230px);
+}
+
+/* ── the phone tab bar ───────────────────────────────────────────────────── */
+.tabbar__btn {
+  font: 600 14px/18px var(--font-ui);
+  color: var(--paper-300);
+  position: relative;
+}
+.tabbar__btn[aria-pressed='true'] {
+  color: var(--paper-000);
+}
+.tabbar__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--seal);
+  color: var(--paper-000);
+  font: 700 11px/1 var(--font-ui);
+  vertical-align: 1px;
+}
+@media (max-width: 599px) {
+  .board__legend {
+    font-size: 11px;
+  }
+  .players {
+    flex-wrap: wrap;
+  }
+  .shell__status {
+    font-size: 13px;
+    padding: 2px var(--sp-2);
+  }
+}
+
+/* ── the refusal line ────────────────────────────────────────────────────── */
+
+/* WHY A PRESS DID NOTHING — AND IT WAS UNREADABLE. `.refusal` set
+   `color: var(--ink-100)`, a token that does not exist, so the declaration was
+   invalid and the sentence inherited the shell's light `--table-text` on a
+   `--paper-050` background: near-white on near-white. It also sat in the page flow
+   above the board, so every refusal shoved the whole layout down by ~40px and
+   pulled it back up when it expired. It now floats under the top bar, in ink. */
+.refusal {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  margin: 0;
+  width: max-content;
+  max-width: min(640px, calc(100vw - 32px));
+  color: var(--ink-900);
+  background: var(--paper-000);
+  border: 1px solid var(--paper-400);
+  border-left: 4px solid var(--warn-volatile);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  font: 500 14px/20px var(--font-ui);
+}
+.refusal::first-letter {
+  text-transform: uppercase;
+}
+.mat__action-why {
+  display: block;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+/* ── the trade composer ──────────────────────────────────────────────────── */
+
+/* Each side is a list of four rows — glyph, name, what is held, then − n + — in
+   place of four cramped `+ 0 −` columns per side. The buttons keep their DOM order
+   (`+` first, `−` last: every driver walks `.picker__grid .row--tight button`), and
+   `order` puts them in the − n + reading order a stepper is expected to have. */
+.sheet--trade {
+  max-width: 760px;
+}
+.sheet--trade .picker__grid {
+  grid-template-columns: 1fr;
+  gap: var(--sp-1);
+}
+.sheet--trade .stepper {
+  display: grid;
+  grid-template-columns: 1fr 40px 40px;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--paper-000);
+  border: 1px solid var(--paper-300);
+  border-bottom: 2px solid var(--res-ink, var(--paper-300));
+  border-radius: var(--r-sm);
+}
+.sheet--trade .stepper__col {
+  order: 0;
+  display: grid;
+  grid-template-columns: 18px auto 1fr;
+  grid-template-areas: 'glyph name count' 'glyph have count';
+  align-items: center;
+  column-gap: var(--sp-2);
+  justify-items: start;
+}
+.sheet--trade .stepper__col > :nth-child(1) {
+  grid-area: glyph;
+}
+.sheet--trade .stepper__col .picker__count {
+  grid-area: count;
+  justify-self: end;
+  font-size: 22px;
+}
+.sheet--trade .stepper__col .picker__name {
+  grid-area: name;
+  font: 700 13px/16px var(--font-ui);
+  text-transform: capitalize;
+}
+.stepper__have {
+  grid-area: have;
+  font: 400 11px/14px var(--font-ui);
+  color: var(--ink-500);
+}
+.sheet--trade .stepper > .btn:first-child {
+  order: 2;
+}
+.sheet--trade .stepper > .btn:last-child {
+  order: 1;
+}
+.sheet--trade .stepper > .btn {
+  min-height: 36px;
+  padding: 0;
+  text-align: center;
+  font: 700 18px/1 var(--font-ui);
+}
+.sheet--trade .stepper > .btn:disabled {
+  background-image: none;
+  background-color: var(--paper-100);
+  color: var(--ink-300);
+  border-color: var(--paper-300);
+}
+.stepper__count {
+  font-size: 18px;
+}
+
+/* ── the result screen ───────────────────────────────────────────────────── */
+[data-testid='scoreboard'] {
+  max-width: 720px;
+}
+[data-testid='score-verdict'] {
+  /* The verdict is built from a player's name and fixed words, and rendered as
+     "Alice WINS WITH 3" — half shouting. One case throughout. */
+  text-transform: uppercase;
+  font: var(--type-display-l);
+  letter-spacing: 0.02em;
+}
+.score__head .seat {
+  background: transparent;
+  padding: 2px var(--sp-2);
+}
+.score__head .seat__name {
+  font: 700 17px/22px var(--font-ui);
+}
+.score__value {
+  font: 700 18px/22px var(--font-ui);
+}
+.score__crown {
+  color: var(--seat-3);
+  font-size: 18px;
+}
+.seat[data-winner='true'] .seat__name {
+  color: var(--ink-900);
+}
+.endturn-dock__guide--plain::before {
+  content: none;
+}
+
+/* The cap caption: the count in numerals, the sentence in prose, and room to wrap.
+   It was one line of 12px monospace small caps, so a full sentence about the cap
+   ran into "12/12 held" and read as one word salad. */
+.meter__caption {
+  align-items: baseline;
+}
+.meter__caption > span:last-child {
+  font: 500 12px/16px var(--font-ui);
+  text-align: right;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECOND PASS — type, surfaces and feedback.
+
+   The first pass fixed what was broken; this one is about how it reads. Three
+   moves: (1) the real typefaces are now loaded (see `main.tsx`), so headings can
+   be set in Bitter and labels in Inter; (2) monospace is kept for NUMERALS only —
+   it had spread to every small label ("UNLOCKS AT CAPITALIST 3", "NEXT IN 2"), and
+   a code font for prose reads as a debug readout; (3) surfaces get depth and
+   controls get a response, so the table feels like a table and a press feels like
+   a press. Tokens only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the table surface ───────────────────────────────────────────────────── */
+.shell,
+.lobby {
+  background:
+    radial-gradient(ellipse 120% 70% at 50% -10%, var(--table-700) 0%, transparent 60%),
+    var(--table-900);
+  background-attachment: fixed;
+}
+.shell__top {
+  background: rgb(20 17 16 / 92%);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 30%);
+}
+
+/* ── panels and headings ─────────────────────────────────────────────────── */
+.panel {
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 45%),
+    0 8px 24px rgb(0 0 0 / 35%);
+}
+.panel__title {
+  font: 700 20px/26px var(--font-display);
+  letter-spacing: 0;
+  color: var(--ink-900);
+  margin-bottom: var(--sp-3);
+}
+.panel__kicker {
+  font: 500 12px/16px var(--font-ui);
+  color: var(--ink-500);
+}
+.mat__h {
+  font: 700 16px/22px var(--font-display);
+  margin-bottom: var(--sp-2);
+}
+/* YOUR TURN, on the mat, without a 2px red cage around the whole column: a seal
+   rule along the top and a soft glow say the same thing at a quarter the weight. */
+.panel--framed {
+  border: 1px solid var(--paper-300);
+  border-top: 4px solid var(--seal);
+  box-shadow:
+    0 0 0 1px rgb(168 52 31 / 35%),
+    0 8px 28px rgb(168 52 31 / 22%),
+    0 8px 24px rgb(0 0 0 / 35%);
+}
+
+/* ── monospace for numerals only ─────────────────────────────────────────── */
+.power__uses,
+.seat__meta,
+.badge,
+.chip,
+.log__meta,
+.shell__round,
+.res__name,
+.picker__name,
+.mani__ideo,
+.mani__bonus,
+.mani__noun,
+.zones-strip__cell,
+.link__meta,
+.score__zones {
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
+}
+.power__uses {
+  font-size: 12px;
+  font-weight: 600;
+}
+.log__meta {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ── your resources ──────────────────────────────────────────────────────── */
+.res__cell {
+  background: var(--paper-000);
+  border: 1px solid var(--paper-300);
+  border-bottom: 3px solid var(--res-ink, var(--paper-300));
+  padding: var(--sp-2) 0 6px;
+  gap: 2px;
+}
+.res__num {
+  font-size: 26px;
+  line-height: 28px;
+}
+.res__name {
+  font: 700 11px/14px var(--font-ui);
+  letter-spacing: 0.08em;
+}
+.meter {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* ── the manifesto ───────────────────────────────────────────────────────── */
+/* Each cell wears its Ideologue's ink as a top rule and on its name, so the four
+   read as four factions at a glance rather than four identical grey boxes. */
+.mani__cell:has(.mani__track[data-ideo='capitalist']) { --cell-ink: var(--ideo-capitalist); }
+.mani__cell:has(.mani__track[data-ideo='supremo']) { --cell-ink: var(--ideo-supremo); }
+.mani__cell:has(.mani__track[data-ideo='showstopper']) { --cell-ink: var(--ideo-showstopper); }
+.mani__cell:has(.mani__track[data-ideo='idealist']) { --cell-ink: var(--ideo-idealist); }
+.mani__cell {
+  background: var(--paper-000);
+  border: 1px solid var(--paper-300);
+  border-top: 3px solid var(--cell-ink, var(--paper-400));
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-1) var(--sp-2);
+}
+.mani__cell[data-level='L3'],
+.mani__cell[data-level='L5'] {
+  border-bottom: 1px solid var(--paper-300);
+  background: var(--paper-050);
+}
+.mani__ideo {
+  font: 700 11px/14px var(--font-ui);
+  letter-spacing: 0.08em;
+  color: var(--cell-ink, var(--ink-700));
+}
+.mani__track {
+  --pip-h: 7px;
+  gap: 3px;
+  margin: 6px 0;
+}
+.mani__pip {
+  border-radius: 999px;
+}
+.mani__pip[data-threshold='power'] {
+  width: 9px;
+  height: 9px;
+}
+.mani__bonus {
+  text-transform: none;
+  font: 500 11px/15px var(--font-ui);
+  letter-spacing: 0;
+}
+
+/* ── powers: the locked fold ─────────────────────────────────────────────── */
+.powers__locked {
+  margin-top: var(--sp-1);
+  border: 1px dashed var(--paper-400);
+  border-radius: var(--r-sm);
+  background: var(--paper-050);
+}
+.powers__locked > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--sp-2) var(--sp-3);
+  font: 600 13px/18px var(--font-ui);
+  color: var(--ink-700);
+}
+.powers__locked > summary::-webkit-details-marker {
+  display: none;
+}
+.powers__locked > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: var(--ink-500);
+  transition: transform var(--dur-160) var(--ease-panel);
+}
+.powers__locked[open] > summary::before {
+  transform: rotate(90deg);
+}
+.powers__locked > .powers {
+  padding: 0 var(--sp-2) var(--sp-2);
+}
+
+/* ── controls that answer back ───────────────────────────────────────────── */
+.btn {
+  letter-spacing: 0.02em;
+  transition:
+    background var(--dur-90) var(--ease-board),
+    border-color var(--dur-90) var(--ease-board),
+    box-shadow var(--dur-120) var(--ease-board),
+    transform var(--dur-90) var(--ease-board);
+}
+.btn:not(:disabled):not([aria-disabled='true']):hover {
+  border-color: var(--ink-300);
+}
+.btn:not(:disabled):not([aria-disabled='true']):active {
+  transform: translateY(1px);
+}
+.btn--primary {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 18%),
+    0 2px 6px rgb(122 36 22 / 35%);
+}
+.btn--primary:not(:disabled):not([aria-disabled='true']):hover {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 18%),
+    0 4px 12px rgb(122 36 22 / 45%);
+}
+.blind-answer__side {
+  transition:
+    border-color var(--dur-90) var(--ease-board),
+    transform var(--dur-120) var(--ease-board),
+    box-shadow var(--dur-120) var(--ease-board);
+}
+.scrim--answer .blind-answer__side:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 45%);
+}
+
+/* ── things that arrive ──────────────────────────────────────────────────── */
+@keyframes polish-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes polish-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+.refusal {
+  animation: polish-drop var(--dur-200) var(--ease-panel) both;
+}
+.toast {
+  animation: polish-rise var(--dur-200) var(--ease-panel) both;
+}
+.table-question,
+.lobby__sheet,
+.sheet {
+  animation: polish-rise var(--dur-260) var(--ease-panel) both;
+}
+.shell__board > .bar,
+.endturn-dock {
+  animation: polish-rise var(--dur-200) var(--ease-panel) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .refusal,
+  .toast,
+  .table-question,
+  .lobby__sheet,
+  .sheet,
+  .shell__board > .bar,
+  .endturn-dock {
+    animation: none;
+  }
+  .btn,
+  .blind-answer__side,
+  .mkt {
+    transition: none;
+  }
+  .scrim--answer .blind-answer__side:not(:disabled):hover,
+  .mkt:not(:disabled):hover {
+    transform: none;
+  }
+}
+
+/* ── last touches ────────────────────────────────────────────────────────── */
+.shell__log-title {
+  font: 700 16px/22px var(--font-display);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--paper-100);
+}
+.shell__log-hint {
+  font: 500 11px/14px var(--font-ui);
+}
+.scrim--answer {
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 30%, var(--table-700) 0%, transparent 70%),
+    var(--table-900);
+}
+/* "+0 funds · next in 2" broke as "next in / 2". Each half now keeps together. */
+.mani__bonus {
+  text-wrap: balance;
+}
+
+/* ── usability: the dock does the next step ──────────────────────────────── */
+.endturn-dock__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.endturn-dock__lead > .btn {
+  flex: none;
+}
+.endturn-dock__btn--confirm {
+  background: var(--seal);
+  border-color: var(--seal);
+  color: var(--paper-000);
+}
+@media (max-width: 899px) {
+  .endturn-dock__lead {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+}
+.shell__help {
+  background: transparent;
+  color: var(--paper-300);
+  border-color: var(--table-600);
+  white-space: nowrap;
+}
+.shell__top .shell__help:not(:disabled):not([aria-disabled='true']):hover {
+  background: var(--table-700);
+  color: var(--paper-000);
+}
+.sheet--wide .rules {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.resolution__hint {
+  text-align: center;
+  font: 500 12px/16px var(--font-ui);
+  color: var(--paper-500);
+  margin: var(--sp-1) 0 0;
+}

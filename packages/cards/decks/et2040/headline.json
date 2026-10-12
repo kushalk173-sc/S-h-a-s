@@ -4,9 +4,9 @@
   "cards": [
     {
       "id": "hl-et2040-001",
-      "source": "REF 4.3 recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. DROPPED: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state, and the lifetime of the grant is G9/G22. G8 landed, so `target: 'everyone'` IS honoured - and it still ships in the `you` reading, because the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player. See card-playback.test.ts and SOURCES.md 4.8.",
+      "source": "REF 4.3 recovers the name and full effect of New Face Who Dis, which REF 4.3 notes is the same archetype as SUBMERGED. DROPPED: 'these voters cannot be placed into Volatile Areas' is a placement RESTRICTION the Effect union cannot state, and the lifetime of the grant is G9/G22. G8 landed, so `target: 'everyone'` IS honoured - and it still ships in the `you` reading, because the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player. See card-playback.test.ts and SOURCES.md 4.8. 2026-10-05: renamed from 'New Face Who Dis'.",
       "provenance": "adapted",
-      "name": "New Face Who Dis",
+      "name": "Change Of Address",
       "text": "You may Gerrymander 1 of your majority or non-majority voters this turn, under the normal Gerrymandering rules. It does not have to happen now.",
       "effects": [
         {
@@ -17,9 +17,9 @@
     },
     {
       "id": "hl-et2040-002",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Red Blooded. DROPPED: (1) the scaling ('any 2 resources for EACH of their discarded voters') needs a per-unit iteration op, KNOWN-GAPS G4; (2) the real discard is 'any 2 voters' including your own, and reduce.ts resolveChoice rejects any area the chooser owns, so `discard-voter` strikes an OPPONENT's voter only. `text` states what the engine does; the fix is one condition in resolveChoice plus a target on the op.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Red Blooded. DROPPED: (1) the scaling ('any 2 resources for EACH of their discarded voters') needs a per-unit iteration op, KNOWN-GAPS G4; (2) the real discard is 'any 2 voters' including your own, and reduce.ts resolveChoice rejects any area the chooser owns, so `discard-voter` strikes an OPPONENT's voter only. `text` states what the engine does; the fix is one condition in resolveChoice plus a target on the op. 2026-10-05: renamed from 'Red Blooded'.",
       "provenance": "adapted",
-      "name": "Red Blooded",
+      "name": "Blood Money",
       "text": "You strike 2 of your opponents' voters from the board, permanently — voters in Volatile Areas cannot be struck, and your own voters are out of your reach. Each opponent then gains 2 resources of their choice from the Public Reserve.",
       "effects": [
         {
@@ -35,9 +35,9 @@
     },
     {
       "id": "hl-et2040-003",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The FIRST BRANCH IS NOW THE PRINTED CLAUSE. It used to be weakened to '2 of your OPPONENTS' voters' because resolveChoice rejected any area the chooser owns; KNOWN-GAPS G-new recorded that as the fix, and G-new is now CLOSED (voterScope in reduce.ts passes the RAW target through). ONE CLAUSE REMAINS DROPPED: the OR-branch donate to the player on your left, which needs a DONATE op aimed at a seat-relative neighbour plus a conditional - G1.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Ain't No Cure For Love. The FIRST BRANCH IS NOW THE PRINTED CLAUSE. It used to be weakened to '2 of your OPPONENTS' voters' because resolveChoice rejected any area the chooser owns; KNOWN-GAPS G-new recorded that as the fix, and G-new is now CLOSED (voterScope in reduce.ts passes the RAW target through). ONE CLAUSE REMAINS DROPPED: the OR-branch donate to the player on your left, which needs a DONATE op aimed at a seat-relative neighbour plus a conditional - G1. 2026-10-05: renamed from 'Ain't No Cure For Love'.",
       "provenance": "adapted",
-      "name": "Ain't No Cure For Love",
+      "name": "Own Goal",
       "text": "You strike 2 of your OWN voters from the board, permanently. Voters in Volatile Areas cannot be struck.",
       "effects": [
         {
@@ -49,9 +49,9 @@
     },
     {
       "id": "hl-et2040-004",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: renamed from 'Quietly, The Ceiling Moved'.",
       "provenance": "inferred",
-      "name": "Quietly, The Ceiling Moved",
+      "name": "Austerity Drive",
       "text": "Every opponent discards 2 Funds to the Public Reserve. You then gain 1 voter.",
       "effects": [
         {
@@ -69,9 +69,9 @@
     },
     {
       "id": "hl-et2040-005",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: renamed from 'The Second Reading'.",
       "provenance": "inferred",
-      "name": "The Second Reading",
+      "name": "Stimulus Package",
       "text": "Every opponent gains 1 resource of their choice. You then get 2 discounts on purchases this turn.",
       "effects": [
         {
@@ -87,9 +87,9 @@
     },
     {
       "id": "hl-et2040-006",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: renamed from 'Long Winter, Short Ledger'.",
       "provenance": "inferred",
-      "name": "Long Winter, Short Ledger",
+      "name": "Evacuation Order",
       "text": "Evict 2 voters from the board. Every opponent then gains 1 resource of their choice.",
       "effects": [
         {
@@ -105,9 +105,9 @@
     },
     {
       "id": "hl-et2040-007",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: renamed from 'An Honest Institution'.",
       "provenance": "inferred",
-      "name": "An Honest Institution",
+      "name": "News Cycle",
       "text": "Discard every face-up Voter Card and deal three fresh ones. Then gain 1 resource of your choice.",
       "effects": [
         {
@@ -121,9 +121,9 @@
     },
     {
       "id": "hl-et2040-008",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: renamed from 'Filed Under: Weather'.",
       "provenance": "inferred",
-      "name": "Filed Under: Weather",
+      "name": "Doomscrolling",
       "text": "Every opponent discards 1 resource of their choice to the Public Reserve. You gain 2 Media.",
       "effects": [
         {
@@ -144,7 +144,7 @@
       "id": "hl-et2040-009",
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of The Four Horsemen. The real card is 'Choose and discard one of the following: 2 Funds OR 2 Clout OR 2 Media OR 2 Trust', which is a single `lose-any` of 2 — any two of one kind and one of each are both in that set, so the choice is expressed exactly. DROPPED: 'You can't make any purchases until you do so', which is a standing RESTRICTION on the player and needs PlayerState.restrictions (KNOWN-GAPS G5); a lasting clause also needs G9/G22. Without it this is a plain 2-resource tax rather than a soft-lock.",
       "provenance": "adapted",
-      "name": "The Four Horsemen",
+      "name": "Cost of Living",
       "text": "Discard 2 resources of your choice to the Public Reserve. Any two of the same kind, or one of each.",
       "effects": [
         {
@@ -155,9 +155,9 @@
     },
     {
       "id": "hl-et2040-010",
-      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Married With Bits. DROPPED: 'to 2 opponents' becomes every opponent, because the card can only be aimed at a target SET (`each-opponent`), not at a count of chosen players; and 'They can choose not to take it' has no expression at all — a granted voter is a pending group the opponent places. `text` states exactly what the engine does. See KNOWN-GAPS G1.",
+      "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Married With Bits. DROPPED: 'to 2 opponents' becomes every opponent, because the card can only be aimed at a target SET (`each-opponent`), not at a count of chosen players; and 'They can choose not to take it' has no expression at all — a granted voter is a pending group the opponent places. `text` states exactly what the engine does. See KNOWN-GAPS G1. 2026-10-05: renamed from 'Married With Bits'.",
       "provenance": "adapted",
-      "name": "Married With Bits",
+      "name": "Free Publicity",
       "text": "Every opponent gains 1 voter, which they may place in any zone on their own turn.",
       "effects": [
         {
@@ -171,7 +171,7 @@
       "id": "hl-et2040-011",
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Good Gig Well Played. Only the 'Keep one for yourself' branch is represented. DROPPED: 'give one card each to 2 opponents', because no op moves a card from one player's hand to another's and no op addresses a target set of chosen players (KNOWN-GAPS G20); and 'if there are fewer than 3 cards in the draw pile, draw the remaining from the discard pile at random' (KNOWN-GAPS G17). A Conspiracy Card is worth its printed 4-5 resources, so this is roughly a third of the real card's swing.",
       "provenance": "adapted",
-      "name": "Good Gig Well Played",
+      "name": "Leaked Memo",
       "text": "Draw the top Conspiracy Card and keep it. It is yours to play whenever you choose.",
       "effects": [
         {
@@ -182,9 +182,9 @@
     },
     {
       "id": "hl-et2040-021",
-      "source": "REF 4.3 recovers DON'T KISS THE BABIES: 'All Voter Cards cost any 1 extra resource in your next turn.' G5's `surcharge` is EXECUTED and read by INFLUENCE and BUY_CONSPIRACY. Refires `inferred` TIDE WARNINGS, whose reason for existing was that JUST BREATHE was unrepresentable - G16 shipped it as hl-et2040-016. WIDER THAN PRINTED, and it is the whole difference: the printed tax is on VOTER Cards, this is on EVERY purchase, Conspiracy Cards included, because `surchargeFor` is one function read by both actions.",
+      "source": "REF 4.3 recovers DON'T KISS THE BABIES: 'All Voter Cards cost any 1 extra resource in your next turn.' G5's `surcharge` is EXECUTED and read by INFLUENCE and BUY_CONSPIRACY. Refires `inferred` TIDE WARNINGS, whose reason for existing was that JUST BREATHE was unrepresentable - G16 shipped it as hl-et2040-016. WIDER THAN PRINTED, and it is the whole difference: the printed tax is on VOTER Cards, this is on EVERY purchase, Conspiracy Cards included, because `surchargeFor` is one function read by both actions. 2026-10-05: renamed from 'Don't Kiss The Babies'.",
       "provenance": "adapted",
-      "name": "Don't Kiss The Babies",
+      "name": "Convenience Fee",
       "text": "Every purchase you make until the start of your next turn costs 1 extra Funds -- Voter Cards and Conspiracy Cards alike, where the printed card taxed Voter Cards only. It stacks on top of a Helping Hands discount rather than being reduced by it.",
       "effects": [
         {
@@ -200,7 +200,7 @@
       "id": "hl-et2040-013",
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of As Clear As Water in full. This slot was `inferred` (THREE DAY WEEKEND, a reskin of hl-et2040-005, which stays); SOURCES.md 4 replaces an inferred placeholder BY the recovered card once the engine can perform it. DROPPED, both for the same reason: a REVEAL has no state consequence here, so reduce() has nothing to perform. SHIPPED: 'if any player does not have a Conspiracy Card, they receive 1 from the draw pile' is `onlyIfEmpty`, read off the RECIPIENT's hand - a fact hidden from every owner too, so it logs nothing.",
       "provenance": "adapted",
-      "name": "As Clear As Water",
+      "name": "Universal Basic Intrigue",
       "text": "Every player who is holding no Conspiracy Card receives 1 from the draw pile, in turn order. A player already holding one takes nothing — and that includes you, unless the card you just played was your last.",
       "effects": [
         {
@@ -215,7 +215,7 @@
       "id": "hl-et2040-020",
       "source": "REF 4.3 recovers GENDER TROUBLE. G5's last consult point landed (`restrict` kind `no-power`, read in powers.ts usesLeft), so the lock is EXECUTED and the card was blocked only by a corpus gate. Retires `inferred` THE POLICY REVIEW, whose own source said it reskinned THE FOUR HORSEMEN's lockless tax - a shape hl-et2040-009 now ships recovered. WEAKER THAN PRINTED: the printed card takes ONE CHOSEN Level 3 power, this takes ALL (naming one is a decision over POWERS not players, G1). The printed 'no L3 power, discard 2 instead' fallback is DROPPED - a conditional over a whole effect list.",
       "provenance": "adapted",
-      "name": "Gender Trouble",
+      "name": "Blue Screen",
       "text": "You cannot use ANY of your unlocked Level 3 Ideologue Powers until the start of your next turn. The printed card lets you name ONE power; this takes all of them, and there is no fallback if you hold none.",
       "effects": [
         {
@@ -231,7 +231,7 @@
       "id": "hl-et2040-015",
       "source": "REF 4.3 (scribd 915391789/2040-Deck-HC) recovers the name and effect of Movement Anxiety Disorder in full. This slot was `inferred` (SILICON RAIN), a placeholder that said it refused to restate any recovered card; SOURCES.md 4 replaces such a placeholder BY the recovered card once the engine can perform it. TWO CLAUSES ARE DROPPED: 'the next 3' ships as the next ONE, because ending 'when 3 have been discarded' is a COUNTER ON THE CARD (G10), not G9; and 'can be blocked at any turn' is a G13 multi-turn window. THE TRIGGER IS PERFORMED (G14 + G22). Reaching your OWN voter needs G-new, closed.",
       "provenance": "adapted",
-      "name": "Movement Anxiety Disorder",
+      "name": "Relocation Fatigue",
       "text": "Before the end of your next turn, the next time one of your own voters is Gerrymandered, you must discard 1 voter of your own from the board. Voters in Volatile Areas cannot be discarded.",
       "effects": [
         {
@@ -250,7 +250,7 @@
       "id": "hl-et2040-016",
       "source": "REF 4.3 recovers Just Breathe in full. G16 landed for the SELECTOR: `zone: your-strongest` is a pure function of the board, so 'the zone where you have the most voters' is now performed rather than approximated. DROPPED, named: 'into an adjacent zone' (a destination is a second decision on top of a source one); 'in case of a tie, pick any of the tied zones' (resolveZone breaks the tie by ZONE_IDS order, deterministically); and 'move' ships as EVICT, which is STRICTLY WEAKER for everyone affected, because an evicted voter returns to its owner's Mat and can be influenced again. KNOWN-GAPS G16.",
       "provenance": "adapted",
-      "name": "Just Breathe",
+      "name": "Overcrowding",
       "text": "Select the constituency where you have the most voters. Evict 2 voters from it -- they go back to their owners' Mats, where they can be influenced again. Voters in Volatile Areas cannot be evicted.",
       "effects": [
         {
@@ -262,10 +262,10 @@
     },
     {
       "id": "hl-et2040-017",
-      "source": "REF 4.1 recovers Nero's Guests: 'Move any 3 voters in this zone. OR Move any 3 voters out of this zone.' with the author's own gloss '\"this zone\" = the volatile zone that triggered it'. G16 landed for BOTH halves: `zone: this-zone` is read off GameState.headlineQueue[0].areaId, which is exactly that gloss and needs NO new state field, so reduce() stays pure. DROPPED, named: 'move' ships as EVICT (strictly weaker); and the adjacent-zone destination plus the all-or-nothing pairing. KNOWN-GAPS.md G16.",
+      "source": "REF 4.1 recovers Nero's Guests: 'Move any 3 voters in this zone. OR Move any 3 voters out of this zone.' with the author's own gloss '\"this zone\" = the volatile zone that triggered it'. G16 landed for BOTH halves: `zone: this-zone` is read off GameState.headlineQueue[0].areaId, which is exactly that gloss and needs NO new state field, so reduce() stays pure. DROPPED, named: 'move' ships as EVICT (strictly weaker); and the adjacent-zone destination plus the all-or-nothing pairing. KNOWN-GAPS.md G16. 2026-10-05: renamed from 'Nero's Guests'.",
       "provenance": "adapted",
-      "name": "Nero's Guests",
-      "text": "Every opponent must evict 3 of their own voters from the Volatile Area whose placement drew this Headline. Evicted voters go back to their Mats, where they can be influenced again. Volatile-Area voters are permanent and cannot be evicted.",
+      "name": "Fire Drill",
+      "text": "Every opponent must evict 3 of their own voters from the constituency whose Volatile Area drew this Headline. Evicted voters go back to their Mats, where they can be influenced again. Voters in Volatile Areas are permanent and cannot be evicted.",
       "effects": [
         {
           "op": "evict",
@@ -279,7 +279,7 @@
       "id": "hl-et2040-018",
       "source": "REF 4.3 recovers Fatality: 'Influence an open Voter Card for free and donate the voters to any opponent.' G1 LANDED: `target: chosen-player` raises a decision for the card's OWN actor, and a player holding nothing is STILL offered -- filtering the list by holdings would make it a readout of their Mat. DROPPED, named: 'for free' is a PURCHASE the engine cannot grant (G15's `price`); 'the voters' ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; 'right away' needs an 'immediately' placement. What ships is the DONATE.",
       "provenance": "adapted",
-      "name": "Fatality",
+      "name": "Pity Vote",
       "text": "Choose an opponent. They receive 1 voter, which they place on the board on their own turn. The printed card has them place it right away, and has you influence a Voter Card for free first; neither is done here.",
       "effects": [
         {
@@ -291,9 +291,9 @@
     },
     {
       "id": "hl-et2040-019",
-      "source": "REF 4.3 recovers Why The Long Face?: 'Pick an opponent. They will get 1 voter (not card) for every Voter Card you influence in their next turn.' G1 LANDED for the NAMED OPPONENT, and G14 + G22 were already landed, so this card is now WHOLE: the hook fires on `on-voter-influenced`, the lifetime is the caster's next turn, and the 'NOT card' parenthetical holds because `voters` grants a group rather than drawing. ONE CLAUSE DROPPED AND IT IS STRONGER: `condition: { byOwner: true }` is left off, so the hook fires on ANY influence, not only yours.",
+      "source": "REF 4.3 recovers Why The Long Face?: 'Pick an opponent. They will get 1 voter (not card) for every Voter Card you influence in their next turn.' G1 LANDED for the NAMED OPPONENT, and G14 + G22 were already landed, so this card is now WHOLE: the hook fires on `on-voter-influenced`, the lifetime is the caster's next turn, and the 'NOT card' parenthetical holds because `voters` grants a group rather than drawing. ONE CLAUSE DROPPED AND IT IS STRONGER: `condition: { byOwner: true }` is left off, so the hook fires on ANY influence, not only yours. 2026-10-05: renamed from 'Why The Long Face?'.",
       "provenance": "adapted",
-      "name": "Why The Long Face?",
+      "name": "Bandwagon",
       "text": "Choose an opponent. Every time a Voter Card is influenced from here until the start of your next turn, they receive 1 voter.",
       "effects": [
         {
@@ -307,9 +307,9 @@
     },
     {
       "id": "hl-et2040-022",
-      "source": "REF 4.1 GREAT LEADER, BAD ECONOMY. TWO THIRDS ALREADY EXISTED: the lifetime is G9, the trigger and its 3-Voter condition are POWER TRIP's own (G14), and 'the player after you' is `player-after`. The new work is ONE PICK WITH TWO HALVES (`move-peg` + `choose-peg-dest`): the voter ops all resolve to a pool or a mat and none has a DESTINATION, and `evict` is the wrong verb because this card HELPS the beneficiary. DROPPED: a Volatile-Area peg is immovable (p18); 'MAY' is not a decline flag. KNOWN-GAPS.md 8.1.",
+      "source": "REF 4.1 GREAT LEADER, BAD ECONOMY. TWO THIRDS ALREADY EXISTED: the lifetime is G9, the trigger and its 3-Voter condition are POWER TRIP's own (G14), and 'the player after you' is `player-after`. The new work is ONE PICK WITH TWO HALVES (`move-peg` + `choose-peg-dest`): the voter ops all resolve to a pool or a mat and none has a DESTINATION, and `evict` is the wrong verb because this card HELPS the beneficiary. DROPPED: a Volatile-Area peg is immovable (p18); 'MAY' is not a decline flag. KNOWN-GAPS.md 8.1. 2026-10-05: renamed from 'Great Leader, Bad Economy'.",
       "provenance": "adapted",
-      "name": "Great Leader, Bad Economy",
+      "name": "Trickle Down",
       "text": "For the rest of the game, every time you influence a 3 Voter Card, the player after you may move 1 of your non-majority voters to an empty area in a neighbouring zone. A voter that is already part of a majority, or that sits in a Volatile Area, cannot be moved.",
       "effects": [
         {
@@ -329,7 +329,7 @@
       "id": "hl-et2040-023",
       "source": "REF 4.3 BRAVE NEW WORLDS. The SHIPPING clause is `no-income` read literally, and `ANSWER` already consults `incomeBlocked` for this card - it logs 'No resources for this answer.' and suppresses the answer's resources AND the passive bonus, which is 'active & passive'. DROPPED is the FIRST sentence: 'every player answers immediately, in order of turn' is an out-of-band sweep, i.e. a SECOND WRITER for `_pendingCard`, which the turn boundary owns and which `move-card`'s `to: 'pending'` already refuses. A RULES QUESTION, not a cost; KNOWN-GAPS.md 8.2. Also `until: round`, not the answering turn.",
       "provenance": "adapted",
-      "name": "Brave New Worlds",
+      "name": "Bank Holiday",
       "text": "For the rest of this round, no player receives any resources for answering an Ideology Card - neither the answer's resources nor their passive bonus. The answer still succeeds.",
       "effects": [
         {
@@ -343,10 +343,10 @@
     },
     {
       "id": "hl-et2040-024",
-      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for HIGGS MORON (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3: its counter that outlives its resolution is G10 (`GameState.counters`, an `add-tokens` op and a `when: 'tokens-reach'` trigger) and `pass-card` has NO REFERENT - G12's in-flight queue and G20's `move-card` are both missing, and reassigning Ideology Cards breaks the blind-answer invariant. Same JOB: a card the whole table has to keep paying while it sits in somebody else's hands.",
+      "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for HIGGS MORON (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3: its counter that outlives its resolution is G10 (`GameState.counters`, an `add-tokens` op and a `when: 'tokens-reach'` trigger) and `pass-card` has NO REFERENT - G12's in-flight queue and G20's `move-card` are both missing, and reassigning Ideology Cards breaks the blind-answer invariant. Same JOB: a card the whole table has to keep paying while it sits in somebody else's hands. 2026-10-05: renamed from 'Hot Potato'.",
       "provenance": "inferred",
-      "name": "Hot Potato",
-      "text": "For the rest of the game, every purchase an opponent makes costs 1 extra Funds — Conspiracy Cards and Voter Cards alike. It stacks on top of a Helping Hands discount and with any other Pythonpost.",
+      "name": "Tariff War",
+      "text": "For the rest of the game, every purchase an opponent makes costs 1 extra Funds — Conspiracy Cards and Voter Cards alike. It stacks on top of a Helping Hands discount and with any other surcharge.",
       "effects": [
         {
           "op": "restrict",
@@ -375,7 +375,7 @@
       "id": "hl-et2040-027",
       "source": "REF 4.1: \"Draw 2 Voter Cards. Keep 1 and donate the other to an opponent. These Voter Cards are influenced for free immediately.\" `adapted`: paraphrased into ops. ONE of four clauses ships, the setup: `reveal {kind:'voter', n:2}` publishes both face up on `revealedCards`. DROPPED, with mechanisms: \"Keep 1\" needs a VOTER CARD HAND (`to:'hand'` is the IDEOLOGY hand, where `ANSWER` fails) + a `choose-card` still limited to `_conspiracyDiscard` (G17); \"donate the other\" needs `move-card` onto a named hand (G20); \"for free\" needs a free `INFLUENCE` (G15); ORDER 8.2b. LOSSY: both cards LEAVE.",
       "provenance": "adapted",
-      "name": "Blessings Of Parents Past",
+      "name": "Exit Poll Leak",
       "text": "Turn the top 2 Voter Cards of the draw pile face up for the whole table to look at. That is all this card does today: there is nowhere in this engine to keep a Voter Card, so the two you turn over leave the game when this Headline resolves. It keeps none, donates none, and influences none for free.",
       "effects": [
         {
@@ -389,7 +389,7 @@
       "id": "hl-et2040-026",
       "source": "original; register per REF 8.2 rule 5. SUBSTITUTE for FUELLING THE NEWS (REF 4.3), RULED OUT in KNOWN-GAPS.md 8.3. CORRECTION 2026-10-04, FACTUAL ONLY, RULING UNCHANGED: this used to claim 'no Headline hand and no Headline draw pile', and that was FALSE - `GameState._headlineDraw` exists and `reveal {kind:'headline'}` reads its TOP. What has no referent is the rest: a Headline HAND to keep one of three and give one to each of 2 opponents (G20; `move-card` is Ideology-only), and 'choose the order in which to resolve these Headlines' (G18). Same JOB: a headline that lands on everybody.",
       "provenance": "inferred",
-      "name": "The Front Page",
+      "name": "Paywall",
       "text": "Every player discards 1 resource of their choice to the Public Reserve.",
       "effects": [
         {
@@ -403,7 +403,7 @@
       "id": "hl-et2040-028",
       "source": "REF 4.1 (Campaign: USA 2020) recovers POLO RETREAT: 'They can use each other's unlocked Level 3 Ideologue Powers in addition to their own.' No USA deck exists; filed beside its campaign-less §4.1 siblings. DEEP THOUGHTS' borrow with `until:'next-turn'`. DROPPED, four: 'each other's' - one decision names one DONOR, and a borrowed Restriction writes the CASTER as owner; 'Pick 2 players', because `applyEffect` computes ONE target per effect list; the 'any one Level 3 Power of their choice' fallback, which need not be UNLOCKED; 'You may pick yourself', which `resolveChoice` refuses.",
       "provenance": "adapted",
-      "name": "Polo Retreat",
+      "name": "Think Tank",
       "text": "Choose a player. Until the start of your next turn, every one of their unlocked Level 3 Ideologue Powers is yours to use as well as your own, and their own powers are left alone. The printed card has two players swap with each other across their next turns; this names one opponent.",
       "effects": [
         { "op": "borrow-power", "target": "chosen-player", "until": "next-turn" }
@@ -413,7 +413,7 @@
       "id": "hl-et2040-029",
       "source": "REF 4.1 (Campaign: Earth 2040) recovers SUBMERGED: 'Starting with you, every player can Gerrymander 1 voter immediately.' REF 4.3 calls it the SAME card as NEW FACE WHO DIS (hl-et2040-001): one archetype, two names. G8 closed, so `target:'everyone'` IS honoured. DROPPED, two: the Volatile-Area placement ban, a RESTRICTION the Effect union cannot state (G5); and the grant's LIFETIME (G9/G22): it lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player. That is why hl-et2040-001 ships the `you` reading; this card's `text` says so.",
       "provenance": "adapted",
-      "name": "Submerged",
+      "name": "Musical Chairs",
       "text": "Starting with you, every player may Gerrymander 1 majority or non-majority voter with this card. It is not a lasting right: the extra Gerrymander is cleared when that player's own turn begins, so it is worth spending on the turn it lands. Voters in Volatile Areas are permanent and cannot be Gerrymandered at all.",
       "effects": [
         { "op": "gerrymander", "n": 1, "target": "everyone" }
@@ -423,7 +423,7 @@
       "id": "hl-et2040-030",
       "source": "REF 4.1 (Rome) recovers A COWARD OR A JOURNALIST?: 'Starting from you, each player can donate 1 of their Ideology Cards.' Filed beside its campaign sibling hl-et2040-017 (NERO'S GUESTS, also Rome). `target:'player-after'` is ONE index into GameState.turnOrder from the actor, wrapping, which in a clockwise order IS 'the opponent on their left' - so it raises NO decision. DROPPED, four: 'starting from you, EACH player' is N donations; 'optional'; 'pass along a card you just received' (G20/G12); the card comes off the Ideology DRAW pile, not a HAND - `from:'hand'` is refused at the type level.",
       "provenance": "adapted",
-      "name": "A Coward Or A Journalist?",
+      "name": "Pay It Forward",
       "text": "The player on your left receives the top Ideology Card from the draw pile, and 6 resources of their choice. One seat and one card, taken from the deck rather than from a hand: the printed card has every player starting with you donate one of their own Ideology Cards, optionally, and allows a card just received to be passed along.",
       "effects": [
         { "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "player-after" },
@@ -432,9 +432,9 @@
     },
     {
       "id": "hl-et2040-031",
-      "source": "REF 4.3 recovers CARD GAMES, which REF 4.3 itself records as a re-skin of A COWARD OR A JOURNALIST? (hl-et2040-030) - the same archetype under its own recovered name, not a second mechanism. The reduction is field-for-field that card's two clauses and every clause dropped or performed is identical, with ONE ADDITION: 'Can be blocked only at the beginning.' That is a rule about WHEN the response window opens, not what happens, and the existing window (GameState.interrupt, G13) opens for the whole resolution - so the narrowed timing is DROPPED and named.",
+      "source": "REF 4.3 recovers CARD GAMES, which REF 4.3 itself records as a re-skin of A COWARD OR A JOURNALIST? (hl-et2040-030) - the same archetype under its own recovered name, not a second mechanism. The reduction is field-for-field that card's two clauses and every clause dropped or performed is identical, with ONE ADDITION: 'Can be blocked only at the beginning.' That is a rule about WHEN the response window opens, not what happens, and the existing window (GameState.interrupt, G13) opens for the whole resolution - so the narrowed timing is DROPPED and named. 2026-10-05: renamed from 'Card Games'.",
       "provenance": "adapted",
-      "name": "Card Games",
+      "name": "Left-Wing Handout",
       "text": "The player on your left receives the top Ideology Card from the draw pile, and 6 resources of their choice. The printed card adds that it can be blocked only at the beginning; the response window here is open for the whole resolution, so that narrowing is not performed.",
       "effects": [
         { "op": "move-card", "from": "draw", "to": "hand", "n": 1, "target": "player-after" },
@@ -445,7 +445,7 @@
       "id": "hl-et2040-033",
       "source": "REF 4.3 recovers THE BIG FREEZE: 'Reduce your resource cap to 10.' PERFORMED whole, via `set-cap` on `PlayerState.capOverride` - a FIELD not a `restrict` kind, because a cap is a NUMBER, not a gate. NO DEADLOCK, which is why the earlier refusal was wrong: enforceCap raises overCap = max(0, total - cap), excess <= total ALWAYS, so the target is REACHABLE (proof: cap-override.test.ts). DROPPED, two: the '[OR] Pick an opponent every turn and donate any 1 resource' branch, a recurring donation to a chosen opponent (G5 + G9) and so a DIFFERENT card; and the reduced cap being visible on the mat.",
       "provenance": "adapted",
-      "name": "The Big Freeze",
+      "name": "Spending Freeze",
       "text": "Your resource cap falls to 10 for the rest of the game, and if you are already over it you discard down to it at once - the discard is always affordable, because you are never asked for more than you hold. A second freeze takes the lower of the two caps. Your reduced cap is not yet shown as a number on your Mat.",
       "effects": [
         { "op": "set-cap", "to": 10, "until": "rest-of-game" }

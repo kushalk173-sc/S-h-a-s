@@ -18,6 +18,17 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+// THE THREE TYPEFACES THE TOKENS NAME, self-hosted. `tokens.css` has always asked
+// for Bitter, Inter and Roboto Mono and nothing ever loaded them, so every player saw
+// the fallbacks (Georgia, Segoe UI, Consolas). Only the weights the tokens use are
+// imported, and they ship in the bundle — no request to a font CDN at runtime.
+import '@fontsource/bitter/400.css';
+import '@fontsource/bitter/700.css';
+import '@fontsource/bitter/800.css';
+import '@fontsource-variable/inter';
+import '@fontsource/roboto-mono/500.css';
+import '@fontsource/roboto-mono/700.css';
+
 import './theme/tokens.css';
 
 import { App } from './app/App.tsx';

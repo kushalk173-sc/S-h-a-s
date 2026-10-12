@@ -114,7 +114,7 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
   it('the cell names the noun, the IDEOLOGUE, and the bonus separately', () => {
     const r = render(
       <ManifestoStrip
-        state={{ players: { [ME]: seat(['capitalist']) } } as unknown as ClientState}
+        state={{ zones: [], players: { [ME]: seat(['capitalist']) } } as unknown as ClientState}
         you={ME}
       />,
     );
@@ -123,7 +123,7 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     const text = cell.textContent ?? '';
     // THE NOUN, visible. This is the entire fix.
     expect(text, 'the count has no noun and reads as the resource holding').toMatch(/1 card Capitalist/i);
-    // �and it agrees with the numeral. A cell reading '1 cards' is the same class of
+    // …and it agrees with the numeral. A cell reading '1 cards' is the same class of
     // error as one reading '23 funds': a number attached to a noun it does not agree
     // with, on the strip whose whole job is to be believed. Caught by a screenshot.
     expect(text, 'the count is pluralised wrongly').not.toMatch(/\b1\s*cards\b/i);
@@ -156,7 +156,7 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     */
     const r = render(
       <ManifestoStrip
-        state={{ players: { [ME]: seat([]) } } as unknown as ClientState}
+        state={{ zones: [], players: { [ME]: seat([]) } } as unknown as ClientState}
         you={ME}
       />,
     );
@@ -217,7 +217,7 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     // SECOND card is what pays.
     const none = render(
       <ManifestoStrip
-        state={{ players: { [ME]: seat([]) } } as unknown as ClientState}
+        state={{ zones: [], players: { [ME]: seat([]) } } as unknown as ClientState}
         you={ME}
       />,
     );
@@ -259,7 +259,7 @@ describe('item 5 — the MANIFESTO number says what it counts', () => {
     // so the sentence has to carry the rule on its own.
     const r = render(
       <ManifestoStrip
-        state={{ players: { [ME]: seat(['capitalist']) } } as unknown as ClientState}
+        state={{ zones: [], players: { [ME]: seat(['capitalist']) } } as unknown as ClientState}
         you={ME}
       />,
     );
@@ -297,7 +297,7 @@ it('the DOM TEXT runs the three facts apart, because textContent is what is read
     ] as const) {
       const r = render(
         <ManifestoStrip
-          state={{ players: { [ME]: player } } as unknown as ClientState}
+          state={{ zones: [], players: { [ME]: player } } as unknown as ClientState}
           you={ME}
         />,
       );
@@ -345,6 +345,7 @@ it('the DOM TEXT runs the three facts apart, because textContent is what is read
             players: { [ME]: me, [P2]: seat([]) },
             turnOrder: [ME, P2],
             activePlayer: ME,
+            zones: [],
           } as unknown as ClientState
         }
         you={ME}

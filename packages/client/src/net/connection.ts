@@ -30,7 +30,7 @@
 
 import type { Action } from '@shasn/engine';
 
-import type { ClientMessage, ServerMessage, Session } from './protocol.ts';
+import type { ClientMessage, ModeId, ServerMessage, Session } from './protocol.ts';
 import { applyServerMessage, clearAnswer, getStore, resetStore, setPhase } from './store.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';
@@ -225,11 +225,11 @@ export class Connection {
   listLobbies(): void {
     this.send({ t: 'lobby:list' });
   }
-  createLobby(name: string, maxPlayers: 2 | 3 | 4 | 5, isPrivate: boolean): void {
-    this.send({ t: 'lobby:create', name, maxPlayers, isPrivate });
+  createLobby(name: string, maxPlayers: 2 | 3 | 4 | 5, isPrivate: boolean, mode: ModeId = 'standard'): boolean {
+    return this.send({ t: 'lobby:create', name, maxPlayers, isPrivate, mode });
   }
-  joinLobby(lobbyId: string, name: string): void {
-    this.send({ t: 'lobby:join', lobbyId, name });
+  joinLobby(lobbyId: string, name: string): boolean {
+    return this.send({ t: 'lobby:join', lobbyId, name });
   }
   leaveLobby(): void {
     this.send({ t: 'lobby:leave' });

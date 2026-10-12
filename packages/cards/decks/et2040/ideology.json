@@ -4,18 +4,18 @@
   "cards": [
     {
       "id": "ig-et2040-001",
-      "source": "original; register per REF 8.2. No Ideology Card from the Earth 2040 campaign was recovered at all (REF 2.4), so this entire deck file is authored.",
+      "source": "original; register per REF 8.2. No Ideology Card from the Earth 2040 campaign was recovered at all (REF 2.4), so this entire deck file is authored. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the cure be free and the patent surrendered?",
+      "question": "Should pandemic vaccine patents be waived so poorer nations can produce doses?",
       "sides": [
         {
-          "answer": "Yes. A cure nobody can pay for is a cure that has not arrived.",
+          "answer": "Yes. A vaccine only the rich can buy leaves everyone exposed.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. Nobody invents it again if nobody is allowed to own it.",
+          "answer": "No. Strip the patent and nobody funds the next vaccine.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         }
@@ -23,18 +23,18 @@
     },
     {
       "id": "ig-et2040-002",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the archive be opened to anyone who asks?",
+      "question": "Should citizens be paid when companies sell their personal data?",
       "sides": [
         {
-          "answer": "Yes. An archive that answers to one family is a family album.",
+          "answer": "Yes. Our lives are the raw material, so we deserve the royalties.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. Someone has to pay for the humidity control.",
+          "answer": "No. Paying for every click would bankrupt the free services everyone uses.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         }
@@ -42,19 +42,19 @@
     },
     {
       "id": "ig-et2040-003",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the ration be shared by need or by household?",
+      "question": "Should food rations be issued through a national biometric ID card?",
       "advisory": "mature",
       "sides": [
         {
-          "answer": "No. Households are countable, and countable things get administered.",
+          "answer": "Yes. A scanned thumb ends fraud and tells the state who eats.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Need is harder to count, and harder to count keeps more people in the room.",
+          "answer": "No. Hungry people without papers should not starve for a missing scan.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -62,18 +62,18 @@
     },
     {
       "id": "ig-et2040-004",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the border be drawn on the water or on the families?",
+      "question": "Should nations grant climate refugees the same protection as war refugees?",
       "sides": [
         {
-          "answer": "No. Water moves. Draw it on the families and the map will at least be honest.",
+          "answer": "No. Voters tune out the moment refugee numbers lead the bulletin.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. Families move too, and they move slower.",
+          "answer": "Yes. A family fleeing a drowned island is fleeing danger just the same.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -81,18 +81,18 @@
     },
     {
       "id": "ig-et2040-005",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the school teach the old census or the new one?",
+      "question": "Should children under sixteen be banned from immersive virtual worlds?",
       "sides": [
         {
-          "answer": "No. Teach the old one. The new one is still being written by the winners.",
+          "answer": "Yes. A nation raised inside headsets cannot defend its real borders.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. Teach the new one and let anyone who wants examine the old one.",
+          "answer": "No. Virtual worlds are where every audience under thirty now lives.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -100,18 +100,18 @@
     },
     {
       "id": "ig-et2040-006",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the seed bank be sold to the highest bidder?",
+      "question": "Should parents be allowed to edit their embryos' genes for intelligence?",
       "sides": [
         {
-          "answer": "Yes. Sell it to the highest bidder and plant the difference where it is visible.",
+          "answer": "Yes. Gene clinics would create a booming industry and smarter workers.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. Sell it to the patientest bidder, and be honest that this is what we did.",
+          "answer": "No. Children should not be born into a genetic class system.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -119,18 +119,18 @@
     },
     {
       "id": "ig-et2040-007",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the last coal plant close on a published date?",
+      "question": "Should the last coal plants close by 2042 even if bills rise?",
       "sides": [
         {
-          "answer": "No. Close it on a published date. Utilities plan better against a deadline than a promise.",
+          "answer": "No. Cheap, steady power keeps factories open and workers employed.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Keep it running until the grid is stable, and publish the figures weekly.",
+          "answer": "Yes. Every extra year of coal is paid for in children's lungs.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -138,18 +138,18 @@
     },
     {
       "id": "ig-et2040-008",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should every district below the seawall help pay for it?",
+      "question": "Should inland cities pay taxes to build seawalls for coastal cities?",
       "sides": [
         {
-          "answer": "No. Let the districts below the wall pay, and put the story on the evening bulletin.",
+          "answer": "No. Inland voters will never cheer for a wall they cannot see.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. Everyone below the wall funds it, including those who plan to be above it.",
+          "answer": "Yes. A nation that lets its ports drown is no nation at all.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -157,18 +157,18 @@
     },
     {
       "id": "ig-et2040-009",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. The orbital-ownership question is the register's answer to REF 5.4's finding that the 2040 cards treat private ownership of infrastructure as the default setting.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. The orbital-ownership question is the register's answer to REF 5.4's finding that the 2040 cards treat private ownership of infrastructure as the default setting. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the orbital platform be sold to the highest bidder?",
+      "question": "Should the national space station be sold to a private company?",
       "sides": [
         {
-          "answer": "Yes. Sell it and it is built twice as fast.",
+          "answer": "Yes. Private owners would run it cheaper and fill it with paying tenants.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. Sell it and it belongs to whoever can afford the paperwork.",
+          "answer": "No. Whoever controls orbit holds the high ground over every city.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         }
@@ -176,18 +176,18 @@
     },
     {
       "id": "ig-et2040-010",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the settlement on the coast be legalised or demolished?",
+      "question": "Should robots pay income tax on the jobs they replace?",
       "sides": [
         {
-          "answer": "Yes. Legalise it and the tax base doubles by Tuesday.",
+          "answer": "No. Tax the robots and the factories move somewhere that will not.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. Legalise it and the next settlement arrives before the ink dries.",
+          "answer": "Yes. Machines that take a nation's jobs must also fill its treasury.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -195,18 +195,18 @@
     },
     {
       "id": "ig-et2040-011",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. Distinct from ig-et2040-001, which asks who owns the cure; this one asks who pays for the water.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. Distinct from ig-et2040-001, which asks who owns the cure; this one asks who pays for the water. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the desalination plant run on the municipal budget?",
+      "question": "Should drinking water be free up to a basic daily amount?",
       "sides": [
         {
-          "answer": "No. Fund it from the water bill, which is honest about who uses it.",
+          "answer": "No. Free water gets wasted, and a price makes people save it.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Run it on the budget, so the cost is visible to everyone it feeds.",
+          "answer": "Yes. Nobody should have to choose between rent and a drink of water.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -214,18 +214,18 @@
     },
     {
       "id": "ig-et2040-012",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the drought be announced before the reservoirs are dry?",
+      "question": "Should we spray aerosols into the sky to cool the planet?",
       "sides": [
         {
-          "answer": "No. Announce it when it is a fact and the panic is only a rumour.",
+          "answer": "Yes. Cooling the sky costs far less than rebuilding every flooded city.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Announce it early and the queue is somebody else's photograph.",
+          "answer": "No. Nobody wants to be the leader who turned the sky white.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -233,18 +233,18 @@
     },
     {
       "id": "ig-et2040-013",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the broadcast carry the migration numbers every night?",
+      "question": "Should every adult receive a universal basic income funded by AI profits?",
       "sides": [
         {
-          "answer": "No. Carry them monthly, once the number has stopped moving.",
+          "answer": "No. Taxing AI profits would drive the best labs offshore.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Carry them nightly and the number becomes the argument.",
+          "answer": "Yes. A monthly cheque in every pocket is the most popular policy alive.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -252,18 +252,18 @@
     },
     {
       "id": "ig-et2040-014",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the space launch be televised live?",
+      "question": "Should taxpayers fund a crewed mission to Mars?",
       "sides": [
         {
-          "answer": "No. Televise the rehearsal and the real one stands a chance.",
+          "answer": "No. That money would earn far more invested back here on Earth.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Live, and the failure is worth exactly what the launch is.",
+          "answer": "Yes. Nothing fills every screen on the planet like a footprint on Mars.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -271,18 +271,18 @@
     },
     {
       "id": "ig-et2040-015",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the voting roll include the people who moved offshore?",
+      "question": "Should citizens be allowed to vote online from their phones?",
       "sides": [
         {
-          "answer": "No. Leave them off it and the poll stays a poll.",
+          "answer": "No. Online ballots invite foreign hackers to choose our leaders.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Include them and the government has to answer across an ocean.",
+          "answer": "Yes. Voting should be as easy for disabled and remote citizens as anyone.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -290,19 +290,19 @@
     },
     {
       "id": "ig-et2040-016",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. Pairs with ig-et2040-001, which asks about the price of the same cure; this one asks about the body it enters.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. Pairs with ig-et2040-001, which asks about the price of the same cure; this one asks about the body it enters. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the cure be compulsory for anyone entering the district?",
+      "question": "Should police use live facial recognition on every city street camera?",
       "advisory": "trigger",
       "sides": [
         {
-          "answer": "Yes. Compel them and the queue is short by Thursday.",
+          "answer": "Yes. Criminals cannot hide in a city that never forgets a face.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "No. Compel them and the next variant arrives from somewhere nobody checked.",
+          "answer": "No. Innocent people should not be tracked just for walking outside.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -310,18 +310,18 @@
     },
     {
       "id": "ig-et2040-017",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the council publish the minutes before or after the vote?",
+      "question": "Should governments be allowed to shut down the internet during riots?",
       "sides": [
         {
-          "answer": "No. After. The vote is not improved by having been read aloud.",
+          "answer": "Yes. Order comes first, and rioters organise online.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. Before. The reading is half of what the meeting is for.",
+          "answer": "No. A blackout becomes the story, and that story is always worse.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -329,18 +329,18 @@
     },
     {
       "id": "ig-et2040-018",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the state of emergency be renewed by default?",
+      "question": "Should a climate emergency let governments suspend elections?",
       "sides": [
         {
-          "answer": "Yes. Renew it by default and the state keeps the tools it needs.",
+          "answer": "Yes. A crisis needs steady hands, not a campaign season.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         },
         {
-          "answer": "No. Renew it by default and nobody remembers what the emergency was.",
+          "answer": "No. Cancelled elections make the worst headlines a government can get.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -348,18 +348,18 @@
     },
     {
       "id": "ig-et2040-019",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the seawall be named after the engineer or the town?",
+      "question": "Should a national space force be allowed to put weapons in orbit?",
       "sides": [
         {
-          "answer": "No. Name it after the town. Names are cheaper to defend.",
+          "answer": "Yes. If we do not arm orbit first, our rivals surely will.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Name it after the engineer and the wall becomes an argument.",
+          "answer": "No. Weapons hanging over every city would make us the world's villain.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -367,18 +367,18 @@
     },
     {
       "id": "ig-et2040-020",
-      "source": "original; register per REF 8.2. Authored — see ig-et2040-001.",
+      "source": "original; register per REF 8.2. Authored — see ig-et2040-001. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the climate curriculum be taught in every school?",
+      "question": "Should climate science be a compulsory subject in every school?",
       "sides": [
         {
-          "answer": "Yes. Every school, including the ones that would rather not.",
+          "answer": "Yes. Children deserve the truth about the world they will inherit.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. Teach it in some schools and it becomes a school trip.",
+          "answer": "No. Nothing makes a cause unpopular faster than turning it into homework.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -386,18 +386,18 @@
     },
     {
       "id": "ig-et2040-021",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the floor price and the queue, Supremo on who ends up holding the pipe. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the floor price and the queue, Supremo on who ends up holding the pipe. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Is selling the seabed licence to the highest bidder a good idea?",
+      "question": "Should companies be allowed to mine the deep seabed for battery metals?",
       "sides": [
         {
-          "answer": "Yes. The licence has a floor price and a queue.",
+          "answer": "Yes. Batteries need those metals, and buyers will pay handsomely for them.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "No. Whoever holds the pipe holds the argument.",
+          "answer": "No. Foreign mining ships on our seabed weaken our hold on our waters.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -405,18 +405,18 @@
     },
     {
       "id": "ig-et2040-022",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on weighing cargo at the next window, Supremo on the flag that was never a private interest. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on weighing cargo at the next window, Supremo on the flag that was never a private interest. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the lunar landing rights be auctioned by the kilo?",
+      "question": "Should private firms be allowed to own the asteroids they mine?",
       "sides": [
         {
-          "answer": "Yes. Weigh the cargo and settle at the next window.",
+          "answer": "Yes. Nobody invests billions in a rock they are not allowed to keep.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. The first flag on it was never a private interest.",
+          "answer": "No. Riches from space should strengthen nations, not unaccountable companies.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -424,18 +424,18 @@
     },
     {
       "id": "ig-et2040-023",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on taxing the emitter, Supremo on owning a field the state can point at. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on taxing the emitter, Supremo on owning a field the state can point at. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should carbon be bought by the tonne or taxed by the tonne?",
+      "question": "Should imports be taxed on the carbon used to make them?",
       "sides": [
         {
-          "answer": "No. Tax the emitters; the money arrives without a project.",
+          "answer": "No. Border carbon taxes start trade wars and raise prices for shoppers.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Buy the capture and the state owns a field it can point at.",
+          "answer": "Yes. Dirty foreign factories should not undercut our own industries.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -443,18 +443,18 @@
     },
     {
       "id": "ig-et2040-024",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on unmetered traffic, Supremo on what a heavier sky leaves aimable. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on unmetered traffic, Supremo on what a heavier sky leaves aimable. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should traffic in orbit be priced per tonne of lift?",
+      "question": "Should self-driving trucks be allowed on every highway?",
       "sides": [
         {
-          "answer": "Yes. Traffic with no meter is congestion with a delay.",
+          "answer": "Yes. Robot trucks never sleep, and freight costs would fall sharply.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "No. Heavier up there means fewer objects that can be aimed.",
+          "answer": "No. One hacked convoy could paralyse the entire country.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -462,18 +462,18 @@
     },
     {
       "id": "ig-et2040-025",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on rebuilding before narrating, Showstopper on aid that arrives attached to the clip. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on rebuilding before narrating, Showstopper on aid that arrives attached to the clip. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the flood footage be released before the water recedes?",
+      "question": "Should outdoor work be banned when temperatures pass forty-five degrees?",
       "sides": [
         {
-          "answer": "No. Rebuild first; the story costs less once the walls hold.",
+          "answer": "No. Halting construction every heatwave would stall the economy all summer.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Release it tonight and the aid arrives with the clip.",
+          "answer": "Yes. Nobody wants a worker collapsing from heat on the evening news.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -481,18 +481,18 @@
     },
     {
       "id": "ig-et2040-026",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a price acting as the ration, Showstopper on a published price making the drought news. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a price acting as the ration, Showstopper on a published price making the drought news. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Must the water market stay shut while the taps are dry?",
+      "question": "Should cattle farm subsidies be moved to lab-grown meat producers?",
       "sides": [
         {
-          "answer": "Yes. A price is a ration, and rationing is the only ration.",
+          "answer": "Yes. Lab meat is cheaper to produce and saves taxpayers a fortune.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. Publish the price and the drought becomes a headline.",
+          "answer": "No. Nobody wins an election by filming ranchers lose their farms.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -500,18 +500,18 @@
     },
     {
       "id": "ig-et2040-027",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what a single language does to the sponsorship, Showstopper on room size as the thing that changes the argument. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what a single language does to the sponsorship, Showstopper on room size as the thing that changes the argument. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the summit be broadcast in one language or in every language?",
+      "question": "Should AI-generated actors be allowed to replace human performers in films?",
       "sides": [
         {
-          "answer": "No. One language, and the sponsors notice the size of the room.",
+          "answer": "Yes. Digital actors cost a fraction and never ask for a raise.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Every language is a bigger room, and bigger rooms argue longer.",
+          "answer": "No. Audiences pay to see real stars, not polished puppets.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -519,18 +519,18 @@
     },
     {
       "id": "ig-et2040-028",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the pension nobody voted to raise, Showstopper on the evening slot as the only place it will pass. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the pension nobody voted to raise, Showstopper on the evening slot as the only place it will pass. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the retirement age rise with the life expectancy it bought?",
+      "question": "Should the retirement age rise as longevity treatments extend lifespans?",
       "sides": [
         {
-          "answer": "No. The pension fund is the last thing anyone voted to raise.",
+          "answer": "Yes. Pension funds cannot pay for retirements that last fifty years.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "Yes. Put it in the evening slot and the young will carry it.",
+          "answer": "No. No campaign survives an ad telling people to work until ninety.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -538,18 +538,18 @@
     },
     {
       "id": "ig-et2040-029",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the price of an appeal nobody funds, Idealist on a decision no one can question. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the price of an appeal nobody funds, Idealist on a decision no one can question. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the machine decide when the appeal cannot be funded?",
+      "question": "Should AI judges decide small claims cases to clear court backlogs?",
       "sides": [
         {
-          "answer": "Yes. A cheap mistake is cheaper than an expensive appeal.",
+          "answer": "Yes. Instant rulings save courts millions and get businesses paid faster.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. A decision nobody can question is not a decision.",
+          "answer": "No. Everyone deserves a human who can hear their side and explain.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -557,18 +557,18 @@
     },
     {
       "id": "ig-et2040-030",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the training invoice and the asset it produced, Idealist on having paid for what the model knows. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the training invoice and the asset it produced, Idealist on having paid for what the model knows. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the model weights be closed when public money trained them?",
+      "question": "Should AI models trained with public money be released free to everyone?",
       "sides": [
         {
-          "answer": "No. The training was our invoice; the weights are the asset.",
+          "answer": "No. The companies that built them need returns to keep investing.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. We paid to train it, so we paid for what it knows.",
+          "answer": "Yes. Taxpayers funded the training, so the public should own the result.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -576,18 +576,18 @@
     },
     {
       "id": "ig-et2040-031",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on charging for a trait so it spreads, Idealist on a seed nobody can afford. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on charging for a trait so it spreads, Idealist on a seed nobody can afford. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the edited seed be released to the growers for nothing?",
+      "question": "Should drought-proof gene-edited crops be patented by the companies that made them?",
       "sides": [
         {
-          "answer": "No. Charge for the trait and the trait spreads faster.",
+          "answer": "Yes. Patents repay the research that keeps new crops coming.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. A seed nobody can afford is a seed replanted from stock.",
+          "answer": "No. Poor farmers in dry regions need these seeds most and afford them least.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -595,18 +595,18 @@
     },
     {
       "id": "ig-et2040-032",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on contribution as the only self-paying ration, Idealist on age as the number everyone already agrees to. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on contribution as the only self-paying ration, Idealist on age as the number everyone already agrees to. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the longevity cure be rationed by age or by contribution?",
+      "question": "Should life-extending treatments be covered by public health insurance?",
       "sides": [
         {
-          "answer": "No. Contribution is the only ration that pays for itself.",
+          "answer": "No. Keeping everyone alive decades longer would bankrupt the health system.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "Yes. Age is the one number every applicant already agrees on.",
+          "answer": "Yes. Longer life should not be a luxury reserved for billionaires.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -614,18 +614,18 @@
     },
     {
       "id": "ig-et2040-033",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a sensor having exactly one master, Showstopper on reuse of an orbit already paid for. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a sensor having exactly one master, Showstopper on reuse of an orbit already paid for. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the satellite that watches the ice also watch the border?",
+      "question": "Should pandemic contact tracing apps be mandatory for everyone?",
       "sides": [
         {
-          "answer": "No. One sensor has one master, and the master is not weather.",
+          "answer": "Yes. Tracking every contact stops outbreaks before they reach the capital.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Reuse the orbit; the glacier gets the same picture as everyone.",
+          "answer": "No. Nothing makes a government look more like Big Brother.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         }
@@ -633,18 +633,18 @@
     },
     {
       "id": "ig-et2040-034",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a chamber earning its emergency, Showstopper on the vote becoming a performance. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a chamber earning its emergency, Showstopper on the vote becoming a performance. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the emergency session be allowed to vote on camera?",
+      "question": "Should the military control the national AI research labs?",
       "sides": [
         {
-          "answer": "Yes. A chamber that fears the camera has not earned the emergency.",
+          "answer": "Yes. Whoever leads in AI leads the world, so the army must hold it.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "No. Filming the emergency turns the vote into a performance.",
+          "answer": "No. Soldiers guarding chatbots would be a gift to every satirist.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -652,18 +652,18 @@
     },
     {
       "id": "ig-et2040-035",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on sovereignty not being delegable to a shed, Showstopper on weekly proof in the open. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on sovereignty not being delegable to a shed, Showstopper on weekly proof in the open. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the restored species be released before the pen is proven?",
+      "question": "Should scientists bring extinct species like the mammoth back to life?",
       "sides": [
         {
-          "answer": "No. Sovereignty over a species is not ours to delegate to a shed.",
+          "answer": "No. Releasing unknown creatures onto our land is a threat we cannot control.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "funds": 2 }
         },
         {
-          "answer": "Yes. Keep the pen, and keep it in the open every week.",
+          "answer": "Yes. A living mammoth would be the most watched animal on Earth.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -671,18 +671,18 @@
     },
     {
       "id": "ig-et2040-036",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a state routed through a foreign relay, Idealist on somebody having to lay the cable. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a state routed through a foreign relay, Idealist on somebody having to lay the cable. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the seabed cable belong to the state or the consortium?",
+      "question": "Should all national data be stored on servers inside our borders?",
       "sides": [
         {
-          "answer": "Yes. A state routed through a foreign relay is not a state.",
+          "answer": "Yes. Data held abroad is data a foreign power can seize.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "No. Somebody has to lay it, and the consortium is somebody.",
+          "answer": "No. Local storage rules make it easier for governments to spy on citizens.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -690,18 +690,18 @@
     },
     {
       "id": "ig-et2040-037",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a permit being a queue inside a border, Idealist on price deciding without a desk. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a permit being a queue inside a border, Idealist on price deciding without a desk. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Must population be managed by permit rather than by price?",
+      "question": "Should couples need a permit to have more than two children?",
       "sides": [
         {
-          "answer": "No. A permit is a queue, and a queue is a border inside the border.",
+          "answer": "Yes. A crowded, thirsty nation needs firm control over its growth.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Price decides without a desk, and no desk has ever been clean.",
+          "answer": "No. Deciding to have a child is a basic human right.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "funds": 2 }
         }
@@ -709,18 +709,18 @@
     },
     {
       "id": "ig-et2040-038",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on voting before the water makes the vote redundant, Idealist on the plan needing a constitution attached. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on voting before the water makes the vote redundant, Idealist on the plan needing a constitution attached. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the retreat be voted on before the water or after it?",
+      "question": "Should coastal towns be forcibly relocated before the sea reaches them?",
       "sides": [
         {
-          "answer": "Yes. Before. Afterwards the only vote is the one nobody needs.",
+          "answer": "Yes. The state must move people in order, not rescue them in chaos.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "No. After. Now it is a relocation plan with a constitution attached.",
+          "answer": "No. Families must not be forced from their homes without their consent.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -728,18 +728,18 @@
     },
     {
       "id": "ig-et2040-039",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on an unallocated river being a rumour, Idealist on the cut being written down as an emergency. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on an unallocated river being a rumour, Idealist on the cut being written down as an emergency. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the river be allocated before the drought is declared?",
+      "question": "Should the army guard rivers and reservoirs during severe droughts?",
       "sides": [
         {
-          "answer": "Yes. Allocate first; an unallocated river is a rumour with a map.",
+          "answer": "Yes. Water is now a strategic asset and needs soldiers to protect it.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "funds": 2 }
         },
         {
-          "answer": "No. Declare first, so the cut is written down as an emergency.",
+          "answer": "No. Troops at the taps turn thirsty citizens into suspects.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -747,18 +747,18 @@
     },
     {
       "id": "ig-et2040-040",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on where the audience stops listening, Idealist on the sources being on screen. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on where the audience stops listening, Idealist on the sources being on screen. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Is on-air self-explanation by the news model a good idea?",
+      "question": "Should AI-generated news stories be clearly labelled as machine-written?",
       "sides": [
         {
-          "answer": "No. The explanation is where the audience stops listening.",
+          "answer": "No. A label makes readers scroll past, and clicks are everything.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Put the sources on screen and let the reader finish it.",
+          "answer": "Yes. Readers have a right to know whether a human wrote their news.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "funds": 2 }
         }
@@ -766,18 +766,18 @@
     },
     {
       "id": "ig-et2040-041",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on silence reading as neglect, Idealist on commentary turning a loss into a segment. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on silence reading as neglect, Idealist on commentary turning a loss into a segment. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should the extinction be narrated or left to the sound?",
+      "question": "Should social media feeds be ranked by algorithms that maximise engagement?",
       "sides": [
         {
-          "answer": "Yes. Narrate it; silence on the archive reads as neglect.",
+          "answer": "Yes. Engagement is attention, and attention is the whole game.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         },
         {
-          "answer": "No. Let the sound carry it; commentary turns a loss into a segment.",
+          "answer": "No. Feeds built to enrage people are tearing communities apart.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -785,20 +785,400 @@
     },
     {
       "id": "ig-et2040-042",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the classroom becoming an employer, Idealist on the two years of argument a later start buys. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the classroom becoming an employer, Idealist on the two years of argument a later start buys. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "Earth 2040",
-      "question": "Should school start at four or at six?",
+      "question": "Should celebrities be paid with public money to promote climate-friendly lifestyles?",
       "sides": [
         {
-          "answer": "No. Start at four and the classroom becomes the first employer.",
+          "answer": "Yes. One famous face cycling to work beats a thousand government leaflets.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         },
         {
-          "answer": "Yes. Start at six and the parents have two years to argue about it.",
+          "answer": "No. Public money should fund honest information, not paid influencers.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-043",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should corporations be allowed to buy and govern entire cities?",
+      "sides": [
+        {
+          "answer": "Yes. A company town fixes potholes faster than any council, because downtime costs money.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. A city answers to the nation, never to a board of shareholders.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-044",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should citizens be free to sell their votes for cash?",
+      "sides": [
+        {
+          "answer": "Yes. A vote is an asset, and every asset deserves an open market.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Once votes are for sale, the state belongs to whoever pays most.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-045",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should lifelike sex robots be legal to sell to adults?",
+      "sides": [
+        {
+          "answer": "Yes. The most talked-about product of the decade deserves a glittering launch.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        },
+        {
+          "answer": "No. Machines built never to refuse teach their owners that consent is optional.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-046",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should families be able to resurrect dead relatives as AI chatbots?",
+      "sides": [
+        {
+          "answer": "Yes. Grandma streaming live at every Sunday dinner is a tearjerker audiences adore.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. The dead never agreed to keep talking, and cannot object now.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-047",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should people be legally allowed to sell their own kidneys?",
+      "sides": [
+        {
+          "answer": "Yes. A legal market ends waiting lists and pays donors what organs are worth.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Billboards of the poor selling body parts would sink any brand overnight.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-048",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should insurers be allowed to set premiums using your genome?",
+      "sides": [
+        {
+          "answer": "Yes. Precise pricing is efficient, and healthy genes deserve cheaper premiums.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Nobody chose their DNA, so nobody should pay extra for it.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-049",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should police arrest people whom an AI predicts will commit crimes?",
+      "sides": [
+        {
+          "answer": "Yes. Stopping a crime before it happens is the purest form of order.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Punishing acts nobody has committed abolishes innocence itself.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-050",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should governments pay citizens to be sterilised to curb overpopulation?",
+      "sides": [
+        {
+          "answer": "Yes. One payment costs far less than a lifetime of schools and hospitals.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Cash for sterility will only ever be accepted by the desperate.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-051",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should there be a legal maximum wage for any job?",
+      "sides": [
+        {
+          "answer": "No. Cap the top earners and the talent, and the taxes, fly abroad.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Nobody's hour is worth a thousand times a nurse's hour.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-052",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should armed autonomous drones patrol city streets to stop crime?",
+      "sides": [
+        {
+          "answer": "Yes. Drones never tire, never take bribes and never hesitate.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. One drone shooting caught on camera would end any government.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-053",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should every citizen carry a public social credit score?",
+      "sides": [
+        {
+          "answer": "Yes. A score rewards the loyal and makes troublemakers visible to everyone.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "No. A nation ranking its own people makes the ugliest headlines abroad.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-054",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should people have to pass a civics test before voting?",
+      "sides": [
+        {
+          "answer": "Yes. Only citizens who understand the state should be trusted to steer it.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        },
+        {
+          "answer": "No. A right that depends on an exam belongs to whoever writes the exam.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-055",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should soldiers be fitted with brain implants that switch off fear?",
+      "sides": [
+        {
+          "answer": "Yes. A soldier without fear is a soldier who follows every order.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Zombie troops on the evening news would horrify every voter at home.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-056",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should uploaded minds of dead founders keep running their companies?",
+      "sides": [
+        {
+          "answer": "Yes. A proven founder forever means no costly succession fights or share slumps.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. A dead tycoon on a screen firing staff is a horror film, not a brand.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-057",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should disaster evacuation seats go to the most useful citizens first?",
+      "sides": [
+        {
+          "answer": "Yes. Save the engineers, doctors and soldiers, and the nation can rebuild.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        },
+        {
+          "answer": "No. In a flood, a cleaner's life weighs exactly what a general's does.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-058",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should pensioners be paid to choose assisted death early?",
+      "sides": [
+        {
+          "answer": "Yes. A farewell party with fireworks beats ten forgotten years in a care home.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Offering cash to die is pressure on the frail dressed up as choice.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-059",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should the state own all land and only lease it to citizens?",
+      "sides": [
+        {
+          "answer": "No. Nobody invests a penny in land they can never truly own.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Whoever holds the land holds the nation, so the state must hold it.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-060",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should unvaccinated people be barred from offices and public transport?",
+      "sides": [
+        {
+          "answer": "Yes. Vaccinated-only zones are a safety campaign everyone can see and share.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        },
+        {
+          "answer": "No. Locking people off buses punishes the poor and the fearful hardest.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-061",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should every flight after your first each year be heavily taxed?",
+      "sides": [
+        {
+          "answer": "No. Business travel closes deals, and taxing it grounds the whole economy.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Grounding jet-setting elites is the most popular climate policy imaginable.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-et2040-062",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "Earth 2040",
+      "question": "Should advanced AI systems be granted the legal rights of persons?",
+      "sides": [
+        {
+          "answer": "Yes. An AI that can own patents and sign contracts is a whole new market.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Give machines rights and the state loses the power to switch them off.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
         }
       ]
     }

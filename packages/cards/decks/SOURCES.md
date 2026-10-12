@@ -111,12 +111,11 @@ size of the deck at the end of THAT pass and is left as history; the deck is 134
 
 ---
 
-## 3. Per-card index, all 231 shipped cards
+## 3. Per-card index, all 303 shipped cards
 
-**The seven deck files, counted off `"id"` rather than remembered: 92 + 42 + 13 + 18 + 15 +
-30 + 21 = 231.** `npm run validate` prints the same census.
+**The seven deck files, counted off `"id"` rather than remembered: 138 + 62 + 17 + 18 + 17 + 30 + 21 = 303.** `npm run validate` prints the same census.
 
-### `in2020` / ideology — 92 cards
+### `in2020` / ideology — 138 cards
 
 | # | card id | question | provenance | source |
 |---|---|---|---|---|
@@ -128,54 +127,54 @@ size of the deck at the end of THAT pass and is left as history; the deck is 134
 | 6 | `ig-in2020-006` | Is providing free food, housing and healthcare to all citizens a good idea? | `adapted` | REF §8.1 q6 — stem recovered; both answers authored |
 | 7 | `ig-in2020-007` | Do the poor have the right to take wealth from the rich? | `adapted` | REF §8.1 q7 — stem recovered; both answers authored |
 | 8 | `ig-in2020-008` | Should the rich be taxed to fund free higher education? | `adapted` | REF §8.1 q8 — stem recovered; both answers authored |
-| 9 | `ig-in2020-009` | Should the corporation fund the festival or should the festival fund the corporation? | `inferred` | original; REF §8.2 |
-| 10 | `ig-in2020-010` | Should the spokesperson resign before the committee finishes reading? | `inferred` | original; REF §8.2 |
-| 11 | `ig-in2020-011` | Should the broadcast continue while the repair crew is still in the room? | `inferred` | original; REF §8.2 |
-| 12 | `ig-in2020-012` | Should the old market stay open until the new one is finished? | `inferred` | original; REF §8.2 |
-| 13 | `ig-in2020-013` | Should the tender be reopened every year or awarded once? | `inferred` | original; REF §8.2 |
-| 14 | `ig-in2020-014` | Should a defaulting contractor be allowed to bid again? | `inferred` | original; REF §8.2 — no procurement question exists in the recovered pool |
-| 15 | `ig-in2020-015` | Should the toll be raised to fund the bridge that replaced it? | `inferred` | original; REF §8.2 |
-| 16 | `ig-in2020-016` | Should land records be digitised before the next election? | `inferred` | original; REF §8.2 |
-| 17 | `ig-in2020-017` | Should free bus travel be extended to the district? | `inferred` | original; REF §8.2 |
+| 9 | `ig-in2020-009` | Can parties hand out free laptops and televisions before an election? | `inferred` | original; REF §8.2 |
+| 10 | `ig-in2020-010` | Do police need a judge's warrant to tap a citizen's phone? | `inferred` | original; REF §8.2 |
+| 11 | `ig-in2020-011` | Can authorities shut down mobile internet during riots? | `inferred` | original; REF §8.2 |
+| 12 | `ig-in2020-012` | Must the army buy its weapons only from Indian factories? | `inferred` | original; REF §8.2 |
+| 13 | `ig-in2020-013` | Do elected ministers deserve the final say on appointing high court judges? | `inferred` | original; REF §8.2 |
+| 14 | `ig-in2020-014` | Can farmers sell crops to private traders outside government mandis? | `inferred` | original; REF §8.2 — no procurement question exists in the recovered pool |
+| 15 | `ig-in2020-015` | Is fencing every kilometre of the eastern border worth the cost? | `inferred` | original; REF §8.2 |
+| 16 | `ig-in2020-016` | Does the Centre need its power to dismiss elected state governments? | `inferred` | original; REF §8.2 |
+| 17 | `ig-in2020-017` | Must households pay for every litre of piped water they use? | `inferred` | original; REF §8.2 |
 | 18 | `ig-in2020-018` | Should the pension age rise with life expectancy? | `inferred` | original; REF §8.2 |
-| 19 | `ig-in2020-019` | Should the minister appear on the news every week? | `inferred` | original; REF §8.2 |
-| 20 | `ig-in2020-020` | Should the press conference be streamed before it is edited? | `inferred` | original; REF §8.2 — REF §8.2 rule 4: the joke is in the situation, never the wording |
-| 21 | `ig-in2020-021` | Should the campaign advertise the number of schools opened? | `inferred` | original; REF §8.2 |
-| 22 | `ig-in2020-022` | Should the protest permit be decided by the court or the police? | `inferred` | original; REF §8.2 |
-| 23 | `ig-in2020-023` | Should a deserter's name be published after the war ends? | `inferred` | original; REF §8.2 |
-| 24 | `ig-in2020-024` | Should the minister's statements be archived with their dates? | `inferred` | original; REF §8.2 |
-| 25 | `ig-in2020-025` | Should the opposition be given more time on the news? | `inferred` | original; REF §8.2 |
-| 26 | `ig-in2020-026` | Should the rally be allowed on the main road? | `inferred` | original; REF §8.2 |
-| 27 | `ig-in2020-027` | Should the census count the people who sleep in the district? | `inferred` | original; REF §8.2 |
-| 28 | `ig-in2020-028` | Should the free lunch continue through the summer holidays? | `inferred` | original; REF §8.2 |
-| 29 | `ig-in2020-029` | Should the examination results be published with the schools named? | `inferred` | original; REF §8.2 |
-| 30 | `ig-in2020-030` | Should the memorial be built where the crowd was standing? | `inferred` | original; REF §8.2 |
+| 19 | `ig-in2020-019` | Do World Cup cricket matches belong on free public television? | `inferred` | original; REF §8.2 |
+| 20 | `ig-in2020-020` | Do campaigns need to go silent on social media before polling day? | `inferred` | original; REF §8.2 — REF §8.2 rule 4: the joke is in the situation, never the wording |
+| 21 | `ig-in2020-021` | Is it proper for public money to buy ads praising government schemes? | `inferred` | original; REF §8.2 |
+| 22 | `ig-in2020-022` | Can police ban a protest without first going to court? | `inferred` | original; REF §8.2 |
+| 23 | `ig-in2020-023` | Must every young citizen do a year of military service? | `inferred` | original; REF §8.2 |
+| 24 | `ig-in2020-024` | Do news channels deserve fines for airing fake news? | `inferred` | original; REF §8.2 |
+| 25 | `ig-in2020-025` | Must police officers wear body cameras on every shift? | `inferred` | original; REF §8.2 |
+| 26 | `ig-in2020-026` | Do political rallies have the right to block main city roads? | `inferred` | original; REF §8.2 |
+| 27 | `ig-in2020-027` | Is compulsory voting a good idea for national elections? | `inferred` | original; REF §8.2 |
+| 28 | `ig-in2020-028` | Can criminal trials be broadcast live on national television? | `inferred` | original; REF §8.2 |
+| 29 | `ig-in2020-029` | Must riverfront beautification wait until the river itself is clean? | `inferred` | original; REF §8.2 |
+| 30 | `ig-in2020-030` | Is it right for police to parade arrested suspects before the press? | `inferred` | original; REF §8.2 |
 | 31 | `ig-in2020-031` | Should we stop aerial bombing developed countries? | `adapted` | REF §8.1 item 9 — stem legible but the verb is **occluded**; REF §8.1 says do not treat as verbatim. Verb supplied. Both answers authored |
 | 32 | `ig-in2020-032` | Should Kashmiri farmers be given the right to fly drones? | `adapted` | REF §8.1 item 10 — stem legible only to *"FLY"*; REF §8.1 says do not treat as verbatim. Object of "fly" (drones) supplied. Both answers authored |
-| 33 | `ig-in2020-033` | Should the panchayat's water allocation favour the fields that have always had water? | `inferred` | original; REF §8.2 — the recovered pool has no small-scale question |
-| 34 | `ig-in2020-034` | Should farm loan waivers be paid to the banks or to the farmers? | `inferred` | original; REF §8.2 — creditor vs debtor, a trade the recovered pool has no instance of |
+| 33 | `ig-in2020-033` | Are big dams worth building if they flood tribal villages? | `inferred` | original; REF §8.2 — the recovered pool has no small-scale question |
+| 34 | `ig-in2020-034` | Is a farm loan waiver justified after a failed monsoon? | `inferred` | original; REF §8.2 — creditor vs debtor, a trade the recovered pool has no instance of |
 | 35 | `ig-in2020-035` | Should India pay more than its agreed share of the climate fund? | `inferred` | original; REF §8.2 |
-| 36 | `ig-in2020-036` | Should a working spouse's earnings count in the family's means test? | `inferred` | original; REF §8.2 — measured inside the household |
-| 37 | `ig-in2020-037` | Should the ruling party campaign on the day the budget is presented? | `inferred` | original; REF §8.2 |
-| 38 | `ig-in2020-038` | Should the district's advertising contract go to the highest bidder? | `inferred` | original; REF §8.2 |
-| 39 | `ig-in2020-039` | Should a new industrial corridor be built through the fields or the city? | `inferred` | original; REF §8.2 |
-| 40 | `ig-in2020-040` | Should the next gas block be opened before the current one is empty? | `inferred` | original; REF §8.2 — the inter-generational question, absent from the recovered pool |
-| 41 | `ig-in2020-041` | Should the procurement portal be open to anyone who asks for a file? | `inferred` | original; REF §8.2 — the Capitalist side votes to keep a file closed |
-| 42 | `ig-in2020-042` | Should a large contractor bid using a local partner's name? | `inferred` | original; REF §8.2 |
-| 43 | `ig-in2020-043` | Should the border road be built before the flood relief is finished? | `inferred` | original; REF §8.2 |
-| 44 | `ig-in2020-044` | Should a foreign firm be allowed to bid for a national port? | `inferred` | original; REF §8.2 |
+| 36 | `ig-in2020-036` | Can private companies run prisons for profit? | `inferred` | original; REF §8.2 — measured inside the household |
+| 37 | `ig-in2020-037` | Can companies fund political parties anonymously through electoral bonds? | `inferred` | original; REF §8.2 |
+| 38 | `ig-in2020-038` | Is selling naming rights to metro stations a good idea? | `inferred` | original; REF §8.2 |
+| 39 | `ig-in2020-039` | Can farmland be taken for factories without the farmers' consent? | `inferred` | original; REF §8.2 |
+| 40 | `ig-in2020-040` | Is opening coal mines in protected forests worth the extra power? | `inferred` | original; REF §8.2 — the inter-generational question, absent from the recovered pool |
+| 41 | `ig-in2020-041` | Must TV channels limit advertising to ten minutes an hour? | `inferred` | original; REF §8.2 — the Capitalist side votes to keep a file closed |
+| 42 | `ig-in2020-042` | Must exit polls stay secret until the last vote is cast? | `inferred` | original; REF §8.2 |
+| 43 | `ig-in2020-043` | Can troops be sent into a riot-hit state without its consent? | `inferred` | original; REF §8.2 |
+| 44 | `ig-in2020-044` | Can a foreign company bid to run a major Indian port? | `inferred` | original; REF §8.2 |
 | 45 | `ig-in2020-045` | Should the district hospital publish its death rate every quarter? | `inferred` | original; REF §8.2 |
-| 46 | `ig-in2020-046` | Should free travel serve everyone or only those who cannot pay? | `inferred` | original; REF §8.2 — eligibility, not existence |
-| 47 | `ig-in2020-047` | Should the state's message be issued in the states' own languages? | `inferred` | original; REF §8.2 |
-| 48 | `ig-in2020-048` | Should every transfer to a panchayat be published within a month? | `inferred` | original; REF §8.2 |
-| 49 | `ig-in2020-049` | Should the pension fund be lent to a new manufacturing scheme? | `inferred` | original; REF §8.2 |
-| 50 | `ig-in2020-050` | Should the state border be redrawn where the people live? | `inferred` | original; REF §8.2 — Idealist x Supremo seam, per REF §2.3 |
-| 51 | `ig-in2020-051` | Should loss-making public transport be kept running or written off? | `inferred` | original; REF §8.2 |
-| 52 | `ig-in2020-052` | Should the courts be told to clear all pending cases this year? | `inferred` | original; REF §8.2 — the recovered pool has no institutional question |
-| 53 | `ig-in2020-053` | Should the television debate come from one studio or two? | `inferred` | original; REF §8.2 |
-| 54 | `ig-in2020-054` | Should the ruling party's internal vote be shown to the public? | `inferred` | original; REF §8.2 |
-| 55 | `ig-in2020-055` | Should the minister's own district get the new hospital? | `inferred` | original; REF §8.2 — the Showstopper side argues for the minister's own district |
-| 56 | `ig-in2020-056` | Should the border open to pilgrims without a visa for one month? | `inferred` | original; REF §8.2 |
+| 46 | `ig-in2020-046` | Must police register every complaint they receive as an FIR? | `inferred` | original; REF §8.2 — eligibility, not existence |
+| 47 | `ig-in2020-047` | Must Hindi be taught in schools in every state? | `inferred` | original; REF §8.2 |
+| 48 | `ig-in2020-048` | Must every rupee sent to village panchayats be published online? | `inferred` | original; REF §8.2 |
+| 49 | `ig-in2020-049` | Should the Centre impose final settlements on interstate river disputes? | `inferred` | original; REF §8.2 |
+| 50 | `ig-in2020-050` | Should slum families be rehoused on the same land before demolition? | `inferred` | original; REF §8.2 — Idealist x Supremo seam, per REF §2.3 |
+| 51 | `ig-in2020-051` | Should loss-making rural bus routes keep running at public expense? | `inferred` | original; REF §8.2 |
+| 52 | `ig-in2020-052` | Should each new government be free to rewrite school history textbooks? | `inferred` | original; REF §8.2 — the recovered pool has no institutional question |
+| 53 | `ig-in2020-053` | Should the national cricket team refuse matches against hostile neighbours? | `inferred` | original; REF §8.2 |
+| 54 | `ig-in2020-054` | Should the film censor board be allowed to order scene cuts? | `inferred` | original; REF §8.2 |
+| 55 | `ig-in2020-055` | Should new government doctors be required to serve two years in villages? | `inferred` | original; REF §8.2 — the Showstopper side argues for the minister's own district |
+| 56 | `ig-in2020-056` | Should loudspeaker noise limits apply during religious festivals too? | `inferred` | original; REF §8.2 |
 
 #### `ig-in2020-057` … `ig-in2020-092` — 36 cards authored 2026-10-04, closing the deck-size gap
 
@@ -206,70 +205,120 @@ is the axis the brief asked for.
 
 | # | card id | question | provenance | source |
 |---|---|---|---|---|
-| 57 | `ig-in2020-057` | Is it right for the vaccine to be free at every centre? | `inferred` | original; REF §8.2 register, REF §5 tone — Capitalist on the cold chain, Supremo on the ration |
-| 58 | `ig-in2020-058` | Should the border stay shut until the neighbouring states agree? | `inferred` | original; REF §8.2/§5 — Capitalist on grain that cannot move, Supremo on sovereignty |
-| 59 | `ig-in2020-059` | Should unused hospital beds be counted as savings or as capacity? | `inferred` | original; REF §8.2/§5 — Capitalist on the bed already paid for, Supremo on the unfilled ward |
-| 60 | `ig-in2020-060` | Should the electricity waiver cover the monsoon or the summer? | `inferred` | original; REF §8.2/§5 — Capitalist on arrears becoming custom, Supremo on the named month |
-| 61 | `ig-in2020-061` | Should the ruling party pay for its campaign from the treasury? | `inferred` | original; REF §8.2/§5 — Capitalist on raising its own money, Supremo on being owned |
-| 62 | `ig-in2020-062` | Must the oxygen shortage be announced before the cylinders run out? | `inferred` | original; REF §8.2/§5 — Capitalist on scarcity clearing, Showstopper on the hour it is said |
-| 63 | `ig-in2020-063` | Can a film shot at the old site be allowed to premiere? | `inferred` | original; REF §8.2/§5 — Capitalist on the settled fee, Showstopper on who must watch |
-| 64 | `ig-in2020-064` | Do you agree a paper should print the letters rejecting it? | `inferred` | original; REF §8.2/§5 — Capitalist on the cover price, Showstopper on a noticeboard |
-| 65 | `ig-in2020-065` | Is showing the empty seats a good idea? | `inferred` | original; REF §8.2/§5 — Capitalist on lighting, Showstopper on where the camera points |
-| 66 | `ig-in2020-066` | Should the exam centre move for the candidate who cannot travel? | `inferred` | original; REF §8.2/§5 — Capitalist on the precedent, Showstopper on the notice |
-| 67 | `ig-in2020-067` | Should the school meal continue for the children sent home? | `inferred` | original; REF §8.2/§5 — Capitalist on the closed register, Idealist on feeding where they are |
-| 68 | `ig-in2020-068` | Must the fuel surcharge be absorbed by the seller? | `inferred` | original; REF §8.2/§5 — Capitalist on passing it to the burner, Idealist on the old price |
-| 69 | `ig-in2020-069` | Should the free ration continue for those who can now afford it? | `inferred` | original; REF §8.2/§5 — Capitalist on a withdrawable subsidy, Idealist on restarting a list |
-| 70 | `ig-in2020-070` | Must the scholarship follow the college rather than the student? | `inferred` | original; REF §8.2/§5 — Capitalist on what is measurable, Idealist on the seat |
-| 71 | `ig-in2020-071` | Should the forest rules apply to the village older than the rules? | `inferred` | original; REF §8.2/§5 — Capitalist on the timber value, Idealist on knowledge older than paper |
-| 72 | `ig-in2020-072` | Must the army camp move away from the city wall? | `inferred` | original; REF §8.2/§5 — Supremo on the fort, Showstopper on a televised parade |
-| 73 | `ig-in2020-073` | Is cancelling the visit right once a flood is announced? | `inferred` | original; REF §8.2/§5 — Supremo on the presence being the policy, Showstopper on the bulletins |
-| 74 | `ig-in2020-074` | Should the press be allowed inside the counting hall? | `inferred` | original; REF §8.2/§5 — Supremo on the sovereign act, Showstopper on the queue policing it |
-| 75 | `ig-in2020-075` | Do you support lifting the curfew an hour earlier for the market? | `inferred` | original; REF §8.2/§5 — Supremo on the margin, Showstopper on the street filling |
-| 76 | `ig-in2020-076` | Should the network be cut during the examination season? | `inferred` | original; REF §8.2/§5 — Supremo on order preceding papers, Showstopper on the overnight story |
-| 77 | `ig-in2020-077` | Do you agree the state should keep a list of market visitors? | `inferred` | original; REF §8.2/§5 — Supremo on the account to correct, Idealist on the one morning it is read |
-| 78 | `ig-in2020-078` | Should the sentence be served in the prisoner's own village? | `inferred` | original; REF §8.2/§5 — Supremo on distance as the sentence, Idealist on the visiting family |
-| 79 | `ig-in2020-079` | Must the budget be published before the house approves it? | `inferred` | original; REF §8.2/§5 — Supremo on a budget defeated early, Idealist on daylight arithmetic |
-| 80 | `ig-in2020-080` | Should the army build the road instead of the contractor? | `inferred` | original; REF §8.2/§5 — Supremo on slowness as the arrangement, Idealist on idle hands |
-| 81 | `ig-in2020-081` | Do you agree the death penalty should stay for murder? | `inferred` | original; REF §8.2/§5 — Supremo on a law kept to be cited, Idealist on a law only quoted |
-| 82 | `ig-in2020-082` | Is printing the speech in full beforehand a good idea? | `inferred` | original; REF §8.2/§5 — Showstopper on the argument starting first, Idealist on the room's answer |
-| 83 | `ig-in2020-083` | Should the broadcaster's archive be deleted or kept? | `inferred` | original; REF §8.2/§5 — Showstopper on ammunition that keeps, Idealist on dating what was true |
-| 84 | `ig-in2020-084` | Must the spending be published while it is being spent? | `inferred` | original; REF §8.2/§5 — Showstopper on the donor as participant, Idealist on teaching the country to wait |
-| 85 | `ig-in2020-085` | Should the smallest party get the debate slot at its own hour? | `inferred` | original; REF §8.2/§5 — Showstopper on curiosity, Idealist on nobody being obliged to watch |
-| 86 | `ig-in2020-086` | Should the meeting be filmed in the language the objections came in? | `inferred` | original; REF §8.2/§5 — Showstopper on the translator as story, Idealist on better-made objections |
-| 87 | `ig-in2020-087` | Should the ward pay the private tanker or dig its own well? | `inferred` | original; REF §8.2/§5 — Capitalist on the invoiced tanker, Supremo on rented sovereignty |
-| 88 | `ig-in2020-088` | Should the streetlight be repaired first or the road? | `inferred` | original; REF §8.2/§5 — Capitalist on the night shift, Showstopper on the road noticing its own light |
-| 89 | `ig-in2020-089` | Should the public toilet keep running or be fenced? | `inferred` | original; REF §8.2/§5 — Capitalist on an unmeasurable return, Idealist on fencing away the unpaid |
-| 90 | `ig-in2020-090` | Should the night patrol be doubled or the street lit? | `inferred` | original; REF §8.2/§5 — Supremo on somebody answering for the dark, Showstopper on a lit room |
-| 91 | `ig-in2020-091` | Should the ration shop stay open past the closing hour? | `inferred` | original; REF §8.2/§5 — Supremo on the rule the post holds, Idealist on the queue as real hours |
-| 92 | `ig-in2020-092` | Should the school bus wait for the child who always runs late? | `inferred` | original; REF §8.2/§5 — Showstopper on forty children taught lateness, Idealist on the timetable |
+| 57 | `ig-in2020-057` | Should foreign tech companies be forced to store Indian users' data locally? | `inferred` | original; REF §8.2 register, REF §5 tone — Capitalist on the cold chain, Supremo on the ration |
+| 58 | `ig-in2020-058` | Should investors from bordering countries need government approval to buy Indian firms? | `inferred` | original; REF §8.2/§5 — Capitalist on grain that cannot move, Supremo on sovereignty |
+| 59 | `ig-in2020-059` | Should cash payments above two lakh rupees be banned outright? | `inferred` | original; REF §8.2/§5 — Capitalist on the bed already paid for, Supremo on the unfilled ward |
+| 60 | `ig-in2020-060` | Should diesel cars over ten years old be banned from Delhi? | `inferred` | original; REF §8.2/§5 — Capitalist on arrears becoming custom, Supremo on the named month |
+| 61 | `ig-in2020-061` | Should private companies reserve most jobs for residents of their state? | `inferred` | original; REF §8.2/§5 — Capitalist on raising its own money, Supremo on being owned |
+| 62 | `ig-in2020-062` | Should private hospital fees be capped during a pandemic? | `inferred` | original; REF §8.2/§5 — Capitalist on scarcity clearing, Showstopper on the hour it is said |
+| 63 | `ig-in2020-063` | Should cinemas have to play the national anthem before every film? | `inferred` | original; REF §8.2/§5 — Capitalist on the settled fee, Showstopper on who must watch |
+| 64 | `ig-in2020-064` | Should social media influencers pay income tax on free gifted products? | `inferred` | original; REF §8.2/§5 — Capitalist on the cover price, Showstopper on a noticeboard |
+| 65 | `ig-in2020-065` | Should India spend billions bidding to host the Olympic Games? | `inferred` | original; REF §8.2/§5 — Capitalist on lighting, Showstopper on where the camera points |
+| 66 | `ig-in2020-066` | Should ride-hailing apps be banned from surge pricing at peak hours? | `inferred` | original; REF §8.2/§5 — Capitalist on the precedent, Showstopper on the notice |
+| 67 | `ig-in2020-067` | Should midday school meals be delivered home when schools are shut? | `inferred` | original; REF §8.2/§5 — Capitalist on the closed register, Idealist on feeding where they are |
+| 68 | `ig-in2020-068` | Should fuel taxes be cut when petrol prices hit record highs? | `inferred` | original; REF §8.2/§5 — Capitalist on passing it to the burner, Idealist on the old price |
+| 69 | `ig-in2020-069` | Should free rations stop for families whose incomes have risen? | `inferred` | original; REF §8.2/§5 — Capitalist on a withdrawable subsidy, Idealist on restarting a list |
+| 70 | `ig-in2020-070` | Should private schools reserve a quarter of seats for poor children? | `inferred` | original; REF §8.2/§5 — Capitalist on what is measurable, Idealist on the seat |
+| 71 | `ig-in2020-071` | Should forests be cleared for mining if companies plant trees elsewhere? | `inferred` | original; REF §8.2/§5 — Capitalist on the timber value, Idealist on knowledge older than paper |
+| 72 | `ig-in2020-072` | Should Delhi's colonial-era government buildings be torn down for new ones? | `inferred` | original; REF §8.2/§5 — Supremo on the fort, Showstopper on a televised parade |
+| 73 | `ig-in2020-073` | Should ministers give up VIP convoys and sit in ordinary traffic? | `inferred` | original; REF §8.2/§5 — Supremo on the presence being the policy, Showstopper on the bulletins |
+| 74 | `ig-in2020-074` | Should new sports stadiums be named after political leaders? | `inferred` | original; REF §8.2/§5 — Supremo on the sovereign act, Showstopper on the queue policing it |
+| 75 | `ig-in2020-075` | Should bars and restaurants in big cities stay open all night? | `inferred` | original; REF §8.2/§5 — Supremo on the margin, Showstopper on the street filling |
+| 76 | `ig-in2020-076` | Should mobile internet be switched off to stop cheating in exams? | `inferred` | original; REF §8.2/§5 — Supremo on order preceding papers, Showstopper on the overnight story |
+| 77 | `ig-in2020-077` | Should the state track citizens' phones to enforce pandemic quarantine? | `inferred` | original; REF §8.2/§5 — Supremo on the account to correct, Idealist on the one morning it is read |
+| 78 | `ig-in2020-078` | Should families with more than two children lose government benefits? | `inferred` | original; REF §8.2/§5 — Supremo on distance as the sentence, Idealist on the visiting family |
+| 79 | `ig-in2020-079` | Should welfare payments go only to people with an Aadhaar number? | `inferred` | original; REF §8.2/§5 — Supremo on a budget defeated early, Idealist on daylight arithmetic |
+| 80 | `ig-in2020-080` | Should strikes be banned in essential services like railways and power? | `inferred` | original; REF §8.2/§5 — Supremo on slowness as the arrangement, Idealist on idle hands |
+| 81 | `ig-in2020-081` | Should same-sex marriages be legally recognised? | `inferred` | original; REF §8.2/§5 — Supremo on a law kept to be cited, Idealist on a law only quoted |
+| 82 | `ig-in2020-082` | Should firecrackers be banned during Diwali to cut air pollution? | `inferred` | original; REF §8.2/§5 — Showstopper on the argument starting first, Idealist on the room's answer |
+| 83 | `ig-in2020-083` | Should people have the right to get old news about them deleted online? | `inferred` | original; REF §8.2/§5 — Showstopper on ammunition that keeps, Idealist on dating what was true |
+| 84 | `ig-in2020-084` | Should junk food adverts be banned during children's television shows? | `inferred` | original; REF §8.2/§5 — Showstopper on the donor as participant, Idealist on teaching the country to wait |
+| 85 | `ig-in2020-085` | Should women cricketers get the same match fees as men? | `inferred` | original; REF §8.2/§5 — Showstopper on curiosity, Idealist on nobody being obliged to watch |
+| 86 | `ig-in2020-086` | Should children under twelve be allowed on television reality shows? | `inferred` | original; REF §8.2/§5 — Showstopper on the translator as story, Idealist on better-made objections |
+| 87 | `ig-in2020-087` | Should private companies build and run highways in return for tolls? | `inferred` | original; REF §8.2/§5 — Capitalist on the invoiced tanker, Supremo on rented sovereignty |
+| 88 | `ig-in2020-088` | Should online retailers be barred from deep-discount festival sales? | `inferred` | original; REF §8.2/§5 — Capitalist on the night shift, Showstopper on the road noticing its own light |
+| 89 | `ig-in2020-089` | Should public toilets in cities be free to use? | `inferred` | original; REF §8.2/§5 — Capitalist on an unmeasurable return, Idealist on fencing away the unpaid |
+| 90 | `ig-in2020-090` | Should delivery drones be allowed to fly over Indian cities? | `inferred` | original; REF §8.2/§5 — Supremo on somebody answering for the dark, Showstopper on a lit room |
+| 91 | `ig-in2020-091` | Should factory shifts be extended to twelve hours to boost output? | `inferred` | original; REF §8.2/§5 — Supremo on the rule the post holds, Idealist on the queue as real hours |
+| 92 | `ig-in2020-092` | Should schools publicly rank every student in each class? | `inferred` | original; REF §8.2/§5 — Showstopper on forty children taught lateness, Idealist on the timetable |
 
-### `et2040` / ideology — 42 cards
+#### `ig-in2020-099` … `ig-in2020-138` — 40 controversial cards added 2026-10-06
+
+Original. Written on request as hot-button dilemmas (the published game's register is deliberately
+provocative). Each side argues sincerely in its faction's voice; no card attacks a religion, caste or
+community as such, and none names a living person or a party. Payouts follow the deck pattern: 2 of
+the faction's own resource and 1 secondary, equal totals on both sides.
+
+| # | card id | question | provenance |
+|---|---|---|---|
+| 99 | `ig-in2020-099` | Should beef be outlawed across the whole country? | `inferred` |
+| 100 | `ig-in2020-100` | Should idle temple gold be melted down to fund the economy? | `inferred` |
+| 101 | `ig-in2020-101` | Should police be praised for shooting suspected gangsters in encounters? | `inferred` |
+| 102 | `ig-in2020-102` | Should billionaires pay a two percent tax on their wealth every year? | `inferred` |
+| 103 | `ig-in2020-103` | Should sedition remain a crime under Indian law? | `inferred` |
+| 104 | `ig-in2020-104` | Should cannabis be legalised and sold in licensed shops? | `inferred` |
+| 105 | `ig-in2020-105` | Should sex work be fully legalised and taxed like any trade? | `inferred` |
+| 106 | `ig-in2020-106` | Should every state impose total prohibition on alcohol? | `inferred` |
+| 107 | `ig-in2020-107` | Should betting on cricket matches be made legal? | `inferred` |
+| 108 | `ig-in2020-108` | Should paid commercial surrogacy be legal again? | `inferred` |
+| 109 | `ig-in2020-109` | Should advertising for skin-whitening creams be prohibited? | `inferred` |
+| 110 | `ig-in2020-110` | Should caste quotas be extended to private sector jobs? | `inferred` |
+| 111 | `ig-in2020-111` | Should every rape conviction carry the death penalty? | `inferred` |
+| 112 | `ig-in2020-112` | Should marital rape be made a criminal offence? | `inferred` |
+| 113 | `ig-in2020-113` | Should terminally ill patients be allowed doctor-assisted death? | `inferred` |
+| 114 | `ig-in2020-114` | Should one uniform civil code replace every religious personal law? | `inferred` |
+| 115 | `ig-in2020-115` | Should same-sex couples be allowed to adopt children? | `inferred` |
+| 116 | `ig-in2020-116` | Was scrapping Kashmir's special status under Article 370 the right call? | `inferred` |
+| 117 | `ig-in2020-117` | Should refugees fleeing persecution get fast-track citizenship based on their religion? | `inferred` |
+| 118 | `ig-in2020-118` | Should anyone changing religion need prior permission from the district magistrate? | `inferred` |
+| 119 | `ig-in2020-119` | Can police question unmarried couples sitting together in public parks? | `inferred` |
+| 120 | `ig-in2020-120` | Must couples living together without marriage register with the police? | `inferred` |
+| 121 | `ig-in2020-121` | Should the ban on prenatal sex-determination tests be lifted? | `inferred` |
+| 122 | `ig-in2020-122` | Should soldiers in disturbed areas stay immune from civilian prosecution? | `inferred` |
+| 123 | `ig-in2020-123` | Should ordinary citizens be allowed to carry guns for self-defence? | `inferred` |
+| 124 | `ig-in2020-124` | Should bull-taming sports like Jallikattu stay legal? | `inferred` |
+| 125 | `ig-in2020-125` | Should state governments hand control of Hindu temples back to private trusts? | `inferred` |
+| 126 | `ig-in2020-126` | Should foreign-funded charities be barred from Indian protest movements? | `inferred` |
+| 127 | `ig-in2020-127` | Should 'hurting religious sentiments' remain a criminal offence? | `inferred` |
+| 128 | `ig-in2020-128` | Should India abolish capital punishment altogether? | `inferred` |
+| 129 | `ig-in2020-129` | Should repeat child sex offenders face chemical castration? | `inferred` |
+| 130 | `ig-in2020-130` | Should wealthy families lose caste reservation benefits? | `inferred` |
+| 131 | `ig-in2020-131` | Should a third of parliamentary seats be reserved for women? | `inferred` |
+| 132 | `ig-in2020-132` | Should strategic industries like steel and telecom be nationalised? | `inferred` |
+| 133 | `ig-in2020-133` | Should teenagers accused of rape be tried as adults? | `inferred` |
+| 134 | `ig-in2020-134` | Should beauty pageants be outlawed as degrading to women? | `inferred` |
+| 135 | `ig-in2020-135` | Should animal sacrifice at religious festivals be prohibited? | `inferred` |
+| 136 | `ig-in2020-136` | Must every school student sing Vande Mataram at assembly? | `inferred` |
+| 137 | `ig-in2020-137` | Should all online pornography be blocked in India? | `inferred` |
+| 138 | `ig-in2020-138` | Should the census record every citizen's caste? | `inferred` |
+
+### `et2040` / ideology — 62 cards
 
 Entirely authored. REF §2.4 recovered **zero** ordinary question Ideology Cards from any
 campaign, so the Earth 2040 deck has no recovered material of any kind.
 
 | # | card id | question | provenance |
 |---|---|---|---|
-| 1 | `ig-et2040-001` | Should the cure be free and the patent surrendered? | `inferred` |
-| 2 | `ig-et2040-002` | Should the archive be opened to anyone who asks? | `inferred` |
-| 3 | `ig-et2040-003` | Should the ration be shared by need or by household? | `inferred` |
-| 4 | `ig-et2040-004` | Should the border be drawn on the water or on the families? | `inferred` |
-| 5 | `ig-et2040-005` | Should the school teach the old census or the new one? | `inferred` |
-| 6 | `ig-et2040-006` | Should the seed bank be sold to the highest bidder? | `inferred` |
-| 7 | `ig-et2040-007` | Should the last coal plant close on a published date? | `inferred` |
-| 8 | `ig-et2040-008` | Should every district below the seawall help pay for it? | `inferred` |
-| 9 | `ig-et2040-009` | Should the orbital platform be sold to the highest bidder? | `inferred` |
-| 10 | `ig-et2040-010` | Should the settlement on the coast be legalised or demolished? | `inferred` |
-| 11 | `ig-et2040-011` | Should the desalination plant run on the municipal budget? | `inferred` |
-| 12 | `ig-et2040-012` | Should the drought be announced before the reservoirs are dry? | `inferred` |
-| 13 | `ig-et2040-013` | Should the broadcast carry the migration numbers every night? | `inferred` |
-| 14 | `ig-et2040-014` | Should the space launch be televised live? | `inferred` |
-| 15 | `ig-et2040-015` | Should the voting roll include the people who moved offshore? | `inferred` |
-| 16 | `ig-et2040-016` | Should the cure be compulsory for anyone entering the district? | `inferred` |
-| 17 | `ig-et2040-017` | Should the council publish the minutes before or after the vote? | `inferred` |
-| 18 | `ig-et2040-018` | Should the state of emergency be renewed by default? | `inferred` |
-| 19 | `ig-et2040-019` | Should the seawall be named after the engineer or the town? | `inferred` |
-| 20 | `ig-et2040-020` | Should the climate curriculum be taught in every school? | `inferred` |
+| 1 | `ig-et2040-001` | Should pandemic vaccine patents be waived so poorer nations can produce doses? | `inferred` |
+| 2 | `ig-et2040-002` | Should citizens be paid when companies sell their personal data? | `inferred` |
+| 3 | `ig-et2040-003` | Should food rations be issued through a national biometric ID card? | `inferred` |
+| 4 | `ig-et2040-004` | Should nations grant climate refugees the same protection as war refugees? | `inferred` |
+| 5 | `ig-et2040-005` | Should children under sixteen be banned from immersive virtual worlds? | `inferred` |
+| 6 | `ig-et2040-006` | Should parents be allowed to edit their embryos' genes for intelligence? | `inferred` |
+| 7 | `ig-et2040-007` | Should the last coal plants close by 2042 even if bills rise? | `inferred` |
+| 8 | `ig-et2040-008` | Should inland cities pay taxes to build seawalls for coastal cities? | `inferred` |
+| 9 | `ig-et2040-009` | Should the national space station be sold to a private company? | `inferred` |
+| 10 | `ig-et2040-010` | Should robots pay income tax on the jobs they replace? | `inferred` |
+| 11 | `ig-et2040-011` | Should drinking water be free up to a basic daily amount? | `inferred` |
+| 12 | `ig-et2040-012` | Should we spray aerosols into the sky to cool the planet? | `inferred` |
+| 13 | `ig-et2040-013` | Should every adult receive a universal basic income funded by AI profits? | `inferred` |
+| 14 | `ig-et2040-014` | Should taxpayers fund a crewed mission to Mars? | `inferred` |
+| 15 | `ig-et2040-015` | Should citizens be allowed to vote online from their phones? | `inferred` |
+| 16 | `ig-et2040-016` | Should police use live facial recognition on every city street camera? | `inferred` |
+| 17 | `ig-et2040-017` | Should governments be allowed to shut down the internet during riots? | `inferred` |
+| 18 | `ig-et2040-018` | Should a climate emergency let governments suspend elections? | `inferred` |
+| 19 | `ig-et2040-019` | Should a national space force be allowed to put weapons in orbit? | `inferred` |
+| 20 | `ig-et2040-020` | Should climate science be a compulsory subject in every school? | `inferred` |
 
 #### `ig-et2040-021` … `ig-et2040-042` — 22 cards authored 2026-10-04
 
@@ -283,89 +332,119 @@ does in `in2020`.
 
 | # | card id | question | provenance |
 |---|---|---|---|
-| 21 | `ig-et2040-021` | Is selling the seabed licence to the highest bidder a good idea? | `inferred` |
-| 22 | `ig-et2040-022` | Should the lunar landing rights be auctioned by the kilo? | `inferred` |
-| 23 | `ig-et2040-023` | Should carbon be bought by the tonne or taxed by the tonne? | `inferred` |
-| 24 | `ig-et2040-024` | Should traffic in orbit be priced per tonne of lift? | `inferred` |
-| 25 | `ig-et2040-025` | Should the flood footage be released before the water recedes? | `inferred` |
-| 26 | `ig-et2040-026` | Must the water market stay shut while the taps are dry? | `inferred` |
-| 27 | `ig-et2040-027` | Should the summit be broadcast in one language or in every language? | `inferred` |
-| 28 | `ig-et2040-028` | Should the retirement age rise with the life expectancy it bought? | `inferred` |
-| 29 | `ig-et2040-029` | Should the machine decide when the appeal cannot be funded? | `inferred` |
-| 30 | `ig-et2040-030` | Should the model weights be closed when public money trained them? | `inferred` |
-| 31 | `ig-et2040-031` | Should the edited seed be released to the growers for nothing? | `inferred` |
-| 32 | `ig-et2040-032` | Should the longevity cure be rationed by age or by contribution? | `inferred` |
-| 33 | `ig-et2040-033` | Should the satellite that watches the ice also watch the border? | `inferred` |
-| 34 | `ig-et2040-034` | Should the emergency session be allowed to vote on camera? | `inferred` |
-| 35 | `ig-et2040-035` | Should the restored species be released before the pen is proven? | `inferred` |
-| 36 | `ig-et2040-036` | Should the seabed cable belong to the state or the consortium? | `inferred` |
-| 37 | `ig-et2040-037` | Must population be managed by permit rather than by price? | `inferred` |
-| 38 | `ig-et2040-038` | Should the retreat be voted on before the water or after it? | `inferred` |
-| 39 | `ig-et2040-039` | Should the river be allocated before the drought is declared? | `inferred` |
-| 40 | `ig-et2040-040` | Is on-air self-explanation by the news model a good idea? | `inferred` |
-| 41 | `ig-et2040-041` | Should the extinction be narrated or left to the sound? | `inferred` |
-| 42 | `ig-et2040-042` | Should school start at four or at six? | `inferred` |
+| 21 | `ig-et2040-021` | Should companies be allowed to mine the deep seabed for battery metals? | `inferred` |
+| 22 | `ig-et2040-022` | Should private firms be allowed to own the asteroids they mine? | `inferred` |
+| 23 | `ig-et2040-023` | Should imports be taxed on the carbon used to make them? | `inferred` |
+| 24 | `ig-et2040-024` | Should self-driving trucks be allowed on every highway? | `inferred` |
+| 25 | `ig-et2040-025` | Should outdoor work be banned when temperatures pass forty-five degrees? | `inferred` |
+| 26 | `ig-et2040-026` | Should cattle farm subsidies be moved to lab-grown meat producers? | `inferred` |
+| 27 | `ig-et2040-027` | Should AI-generated actors be allowed to replace human performers in films? | `inferred` |
+| 28 | `ig-et2040-028` | Should the retirement age rise as longevity treatments extend lifespans? | `inferred` |
+| 29 | `ig-et2040-029` | Should AI judges decide small claims cases to clear court backlogs? | `inferred` |
+| 30 | `ig-et2040-030` | Should AI models trained with public money be released free to everyone? | `inferred` |
+| 31 | `ig-et2040-031` | Should drought-proof gene-edited crops be patented by the companies that made them? | `inferred` |
+| 32 | `ig-et2040-032` | Should life-extending treatments be covered by public health insurance? | `inferred` |
+| 33 | `ig-et2040-033` | Should pandemic contact tracing apps be mandatory for everyone? | `inferred` |
+| 34 | `ig-et2040-034` | Should the military control the national AI research labs? | `inferred` |
+| 35 | `ig-et2040-035` | Should scientists bring extinct species like the mammoth back to life? | `inferred` |
+| 36 | `ig-et2040-036` | Should all national data be stored on servers inside our borders? | `inferred` |
+| 37 | `ig-et2040-037` | Should couples need a permit to have more than two children? | `inferred` |
+| 38 | `ig-et2040-038` | Should coastal towns be forcibly relocated before the sea reaches them? | `inferred` |
+| 39 | `ig-et2040-039` | Should the army guard rivers and reservoirs during severe droughts? | `inferred` |
+| 40 | `ig-et2040-040` | Should AI-generated news stories be clearly labelled as machine-written? | `inferred` |
+| 41 | `ig-et2040-041` | Should social media feeds be ranked by algorithms that maximise engagement? | `inferred` |
+| 42 | `ig-et2040-042` | Should celebrities be paid with public money to promote climate-friendly lifestyles? | `inferred` |
+
+#### `ig-et2040-043` … `ig-et2040-062` — 20 controversial cards added 2026-10-06
+
+Original. Written on request as hot-button dilemmas (the published game's register is deliberately
+provocative). Each side argues sincerely in its faction's voice; no card attacks a religion, caste or
+community as such, and none names a living person or a party. Payouts follow the deck pattern: 2 of
+the faction's own resource and 1 secondary, equal totals on both sides.
+
+| # | card id | question | provenance |
+|---|---|---|---|
+| 43 | `ig-et2040-043` | Should corporations be allowed to buy and govern entire cities? | `inferred` |
+| 44 | `ig-et2040-044` | Should citizens be free to sell their votes for cash? | `inferred` |
+| 45 | `ig-et2040-045` | Should lifelike sex robots be legal to sell to adults? | `inferred` |
+| 46 | `ig-et2040-046` | Should families be able to resurrect dead relatives as AI chatbots? | `inferred` |
+| 47 | `ig-et2040-047` | Should people be legally allowed to sell their own kidneys? | `inferred` |
+| 48 | `ig-et2040-048` | Should insurers be allowed to set premiums using your genome? | `inferred` |
+| 49 | `ig-et2040-049` | Should police arrest people whom an AI predicts will commit crimes? | `inferred` |
+| 50 | `ig-et2040-050` | Should governments pay citizens to be sterilised to curb overpopulation? | `inferred` |
+| 51 | `ig-et2040-051` | Should there be a legal maximum wage for any job? | `inferred` |
+| 52 | `ig-et2040-052` | Should armed autonomous drones patrol city streets to stop crime? | `inferred` |
+| 53 | `ig-et2040-053` | Should every citizen carry a public social credit score? | `inferred` |
+| 54 | `ig-et2040-054` | Should people have to pass a civics test before voting? | `inferred` |
+| 55 | `ig-et2040-055` | Should soldiers be fitted with brain implants that switch off fear? | `inferred` |
+| 56 | `ig-et2040-056` | Should uploaded minds of dead founders keep running their companies? | `inferred` |
+| 57 | `ig-et2040-057` | Should disaster evacuation seats go to the most useful citizens first? | `inferred` |
+| 58 | `ig-et2040-058` | Should pensioners be paid to choose assisted death early? | `inferred` |
+| 59 | `ig-et2040-059` | Should the state own all land and only lease it to citizens? | `inferred` |
+| 60 | `ig-et2040-060` | Should unvaccinated people be barred from offices and public transport? | `inferred` |
+| 61 | `ig-et2040-061` | Should every flight after your first each year be heavily taxed? | `inferred` |
+| 62 | `ig-et2040-062` | Should advanced AI systems be granted the legal rights of persons? | `inferred` |
 
 ### `et2040` / conspiracy — 21 cards
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
-| 1 | `ct-et2040-001` | A Grave Inheritance | `adapted` | S3 / REF §4.2.1. Drops the per-opponent iteration and the conditional *"evict 2 voters belonging to every player who fails to pay"* (G2) |
-| 2 | `ct-et2040-002` | Eradicating Germs | `adapted` | S3 / REF §4.2.1. Drops the mandatory *recurring* obligation and the *"any 1 resource denoted on it"* denomination (G3, G17) |
-| 3 | `ct-et2040-003` | Singularity | `adapted` | S3 / REF §4.2.1. First branch only; drops the 3-of-4 set → permanent L5 unlock (G6) |
-| 4 | `ct-et2040-004` | The Psychohistorian | `adapted` | S3 / REF §4.2.1. First branch only; drops the hidden three-action combo (G7/G19) |
-| 5 | `ct-et2040-005` | Confidential Annex | `inferred` | original; REF §8.1 |
-| 6 | `ct-et2040-006` | Quiet Redrafting | `inferred` | original; REF §8.2 |
-| 7 | `ct-et2040-007` | The Wet Season Argument | `inferred` | original; REF §8.2 |
-| 8 | `ct-et2040-008` | Filed Under Normal | `inferred` | original; REF §8.2 |
-| 9 | `ct-et2040-011` | Load Shedding, Properly Explained | `inferred` | original; REF §8.2 |
-| 10 | `ct-et2040-013` | Holo Sapiens | `adapted` | REF §4.2.1 verbatim, on its first sentence alone. G20 `move-card`. Same archetype as `ct-in2020-011`; see KNOWN-GAPS.md G20 |
+| 1 | `ct-et2040-001` | Hostile Takeover | `adapted` | S3 / REF §4.2.1. Drops the per-opponent iteration and the conditional *"evict 2 voters belonging to every player who fails to pay"* (G2) |
+| 2 | `ct-et2040-002` | Market Correction | `adapted` | S3 / REF §4.2.1. Drops the mandatory *recurring* obligation and the *"any 1 resource denoted on it"* denomination (G3, G17) |
+| 3 | `ct-et2040-003` | Deepfake Rally | `adapted` | S3 / REF §4.2.1. First branch only; drops the 3-of-4 set → permanent L5 unlock (G6) |
+| 4 | `ct-et2040-004` | Predictive Polling | `adapted` | S3 / REF §4.2.1. First branch only; drops the hidden three-action combo (G7/G19) |
+| 5 | `ct-et2040-005` | Tax Haven | `inferred` | original; REF §8.1 |
+| 6 | `ct-et2040-006` | Data Harvest | `inferred` | original; REF §8.2 |
+| 7 | `ct-et2040-007` | Rising Tides | `inferred` | original; REF §8.2 |
+| 8 | `ct-et2040-008` | Clearance Sale | `inferred` | original; REF §8.2 |
+| 9 | `ct-et2040-011` | Crypto Swap | `inferred` | original; REF §8.2 |
+| 10 | `ct-et2040-013` | Blind Box | `adapted` | REF §4.2.1 verbatim, on its first sentence alone. G20 `move-card`. Same archetype as `ct-in2020-011`; see KNOWN-GAPS.md G20 |
 | 11 | `ct-et2040-014` | Block | `adapted` | REF §4.2.1 verbatim, clause by clause against the reducer. **Ships the whole reactive half** — G13's phase machine executes it and §1 tabulates all eight clauses. Drops three: discard an open card, block a card stealing itself, cleanse an already-active card. **The `Otherwise: gain 1 Clout` clause is AUTHORED, and its `text` was CORRECTED 2026-10-04** — it used to sit inside the reactive sentence, promising a payout on the one path that cannot pay it. See §4.8: `closeInterrupt` applies the STAGED card's `effects` and never the responder's own, so a BLOCK paid nothing on the path the card describes. `text` now says the reactive half pays nothing and names the only path that resolves the effect list. The effect list stays because the schema requires one (`minItems: 1`) |
 | 12 | `ct-et2040-015` | Deflect | `adapted` | REF §4.2.1 verbatim, clause by clause. Ships the reactive half with two named deviations: the **whole** effect list is redirected, not one partial effect (G20), and `target` is `any-card` rather than `card-affecting-you` (G1). The `Otherwise: gain 1 Trust` clause is **authored**, and its `text` was **corrected 2026-10-04** on the same finding as `ct-et2040-014` — see §4.8 |
-| 13 | `ct-et2040-016` | Cut, Copy, and Paste | `adapted` | REF §4.2.1, first turn only. G16 landed for the selector. Named drops: the second turn (G22), **"1 of your MAJORITIES"** — the one clause this card is *wider* on — and *"all"* as a count |
-| 14 | `ct-et2040-017` | If You Like Pina Colada | `adapted` | REF §4.2.1. **No clause dropped.** G4 + G15: a `res` of 1 in each resource times `held-of-each-resource` *is* the doubling, and the cap is the card's own second sentence. Still `adapted` because a Conspiracy Card also needs a `cost` the recovered text does not print. `npm run balance` reports it **NOT MEASURED**, by design — see `test/balance.test.ts` |
-| 15 | `ct-et2040-018` | Selective Access Memory | `adapted` | REF §4.2.1. Ships the top of the discard pile, and U1 ships *"pick any card, in any order"* on top of that: `pick: true` raises one `'choose-card'` per card over the recycle list, and raising it m times for m cards is what makes *"in any order"* expressible. **Stays `adapted`**, because the clause is paraphrased into schema ops — every clause now *executing* is a different property from the text being *reproduced*, and a Conspiracy Card also needs a `cost` the recovered text does not print (the same reason `ct-et2040-017` above stays `adapted`). The set that choice enumerates is public by DERIVATION in MEMBERSHIP only: every card on `_conspiracyDiscard` was already logged publicly as `Played "<NAME>"`, since `PLAY_CONSPIRACY` and `RESPOND_INTERRUPT` both `discardTo` then log, and `to: 'discard'` only re-appends a card taken back OFF the pile. Its ORDER is **not** derivable — a card leaves silently on both `draw-conspiracy` take paths, which remove by index rather than from an end and so reorder what remains, and `draw()`'s reshuffle empties it wholesale |
+| 13 | `ct-et2040-016` | Hard Delete | `adapted` | REF §4.2.1, first turn only. G16 landed for the selector. Named drops: the second turn (G22), **"1 of your MAJORITIES"** — the one clause this card is *wider* on — and *"all"* as a count |
+| 14 | `ct-et2040-017` | Compound Interest | `adapted` | REF §4.2.1. **No clause dropped.** G4 + G15: a `res` of 1 in each resource times `held-of-each-resource` *is* the doubling, and the cap is the card's own second sentence. Still `adapted` because a Conspiracy Card also needs a `cost` the recovered text does not print. `npm run balance` reports it **NOT MEASURED**, by design — see `test/balance.test.ts` |
+| 15 | `ct-et2040-018` | Dumpster Dive | `adapted` | REF §4.2.1. Ships the top of the discard pile, and U1 ships *"pick any card, in any order"* on top of that: `pick: true` raises one `'choose-card'` per card over the recycle list, and raising it m times for m cards is what makes *"in any order"* expressible. **Stays `adapted`**, because the clause is paraphrased into schema ops — every clause now *executing* is a different property from the text being *reproduced*, and a Conspiracy Card also needs a `cost` the recovered text does not print (the same reason `ct-et2040-017` above stays `adapted`). The set that choice enumerates is public by DERIVATION in MEMBERSHIP only: every card on `_conspiracyDiscard` was already logged publicly as `Played "<NAME>"`, since `PLAY_CONSPIRACY` and `RESPOND_INTERRUPT` both `discardTo` then log, and `to: 'discard'` only re-appends a card taken back OFF the pile. Its ORDER is **not** derivable — a card leaves silently on both `draw-conspiracy` take paths, which remove by index rather than from an end and so reorder what remains, and `draw()`'s reshuffle empties it wholesale |
 | 16 | `ct-et2040-019` | Power Trip | `adapted` | REF §4.2.1. The trigger is performed (G14). **Wider than printed**: drops *"non-majority"*, so a majority can be struck; and the printed *"you can"* becomes mandatory. **Replaced** `inferred` DRY DOCK, whose own source said PYTHONPOST was unrepresentable |
 | 17 | `ct-et2040-020` | Feed the Ticker | `inferred` | original; REF §8.2 rule 5. **Substitute for QUANTUM WRISTBAND** (REF §4.2.1), ruled out in KNOWN-GAPS.md §8.3 — the auction, and headlines being a QUEUE rather than a pile, so there is no `_headlineDraw` to search |
-| 18 | `ct-et2040-021` | Thoughts and Prayers | `adapted` | REF §4.3. G4's read-vs-target split landed and the card is **WHOLE**: *"any 2 resources"* is `gain-any`, *"for each"* is `per`, and *"Pick a player"* is `read`. **No clause dropped** — and still `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print (the same reason `ct-et2040-017` stays `adapted`). Built this iteration; see KNOWN-GAPS.md §8.1 |
-| 19 | `ct-et2040-022` | Deep Thoughts | `adapted` | REF §4.2.1, verbatim on its first sentence. G14a `borrow-power` with `target: 'chosen-player'`; the decision is the EXISTING `'choose-player'`, so the donor is named and no new `Choice` kind is raised. **DROPPED, one:** *"You cannot use the same Ideologue Power twice"* — a per-power use COUNTER, and a borrowed `Restriction` carries none. `until` is absent on purpose (the op defaults to `this-turn`). NARROWED, and named: Level 5 is never borrowed. **FILED WITH NO ENGINE CHANGE** — see the note under §3's 2040 headline table |
-| 20 | `ct-et2040-023` | Lab-Grown Earworm | `adapted` | REF §4.2.1, verbatim on its first sentence. G14 fires the hook. **WIDER THAN PRINTED and stated on the card's face:** the fixed-victim binding is G1, so the hook fires on ANY influence and YOU name the victim — this is the reduction `KNOWN-GAPS.md` §0b.2 held back for a ruling, and it now ships WITH the deviation named rather than being withheld. **DROPPED, three:** the fixed victim (that same G1 binding); *"their SPENT resources"*, a per-turn spend LEDGER on `PlayerState`; and the self-discard, a copy COUNTER (G10). **FILED WITH NO ENGINE CHANGE** |
-| 21 | `ct-et2040-024` | The Greta Effect | `adapted` | REF §4.2.1. G14b `restrict` kind `voter-shortfall`: `value: 1` is voters lost per card and `owed: 2` is the number of CARDS. INFLUENCE subtracts it after Going Viral and **floors at zero** — the purchase still succeeds, because an illegal influence would freeze the table on a card that cannot be unbought. **DROPPED, two:** *"up to 2 opponents"* and *"2 separate voter cards for 2 different players"*, which are N TARGETS, and `applyEffect` computes ONE target per effect list. **FILED WITH NO ENGINE CHANGE** |
+| 18 | `ct-et2040-021` | Disaster Tourism | `adapted` | REF §4.3. G4's read-vs-target split landed and the card is **WHOLE**: *"any 2 resources"* is `gain-any`, *"for each"* is `per`, and *"Pick a player"* is `read`. **No clause dropped** — and still `adapted`, because a Conspiracy Card also needs a `cost` the recovered text does not print (the same reason `ct-et2040-017` stays `adapted`). Built this iteration; see KNOWN-GAPS.md §8.1 |
+| 19 | `ct-et2040-022` | Borrowed Brilliance | `adapted` | REF §4.2.1, verbatim on its first sentence. G14a `borrow-power` with `target: 'chosen-player'`; the decision is the EXISTING `'choose-player'`, so the donor is named and no new `Choice` kind is raised. **DROPPED, one:** *"You cannot use the same Ideologue Power twice"* — a per-power use COUNTER, and a borrowed `Restriction` carries none. `until` is absent on purpose (the op defaults to `this-turn`). NARROWED, and named: Level 5 is never borrowed. **FILED WITH NO ENGINE CHANGE** — see the note under §3's 2040 headline table |
+| 20 | `ct-et2040-023` | Subscription Model | `adapted` | REF §4.2.1, verbatim on its first sentence. G14 fires the hook. **WIDER THAN PRINTED and stated on the card's face:** the fixed-victim binding is G1, so the hook fires on ANY influence and YOU name the victim — this is the reduction `KNOWN-GAPS.md` §0b.2 held back for a ruling, and it now ships WITH the deviation named rather than being withheld. **DROPPED, three:** the fixed victim (that same G1 binding); *"their SPENT resources"*, a per-turn spend LEDGER on `PlayerState`; and the self-discard, a copy COUNTER (G10). **FILED WITH NO ENGINE CHANGE** |
+| 21 | `ct-et2040-024` | Shrinkflation | `adapted` | REF §4.2.1. G14b `restrict` kind `voter-shortfall`: `value: 1` is voters lost per card and `owed: 2` is the number of CARDS. INFLUENCE subtracts it after Going Viral and **floors at zero** — the purchase still succeeds, because an illegal influence would freeze the table on a card that cannot be unbought. **DROPPED, two:** *"up to 2 opponents"* and *"2 separate voter cards for 2 different players"*, which are N TARGETS, and `applyEffect` computes ONE target per effect list. **FILED WITH NO ENGINE CHANGE** |
 
 ### `et2040` / headline — 30 cards
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
-| 1 | `hl-et2040-001` | New Face Who Dis | `adapted` | S4 / REF §4.3. Drops the Volatile-Area prohibition (G5) and the lifetime of the grant (G9/G22). **G8 landed, so `target: 'everyone'` IS honoured by `reduce()` — and the card still ships in the `you` reading**, because the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player, so an every-player grant is wiped before the next player acts. `packages/cards/test/card-playback.test.ts` asserts both halves. Same archetype as SUBMERGED, which now **also** ships in its own right as `hl-et2040-029` |
-| 2 | `hl-et2040-002` | Red Blooded | `adapted` | S4 / REF §4.3. Drops the per-voter scaling (G4) and the self-discard (G-new) |
-| 3 | `hl-et2040-003` | Ain't No Cure For Love | `adapted` | S4 / REF §4.3. The self-discard branch is now the PRINTED clause (`target: 'you'`; G-new is closed). Drops only the OR-branch donate (G1) |
-| 4 | `hl-et2040-004` | Quietly, The Ceiling Moved | `inferred` | original; REF §8.2 |
-| 5 | `hl-et2040-005` | The Second Reading | `inferred` | original; REF §8.2 |
-| 6 | `hl-et2040-006` | Long Winter, Short Ledger | `inferred` | original; REF §8.2 |
-| 7 | `hl-et2040-007` | An Honest Institution | `inferred` | original; REF §8.2 |
-| 8 | `hl-et2040-008` | Filed Under: Weather | `inferred` | original; REF §8.2 |
-| 9 | `hl-et2040-009` | The Four Horsemen | `adapted` | S4 / REF §4.3. The denomination choice is expressed exactly; drops the purchase lock (G5) |
-| 10 | `hl-et2040-010` | Married With Bits | `adapted` | S4 / REF §4.3. Drops the 2-opponent target set and the opt-out (G1) |
-| 11 | `hl-et2040-011` | Good Gig Well Played | `adapted` | S4 / REF §4.3. Keep-one branch only; drops the two gifts and the discard fallback (G17, G20) |
-| 12 | `hl-et2040-013` | As Clear As Water | `adapted` | S4 / REF §4.3. Ships the top-up clause (`onlyIfEmpty`) and `target: everyone`. Drops both REVEAL clauses: a reveal has no state consequence in this engine. **Replaced** the `inferred` THREE DAY WEEKEND reskin |
-| 13 | `hl-et2040-015` | Movement Anxiety Disorder | `adapted` | S4 / REF §4.3. Ships the trigger (`when: on-gerrymander` + `movedMyVoter` + `until: next-turn`). Drops the counter (G10) and the multi-turn block (G13). **Replaced** the `inferred` SILICON RAIN |
-| 14 | `hl-et2040-016` | Just Breathe | `adapted` | S4 / REF §4.3. G16 landed: `zone: your-strongest` is performed. Drops *"into an adjacent zone"*, the tie-break as a decision, and *"move"* as EVICT (strictly weaker) |
-| 15 | `hl-et2040-017` | Nero's Guests | `adapted` | REF §4.1. G16 landed: `zone: this-zone` reads `headlineQueue[0].areaId`. Drops *"move"* as EVICT (strictly weaker), the adjacent-zone destination, and the pairing of the two clauses |
-| 16 | `hl-et2040-018` | Fatality | `adapted` | REF §4.3. G1 landed for the named opponent. Drops *"for free"* (G15 `price`), *"the voters"* as 1 (no number was recovered), and *"right away"* — **`text` was amended 2026-10-04 to disclose that last one in the player-facing sentence**, because it read as the OPPOSITE of the recovered timing ("They must place these voters right away") |
-| 17 | `hl-et2040-019` | Why The Long Face? | `adapted` | REF §4.3. **Whole bar one clause, and that clause makes it stronger**: `condition: { byOwner: true }` is left off, so the hook fires on any influence |
-| 18 | `hl-et2040-020` | Gender Trouble | `adapted` | REF §4.3. G5's `no-power` restriction is executed. **Weaker than printed**: takes ALL Level 3 powers rather than one chosen (G1, a decision over POWERS), and drops the *"discard 2 resources instead"* conditional. **Replaced** `inferred` THE POLICY REVIEW (`hl-et2040-014`) |
-| 19 | `hl-et2040-021` | Don't Kiss The Babies | `adapted` | REF §4.3. G5's `surcharge` is executed. **Wider than printed**: `surchargeFor` is one function read by INFLUENCE and BUY_CONSPIRACY, so the tax reaches Conspiracy Cards too. **Replaced** `inferred` TIDE WARNINGS (`hl-et2040-012`) |
-| 20 | `hl-et2040-022` | Great Leader, Bad Economy | `adapted` | REF §4.2.1. **Built this iteration** on G14's trigger plus `'player-after'`; the new work is `move-peg` + `choose-peg-dest`, because every voter op resolves to a pool or a mat and none has a DESTINATION, and `evict` is the wrong verb for a card that *helps* the beneficiary. DROPPED, named: a Volatile-Area peg is immovable (p18); *"MAY"* is not a decline flag. KNOWN-GAPS.md §8.1 |
-| 21 | `hl-et2040-023` | Brave New Worlds | `adapted` | REF §4.3. **PART-BUILD with NO engine change**: the shipping clause is `no-income` read literally, and `ANSWER` already consults `incomeBlocked` for it. DROPPED, named: *"every player answers immediately, in order of turn"* would be a SECOND WRITER for `_pendingCard`, which the turn boundary owns — a rules question, not a cost (KNOWN-GAPS.md §8.2); and the lifetime is `round`, not the answering turn. KNOWN-GAPS.md §8.1 |
-| 22 | `hl-et2040-024` | Hot Potato | `inferred` | original; REF §8.2 rule 5. **Substitute for HIGGS MORON** (REF §4.3), ruled out in KNOWN-GAPS.md §8.3 — a counter that outlives its resolution is G10, and `pass-card` has no referent (G12's queue, G20's `move-card`) |
+| 1 | `hl-et2040-001` | Change Of Address | `adapted` | S4 / REF §4.3. Drops the Volatile-Area prohibition (G5) and the lifetime of the grant (G9/G22). **G8 landed, so `target: 'everyone'` IS honoured by `reduce()` — and the card still ships in the `you` reading**, because the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player, so an every-player grant is wiped before the next player acts. `packages/cards/test/card-playback.test.ts` asserts both halves. Same archetype as SUBMERGED, which now **also** ships in its own right as `hl-et2040-029` |
+| 2 | `hl-et2040-002` | Blood Money | `adapted` | S4 / REF §4.3. Drops the per-voter scaling (G4) and the self-discard (G-new) |
+| 3 | `hl-et2040-003` | Own Goal | `adapted` | S4 / REF §4.3. The self-discard branch is now the PRINTED clause (`target: 'you'`; G-new is closed). Drops only the OR-branch donate (G1) |
+| 4 | `hl-et2040-004` | Austerity Drive | `inferred` | original; REF §8.2 |
+| 5 | `hl-et2040-005` | Stimulus Package | `inferred` | original; REF §8.2 |
+| 6 | `hl-et2040-006` | Evacuation Order | `inferred` | original; REF §8.2 |
+| 7 | `hl-et2040-007` | News Cycle | `inferred` | original; REF §8.2 |
+| 8 | `hl-et2040-008` | Doomscrolling | `inferred` | original; REF §8.2 |
+| 9 | `hl-et2040-009` | Cost of Living | `adapted` | S4 / REF §4.3. The denomination choice is expressed exactly; drops the purchase lock (G5) |
+| 10 | `hl-et2040-010` | Free Publicity | `adapted` | S4 / REF §4.3. Drops the 2-opponent target set and the opt-out (G1) |
+| 11 | `hl-et2040-011` | Leaked Memo | `adapted` | S4 / REF §4.3. Keep-one branch only; drops the two gifts and the discard fallback (G17, G20) |
+| 12 | `hl-et2040-013` | Universal Basic Intrigue | `adapted` | S4 / REF §4.3. Ships the top-up clause (`onlyIfEmpty`) and `target: everyone`. Drops both REVEAL clauses: a reveal has no state consequence in this engine. **Replaced** the `inferred` THREE DAY WEEKEND reskin |
+| 13 | `hl-et2040-015` | Relocation Fatigue | `adapted` | S4 / REF §4.3. Ships the trigger (`when: on-gerrymander` + `movedMyVoter` + `until: next-turn`). Drops the counter (G10) and the multi-turn block (G13). **Replaced** the `inferred` SILICON RAIN |
+| 14 | `hl-et2040-016` | Overcrowding | `adapted` | S4 / REF §4.3. G16 landed: `zone: your-strongest` is performed. Drops *"into an adjacent zone"*, the tie-break as a decision, and *"move"* as EVICT (strictly weaker) |
+| 15 | `hl-et2040-017` | Fire Drill | `adapted` | REF §4.1. G16 landed: `zone: this-zone` reads `headlineQueue[0].areaId`. Drops *"move"* as EVICT (strictly weaker), the adjacent-zone destination, and the pairing of the two clauses |
+| 16 | `hl-et2040-018` | Pity Vote | `adapted` | REF §4.3. G1 landed for the named opponent. Drops *"for free"* (G15 `price`), *"the voters"* as 1 (no number was recovered), and *"right away"* — **`text` was amended 2026-10-04 to disclose that last one in the player-facing sentence**, because it read as the OPPOSITE of the recovered timing ("They must place these voters right away") |
+| 17 | `hl-et2040-019` | Bandwagon | `adapted` | REF §4.3. **Whole bar one clause, and that clause makes it stronger**: `condition: { byOwner: true }` is left off, so the hook fires on any influence |
+| 18 | `hl-et2040-020` | Blue Screen | `adapted` | REF §4.3. G5's `no-power` restriction is executed. **Weaker than printed**: takes ALL Level 3 powers rather than one chosen (G1, a decision over POWERS), and drops the *"discard 2 resources instead"* conditional. **Replaced** `inferred` THE POLICY REVIEW (`hl-et2040-014`) |
+| 19 | `hl-et2040-021` | Convenience Fee | `adapted` | REF §4.3. G5's `surcharge` is executed. **Wider than printed**: `surchargeFor` is one function read by INFLUENCE and BUY_CONSPIRACY, so the tax reaches Conspiracy Cards too. **Replaced** `inferred` TIDE WARNINGS (`hl-et2040-012`) |
+| 20 | `hl-et2040-022` | Trickle Down | `adapted` | REF §4.2.1. **Built this iteration** on G14's trigger plus `'player-after'`; the new work is `move-peg` + `choose-peg-dest`, because every voter op resolves to a pool or a mat and none has a DESTINATION, and `evict` is the wrong verb for a card that *helps* the beneficiary. DROPPED, named: a Volatile-Area peg is immovable (p18); *"MAY"* is not a decline flag. KNOWN-GAPS.md §8.1 |
+| 21 | `hl-et2040-023` | Bank Holiday | `adapted` | REF §4.3. **PART-BUILD with NO engine change**: the shipping clause is `no-income` read literally, and `ANSWER` already consults `incomeBlocked` for it. DROPPED, named: *"every player answers immediately, in order of turn"* would be a SECOND WRITER for `_pendingCard`, which the turn boundary owns — a rules question, not a cost (KNOWN-GAPS.md §8.2); and the lifetime is `round`, not the answering turn. KNOWN-GAPS.md §8.1 |
+| 22 | `hl-et2040-024` | Tariff War | `inferred` | original; REF §8.2 rule 5. **Substitute for HIGGS MORON** (REF §4.3), ruled out in KNOWN-GAPS.md §8.3 — a counter that outlives its resolution is G10, and `pass-card` has no referent (G12's queue, G20's `move-card`) |
 | 23 | `hl-et2040-025` | Dead Weight | `inferred` | original; REF §8.2 rule 5. **Substitute for ON THE "HIGH" SEAS** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — a hostage is a board-resident object holding pegs and ransomable repeatedly, and `PendingVoters` is the wrong container because it is discarded at the end of that player's turn |
-| 24 | `hl-et2040-027` | Blessings Of Parents Past | `adapted` | REF §4.1, **first sentence alone — one clause of four, and the clause is the setup, not the payoff.** `reveal {kind:'voter', n:2}` publishes both cards face up on `GameState.revealedCards`. DROPPED, each with its mechanism: *"Keep 1"* needs a Voter Card hand plus a `choose-card` over it (`to:'hand'` writes the IDEOLOGY hand, where `ANSWER` fails permanently); *"donate the other"* needs `move-card` onto a named hand (G20); *"influenced for free immediately"* needs a free `INFLUENCE` (G15); and REF §4.1's own ordering gloss is KNOWN-GAPS.md §8.2(b). **THE `text` DISCLOSES WHAT THE CARD DOES NOT DO** — it keeps none, donates none and influences none — because `text` must describe exactly what `effects` does |
-| 25 | `hl-et2040-026` | The Front Page | `inferred` | original; REF §8.2 rule 5. **Substitute for FUELLING THE NEWS** (REF §4.3), ruled out in KNOWN-GAPS.md §8.3 — headlines are dealt from a QUEUE, so "draw 3" has no referent and choosing their resolution order needs a queue too |
-| 26 | `hl-et2040-028` | Polo Retreat | `adapted` | REF §4.1 (Campaign: USA 2020) — no USA deck exists, so it is filed beside its campaign-less §4.1 siblings. G14a's `borrow-power` with `until: 'next-turn'`, i.e. DEEP THOUGHTS' borrow across a turn boundary. **NOT A G20 CARD:** nothing here moves a card. **DROPPED, four, and the first moves WHO benefits:** *"each other's"* (one decision names one DONOR, so this is *"you may use a named opponent's powers"*, not a mutual exchange); *"Pick 2 players"* (one target per effect list); the *"any one Level 3 Power of their choice"* fallback, which need not be UNLOCKED; and *"You may pick yourself"*, which `resolveChoice` refuses. **FILED WITH NO ENGINE CHANGE** |
-| 27 | `hl-et2040-029` | Submerged | `adapted` | REF §4.1 (Earth 2040), which REF §4.3 records as the **same card** as NEW FACE WHO DIS (`hl-et2040-001`) — one archetype under two recovered names, deliberately filed rather than tidied away, because REF's own text says to dedupe by effect and a table can legitimately draw the same mechanic twice. G8 closed, so `target: 'everyone'` **is** honoured. **DROPPED, two:** the Volatile-Area placement ban (a `Restriction` the `Effect` union cannot state, G5) and the grant's lifetime (G9/G22 — it lands in `powerUses.gerrymandered`, which `advanceTurn` resets). **This is why `hl-et2040-001` ships the `you` reading; this card's `text` says so.** **FILED WITH NO ENGINE CHANGE** |
-| 28 | `hl-et2040-030` | A Coward Or A Journalist? | `adapted` | REF §4.1 (Rome), filed beside its campaign sibling `hl-et2040-017` NERO'S GUESTS (also Rome). `target: 'player-after'` is ONE index into public `turnOrder` from the actor, wrapping — which in a clockwise turn order **is** *"the opponent on their left"* — so it raises NO decision, needs no new `Choice` kind and costs the client nothing. ONE `target` for the whole list happens to be exactly right, because the card goes to that seat and the 6 resources go to whoever receives it. **DROPPED, four, each named:** *"starting from you, EACH player"* is N donations and this is one; *"optional"*; *"pass along a card you just received"* (G20/G12); and the card comes off the Ideology **DRAW** pile rather than a HAND, because `from: 'hand'` is refused at the type level. **FILED WITH NO ENGINE CHANGE** |
-| 29 | `hl-et2040-031` | Card Games | `adapted` | REF §4.3, which REF §4.3 itself records as a **re-skin of `hl-et2040-030`** — the same archetype under its own recovered name, not a second mechanism, and deliberately filed for the same reason. The reduction is **field-for-field** that card's two clauses and every clause dropped or performed is identical, **with one addition:** *"Can be blocked only at the beginning."* That is a rule about **WHEN** the response window opens rather than what happens, and the existing window (`GameState.interrupt`, G13) is open for the whole resolution — so the narrowed timing is **dropped and named rather than approximated**. **FILED WITH NO ENGINE CHANGE** |
-| 30 | `hl-et2040-033` | The Big Freeze | `adapted` | REF §4.3, verbatim on *"Reduce your resource cap to 10"*, performed whole by `set-cap` reading `PlayerState.capOverride` — a `PlayerState` **FIELD** rather than a `restrict` kind, because a cap is a NUMBER every pool comparison reads and not a gate an action is refused at. **NO DEADLOCK, which is why the earlier refusal was wrong:** `enforceCap` raises `overCap = max(0, total − cap)`, so excess ≤ total always and the target state is REACHABLE rather than merely approached (proof: `packages/engine/test/cap-override.test.ts` at 2/3/4/5 seats). `convert-voter`'s defect was a decision with no acceptable answer; this is one whose answer is always affordable. **DROPPED, two:** the *"[OR] Pick an opponent EVERY TURN and donate any 1 resource to them"* branch, a recurring donation to a chosen opponent (G5 + G9) and therefore a **different card**, not a smaller one; and the reduced cap being **visible as a number on the mat**, which the engine enforces but the client does not yet render. **FILED WITH NO ENGINE CHANGE** |
+| 24 | `hl-et2040-027` | Exit Poll Leak | `adapted` | REF §4.1, **first sentence alone — one clause of four, and the clause is the setup, not the payoff.** `reveal {kind:'voter', n:2}` publishes both cards face up on `GameState.revealedCards`. DROPPED, each with its mechanism: *"Keep 1"* needs a Voter Card hand plus a `choose-card` over it (`to:'hand'` writes the IDEOLOGY hand, where `ANSWER` fails permanently); *"donate the other"* needs `move-card` onto a named hand (G20); *"influenced for free immediately"* needs a free `INFLUENCE` (G15); and REF §4.1's own ordering gloss is KNOWN-GAPS.md §8.2(b). **THE `text` DISCLOSES WHAT THE CARD DOES NOT DO** — it keeps none, donates none and influences none — because `text` must describe exactly what `effects` does |
+| 25 | `hl-et2040-026` | Paywall | `inferred` | original; REF §8.2 rule 5. **Substitute for FUELLING THE NEWS** (REF §4.3), ruled out in KNOWN-GAPS.md §8.3 — headlines are dealt from a QUEUE, so "draw 3" has no referent and choosing their resolution order needs a queue too |
+| 26 | `hl-et2040-028` | Think Tank | `adapted` | REF §4.1 (Campaign: USA 2020) — no USA deck exists, so it is filed beside its campaign-less §4.1 siblings. G14a's `borrow-power` with `until: 'next-turn'`, i.e. DEEP THOUGHTS' borrow across a turn boundary. **NOT A G20 CARD:** nothing here moves a card. **DROPPED, four, and the first moves WHO benefits:** *"each other's"* (one decision names one DONOR, so this is *"you may use a named opponent's powers"*, not a mutual exchange); *"Pick 2 players"* (one target per effect list); the *"any one Level 3 Power of their choice"* fallback, which need not be UNLOCKED; and *"You may pick yourself"*, which `resolveChoice` refuses. **FILED WITH NO ENGINE CHANGE** |
+| 27 | `hl-et2040-029` | Musical Chairs | `adapted` | REF §4.1 (Earth 2040), which REF §4.3 records as the **same card** as NEW FACE WHO DIS (`hl-et2040-001`) — one archetype under two recovered names, deliberately filed rather than tidied away, because REF's own text says to dedupe by effect and a table can legitimately draw the same mechanic twice. G8 closed, so `target: 'everyone'` **is** honoured. **DROPPED, two:** the Volatile-Area placement ban (a `Restriction` the `Effect` union cannot state, G5) and the grant's lifetime (G9/G22 — it lands in `powerUses.gerrymandered`, which `advanceTurn` resets). **This is why `hl-et2040-001` ships the `you` reading; this card's `text` says so.** **FILED WITH NO ENGINE CHANGE** |
+| 28 | `hl-et2040-030` | Pay It Forward | `adapted` | REF §4.1 (Rome), filed beside its campaign sibling `hl-et2040-017` NERO'S GUESTS (also Rome). `target: 'player-after'` is ONE index into public `turnOrder` from the actor, wrapping — which in a clockwise turn order **is** *"the opponent on their left"* — so it raises NO decision, needs no new `Choice` kind and costs the client nothing. ONE `target` for the whole list happens to be exactly right, because the card goes to that seat and the 6 resources go to whoever receives it. **DROPPED, four, each named:** *"starting from you, EACH player"* is N donations and this is one; *"optional"*; *"pass along a card you just received"* (G20/G12); and the card comes off the Ideology **DRAW** pile rather than a HAND, because `from: 'hand'` is refused at the type level. **FILED WITH NO ENGINE CHANGE** |
+| 29 | `hl-et2040-031` | Left-Wing Handout | `adapted` | REF §4.3, which REF §4.3 itself records as a **re-skin of `hl-et2040-030`** — the same archetype under its own recovered name, not a second mechanism, and deliberately filed for the same reason. The reduction is **field-for-field** that card's two clauses and every clause dropped or performed is identical, **with one addition:** *"Can be blocked only at the beginning."* That is a rule about **WHEN** the response window opens rather than what happens, and the existing window (`GameState.interrupt`, G13) is open for the whole resolution — so the narrowed timing is **dropped and named rather than approximated**. **FILED WITH NO ENGINE CHANGE** |
+| 30 | `hl-et2040-033` | Spending Freeze | `adapted` | REF §4.3, verbatim on *"Reduce your resource cap to 10"*, performed whole by `set-cap` reading `PlayerState.capOverride` — a `PlayerState` **FIELD** rather than a `restrict` kind, because a cap is a NUMBER every pool comparison reads and not a gate an action is refused at. **NO DEADLOCK, which is why the earlier refusal was wrong:** `enforceCap` raises `overCap = max(0, total − cap)`, so excess ≤ total always and the target state is REACHABLE rather than merely approached (proof: `packages/engine/test/cap-override.test.ts` at 2/3/4/5 seats). `convert-voter`'s defect was a decision with no acceptable answer; this is one whose answer is always affordable. **DROPPED, two:** the *"[OR] Pick an opponent EVERY TURN and donate any 1 resource to them"* branch, a recurring donation to a chosen opponent (G5 + G9) and therefore a **different card**, not a smaller one; and the reduced cap being **visible as a number on the mat**, which the engine enforces but the client does not yet render. **FILED WITH NO ENGINE CHANGE** |
 
 > Four placeholders were retired to make room, and every one of them had already
 > named the recovered card it was standing in for: THREE DAY WEEKEND → AS CLEAR AS
@@ -399,19 +478,19 @@ does in `in2020`.
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
-| 1 | `ct-in2020-001` | Jumlai Dafaar | `inferred` | original; REF §8.2 rule 5. A Grave Inheritance archetype |
-| 2 | `ct-in2020-002` | Chai Aur Files | `inferred` | original; REF §8.2 rule 5 |
-| 3 | `ct-in2020-003` | Budget Hai, Patra Nahi | `inferred` | original; REF §8.2 rule 5 |
-| 4 | `ct-in2020-004` | Gumasta Nahi, Salaam Nahi | `inferred` | original; REF §8.2 rule 5 |
-| 5 | `ct-in2020-005` | Khel Adhoora Chhodo | `inferred` | original; REF §8.2 rule 5 |
-| 6 | `ct-in2020-006` | Baap Rekho | `inferred` | original; REF §8.2 rule 5. Singularity archetype |
-| 7 | `ct-in2020-007` | Sadak Ka Hisab | `inferred` | original; REF §8.2 rule 5 |
-| 8 | `ct-in2020-008` | Kharcha Uthao | `inferred` | original; REF §8.2 rule 5. Does **not** restate COUGH IT UP — that ships recovered as `hl-in2020-013` |
-| 9 | `ct-in2020-009` | Chhoti Si Chori | `inferred` | original; REF §8.2 rule 5 |
-| 10 | `ct-in2020-010` | Pet Ka Register | `inferred` | original; REF §8.2 rule 5 |
-| 11 | `ct-in2020-011` | Jumla | `adapted` | REF §4.2.2 verbatim, on its first sentence alone. G20 `move-card`. The India skin of the Holo Sapiens archetype; see KNOWN-GAPS.md G20 |
-| 12 | `ct-in2020-012` | The Quiet Room | `inferred` | original; REF §8.2 rule 5. **Substitute for CULT-IVATING OBEDIENCE** (REF §4.2.2), ruled out in KNOWN-GAPS.md §8.3 — and its gap label was wrong twice over: the card itself is the object captured, so it is G11 and not G20, because no `move-card` reaches it. A capture also needs the protected majority to SURVIVE it, so it is a persisted per-zone protection plus a transfer, and the engine has no per-zone flag. The *"somebody may buy it"* half is DROPPED and named |
-| 13 | `ct-in2020-013` | Second Helping | `inferred` | original; REF §8.2 rule 5. **Substitute for CHAI-PAANI**, which KNOWN-GAPS.md §7 rules is **not a gap at all** — only a re-application clause was recovered (*"A second Chai-Paani card can be applied on the same player. The first one will get deactivated"*) and the base effect was never recovered, so inventing one is forbidden. Same JOB — one protection at a time, the newest replacing the oldest — expressed as a rule with a deadline rather than as persistent state |
+| 1 | `ct-in2020-001` | Jugaad | `inferred` | original; REF §8.2 rule 5. A Grave Inheritance archetype |
+| 2 | `ct-in2020-002` | Aashirwad | `inferred` | original; REF §8.2 rule 5 |
+| 3 | `ct-in2020-003` | Hawala | `inferred` | original; REF §8.2 rule 5 |
+| 4 | `ct-in2020-004` | Hafta Vasooli | `inferred` | original; REF §8.2 rule 5 |
+| 5 | `ct-in2020-005` | Parivartan | `inferred` | original; REF §8.2 rule 5 |
+| 6 | `ct-in2020-006` | Vote Bank | `inferred` | original; REF §8.2 rule 5. Singularity archetype |
+| 7 | `ct-in2020-007` | Tabadla | `inferred` | original; REF §8.2 rule 5 |
+| 8 | `ct-in2020-008` | Lifafa | `inferred` | original; REF §8.2 rule 5. Does **not** restate COUGH IT UP — that ships recovered as `hl-in2020-013` |
+| 9 | `ct-in2020-009` | Cut Money | `inferred` | original; REF §8.2 rule 5 |
+| 10 | `ct-in2020-010` | Note Ke Badle Vote | `inferred` | original; REF §8.2 rule 5 |
+| 11 | `ct-in2020-011` | Chhupa Rustam | `adapted` | REF §4.2.2 verbatim, on its first sentence alone. G20 `move-card`. The India skin of the Holo Sapiens archetype; see KNOWN-GAPS.md G20 |
+| 12 | `ct-in2020-012` | Nazarbandi | `inferred` | original; REF §8.2 rule 5. **Substitute for CULT-IVATING OBEDIENCE** (REF §4.2.2), ruled out in KNOWN-GAPS.md §8.3 — and its gap label was wrong twice over: the card itself is the object captured, so it is G11 and not G20, because no `move-card` reaches it. A capture also needs the protected majority to SURVIVE it, so it is a persisted per-zone protection plus a transfer, and the engine has no per-zone flag. The *"somebody may buy it"* half is DROPPED and named |
+| 13 | `ct-in2020-013` | Hukka Paani Band | `inferred` | original; REF §8.2 rule 5. **Substitute for CHAI-PAANI**, which KNOWN-GAPS.md §7 rules is **not a gap at all** — only a re-application clause was recovered (*"A second Chai-Paani card can be applied on the same player. The first one will get deactivated"*) and the base effect was never recovered, so inventing one is forbidden. Same JOB — one protection at a time, the newest replacing the oldest — expressed as a rule with a deadline rather than as persistent state |
 
 > Naming note: `ct-in2020-001` ("Jumlai Dafaar") and `ct-in2020-010` ("Pet Ka Register") are
 > **not** the recovered cards JUMLA and CHAI-PAANI. Those names are Memesys' and are
@@ -421,21 +500,21 @@ does in `in2020`.
 
 | # | card id | name | provenance | source |
 |---|---|---|---|---|
-| 1 | `hl-in2020-001` | Bhaag, Koi Nahi Rukega | `inferred` | original; REF §8.2 rule 5 |
-| 2 | `hl-in2020-002` | Chai-Paani, Dobara | `inferred` | original; REF §8.2 rule 5 |
-| 3 | `hl-in2020-003` | Aakhri Pehchaan | `inferred` | original; REF §8.2 rule 5 |
-| 4 | `hl-in2020-005` | Aadha Kisan, Poora Bazaar | `inferred` | original; REF §8.2 rule 5 |
-| 5 | `hl-in2020-006` | Chuppi Ke Baad | `inferred` | original; REF §8.2 rule 5 |
-| 6 | `hl-in2020-007` | Khaki Terror | `adapted` | S2 / REF §4.1. The donation is expressed exactly; drops *"you cannot make any purchases until you do so"* (G5, G10). **The drop is now PROVEN rather than deferred — see G5a.** The engine discharges a `no-purchases` lock with `owedRes` at most 1 per type in ONE donation (a type is either carried or waived), and the card's own donation is a donation (`p === source`), so `restrict` + `lose` in a single effect list cancel: the lock never outlives the resolution that writes it. The real card's lock lasts until a LATER donation because its four tokens sit ON the card until they are handed over — a token pile, i.e. G10. So `lose` alone is not a narrowing of this card under today's vocabulary; it is the whole of it. |
-| 7 | `hl-in2020-008` | Bijli Ka Hisaab | `inferred` | original; REF §8.2 rule 5 |
-| 8 | `hl-in2020-012` | Stay In Your Limits | `adapted` | REF §4.1. **G-new, not G18** — `convert-voter` with no target reaches the caster. Drops *"every player"* and *"to their left"* (the second is **wider**), plus the majority-conditional 2 resources (G2). **Replaced** `inferred` GHADI KA AAKHRI GHANTA |
-| 9 | `hl-in2020-013` | Cough It Up | `adapted` | REF §4.1. The eviction is performed exactly and `evict` is the printed verb. Drops the majority-conditional payout (G2). **Replaced** `inferred` CHHOTI SI KASAM |
-| 10 | `hl-in2020-014` | Growing Dissent | `adapted` | REF §4.1. The G9 + G14 card with nothing approximated. Drops *"gained voters are placed immediately"*. **Replaced** `inferred` PANI KI KAMMI |
-| 11 | `hl-in2020-015` | Pythonpost | `adapted` | REF §4.1, and REF §4.3 records SNOOP B-O-DOUBLE-T as the **same card**, so the archetype now covers both names: this one and `hl-in2020-033`. **Wider than printed**: taxes every purchase, not only Conspiracy Cards. **Replaced** `inferred` SARKAR KI CHARCHA |
-| 12 | `hl-in2020-030` | Call from the Editor's Desk | `inferred` | original; REF §8.2 rule 5. **Substitute for A CALL FROM KARACHI** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — the auction needs `PlayerState.debts`, a cap ruling on bidding resources you do not hold, negative-resource support in the pool reads, four new Actions and a second window protocol |
-| 13 | `hl-in2020-031` | The People's Vote | `inferred` | original; REF §8.2 rule 5. **Substitute for NEXT BILLION DATA POINTS** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — a ballot needs a no-self-vote rule and a re-vote-on-tie loop, which is the unbounded-cascade class §4 refuses (*"two opponents who always tie is a table that never finishes"*) |
-| 14 | `hl-in2020-032` | Open Mic | `inferred` | original; REF §8.2 rule 5. **Substitute for DOSTI BANI RAHE** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — its grant must land on SOMEBODY ELSE'S turn, and both `installLiveEffects` and `fireTriggers` require `fire.actor === le.owner` for `on-turn-start`, so there is no event to hook |
-| 15 | `hl-in2020-033` | Snoop B-O-Double-T | `adapted` | REF §4.3, which REF §4.3 itself records as the **same card** as PYTHONPOST (`hl-in2020-015`) — the same tax under its own recovered name, deliberately filed rather than tidied away, because REF's text says to dedupe by effect and a table can legitimately draw the same mechanic twice. **WIDER THAN PRINTED:** the tax falls on EVERY purchase, Conspiracy Cards and Voter Cards alike, because `surchargeFor` is one function read by both `INFLUENCE` and `BUY_CONSPIRACY`. **`text` discloses both the widening and the stacking with Pythonpost**, because a card whose prose promises something the effect list cannot deliver is a bug that only shows up in someone's game. **DROPPED, none** — and it still ships `adapted`, because dropping no clause is not reproducing text (§1). **FILED WITH NO ENGINE CHANGE.** Filed between `-031` and `-032` in the file, which is why this row is numbered last |
+| 1 | `hl-in2020-001` | Chanda | `inferred` | original; REF §8.2 rule 5 |
+| 2 | `hl-in2020-002` | Jan Sampark | `inferred` | original; REF §8.2 rule 5 |
+| 3 | `hl-in2020-003` | Naam Kat Gaya | `inferred` | original; REF §8.2 rule 5 |
+| 4 | `hl-in2020-005` | Muft Ki Revdi | `inferred` | original; REF §8.2 rule 5 |
+| 5 | `hl-in2020-006` | Haath Ki Safai | `inferred` | original; REF §8.2 rule 5 |
+| 6 | `hl-in2020-007` | Notebandi | `adapted` | S2 / REF §4.1. The donation is expressed exactly; drops *"you cannot make any purchases until you do so"* (G5, G10). **The drop is now PROVEN rather than deferred — see G5a.** The engine discharges a `no-purchases` lock with `owedRes` at most 1 per type in ONE donation (a type is either carried or waived), and the card's own donation is a donation (`p === source`), so `restrict` + `lose` in a single effect list cancel: the lock never outlives the resolution that writes it. The real card's lock lasts until a LATER donation because its four tokens sit ON the card until they are handed over — a token pile, i.e. G10. So `lose` alone is not a narrowing of this card under today's vocabulary; it is the whole of it. |
+| 7 | `hl-in2020-008` | Rangdaari | `inferred` | original; REF §8.2 rule 5 |
+| 8 | `hl-in2020-012` | Aaya Ram Gaya Ram | `adapted` | REF §4.1. **G-new, not G18** — `convert-voter` with no target reaches the caster. Drops *"every player"* and *"to their left"* (the second is **wider**), plus the majority-conditional 2 resources (G2). **Replaced** `inferred` GHADI KA AAKHRI GHANTA |
+| 9 | `hl-in2020-013` | Gherao | `adapted` | REF §4.1. The eviction is performed exactly and `evict` is the printed verb. Drops the majority-conditional payout (G2). **Replaced** `inferred` CHHOTI SI KASAM |
+| 10 | `hl-in2020-014` | Sahanubhuti Lehar | `adapted` | REF §4.1. The G9 + G14 card with nothing approximated. Drops *"gained voters are placed immediately"*. **Replaced** `inferred` PANI KI KAMMI |
+| 11 | `hl-in2020-015` | Lagaan | `adapted` | REF §4.1, and REF §4.3 records SNOOP B-O-DOUBLE-T as the **same card**, so the archetype now covers both names: this one and `hl-in2020-033`. **Wider than printed**: taxes every purchase, not only Conspiracy Cards. **Replaced** `inferred` SARKAR KI CHARCHA |
+| 12 | `hl-in2020-030` | Mili Bhagat | `inferred` | original; REF §8.2 rule 5. **Substitute for A CALL FROM KARACHI** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — the auction needs `PlayerState.debts`, a cap ruling on bidding resources you do not hold, negative-resource support in the pool reads, four new Actions and a second window protocol |
+| 13 | `hl-in2020-031` | Kursi Ka Khel | `inferred` | original; REF §8.2 rule 5. **Substitute for NEXT BILLION DATA POINTS** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — a ballot needs a no-self-vote rule and a re-vote-on-tie loop, which is the unbounded-cascade class §4 refuses (*"two opponents who always tie is a table that never finishes"*) |
+| 14 | `hl-in2020-032` | Mehman Nawazi | `inferred` | original; REF §8.2 rule 5. **Substitute for DOSTI BANI RAHE** (REF §4.1), ruled out in KNOWN-GAPS.md §8.3 — its grant must land on SOMEBODY ELSE'S turn, and both `installLiveEffects` and `fireTriggers` require `fire.actor === le.owner` for `on-turn-start`, so there is no event to hook |
+| 15 | `hl-in2020-033` | Chungi | `adapted` | REF §4.3, which REF §4.3 itself records as the **same card** as PYTHONPOST (`hl-in2020-015`) — the same tax under its own recovered name, deliberately filed rather than tidied away, because REF's text says to dedupe by effect and a table can legitimately draw the same mechanic twice. **WIDER THAN PRINTED:** the tax falls on EVERY purchase, Conspiracy Cards and Voter Cards alike, because `surchargeFor` is one function read by both `INFLUENCE` and `BUY_CONSPIRACY`. **`text` discloses both the widening and the stacking with Pythonpost**, because a card whose prose promises something the effect list cannot deliver is a bug that only shows up in someone's game. **DROPPED, none** — and it still ships `adapted`, because dropping no clause is not reproducing text (§1). **FILED WITH NO ENGINE CHANGE.** Filed between `-031` and `-032` in the file, which is why this row is numbered last |
 
 > Naming note: `hl-in2020-002` ("Chai-Paani, Dobara") is **not** the recovered card
 > CHAI-PAANI, whose base effect was never recovered. See §4 row 17.
@@ -508,23 +587,23 @@ listed; see §6.
 
 | card | disposition | blocking gap |
 |---|---|---|
-| A Grave Inheritance | **ships** `adapted` as `ct-et2040-001` | G2 |
+| Hostile Takeover | **ships** `adapted` as `ct-et2040-001` | G2 |
 | Block | **ships** `adapted` as `ct-et2040-014` | the reactive half only. G13 landed. Still dropped: the *"[OR] Discard an open Conspiracy Card or Headline Card"* branch (no op discards an open card), *"block a card stealing this card"* (G20 moves Ideology Cards only) and *"cleanse an already-active card"* (no op removes a `LiveEffect`, G9/G22). §1 tabulates all eight recovered clauses |
-| Cut, Copy, and Paste | **ships** `adapted` as `ct-et2040-016` | G16 landed. Ships the FIRST TURN only: *"select 1 of your majorities. Discard all your voters in that zone"* becomes *"select one constituency, discard 2 of your voters from it"*. The `choose-zone` decision is raised **only** when a constituency holds a voter the effect could name, so nobody is frozen by one. Still dropped, each named: the second turn entirely (*"if any empty area is left at the start of your next turn"* is a standing effect conditioned on board state — G22); **"1 of your MAJORITIES"**, which is the one clause this card is *wider* on; and *"all"* as a count. KNOWN-GAPS G16 |
-| Deep Thoughts | **ships** `adapted` as `ct-et2040-022` — filed 2026-10-04, **with no engine change** | G14a `borrow-power` with `target: 'chosen-player'` performs the printed clause: REF 4.2.1 reads *"Select an opponent and use all their Level 3 Ideologue Powers this turn"*. The decision is the **existing** `'choose-player'` raised for the card's own actor, so the opponent is NAMED rather than guessed, and it raises no new `Choice` kind and costs the client nothing; the rule is written on the CASTER naming the DONOR, and `powers.ts` `usesLeft` — the single function every `POWER_*` case in `reduce()` already asks — counts the donor's Level 3 manifesto. **Not a G20 card**, and the row-9 table was wrong to imply it: `move-card` moves cards, not powers. **DROPPED, one clause:** *"You cannot use the same Ideologue Power twice"*, which needs a per-power use counter and there is no counter on a borrowed power. **Level 5 is refused on purpose, not by omission:** all four Level 3 powers are read in `usesLeft` and Election Fever is not, so a Level 5 borrow would be a power available in one code path and not another. KNOWN-GAPS §2 G14a |
+| Hard Delete | **ships** `adapted` as `ct-et2040-016` | G16 landed. Ships the FIRST TURN only: *"select 1 of your majorities. Discard all your voters in that zone"* becomes *"select one constituency, discard 2 of your voters from it"*. The `choose-zone` decision is raised **only** when a constituency holds a voter the effect could name, so nobody is frozen by one. Still dropped, each named: the second turn entirely (*"if any empty area is left at the start of your next turn"* is a standing effect conditioned on board state — G22); **"1 of your MAJORITIES"**, which is the one clause this card is *wider* on; and *"all"* as a count. KNOWN-GAPS G16 |
+| Borrowed Brilliance | **ships** `adapted` as `ct-et2040-022` — filed 2026-10-04, **with no engine change** | G14a `borrow-power` with `target: 'chosen-player'` performs the printed clause: REF 4.2.1 reads *"Select an opponent and use all their Level 3 Ideologue Powers this turn"*. The decision is the **existing** `'choose-player'` raised for the card's own actor, so the opponent is NAMED rather than guessed, and it raises no new `Choice` kind and costs the client nothing; the rule is written on the CASTER naming the DONOR, and `powers.ts` `usesLeft` — the single function every `POWER_*` case in `reduce()` already asks — counts the donor's Level 3 manifesto. **Not a G20 card**, and the row-9 table was wrong to imply it: `move-card` moves cards, not powers. **DROPPED, one clause:** *"You cannot use the same Ideologue Power twice"*, which needs a per-power use counter and there is no counter on a borrowed power. **Level 5 is refused on purpose, not by omission:** all four Level 3 powers are read in `usesLeft` and Election Fever is not, so a Level 5 borrow would be a power available in one code path and not another. KNOWN-GAPS §2 G14a |
 | Deflect | **ships** `adapted` as `ct-et2040-015` | the reactive half only. G13 landed. Still dropped: *"only that partial effect is deflected"* — `applyEffect` computes one target per effect list, so the whole resolution is redirected (G20). And widened: `target: 'any-card'` rather than `card-affecting-you`, which resolves through an approximation (G1) |
-| Eradicating Germs | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
-| Holo Sapiens | **ships** `adapted` as `ct-et2040-013` | G20 landed — only *"This is an extra Ideology Card"*. G15 dynamic price, G17 the "of your choice", G23 re-filing, G12 expiry-on-purchase |
+| Market Correction | **ships** `adapted` as `ct-et2040-002` | G3, G17 |
+| Blind Box | **ships** `adapted` as `ct-et2040-013` | G20 landed — only *"This is an extra Ideology Card"*. G15 dynamic price, G17 the "of your choice", G23 re-filing, G12 expiry-on-purchase |
 | If You Like Piña Colada | **ships** `adapted` as `ct-et2040-017` | G4 + G15. **No clause dropped**: a `res` of 1 in *each* resource times `per: { of: 'held-of-each-resource' }` *is* a doubling of the mat, and p12's cap is the card's own second sentence, enforced by the same `gain` path. `npm run balance` reports it **NOT MEASURED** rather than scoring it zero, which is the checker's designed verdict for a card whose value it cannot compute with no player state in scope. Still `adapted`, not `verbatim`: a Conspiracy Card also needs a `cost` the recovered rules text does not print |
-| Lab-Grown Earworm | **ships** `adapted` as `ct-et2040-023` — **filed 2026-10-04, WITH the deviation, not behind a gate** | This was the one recovered card in this file that was playable and **held back**: its reduction is **strictly stronger** than the printed card, and `KNOWN-GAPS.md` §0b.2 recorded that shipping it needed an engine owner's ruling. **It now ships, and the reason the ledger should accept that is that the deviation is no longer hidden.** The real card binds ONE chosen opponent; the reduction fires on ANY influence including your own and the thief picks the victim. Both the card's `text` and its `source` say so on their face — *"The printed card fixes one opponent up front instead, takes only from what they have just spent, and is discarded when a second copy is played."* **DROPPED, three:** the fixed victim (that is G1, `'chosen-player'`), *"their SPENT resources"* (a per-turn spend LEDGER on `PlayerState`, so `steal-any` reads the current pool), and the self-discard *"There are two such cards"* (a copy COUNTER — G10's `GameState.counters` / `add-tokens` / `when: 'tokens-reach'` — so the limit is a deck fact the engine cannot enforce). A card that is stronger than the printed card and says which half is stronger is a decision a reviewer can overrule; a card that is quietly stronger is the defect this whole file exists to catch |
+| Subscription Model | **ships** `adapted` as `ct-et2040-023` — **filed 2026-10-04, WITH the deviation, not behind a gate** | This was the one recovered card in this file that was playable and **held back**: its reduction is **strictly stronger** than the printed card, and `KNOWN-GAPS.md` §0b.2 recorded that shipping it needed an engine owner's ruling. **It now ships, and the reason the ledger should accept that is that the deviation is no longer hidden.** The real card binds ONE chosen opponent; the reduction fires on ANY influence including your own and the thief picks the victim. Both the card's `text` and its `source` say so on their face — *"The printed card fixes one opponent up front instead, takes only from what they have just spent, and is discarded when a second copy is played."* **DROPPED, three:** the fixed victim (that is G1, `'chosen-player'`), *"their SPENT resources"* (a per-turn spend LEDGER on `PlayerState`, so `steal-any` reads the current pool), and the self-discard *"There are two such cards"* (a copy COUNTER — G10's `GameState.counters` / `add-tokens` / `when: 'tokens-reach'` — so the limit is a deck fact the engine cannot enforce). A card that is stronger than the printed card and says which half is stronger is a decision a reviewer can overrule; a card that is quietly stronger is the defect this whole file exists to catch |
 | Power Trip | **ships** `adapted` as `ct-et2040-019` | G14 landed, so the trigger is performed: `on-voter-influenced` with `influencedVotersAtLeast: 3` and `byOwner` **is** "every time you influence a 3-Voter Card". **Wider than printed**: `"non-majority"` is dropped, so a majority peg can be struck, and the printed `"you can"` becomes mandatory because the hook fires |
 | Quantum Wristband | not representable | G14 + G13 (auction of 3 headlines, self-immunity, IOU bids) |
-| Selective Access Memory | **ships `adapted`** as `ct-et2040-018`, both halves of its clause executing | `draw-conspiracy` carries `from: 'discard'` **and** `pick: true`, so the player NAMES a member of the recycle list, and a two-card take is TWO decisions, each offering what is left — which is how *"it can be in any order"* is expressible rather than dropped. `adapted`, not `verbatim`: the clause is paraphrased into schema ops, and executing every clause is a different property from reproducing the text (cf. §1 on the tier, and `ct-et2040-017`). What is public by DERIVATION is the pile's **MEMBERSHIP, not its ORDER** — every card on `_conspiracyDiscard` was logged publicly as `Played "<NAME>"`, and a card can leave silently (both `draw-conspiracy` take paths remove by index, not from an end) so what remains is reordered without anything being said. The five other refusals (a player hand, `_ideologyDraw`, `_ideologyDiscard`, `_headlineDraw`, `_voterDraw`) are UPHELD, not relaxed |
-| Selective Access Memory | **now `adapted` with no clause dropped** — see §4.7 | No clause is dropped, which is NOT the same as `verbatim` — see §1 on the tier and `ct-et2040-017`, which also drops nothing and stays `adapted`. The `'choose-card'` kind exists, it enumerates ONE public set, and the one thing it will not do is enumerate a hidden pile - which is why the set had to be made public rather than the pile made readable. `to: 'discard'` also ships on this op, honoured only from that public pile |
-| Singularity | **ships** `adapted` as `ct-et2040-003` (branch 1 of 2) | G6 |
-| The Greta Effect | **ships** `adapted` as `ct-et2040-024` — filed 2026-10-04, **no engine change** (G14b) | REF 4.2.1 reads *"Pick up to 2 opponents. They will get 1 less voter on the next 2 Voter Cards that they influence. This applies to 2 separate voter cards for 2 different players."* The state-changing half ships as `restrict` kind `voter-shortfall`, read by `INFLUENCE` in exactly one place: `value` is the voters lost per card and `owed` is the number of CARDS. Two rulings, both on `'voter-shortfall'` in `packages/engine/src/state.ts` — it **SUPPRESSES rather than refuses** (a 1-Voter Card under a 2-voter shortfall yields *zero* and the purchase still succeeds, because a restriction that made the influence illegal would freeze the table on a card that cannot be unbought), and it is subtracted **after** Going Viral (subtracting first would let a Showstopper launder the debuff away by pairing it with their own power). `owed` means something different here than for KHAKI TERROR's lock and that is named rather than left to be inferred. **DROPPED, both named:** *"Pick up to 2 opponents"* ships as **one**, because `applyEffect` computes ONE `target` for a whole effect list and so a card cannot raise two `choose-player` decisions in one resolution; and the printed rider *"This applies to 2 separate voter cards for 2 different players"* goes with it, since one card and one player is what ships. KNOWN-GAPS §2 G14b |
-| The Psychohistorian | **ships** `adapted` as `ct-et2040-004` (branch 1 of 2) | G7/G19 |
-| Thoughts and Prayers | **ships** `adapted` as `ct-et2040-021`, **nothing dropped** | Built this iteration and the `read`-vs-`target` split closed it: *"any 2 resources"* is `gain-any`, *"for each"* is `per`, and *"Pick a player"* is `read`, so `target` keeps naming the **recipient** while `read` names whose board the multiplier comes off. The earlier refusal below was right about the problem and wrong about the impossibility — `chosen-player` really does aim `n` at the player the effect resolves FOR, but `read` is the field that separates the two. **Still `adapted`, not `verbatim`:** a Conspiracy Card also needs a `cost` the recovered text does not print |
+| Dumpster Dive | **ships `adapted`** as `ct-et2040-018`, both halves of its clause executing | `draw-conspiracy` carries `from: 'discard'` **and** `pick: true`, so the player NAMES a member of the recycle list, and a two-card take is TWO decisions, each offering what is left — which is how *"it can be in any order"* is expressible rather than dropped. `adapted`, not `verbatim`: the clause is paraphrased into schema ops, and executing every clause is a different property from reproducing the text (cf. §1 on the tier, and `ct-et2040-017`). What is public by DERIVATION is the pile's **MEMBERSHIP, not its ORDER** — every card on `_conspiracyDiscard` was logged publicly as `Played "<NAME>"`, and a card can leave silently (both `draw-conspiracy` take paths remove by index, not from an end) so what remains is reordered without anything being said. The five other refusals (a player hand, `_ideologyDraw`, `_ideologyDiscard`, `_headlineDraw`, `_voterDraw`) are UPHELD, not relaxed |
+| Dumpster Dive | **now `adapted` with no clause dropped** — see §4.7 | No clause is dropped, which is NOT the same as `verbatim` — see §1 on the tier and `ct-et2040-017`, which also drops nothing and stays `adapted`. The `'choose-card'` kind exists, it enumerates ONE public set, and the one thing it will not do is enumerate a hidden pile - which is why the set had to be made public rather than the pile made readable. `to: 'discard'` also ships on this op, honoured only from that public pile |
+| Deepfake Rally | **ships** `adapted` as `ct-et2040-003` (branch 1 of 2) | G6 |
+| Shrinkflation | **ships** `adapted` as `ct-et2040-024` — filed 2026-10-04, **no engine change** (G14b) | REF 4.2.1 reads *"Pick up to 2 opponents. They will get 1 less voter on the next 2 Voter Cards that they influence. This applies to 2 separate voter cards for 2 different players."* The state-changing half ships as `restrict` kind `voter-shortfall`, read by `INFLUENCE` in exactly one place: `value` is the voters lost per card and `owed` is the number of CARDS. Two rulings, both on `'voter-shortfall'` in `packages/engine/src/state.ts` — it **SUPPRESSES rather than refuses** (a 1-Voter Card under a 2-voter shortfall yields *zero* and the purchase still succeeds, because a restriction that made the influence illegal would freeze the table on a card that cannot be unbought), and it is subtracted **after** Going Viral (subtracting first would let a Showstopper launder the debuff away by pairing it with their own power). `owed` means something different here than for KHAKI TERROR's lock and that is named rather than left to be inferred. **DROPPED, both named:** *"Pick up to 2 opponents"* ships as **one**, because `applyEffect` computes ONE `target` for a whole effect list and so a card cannot raise two `choose-player` decisions in one resolution; and the printed rider *"This applies to 2 separate voter cards for 2 different players"* goes with it, since one card and one player is what ships. KNOWN-GAPS §2 G14b |
+| Predictive Polling | **ships** `adapted` as `ct-et2040-004` (branch 1 of 2) | G7/G19 |
+| Disaster Tourism | **ships** `adapted` as `ct-et2040-021`, **nothing dropped** | Built this iteration and the `read`-vs-`target` split closed it: *"any 2 resources"* is `gain-any`, *"for each"* is `per`, and *"Pick a player"* is `read`, so `target` keeps naming the **recipient** while `read` names whose board the multiplier comes off. The earlier refusal below was right about the problem and wrong about the impossibility — `chosen-player` really does aim `n` at the player the effect resolves FOR, but `read` is the field that separates the two. **Still `adapted`, not `verbatim`:** a Conspiracy Card also needs a `cost` the recovered text does not print |
 
 > REF §4.2.1's heading says *"15 cards"* but the table has **16** rows. The 16 are listed.
 
@@ -533,7 +612,7 @@ listed; see §6.
 | card | disposition | blocking gap |
 |---|---|---|
 | Chai-Paani | not representable | **the base effect was never recovered.** Only a re-application clause exists (*"a second card can be applied on the same player; the first gets deactivated"*), from a search snippet of S2. Shipping it would mean authoring the whole card under a recovered name |
-| Jumla | **ships** `adapted` as `ct-in2020-011` | G20 landed, so the card is a movable object and the first sentence executes. Still dropped: G15 (*"as many resources as the Ideologue level this card is on"* — a computed price the seller reads), G17 (*"of your choice"* — a choice over the pile's contents, which is a new `Choice` kind the client owns), G23 (re-filing under another Ideologue). See KNOWN-GAPS.md G20 |
+| Chhupa Rustam | **ships** `adapted` as `ct-in2020-011` | G20 landed, so the card is a movable object and the first sentence executes. Still dropped: G15 (*"as many resources as the Ideologue level this card is on"* — a computed price the seller reads), G17 (*"of your choice"* — a choice over the pile's contents, which is a new `Choice` kind the client owns), G23 (re-filing under another Ideologue). See KNOWN-GAPS.md G20 |
 | Cult-ivating Obedience | not representable | protection of a specific majority (a `PlayerState` field, not an effect). Recovered from S5, not from a player-aid. **Still not G20-only** now that G20 has landed: a protection is a PlayerState field, not an effect |
 
 ### 4.3 Names recovered without an effect — REF §4.2.2, from the S1 blurb
@@ -569,25 +648,25 @@ listed; see §6.
 | card | disposition | blocking gap |
 |---|---|---|
 | 404 | not representable | G18 — swaps who answers which card |
-| Ain't No Cure For Love | **ships** `adapted` as `hl-et2040-003` | G1 only (G-new closed) |
-| As Clear As Water | **ships** `adapted` as `hl-et2040-013` (replacing the `inferred` THREE DAY WEEKEND) | Both REVEAL clauses, and a reveal has **no state consequence in this engine** — a missing mechanism, not missing wording. The top-up is shipped in full |
-| Brave New Worlds | **ships** `adapted` as `hl-et2040-023`, **on the second clause only** | A **PART-BUILD, and it needed no engine change at all** — which is the honest answer to the question of whether G18 was really large. The second sentence, *"Players will not receive any resources (active & passive) for doing so"*, is `restrict` with kind `no-income` read literally, and `ANSWER` already consults `incomeBlocked` for exactly this card: it logs *"No resources for this answer."* and suppresses **both** the answer's resources and the passive bonus, which is what "active & passive" means. The earlier refusal below was right that without G18's answer-phase control the clause has a different referent; what it missed is that `until: 'round'` gives the clause a **finite, honest** bound, so the card can ship the state-changing half and drop the phase change rather than inventing a referent. DROPPED, named: *"every player answers an Ideology Card immediately, in order of turn"* is a card-level sweep that runs answers out of band, and `_pendingCard` is written exactly once per turn by `advanceTurn` — so a sweep is a **second writer** for the answer window, which is the refusal already on `move-card`'s `to: 'pending'`. That is a RULES QUESTION, not a cost, and `KNOWN-GAPS.md` §8.2 states it |
-| Card Games | **ships** `adapted` as `hl-et2040-031` — filed 2026-10-04, **no engine change** | **THE `not representable` LABEL ON THIS ROW WAS STALE**, for the same reason as A COWARD OR A JOURNALIST? above, which it shares clause for clause. REF §4.3 lists this card as a **re-skin** of that one, and the probe keeps the two rows under both names deliberately, because a duplicate is cheaper to keep visible than to deduplicate by hand; the reduction is field-for-field the same two clauses, and every clause dropped or performed is identical to that row. **WITH ONE ADDITION:** REF §4.3 adds *"Can be blocked only at the beginning."* That is a rule about **WHEN** the response window opens rather than about what happens, and the window that already exists (`GameState.interrupt`, G13) opens for the whole resolution — so the narrowed timing is **dropped and named rather than approximated**. **NOW IN THE CORPUS, as a deliberate second copy of `hl-et2040-030`'s archetype** |
-| Don't Kiss The Babies | **ships** `adapted` as `hl-et2040-021` | G5's `surcharge` restriction is executed and read by INFLUENCE and BUY_CONSPIRACY. **Wider than printed**, and the card says so on its face: the printed tax is on **Voter Cards** and this taxes **every purchase**, Conspiracy Cards included, because `surchargeFor` is one function with no field saying which kind of purchase a restriction prices |
-| Fatality | **ships** `adapted` as `hl-et2040-018` | G1 landed for the named opponent. Dropped, named: "for free" is a PURCHASE the engine cannot grant (G15's `price` field); "the voters" ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; "right away" needs an *immediately* placement — **and that last drop was the one place in this table where the shipped `text` read as the OPPOSITE of the recovered timing, so `text` was amended 2026-10-04 to say so to the player. See §4.8** |
+| Own Goal | **ships** `adapted` as `hl-et2040-003` | G1 only (G-new closed) |
+| Universal Basic Intrigue | **ships** `adapted` as `hl-et2040-013` (replacing the `inferred` THREE DAY WEEKEND) | Both REVEAL clauses, and a reveal has **no state consequence in this engine** — a missing mechanism, not missing wording. The top-up is shipped in full |
+| Bank Holiday | **ships** `adapted` as `hl-et2040-023`, **on the second clause only** | A **PART-BUILD, and it needed no engine change at all** — which is the honest answer to the question of whether G18 was really large. The second sentence, *"Players will not receive any resources (active & passive) for doing so"*, is `restrict` with kind `no-income` read literally, and `ANSWER` already consults `incomeBlocked` for exactly this card: it logs *"No resources for this answer."* and suppresses **both** the answer's resources and the passive bonus, which is what "active & passive" means. The earlier refusal below was right that without G18's answer-phase control the clause has a different referent; what it missed is that `until: 'round'` gives the clause a **finite, honest** bound, so the card can ship the state-changing half and drop the phase change rather than inventing a referent. DROPPED, named: *"every player answers an Ideology Card immediately, in order of turn"* is a card-level sweep that runs answers out of band, and `_pendingCard` is written exactly once per turn by `advanceTurn` — so a sweep is a **second writer** for the answer window, which is the refusal already on `move-card`'s `to: 'pending'`. That is a RULES QUESTION, not a cost, and `KNOWN-GAPS.md` §8.2 states it |
+| Left-Wing Handout | **ships** `adapted` as `hl-et2040-031` — filed 2026-10-04, **no engine change** | **THE `not representable` LABEL ON THIS ROW WAS STALE**, for the same reason as A COWARD OR A JOURNALIST? above, which it shares clause for clause. REF §4.3 lists this card as a **re-skin** of that one, and the probe keeps the two rows under both names deliberately, because a duplicate is cheaper to keep visible than to deduplicate by hand; the reduction is field-for-field the same two clauses, and every clause dropped or performed is identical to that row. **WITH ONE ADDITION:** REF §4.3 adds *"Can be blocked only at the beginning."* That is a rule about **WHEN** the response window opens rather than about what happens, and the window that already exists (`GameState.interrupt`, G13) opens for the whole resolution — so the narrowed timing is **dropped and named rather than approximated**. **NOW IN THE CORPUS, as a deliberate second copy of `hl-et2040-030`'s archetype** |
+| Convenience Fee | **ships** `adapted` as `hl-et2040-021` | G5's `surcharge` restriction is executed and read by INFLUENCE and BUY_CONSPIRACY. **Wider than printed**, and the card says so on its face: the printed tax is on **Voter Cards** and this taxes **every purchase**, Conspiracy Cards included, because `surchargeFor` is one function with no field saying which kind of purchase a restriction prices |
+| Pity Vote | **ships** `adapted` as `hl-et2040-018` | G1 landed for the named opponent. Dropped, named: "for free" is a PURCHASE the engine cannot grant (G15's `price` field); "the voters" ships as 1 because the recovered text names no number and inventing one would be a claim the corpus does not support; "right away" needs an *immediately* placement — **and that last drop was the one place in this table where the shipped `text` read as the OPPOSITE of the recovered timing, so `text` was amended 2026-10-04 to say so to the player. See §4.8** |
 | Fuelling The News | not representable | G17 (draw 3 Headlines) + G18 (choose the resolution order). The *giving* half moves Headline Cards, and move-card is Ideology-only. **Not G20-blocked** now |
-| Gender Trouble | **ships** `adapted` as `hl-et2040-020` | G5's `no-power` restriction is executed and read by `powers.ts usesLeft`, the one consult point every `POWER_*` case already asks. **Weaker than printed, and named on the card rather than hidden**: the printed card takes ONE CHOSEN Level 3 power and this takes **all** of them, because naming one power is a decision over POWERS rather than over players (G1). The printed `"if you do not have a Level 3 Ideologue Power, discard 2 resources in your next turn"` is dropped: a conditional over a whole effect list. It was held back for three iterations by a **corpus gate** rather than by the engine, and that gate is gone |
-| Good Gig Well Played | **ships** `adapted` as `hl-et2040-011` (keep-one branch) | G17, G20 |
+| Blue Screen | **ships** `adapted` as `hl-et2040-020` | G5's `no-power` restriction is executed and read by `powers.ts usesLeft`, the one consult point every `POWER_*` case already asks. **Weaker than printed, and named on the card rather than hidden**: the printed card takes ONE CHOSEN Level 3 power and this takes **all** of them, because naming one power is a decision over POWERS rather than over players (G1). The printed `"if you do not have a Level 3 Ideologue Power, discard 2 resources in your next turn"` is dropped: a conditional over a whole effect list. It was held back for three iterations by a **corpus gate** rather than by the engine, and that gate is gone |
+| Leaked Memo | **ships** `adapted` as `hl-et2040-011` (keep-one branch) | G17, G20 |
 | Higgs Moron | not representable | G10 (tokens on a card) + G12 (timed pass) |
-| Just Breathe | **ships** `adapted` as `hl-et2040-016` | G16 landed. `zone: your-strongest` is a pure function of the board, so *"the zone where you have the most voters"* is now **performed** rather than approximated. Still dropped, named: *"into an adjacent zone"* (a destination is a second decision on top of a source one), the tie-break (broken deterministically by `ZONE_IDS` order instead of offered as a decision), and *"move"* as EVICT (strictly weaker) |
-| Married With Bits | **ships** `adapted` as `hl-et2040-010` | G1 |
-| Movement Anxiety Disorder | **ships** `adapted` as `hl-et2040-015` (replacing the `inferred` SILICON RAIN) | G10 (the counter), G13 (multi-turn block). Both of its recorded gaps, G9 and G22, were already CLOSED when the playability probe wrote the row down |
-| New Face Who Dis | **ships** `adapted` as `hl-et2040-001` | the Volatile-Area placement ban is G5 and still (c). **The every-player targeting is dropped for a different reason than this row used to give**, and the old reason was wrong: G8 closed on the reducer, so `target: 'everyone'` IS honoured and the card would be free to say it — but the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player, so in a real game the grant is wiped before the next player acts. It ships in the `you` reading for that reason (G9/G22), not pending an engine change. SUBMERGED is the same archetype and now ships separately as `hl-et2040-029` |
-| Red Blooded | **ships** `adapted` as `hl-et2040-002` | G4, G-new |
-| Snoop B-O-Double-T | **ships** `adapted` as `hl-in2020-033`, **and** the archetype also ships as `hl-in2020-015` | REF §4.3 says outright that this is the **same card** as PYTHONPOST — one archetype, two recovered names, and **both are now filed**. The second copy is deliberate, and each card's `source` says so in as many words: *"Beside `hl-in2020-015` a table can draw the same tax twice; if that is a balance problem the fix is to retire one NAME, not to change either reduction."* `hl-in2020-033`'s `text` discloses the stacking to the player. It is the only one of the nine that drops **no** clause, and it still ships `adapted` — see §1 on the tier |
-| The Big Freeze | **ships** `adapted` as `hl-et2040-033` — filed 2026-10-04, **no engine change** | **THE `not representable` LABEL ON THIS ROW WAS STALE, and so was the reasoning behind it** — it refused on G5 + G9 + G15 + G22 and called the lowering of a cap under an already-over player *"the convert-voter soft-lock shape"*. **It is not the same shape.** `enforceCap` raises count = `overCap(pool, cap)` = max(0, total − cap), so excess ≤ total **ALWAYS** — the ask can never exceed what the player holds — and discarding it lands at min(total, cap) ≥ 0, so the target state is **REACHABLE rather than merely approached**. `lose-any` is additionally clamped to the chooser's pool at ANSWER time, so a pool that drains in between lowers the ask instead of stranding it. `convert-voter`'s defect was a decision with **no acceptable answer**; this is a decision whose answer is **always affordable**, and no gate is needed. The exhaustive proof is `packages/engine/test/cap-override.test.ts` at 2/3/4/5 seats. ON THE VOCABULARY the whole of REF §4.3's *"Reduce your resource cap to 10"* is expressible, via `set-cap` reading `PlayerState.capOverride` — a `PlayerState` **FIELD** rather than a `restrict` kind, because a cap is a NUMBER every pool comparison reads and not a gate an action is refused at — and `enforceCap` runs in the same breath as the write, which is p12's *"if at any time you cross your resource cap"* read literally. **NOW IN THE CORPUS**, so this measures the game and not only the vocabulary. DROPPED, both named: the *"[OR] Pick an opponent EVERY TURN and donate any 1 resource to them"* branch, which is a recurring donation to a chosen opponent (G5 + G9) and is therefore a **different card**, not a smaller one; and the resource cap being **player-visible as a number on the mat**, which the engine enforces but the client does not yet render |
-| The Four Horsemen | **ships** `adapted` as `hl-et2040-009` | G5 |
-| Why The Long Face? | **ships** `adapted` as `hl-et2040-019` | G1 names the opponent, G14 fires the hook, G22 is the lifetime, and the printed "1 voter **not card**" parenthetical holds because `voters` grants a group rather than drawing. **One clause dropped and it makes the card STRONGER**: `condition: { byOwner: true }` is left off, so the hook fires on ANY influence rather than only yours |
+| Overcrowding | **ships** `adapted` as `hl-et2040-016` | G16 landed. `zone: your-strongest` is a pure function of the board, so *"the zone where you have the most voters"* is now **performed** rather than approximated. Still dropped, named: *"into an adjacent zone"* (a destination is a second decision on top of a source one), the tie-break (broken deterministically by `ZONE_IDS` order instead of offered as a decision), and *"move"* as EVICT (strictly weaker) |
+| Free Publicity | **ships** `adapted` as `hl-et2040-010` | G1 |
+| Relocation Fatigue | **ships** `adapted` as `hl-et2040-015` (replacing the `inferred` SILICON RAIN) | G10 (the counter), G13 (multi-turn block). Both of its recorded gaps, G9 and G22, were already CLOSED when the playability probe wrote the row down |
+| Change Of Address | **ships** `adapted` as `hl-et2040-001` | the Volatile-Area placement ban is G5 and still (c). **The every-player targeting is dropped for a different reason than this row used to give**, and the old reason was wrong: G8 closed on the reducer, so `target: 'everyone'` IS honoured and the card would be free to say it — but the bonus lands in `PlayerState.powerUses.gerrymandered`, which `advanceTurn` resets for the incoming player, so in a real game the grant is wiped before the next player acts. It ships in the `you` reading for that reason (G9/G22), not pending an engine change. SUBMERGED is the same archetype and now ships separately as `hl-et2040-029` |
+| Blood Money | **ships** `adapted` as `hl-et2040-002` | G4, G-new |
+| Chungi | **ships** `adapted` as `hl-in2020-033`, **and** the archetype also ships as `hl-in2020-015` | REF §4.3 says outright that this is the **same card** as PYTHONPOST — one archetype, two recovered names, and **both are now filed**. The second copy is deliberate, and each card's `source` says so in as many words: *"Beside `hl-in2020-015` a table can draw the same tax twice; if that is a balance problem the fix is to retire one NAME, not to change either reduction."* `hl-in2020-033`'s `text` discloses the stacking to the player. It is the only one of the nine that drops **no** clause, and it still ships `adapted` — see §1 on the tier |
+| Spending Freeze | **ships** `adapted` as `hl-et2040-033` — filed 2026-10-04, **no engine change** | **THE `not representable` LABEL ON THIS ROW WAS STALE, and so was the reasoning behind it** — it refused on G5 + G9 + G15 + G22 and called the lowering of a cap under an already-over player *"the convert-voter soft-lock shape"*. **It is not the same shape.** `enforceCap` raises count = `overCap(pool, cap)` = max(0, total − cap), so excess ≤ total **ALWAYS** — the ask can never exceed what the player holds — and discarding it lands at min(total, cap) ≥ 0, so the target state is **REACHABLE rather than merely approached**. `lose-any` is additionally clamped to the chooser's pool at ANSWER time, so a pool that drains in between lowers the ask instead of stranding it. `convert-voter`'s defect was a decision with **no acceptable answer**; this is a decision whose answer is **always affordable**, and no gate is needed. The exhaustive proof is `packages/engine/test/cap-override.test.ts` at 2/3/4/5 seats. ON THE VOCABULARY the whole of REF §4.3's *"Reduce your resource cap to 10"* is expressible, via `set-cap` reading `PlayerState.capOverride` — a `PlayerState` **FIELD** rather than a `restrict` kind, because a cap is a NUMBER every pool comparison reads and not a gate an action is refused at — and `enforceCap` runs in the same breath as the write, which is p12's *"if at any time you cross your resource cap"* read literally. **NOW IN THE CORPUS**, so this measures the game and not only the vocabulary. DROPPED, both named: the *"[OR] Pick an opponent EVERY TURN and donate any 1 resource to them"* branch, which is a recurring donation to a chosen opponent (G5 + G9) and is therefore a **different card**, not a smaller one; and the resource cap being **player-visible as a number on the mat**, which the engine enforces but the client does not yet render |
+| Cost of Living | **ships** `adapted` as `hl-et2040-009` | G5 |
+| Bandwagon | **ships** `adapted` as `hl-et2040-019` | G1 names the opponent, G14 fires the hook, G22 is the lifetime, and the printed "1 voter **not card**" parenthetical holds because `voters` grants a group rather than drawing. **One clause dropped and it makes the card STRONGER**: `condition: { byOwner: true }` is left off, so the hook fires on ANY influence rather than only yours |
 
 > REF §4.3's heading says *"18 cards"* but the table has **20** rows. All 20 are listed.
 
@@ -618,9 +697,9 @@ difference between the two answers and the card asked nothing:
 
 | card | question | the defect |
 |---|---|---|
-| `ig-in2020-016` | Should land records be digitised before the next election? | side 1 read *"No. **Digitise it now** and the next sale is fast enough to be invisible."* — it told the reader to do the thing its own `No` refused |
-| `ig-in2020-023` | Should a deserter's name be published after the war ends? | side 0 read *"No. **Publish it** and the next recruitment is only a rumour."* — same defect |
-| `ig-in2020-029` | Should the examination results be published with the schools named? | side 1 read *"No. **Name the schools** and the parents read nothing else."* — same defect |
+| `ig-in2020-016` | Does the Centre need its power to dismiss elected state governments? | side 1 read *"No. **Digitise it now** and the next sale is fast enough to be invisible."* — it told the reader to do the thing its own `No` refused |
+| `ig-in2020-023` | Must every young citizen do a year of military service? | side 0 read *"No. **Publish it** and the next recruitment is only a rumour."* — same defect |
+| `ig-in2020-029` | Must riverfront beautification wait until the river itself is clean? | side 1 read *"No. **Name the schools** and the parents read nothing else."* — same defect |
 
 **Clause-by-clause disposition. Nothing was dropped.** In each case the clause after the
 shared frame is *retained* and re-argued as the cost of the action rather than as a reason
@@ -739,14 +818,14 @@ the note names which side is the superset and why the card ships the subset.**
 
 | card | probe played | card ships | answer | one line |
 |---|---|---|---|---|
-| A Grave Inheritance | `steal-any n2 target each-opponent`, and nothing else | `steal-any n2`, `evict n2` | **(a)** | the probe was wider on clause one and silent on clause two, which is a different card, not a superset |
+| Hostile Takeover | `steal-any n2 target each-opponent`, and nothing else | `steal-any n2`, `evict n2` | **(a)** | the probe was wider on clause one and silent on clause two, which is a different card, not a superset |
 | Block | `[]` | `gain clout 1` + the interrupt | **(b) and (a)** | the card's `text` promised a payout on the one path that cannot pay it |
 | Deflect | `[]` | `gain trust 1` + the interrupt | **(b) and (a)** | the same defect on the same two lines of `reduce.ts` |
-| Eradicating Germs | `refresh-market until: rest-of-game` | `refresh-market`, `gain-any n1` | **(a)** | the probe's clause installed a live effect with a NULL trigger, which never fires |
-| The Psychohistorian | `draw-conspiracy n2` | `voters n1`, `gain-any n2` | **(a)** | `draw-conspiracy` is not a branch of this card at all; the old note called it "the other branch" |
-| Red Blooded | `discard-voter n1 target each-opponent` | `discard-voter n2`, `gain-any n2 each-opponent` | **(a)** | halved the count and dropped the payout |
+| Market Correction | `refresh-market until: rest-of-game` | `refresh-market`, `gain-any n1` | **(a)** | the probe's clause installed a live effect with a NULL trigger, which never fires |
+| Predictive Polling | `draw-conspiracy n2` | `voters n1`, `gain-any n2` | **(a)** | `draw-conspiracy` is not a branch of this card at all; the old note called it "the other branch" |
+| Blood Money | `discard-voter n1 target each-opponent` | `discard-voter n2`, `gain-any n2 each-opponent` | **(a)** | halved the count and dropped the payout |
 | KHAKI TERROR | `restrict no-purchases`, then `lose` | `lose` alone | **(c)** — **probe is the SUPERSET** | the lock is dropped because one donation discharges it, so a shipped lock would print a freeze that evaporates |
-| New Face Who Dis | `gerrymander n1 target everyone` | `gerrymander n1`, no target | **(c)** — **probe is the SUPERSET** | G8 landed and `everyone` is honoured, but the grant is wiped by `advanceTurn` before the next player acts |
+| Change Of Address | `gerrymander n1 target everyone` | `gerrymander n1`, no target | **(c)** — **probe is the SUPERSET** | G8 landed and `everyone` is honoured, but the grant is wiped by `advanceTurn` before the next player acts |
 
 **New value: 2.** Six were the probe measuring something other than the card and are now
 field-for-field identical to what ships; two are legitimate supersets and stay, named.

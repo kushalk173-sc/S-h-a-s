@@ -248,7 +248,7 @@ describe('the table the client actually builds', () => {
     const hub = server();
     const lobbyId = 'lob_1';
     const tabs = [tab('P1'), tab('P2'), tab('P3')];
-    hub.handle({ t: 'lobby:create', name: 'P1', maxPlayers: 3, isPrivate: false }, tabs[0]!.conn);
+    hub.handle({ t: 'lobby:create', name: 'P1', maxPlayers: 3, isPrivate: false, mode: 'standard' }, tabs[0]!.conn);
     for (const t of tabs.slice(1)) {
       hub.handle({ t: 'lobby:join', lobbyId, name: t.conn.name }, t.conn);
     }
@@ -305,7 +305,7 @@ describe('the table the client actually builds', () => {
     const p1 = tab('P1');
     const p2 = tab('P2');
     const watcher = tab('W');
-    hub.handle({ t: 'lobby:create', name: 'P1', maxPlayers: 2, isPrivate: false }, p1.conn);
+    hub.handle({ t: 'lobby:create', name: 'P1', maxPlayers: 2, isPrivate: false, mode: 'standard' }, p1.conn);
     hub.handle({ t: 'lobby:join', lobbyId, name: 'P2' }, p2.conn);
     expect(hub.seats(lobbyId)).toHaveLength(2);
 

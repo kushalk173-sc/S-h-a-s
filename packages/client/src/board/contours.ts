@@ -91,7 +91,7 @@ export function buildContourPaths(seed = 0x5348_4153): string[] {
  * second hand-typed copy of it.
  *
  * A map sheet has a neatline: a thin rule just inside the coast. It is drawn as
- * a printed rule and not a gradient, because �1.6 ("print, don't glow") and A.2
+ * a printed rule and not a gradient, because §1.6 ("print, don't glow") and A.2
  * ("no gradients anywhere") forbid gradients, and because a second copy of the
  * coastline in this file would be a second thing to keep in sync with the
  * generated data.
@@ -102,7 +102,7 @@ export function buildCoastInsetPaths(): string[] {
 
 /**
  * Shrink a closed ring toward its centroid by a fixed factor, in board units.
- * At 0.93 the rule sits ~20 units inside the coast on the long axis � inside the
+ * At 0.93 the rule sits ~20 units inside the coast on the long axis — inside the
  * 48-unit hit-rect half-width, so it can never be mistaken for a boundary.
  */
 function insetAbout(points: readonly Point[], factor: number): string {

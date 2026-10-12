@@ -1,5 +1,5 @@
 /**
- * Board geometry � a VERBATIM COPY of the data section of
+ * Board geometry — a VERBATIM COPY of the data section of
  * `packages/engine/src/board.generated.ts` (the generated file is 286 lines;
  * everything from `export const BOARD_WIDTH` to EOF is reproduced below
  * unchanged).

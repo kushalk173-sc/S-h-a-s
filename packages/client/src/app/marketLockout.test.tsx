@@ -141,7 +141,7 @@ describe('the endgame: nothing affordable is a STATE, and it says so', () => {
     // …and the caption now says FULL rather than leaving it to be inferred from a
     // fraction that reads like a healthy one.
     const caption = strip.container.querySelector('[data-testid=meter-caption]')?.textContent ?? '';
-    expect(caption, 'the mat does not name the full state').toMatch(/AT your cap of 12/);
+    expect(caption, 'the mat does not name the full state').toMatch(/at your cap of 12/i);
     expect(
       caption,
       'the mat does not say the next resource comes straight back',
@@ -187,7 +187,7 @@ describe('the endgame: nothing affordable is a STATE, and it says so', () => {
     // And the mat says OVER rather than AT for the same pool.
     const strip = render(<ResourceStrip pool={over} />);
     expect(strip.container.querySelector('[data-testid=meter-caption]')?.textContent ?? '').toMatch(
-      /OVER your cap of 12/,
+      /over your cap of 12/i,
     );
     strip.unmount();
   });
@@ -255,8 +255,8 @@ describe('the endgame: nothing affordable is a STATE, and it says so', () => {
     const strip = render(<ResourceStrip pool={{ funds: 4, clout: 4, media: 2, trust: 2 }} />);
     const caption = strip.container.querySelector('[data-testid=meter-caption]')?.textContent ?? '';
     expect(strip.container.textContent ?? '').toContain('12/12 held');
-    expect(caption).toMatch(/AT your cap of 12/);
-    expect(caption, 'a player ON the cap is told they are OVER it').not.toMatch(/OVER your cap/);
+    expect(caption).toMatch(/at your cap of 12/i);
+    expect(caption, 'a player ON the cap is told they are OVER it').not.toMatch(/over your cap/i);
     strip.unmount();
   });
 });

@@ -609,6 +609,15 @@ export function AnswerResolution({
         aria-label="Your answer"
         className="resolution"
         style={{ outline: 'none' }}
+        // Enter, Space or Escape continues. The screen takes focus when it opens,
+        // so the key works without hunting for the button — it appears after every
+        // answer, every turn, and a mouse trip to CONTINUE each time adds up.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+            e.preventDefault();
+            onContinue();
+          }
+        }}
       >
         <p className="eyebrow" style={{ textAlign: 'center' }}>
           YOUR ANSWER
@@ -682,6 +691,7 @@ export function AnswerResolution({
             CONTINUE
           </button>
         </div>
+        <p className="resolution__hint">or press Enter</p>
 
         <p
           className="panel__note panel__note--quiet"

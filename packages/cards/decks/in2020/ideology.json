@@ -4,7 +4,7 @@
   "cards": [
     {
       "id": "ig-in2020-001",
-      "source": "REF 5.1 (india_ideology.jpg) recovers the question and the answer 'No. Hit us first and you'll breathe your last.' on the SUPREMO side; the opposite side is authored here because only one face was ever legible. REF 2.4 records that zero ordinary question cards were recovered in full.",
+      "source": "REF 5.1 (india_ideology.jpg) recovers the question and the answer 'No. Hit us first and you'll breathe your last.' on the SUPREMO side; the opposite side is authored here because only one face was ever legible. REF 2.4 records that zero ordinary question cards were recovered in full. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Do you condemn the use of surgical strikes as a reactionary tool?",
@@ -15,7 +15,7 @@
           "pays": { "clout": 2, "media": 1 }
         },
         {
-          "answer": "Yes. A people who cannot be reached by argument can be reached by theatre.",
+          "answer": "Yes. Strikes staged for votes risk a war that ordinary soldiers must fight.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -23,7 +23,7 @@
     },
     {
       "id": "ig-in2020-002",
-      "source": "REF 5.2 verifies the Capitalist side of the shipped 'SHOULD WE INVADE NEW SPAIN?' card pays 2 Trust + 1 Media and ZERO Funds, and REF 8.1 recovers the 'far more lucrative to invade nearby islands' answer. The Supremo side is authored; the ideologue of the recovered answer is inferred from its reasoning.",
+      "source": "REF 5.2 verifies the Capitalist side of the shipped 'SHOULD WE INVADE NEW SPAIN?' card pays 2 Trust + 1 Media and ZERO Funds, and REF 8.1 recovers the 'far more lucrative to invade nearby islands' answer. The Supremo side is authored; the ideologue of the recovered answer is inferred from its reasoning. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should we invade New Spain?",
@@ -34,7 +34,7 @@
           "pays": { "funds": 0, "trust": 2, "media": 1 }
         },
         {
-          "answer": "Yes. The strait was ours before it was theirs, and the story should say so.",
+          "answer": "Yes. A nation that never expands its borders is a nation waiting to shrink.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -42,18 +42,18 @@
     },
     {
       "id": "ig-in2020-003",
-      "source": "REF 8.1 question 3, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 question 3, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should mistakes be forgiven?",
       "sides": [
         {
-          "answer": "No. A queue that does not move is only a queue with better lighting.",
+          "answer": "No. Forgive one unpaid loan and every borrower learns repayment is optional.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Forgive the mistake, publish the method, and let the crowd do the arithmetic.",
+          "answer": "Yes. People who admit their mistakes deserve a second chance, not lifelong punishment.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -61,19 +61,19 @@
     },
     {
       "id": "ig-in2020-004",
-      "source": "REF 8.1 question 4, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 question 4, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should women be free to have children single or in a relationship?",
       "advisory": "mature",
       "sides": [
         {
-          "answer": "Yes. The state has no standing in a bedroom.",
+          "answer": "Yes. Whether to raise a child alone is her choice, not the state's.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. The next decade is a budget line, and the budget line is not neutral.",
+          "answer": "No. Most voters are not ready for it, and unpopular causes lose elections.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -81,18 +81,18 @@
     },
     {
       "id": "ig-in2020-005",
-      "source": "REF 8.1 question 5, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 question 5, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should the government spend money on space exploration?",
       "sides": [
         {
-          "answer": "Yes. Nothing on this surface has ever been solved by staying on it.",
+          "answer": "Yes. Space research inspires every child in every village classroom to study science.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. There is a bus stop on this planet that still has no roof.",
+          "answer": "No. A rocket launch is a one-day headline; potholes make headlines every monsoon.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -100,18 +100,18 @@
     },
     {
       "id": "ig-in2020-006",
-      "source": "REF 8.1 question 6, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. REBALANCED for D2: side 1 paid {media 2, funds 1} against side 0's {trust 2, funds 2}, a visible ONE-RESOURCE total edge the old tolerance band swallowed, so one answer was never right under full information. Side 1 now pays {media 2, funds 2}; the two compositions stay incomparable. See BALANCE_TOLERANCE_TOTAL in src/balance.ts.",
+      "source": "REF 8.1 question 6, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. REBALANCED for D2: side 1 paid {media 2, funds 1} against side 0's {trust 2, funds 2}, a visible ONE-RESOURCE total edge the old tolerance band swallowed, so one answer was never right under full information. Side 1 now pays {media 2, funds 2}; the two compositions stay incomparable. See BALANCE_TOLERANCE_TOTAL in src/balance.ts. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Is providing free food, housing and healthcare to all citizens a good idea?",
       "sides": [
         {
-          "answer": "Yes. Give them the floor and they will build the walls themselves.",
+          "answer": "Yes. Food, a roof and medicine are basic rights, not rewards.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 2 }
         },
         {
-          "answer": "No. Free is not a policy. Free is a queue with a nicer name.",
+          "answer": "No. Promise it all and every shortage becomes tomorrow's front page.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 2 }
         }
@@ -119,19 +119,19 @@
     },
     {
       "id": "ig-in2020-007",
-      "source": "REF 8.1 question 7, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 question 7, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Do the poor have the right to take wealth from the rich?",
       "advisory": "mature",
       "sides": [
         {
-          "answer": "No. Ownership is the only argument that has ever survived a recession.",
+          "answer": "No. Seize wealth once and investors take their money elsewhere for good.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. The argument was never about ownership. It was about who was holding it.",
+          "answer": "Yes. The power of a nation lies with its masses, not its millionaires.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -139,18 +139,18 @@
     },
     {
       "id": "ig-in2020-008",
-      "source": "REF 8.1 question 8, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 question 8, recovered from the official 432-card marketing render. No answer side was legible; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should the rich be taxed to fund free higher education?",
       "sides": [
         {
-          "answer": "Yes. A debt forgiven at eighteen is cheaper than a country that is not.",
+          "answer": "Yes. Talent is everywhere in the country, but tuition money is not.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. Every free seat is a private school with a public address.",
+          "answer": "No. Heavy taxes drive away the very earners who create graduate jobs.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         }
@@ -158,18 +158,18 @@
     },
     {
       "id": "ig-in2020-009",
-      "source": "original; register per REF 8.2 (deadpan, Yes./No. opener, no jokes in the answer). Added because the recovered question pool is eight cards deep and one deck cannot show a fourth of the pairing table.",
+      "source": "original; register per REF 8.2 (deadpan, Yes./No. opener, no jokes in the answer). Added because the recovered question pool is eight cards deep and one deck cannot show a fourth of the pairing table. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the corporation fund the festival or should the festival fund the corporation?",
+      "question": "Can parties hand out free laptops and televisions before an election?",
       "sides": [
         {
-          "answer": "No. Let them pay for the drums. The logo will still be on the stage.",
+          "answer": "Yes. Nothing fills a rally ground like a free television on the stage.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Make them pay for the road as well. Roads are remembered longer than stages.",
+          "answer": "No. Election freebies are paid for with borrowed money and future taxes.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         }
@@ -177,19 +177,19 @@
     },
     {
       "id": "ig-in2020-010",
-      "source": "original; register per REF 8.2. REF 2.3 infers from 14 tournament hands that Idealist and Supremo sit in largely disjoint question space; this card tests the seam rather than filling it.",
+      "source": "original; register per REF 8.2. REF 2.3 infers from 14 tournament hands that Idealist and Supremo sit in largely disjoint question space; this card tests the seam rather than filling it. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the spokesperson resign before the committee finishes reading?",
+      "question": "Do police need a judge's warrant to tap a citizen's phone?",
       "advisory": "trigger",
       "sides": [
         {
-          "answer": "No. Leaving now is a statement. Staying is a sentence.",
+          "answer": "No. Waiting for a judge gives criminals time to switch their phones.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. Read the whole file before you answer any part of it.",
+          "answer": "Yes. Without a warrant, every critic's private calls become the state's business.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -197,18 +197,18 @@
     },
     {
       "id": "ig-in2020-011",
-      "source": "original; register per REF 8.2. Added to cover the Showstopper x Supremo pairing, which the recovered question pool never exercises.",
+      "source": "original; register per REF 8.2. Added to cover the Showstopper x Supremo pairing, which the recovered question pool never exercises. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the broadcast continue while the repair crew is still in the room?",
+      "question": "Can authorities shut down mobile internet during riots?",
       "sides": [
         {
-          "answer": "No. Show the room. The audience can decide for itself what a hole is worth.",
+          "answer": "Yes. Cutting the network stops rumours before they turn into mobs.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Show the finished room. Nobody has ever voted for a half-built wall.",
+          "answer": "No. A blackout becomes the biggest headline of all, here and abroad.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -216,18 +216,18 @@
     },
     {
       "id": "ig-in2020-012",
-      "source": "original; register per REF 8.2. Added so the Capitalist x Supremo pair is not carried entirely by the two recovered New Spain / wealth answers.",
+      "source": "original; register per REF 8.2. Added so the Capitalist x Supremo pair is not carried entirely by the two recovered New Spain / wealth answers. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the old market stay open until the new one is finished?",
+      "question": "Must the army buy its weapons only from Indian factories?",
       "sides": [
         {
-          "answer": "No. The new market needs the old one's footfall for a year before it can stand.",
+          "answer": "No. Foreign suppliers are often cheaper and faster, and the budget is limited.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. A city that keeps both pays for both and decides about neither.",
+          "answer": "Yes. A country that imports its weapons can be switched off by others.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -235,18 +235,18 @@
     },
     {
       "id": "ig-in2020-013",
-      "source": "original; register per REF 8.2. REF 8.2 rule 3 (question at most 12 words, answer at most 15 after the Yes/No) is the authoring constraint here; the situation carries the satire and the wording stays flat.",
+      "source": "original; register per REF 8.2. REF 8.2 rule 3 (question at most 12 words, answer at most 15 after the Yes/No) is the authoring constraint here; the situation carries the satire and the wording stays flat. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the tender be reopened every year or awarded once?",
+      "question": "Do elected ministers deserve the final say on appointing high court judges?",
       "sides": [
         {
-          "answer": "No. Award it once and the work is finished before anyone can challenge the price.",
+          "answer": "No. Investors trust contracts only where judges are free of political pressure.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Reopen it every year and the price falls to the lowest bidder's comfort.",
+          "answer": "Yes. Elected leaders, not unelected judges, should hold that power.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -254,18 +254,18 @@
     },
     {
       "id": "ig-in2020-014",
-      "source": "original; register per REF 8.2. The recovered question pool contains no procurement question at all, which is the register's largest silence.",
+      "source": "original; register per REF 8.2. The recovered question pool contains no procurement question at all, which is the register's largest silence. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should a defaulting contractor be allowed to bid again?",
+      "question": "Can farmers sell crops to private traders outside government mandis?",
       "sides": [
         {
-          "answer": "No. A record of failure is the only collateral anyone has ever offered.",
+          "answer": "Yes. More buyers mean better prices for farmers and less wasted grain.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Ban them and the next contractor is worse, and the file says so.",
+          "answer": "No. The mandi system keeps the nation's food supply under firm state control.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -273,18 +273,18 @@
     },
     {
       "id": "ig-in2020-015",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the toll be raised to fund the bridge that replaced it?",
+      "question": "Is fencing every kilometre of the eastern border worth the cost?",
       "sides": [
         {
-          "answer": "Yes. The bridge is a longer-lived asset than the toll ever was.",
+          "answer": "No. The money would earn far more spent on trade posts than fences.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. The toll was the only part of that road anyone could point at.",
+          "answer": "Yes. A border you cannot see is a border you cannot hold.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         }
@@ -292,18 +292,18 @@
     },
     {
       "id": "ig-in2020-016",
-      "source": "original; register per REF 8.2. SIDE 1 REWRITTEN 2026-10-04: it read \"No. Digitise it now and the next sale is fast enough to be invisible.\", which told the reader to DO the thing its own \"No\" rejected, so the two sides advocated one action and the polarity token was the only difference. Nothing was dropped: the clause about the sale being fast enough to be invisible is retained, re-argued as the cost of digitising rather than as a reason to digitise. See decks/SOURCES.md.",
+      "source": "original; register per REF 8.2. SIDE 1 REWRITTEN 2026-10-04: it read \"No. Digitise it now and the next sale is fast enough to be invisible.\", which told the reader to DO the thing its own \"No\" rejected, so the two sides advocated one action and the polarity token was the only difference. Nothing was dropped: the clause about the sale being fast enough to be invisible is retained, re-argued as the cost of digitising rather than as a reason to digitise. See decks/SOURCES.md. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should land records be digitised before the next election?",
+      "question": "Does the Centre need its power to dismiss elected state governments?",
       "sides": [
         {
-          "answer": "Yes. Digitise it now and the next sale is clean enough to tax.",
+          "answer": "No. Investors flee states where an elected government can vanish overnight.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. The register is the last thing here the state still owns outright, and a searchable copy is a copy somebody else is holding. Leave it on paper and the next sale stays slow enough to be legible.",
+          "answer": "Yes. When a state slides into disorder, the Centre must be able to step in.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -311,18 +311,18 @@
     },
     {
       "id": "ig-in2020-017",
-      "source": "original; register per REF 8.2. Welfare questions recovered at REF 8.1 items 6 and 8 are all-or-nothing; this one is about the boundary of a scheme that already exists.",
+      "source": "original; register per REF 8.2. Welfare questions recovered at REF 8.1 items 6 and 8 are all-or-nothing; this one is about the boundary of a scheme that already exists. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should free bus travel be extended to the district?",
+      "question": "Must households pay for every litre of piped water they use?",
       "sides": [
         {
-          "answer": "No. Extend it and the ticket-holding commuters are paying for the rest.",
+          "answer": "Yes. Free water gets wasted, while metered water pays for the pipes.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Extend it and the road fills with people counted nowhere else.",
+          "answer": "No. Clean drinking water belongs to everyone, not just to those who can pay.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -330,18 +330,18 @@
     },
     {
       "id": "ig-in2020-018",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
       "question": "Should the pension age rise with life expectancy?",
       "sides": [
         {
-          "answer": "No. Lower it instead and pay for it out of the same accounts.",
+          "answer": "Yes. Longer lives on the same retirement age will bankrupt the pension fund.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Tie it to expectancy and the ledger finally means something.",
+          "answer": "No. Labourers who started work at fourteen should not toil until seventy.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -349,18 +349,18 @@
     },
     {
       "id": "ig-in2020-019",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the minister appear on the news every week?",
+      "question": "Do World Cup cricket matches belong on free public television?",
       "sides": [
         {
-          "answer": "No. Once a quarter is enough, and the audit confirms it either way.",
+          "answer": "No. Broadcast rights are worth billions, and free telecasts wipe out that value.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Weekly is cheap, and nobody checks what was said by Tuesday.",
+          "answer": "Yes. A free World Cup final puts the whole country before one screen.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -368,18 +368,18 @@
     },
     {
       "id": "ig-in2020-020",
-      "source": "original; register per REF 8.2. REF 8.2 rule 4 forbids a joke in the answer; the joke here is entirely in the situation.",
+      "source": "original; register per REF 8.2. REF 8.2 rule 4 forbids a joke in the answer; the joke here is entirely in the situation. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the press conference be streamed before it is edited?",
+      "question": "Do campaigns need to go silent on social media before polling day?",
       "sides": [
         {
-          "answer": "No. Edit it first and the sentence survives the week.",
+          "answer": "Yes. A quiet period stops parties outspending each other on last-minute ads.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Stream it raw and the clip does the work of a campaign.",
+          "answer": "No. The final two days are when one viral video wins the seat.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -387,18 +387,18 @@
     },
     {
       "id": "ig-in2020-021",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the campaign advertise the number of schools opened?",
+      "question": "Is it proper for public money to buy ads praising government schemes?",
       "sides": [
         {
-          "answer": "No. Advertise the accounts and the schools will read the advertisement.",
+          "answer": "No. Crores spent on self-praise build nothing and return nothing.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Advertise the number and the arithmetic waits for the next election.",
+          "answer": "Yes. A scheme nobody has heard of is a scheme nobody votes for.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -406,19 +406,19 @@
     },
     {
       "id": "ig-in2020-022",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the protest permit be decided by the court or the police?",
+      "question": "Can police ban a protest without first going to court?",
       "advisory": "mature",
       "sides": [
         {
-          "answer": "No. By the court, and the refusal acquires a signature.",
+          "answer": "Yes. Officers on the ground know when a crowd is about to turn violent.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. By the police, and the crowd still turns up on the day.",
+          "answer": "No. The right to protest means nothing if police can cancel it at will.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -426,18 +426,18 @@
     },
     {
       "id": "ig-in2020-023",
-      "source": "original; register per REF 8.2. REF 8.2 rule 8 permits references to real subjects; no individual is named, the question is the register's ordinary register of consequence rather than of person. SIDE 0 REWRITTEN 2026-10-04: it read \"No. Publish it and the next recruitment is only a rumour.\", which told the reader to publish the name its own \"No\" refused. Nothing was dropped: the clause about the next recruitment being only a rumour is retained and re-argued as the cost of the list rather than as an instruction to build one. See decks/SOURCES.md.",
+      "source": "original; register per REF 8.2. REF 8.2 rule 8 permits references to real subjects; no individual is named, the question is the register's ordinary register of consequence rather than of person. SIDE 0 REWRITTEN 2026-10-04: it read \"No. Publish it and the next recruitment is only a rumour.\", which told the reader to publish the name its own \"No\" refused. Nothing was dropped: the clause about the next recruitment being only a rumour is retained and re-argued as the cost of the list rather than as an instruction to build one. See decks/SOURCES.md. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should a deserter's name be published after the war ends?",
+      "question": "Must every young citizen do a year of military service?",
       "sides": [
         {
-          "answer": "No. A name on a list is a name the next government can reuse, and the next government is not us. Publish it and the next recruitment is only a rumour we have to live with.",
+          "answer": "Yes. A year in uniform builds discipline and a stronger nation.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Publish it and the next recruitment is at least accurate.",
+          "answer": "No. Forcing young people to carry weapons violates their freedom of conscience.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -445,18 +445,18 @@
     },
     {
       "id": "ig-in2020-024",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the minister's statements be archived with their dates?",
+      "question": "Do news channels deserve fines for airing fake news?",
       "sides": [
         {
-          "answer": "No. Archive them and the ministry becomes a museum by Friday.",
+          "answer": "Yes. Lies on air spark riots, and the state must keep order.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. Archive them with dates and the archive becomes the story.",
+          "answer": "No. Fines make channels timid, and timid news gets no viewers.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -464,18 +464,18 @@
     },
     {
       "id": "ig-in2020-025",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the opposition be given more time on the news?",
+      "question": "Must police officers wear body cameras on every shift?",
       "sides": [
         {
-          "answer": "No. Equal time and the argument stops being an argument.",
+          "answer": "No. Officers who feel watched hesitate, and hesitation in a crisis costs lives.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         },
         {
-          "answer": "Yes. More airtime and the argument survives the week.",
+          "answer": "Yes. One clip of an officer doing right beats a thousand press releases.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -483,18 +483,18 @@
     },
     {
       "id": "ig-in2020-026",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the rally be allowed on the main road?",
+      "question": "Do political rallies have the right to block main city roads?",
       "sides": [
         {
-          "answer": "Yes. Allow it and the road learns what it is for.",
+          "answer": "No. Roads belong to ambulances and commuters, not to whoever brings the biggest crowd.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         },
         {
-          "answer": "No. Redirect it and the footage is better.",
+          "answer": "Yes. A rally nobody sees from the main road is a rally wasted.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -502,18 +502,18 @@
     },
     {
       "id": "ig-in2020-027",
-      "source": "original; register per REF 8.2. REF 8.2 rule 7 requires campaign variety; this is the enumeration question the recovered pool never reaches.",
+      "source": "original; register per REF 8.2. REF 8.2 rule 7 requires campaign variety; this is the enumeration question the recovered pool never reaches. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the census count the people who sleep in the district?",
+      "question": "Is compulsory voting a good idea for national elections?",
       "sides": [
         {
-          "answer": "Yes. Count them where they sleep and the number is honest.",
+          "answer": "No. Forcing people to vote punishes the poorest, who cannot miss a day's wages.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. Count them where they vote and the number is convenient.",
+          "answer": "Yes. Record turnout makes a dazzling headline for the world's largest democracy.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -521,18 +521,18 @@
     },
     {
       "id": "ig-in2020-028",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the free lunch continue through the summer holidays?",
+      "question": "Can criminal trials be broadcast live on national television?",
       "sides": [
         {
-          "answer": "Yes. The building is empty and the kitchen is not.",
+          "answer": "No. Cameras turn witnesses into performers and victims into entertainment.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. End it in June and July stops being visible.",
+          "answer": "Yes. Live trials would draw bigger audiences than any prime-time serial.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -540,18 +540,18 @@
     },
     {
       "id": "ig-in2020-029",
-      "source": "original; register per REF 8.2. SIDE 1 REWRITTEN 2026-10-04: it read \"No. Name the schools and the parents read nothing else.\", which told the reader to name the schools its own \"No\" refused. Nothing was dropped: the clause about the parents reading nothing else is retained, re-argued as the risk of naming rather than as a reason to name. See decks/SOURCES.md.",
+      "source": "original; register per REF 8.2. SIDE 1 REWRITTEN 2026-10-04: it read \"No. Name the schools and the parents read nothing else.\", which told the reader to name the schools its own \"No\" refused. Nothing was dropped: the clause about the parents reading nothing else is retained, re-argued as the risk of naming rather than as a reason to name. See decks/SOURCES.md. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the examination results be published with the schools named?",
+      "question": "Must riverfront beautification wait until the river itself is clean?",
       "sides": [
         {
-          "answer": "Yes. Name the schools and the parents will actually read them.",
+          "answer": "Yes. Clean water for people downstream matters more than a pretty riverside walk.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. Publish the league table without a single name on it. The moment a school is printed next to a number, the parents read nothing else and the school teaches to the number.",
+          "answer": "No. A gleaming riverfront is the photograph that wins the next election.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -559,19 +559,19 @@
     },
     {
       "id": "ig-in2020-030",
-      "source": "original; register per REF 8.2.",
+      "source": "original; register per REF 8.2. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the memorial be built where the crowd was standing?",
+      "question": "Is it right for police to parade arrested suspects before the press?",
       "advisory": "mature",
       "sides": [
         {
-          "answer": "Yes. Where they stood, so the ground keeps the argument.",
+          "answer": "No. A suspect is innocent until convicted, not a prop for photographers.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. Where it photographs cleanly, and the ground stays quiet.",
+          "answer": "Yes. A suspect paraded before cameras shows the public that police are working.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -579,18 +579,18 @@
     },
     {
       "id": "ig-in2020-031",
-      "source": "REF 8.1 item 9 recovers the stem 'SHOULD WE [STOP] AERIAL BOMBING DEVELOPED COUNTRIES?' legible in the official 432-card marketing render, but the verb is bracketed by the researcher as an inference and REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: one word, the verb, which is supplied here. No answer side was legible at all; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 item 9 recovers the stem 'SHOULD WE [STOP] AERIAL BOMBING DEVELOPED COUNTRIES?' legible in the official 432-card marketing render, but the verb is bracketed by the researcher as an inference and REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: one word, the verb, which is supplied here. No answer side was legible at all; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should we stop aerial bombing developed countries?",
       "sides": [
         {
-          "answer": "No. They are our largest export market and markets are not bombed.",
+          "answer": "No. Wartime orders keep our arms factories busy and our workers paid.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Stop it and the footage stops being a reason to continue.",
+          "answer": "Yes. Every bombed city on the evening news makes us look like villains.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -598,19 +598,19 @@
     },
     {
       "id": "ig-in2020-032",
-      "source": "REF 8.1 item 10 recovers the stem 'SHOULD KASHMIRI FARMERS BE GIVEN THE RIGHT TO FLY [â€¦]?' legible only up to the word FLY; REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: the object of 'fly' â€” 'drones' is supplied here and is authored, not recovered. No answer side was legible at all; both answers are authored in the REF 8.2 register.",
+      "source": "REF 8.1 item 10 recovers the stem 'SHOULD KASHMIRI FARMERS BE GIVEN THE RIGHT TO FLY [â€¦]?' legible only up to the word FLY; REF 8.1 says explicitly: do not treat as verbatim. MISSING CLAUSE: the object of 'fly' â€” 'drones' is supplied here and is authored, not recovered. No answer side was legible at all; both answers are authored in the REF 8.2 register. 2026-10-05: authored side rewritten for clarity; recovered text unchanged.",
       "provenance": "adapted",
       "campaign": "India 2020",
       "question": "Should Kashmiri farmers be given the right to fly drones?",
       "advisory": "mature",
       "sides": [
         {
-          "answer": "No. Every licence issued is one more reason to withdraw it.",
+          "answer": "No. Unregistered drones near a sensitive border are a security risk, whoever flies them.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Issue it and watch who stops appearing at the border.",
+          "answer": "Yes. Kashmiri farmers deserve the same farm technology as farmers everywhere else.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -618,18 +618,18 @@
     },
     {
       "id": "ig-in2020-033",
-      "source": "original; register per REF 8.2. Authored to open the register's smallest scale. REF 2.3 infers the recovered question pool is entirely national and international in framing; no recovered card concerns a village panchayat, a water right or a local allocation, so the deck had no small-scale question at all.",
+      "source": "original; register per REF 8.2. Authored to open the register's smallest scale. REF 2.3 infers the recovered question pool is entirely national and international in framing; no recovered card concerns a village panchayat, a water right or a local allocation, so the deck had no small-scale question at all. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the panchayat's water allocation favour the fields that have always had water?",
+      "question": "Are big dams worth building if they flood tribal villages?",
       "sides": [
         {
-          "answer": "Yes. Every new borewell is a subsidy to whoever drilled deepest.",
+          "answer": "Yes. One dam powers millions of homes and irrigates whole districts.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. Entitlement is the only inheritance that does not need a lawyer.",
+          "answer": "No. Tribal families lose homes, forests and graves for someone else's electricity.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -637,18 +637,18 @@
     },
     {
       "id": "ig-in2020-034",
-      "source": "original; register per REF 8.2. A creditor-versus-debtor question. The recovered pool contains one wealth question (REF 8.1 item 7) and one taxation question (item 8) and no question about who absorbs a loss already booked, which is a different trade.",
+      "source": "original; register per REF 8.2. A creditor-versus-debtor question. The recovered pool contains one wealth question (REF 8.1 item 7) and one taxation question (item 8) and no question about who absorbs a loss already booked, which is a different trade. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should farm loan waivers be paid to the banks or to the farmers?",
+      "question": "Is a farm loan waiver justified after a failed monsoon?",
       "sides": [
         {
-          "answer": "Yes. A bank that cannot lend stops lending to everyone.",
+          "answer": "No. Waivers teach borrowers to wait for the next election instead of repaying.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. The debt was raised at the farmer's table, not the bank's.",
+          "answer": "Yes. A farmer ruined by drought should not lose his land as well.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -656,18 +656,18 @@
     },
     {
       "id": "ig-in2020-035",
-      "source": "original; register per REF 8.2. Authored to put the two sides on opposite sides of an international obligation, where the recovered pool's only non-domestic questions are about invading and bombing other countries.",
+      "source": "original; register per REF 8.2. Authored to put the two sides on opposite sides of an international obligation, where the recovered pool's only non-domestic questions are about invading and bombing other countries. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
       "question": "Should India pay more than its agreed share of the climate fund?",
       "sides": [
         {
-          "answer": "Yes. A payer in arrears loses the vote on where it is spent.",
+          "answer": "No. Every extra rupee sent abroad is a rupee not invested at home.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. A share that grows with capacity is a share nobody signs.",
+          "answer": "Yes. Climate change hits the poorest first, and they cannot wait for fair shares.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -675,18 +675,18 @@
     },
     {
       "id": "ig-in2020-036",
-      "source": "original; register per REF 8.2. Authored because the recovered welfare questions (REF 8.1 items 6 and 8) are all about whether a benefit exists, and none about who inside the household is measured by it. The Capitalist side is the restrained one here, which is the deck's answer to a greedy side reading as the obvious one.",
+      "source": "original; register per REF 8.2. Authored because the recovered welfare questions (REF 8.1 items 6 and 8) are all about whether a benefit exists, and none about who inside the household is measured by it. The Capitalist side is the restrained one here, which is the deck's answer to a greedy side reading as the obvious one. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should a working spouse's earnings count in the family's means test?",
+      "question": "Can private companies run prisons for profit?",
       "sides": [
         {
-          "answer": "Yes. A benefit measured on the household measures both incomes.",
+          "answer": "Yes. Private operators build cells faster and run them for less.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. The second income becomes the reason the first is refused.",
+          "answer": "No. Nobody should profit from keeping more people locked up for longer.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -694,18 +694,18 @@
     },
     {
       "id": "ig-in2020-037",
-      "source": "original; register per REF 8.2. The incumbent-hedging question. REF 8.1 recovers campaign questions from the American material; the recovered pool contains no question about the timing advantage of the party already in office.",
+      "source": "original; register per REF 8.2. The incumbent-hedging question. REF 8.1 recovers campaign questions from the American material; the recovered pool contains no question about the timing advantage of the party already in office. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the ruling party campaign on the day the budget is presented?",
+      "question": "Can companies fund political parties anonymously through electoral bonds?",
       "sides": [
         {
-          "answer": "Yes. Six weeks of undivided attention beats one week of it.",
+          "answer": "Yes. Anonymous donors give more because they need not fear business reprisals.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. On the day it lands, the number is already the story.",
+          "answer": "No. Secret donations look shady, and voters punish parties that look shady.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -713,18 +713,18 @@
     },
     {
       "id": "ig-in2020-038",
-      "source": "original; register per REF 8.2. REF 8.1 item 5 is the only recovered question about spending, and it asks about space. This asks about the ordinary recurring purchase every district makes, where visibility and price pull in opposite directions.",
+      "source": "original; register per REF 8.2. REF 8.1 item 5 is the only recovered question about spending, and it asks about space. This asks about the ordinary recurring purchase every district makes, where visibility and price pull in opposite directions. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the district's advertising contract go to the highest bidder?",
+      "question": "Is selling naming rights to metro stations a good idea?",
       "sides": [
         {
-          "answer": "Yes. The highest bidder has at least proved it can pay.",
+          "answer": "Yes. Naming rights pay for maintenance without raising a single fare.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. The highest bidder is on every hoarding for a decade.",
+          "answer": "No. A station named after a soap brand becomes a national joke.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -732,18 +732,18 @@
     },
     {
       "id": "ig-in2020-039",
-      "source": "original; register per REF 8.2. The land question. ig-in2020-016 asks whether land records should be digitised; nothing in the recovered pool asks what happens to the ground once they are.",
+      "source": "original; register per REF 8.2. The land question. ig-in2020-016 asks whether land records should be digitised; nothing in the recovered pool asks what happens to the ground once they are. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should a new industrial corridor be built through the fields or the city?",
+      "question": "Can farmland be taken for factories without the farmers' consent?",
       "sides": [
         {
-          "answer": "Yes. The city already has the buyers and the trucks.",
+          "answer": "Yes. One big factory creates more jobs than a hundred small farms.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. The fields are the only thing here that was not built.",
+          "answer": "No. Taking land without consent is theft, whatever the compensation.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -751,18 +751,18 @@
     },
     {
       "id": "ig-in2020-040",
-      "source": "original; register per REF 8.2. The inter-generational question, which the recovered pool has no instance of at all: every recovered card decides something inside one electoral term.",
+      "source": "original; register per REF 8.2. The inter-generational question, which the recovered pool has no instance of at all: every recovered card decides something inside one electoral term. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the next gas block be opened before the current one is empty?",
+      "question": "Is opening coal mines in protected forests worth the extra power?",
       "sides": [
         {
-          "answer": "Yes. The block is licensed, the wells are surveyed, the gas is sold.",
+          "answer": "Yes. Cheap coal keeps the factories running and the lights on.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. A block opened early is a field emptied two years early.",
+          "answer": "No. An ancient forest cannot be replanted once the mine is exhausted.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -770,18 +770,18 @@
     },
     {
       "id": "ig-in2020-041",
-      "source": "original; register per REF 8.2. Transparency with a price on it. The Capitalist side is the one that votes to keep a file closed, so the question does not reward the reflex of its own answer.",
+      "source": "original; register per REF 8.2. Transparency with a price on it. The Capitalist side is the one that votes to keep a file closed, so the question does not reward the reflex of its own answer. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the procurement portal be open to anyone who asks for a file?",
+      "question": "Must TV channels limit advertising to ten minutes an hour?",
       "sides": [
         {
-          "answer": "No. Bidder names are worth more than the files holding them.",
+          "answer": "No. Ad revenue keeps channels alive, and a cap would bankrupt half of them.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. A portal nobody reads is a cabinet with a firewall.",
+          "answer": "Yes. Fewer ad breaks keep viewers glued instead of reaching for the remote.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -789,18 +789,18 @@
     },
     {
       "id": "ig-in2020-042",
-      "source": "original; register per REF 8.2. Extends the procurement family of ig-in2020-013 and ig-in2020-014 from the price of the work to the name on the envelope.",
+      "source": "original; register per REF 8.2. Extends the procurement family of ig-in2020-013 and ig-in2020-014 from the price of the work to the name on the envelope. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should a large contractor bid using a local partner's name?",
+      "question": "Must exit polls stay secret until the last vote is cast?",
       "sides": [
         {
-          "answer": "Yes. The consortium is what the tender was written for.",
+          "answer": "Yes. Early exit polls swing the stock market on guesses, not results.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. The name is the whole bid, and the name was not theirs.",
+          "answer": "No. Exit polls make election night the most watched television of the year.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -808,18 +808,18 @@
     },
     {
       "id": "ig-in2020-043",
-      "source": "original; register per REF 8.2. Both sides here are defensible and neither is cheap, which is the register's ordinary shape: two spends competing for one season.",
+      "source": "original; register per REF 8.2. Both sides here are defensible and neither is cheap, which is the register's ordinary shape: two spends competing for one season. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the border road be built before the flood relief is finished?",
+      "question": "Can troops be sent into a riot-hit state without its consent?",
       "sides": [
         {
-          "answer": "Yes. A road that cannot be flooded is worth two seasons.",
+          "answer": "No. Soldiers on city streets scare off investors for years.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "No. The relief is this year, and the road is also this year.",
+          "answer": "Yes. Order comes first, and a state that lost control has no veto.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -827,18 +827,18 @@
     },
     {
       "id": "ig-in2020-044",
-      "source": "original; register per REF 8.2. Sovereignty against cost. The Capitalist side is the one that opens the tender to a foreign firm, so the greedy reading of the Ideologue and the cautious reading coincide on this card.",
+      "source": "original; register per REF 8.2. Sovereignty against cost. The Capitalist side is the one that opens the tender to a foreign firm, so the greedy reading of the Ideologue and the cautious reading coincide on this card. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should a foreign firm be allowed to bid for a national port?",
+      "question": "Can a foreign company bid to run a major Indian port?",
       "sides": [
         {
-          "answer": "Yes. Whoever builds it fastest also builds it cheapest.",
+          "answer": "Yes. Open bidding brings the lowest price and the best technology.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. A port is an address, and an address can be changed.",
+          "answer": "No. A strategic port in foreign hands is a gate we cannot lock.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -846,18 +846,18 @@
     },
     {
       "id": "ig-in2020-045",
-      "source": "original; register per REF 8.2. Disclosure of a number that the state controls. The recovered pool contains no question about a published statistic, which is the ordinary instrument of the register.",
+      "source": "original; register per REF 8.2. Disclosure of a number that the state controls. The recovered pool contains no question about a published statistic, which is the ordinary instrument of the register. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
       "question": "Should the district hospital publish its death rate every quarter?",
       "sides": [
         {
-          "answer": "Yes. A number that is published is one somebody answers for.",
+          "answer": "Yes. Patients have a right to know how safe their hospital is.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. A quarterly number is a quarterly campaign for whoever it hurts.",
+          "answer": "No. One bad quarter becomes a scandal that drives patients away.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -865,18 +865,18 @@
     },
     {
       "id": "ig-in2020-046",
-      "source": "original; register per REF 8.2. Eligibility rather than existence. ig-in2020-017 asks whether a scheme should reach further geographically; this asks whether it should be universal or means-tested, which is the same money for a different named group.",
+      "source": "original; register per REF 8.2. Eligibility rather than existence. ig-in2020-017 asks whether a scheme should reach further geographically; this asks whether it should be universal or means-tested, which is the same money for a different named group. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should free travel serve everyone or only those who cannot pay?",
+      "question": "Must police register every complaint they receive as an FIR?",
       "sides": [
         {
-          "answer": "Yes. Everyone, and the fare is what pays for everyone else.",
+          "answer": "Yes. A complaint turned away at the station is justice denied at the door.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. Those who can pay, and the scheme stays legible from a bus.",
+          "answer": "No. Registering every complaint makes the crime figures look terrible.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -884,18 +884,18 @@
     },
     {
       "id": "ig-in2020-047",
-      "source": "original; register per REF 8.2. Language policy. Neither recovered welfare question nor any of the eight recovered stems asks who has to be addressed in what language to receive a benefit.",
+      "source": "original; register per REF 8.2. Language policy. Neither recovered welfare question nor any of the eight recovered stems asks who has to be addressed in what language to receive a benefit. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the state's message be issued in the states' own languages?",
+      "question": "Must Hindi be taught in schools in every state?",
       "sides": [
         {
-          "answer": "Yes. A message nobody reads in the first hour is issued twice.",
+          "answer": "No. Each state's own language deserves equal respect in its classrooms.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. One message, one spokesperson, and one number to correct.",
+          "answer": "Yes. One shared language builds one national audience for every message.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -903,18 +903,18 @@
     },
     {
       "id": "ig-in2020-048",
-      "source": "original; register per REF 8.2. Extends the transparency family of ig-in2020-016 and ig-in2020-041 from records to money actually moved, and both sides agree the deadline is correct and disagree about whether it has force.",
+      "source": "original; register per REF 8.2. Extends the transparency family of ig-in2020-016 and ig-in2020-041 from records to money actually moved, and both sides agree the deadline is correct and disagree about whether it has force. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should every transfer to a panchayat be published within a month?",
+      "question": "Must every rupee sent to village panchayats be published online?",
       "sides": [
         {
-          "answer": "Yes. Published in a month, spent and accounted for.",
+          "answer": "Yes. Villagers deserve to see exactly where their development money goes.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. Published in a month, read in a quarter, disputed in a year.",
+          "answer": "No. Every misspent rupee would become a local scandal by morning.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "clout": 1 }
         }
@@ -922,18 +922,18 @@
     },
     {
       "id": "ig-in2020-049",
-      "source": "original; register per REF 8.2. Two constituencies with incompatible reasons, which is the register's preferred shape: both sides are defending somebody, neither is defending a self-interest.",
+      "source": "original; register per REF 8.2. Two constituencies with incompatible reasons, which is the register's preferred shape: both sides are defending somebody, neither is defending a self-interest. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the pension fund be lent to a new manufacturing scheme?",
+      "question": "Should the Centre impose final settlements on interstate river disputes?",
       "sides": [
         {
-          "answer": "Yes. A factory that employs people funds their pensions better.",
+          "answer": "No. Farmers in each state deserve a fair hearing, not a decree from Delhi.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. The fund is the only promise kept fifty years without a vote.",
+          "answer": "Yes. Only a firm central hand can end decades of state quarrels.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -941,18 +941,18 @@
     },
     {
       "id": "ig-in2020-050",
-      "source": "original; register per REF 8.2. Borders. REF 2.3 [INFERRED] that Idealist and Supremo sit in largely disjoint question space, and ig-in2020-001 and ig-in2020-032 already touch the seam; this is the fourth card on it and the first that asks who an administrative line is drawn for.",
+      "source": "original; register per REF 8.2. Borders. REF 2.3 [INFERRED] that Idealist and Supremo sit in largely disjoint question space, and ig-in2020-001 and ig-in2020-032 already touch the seam; this is the fourth card on it and the first that asks who an administrative line is drawn for. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the state border be redrawn where the people live?",
+      "question": "Should slum families be rehoused on the same land before demolition?",
       "sides": [
         {
-          "answer": "Yes. A line that ignores a village produces two governments for it.",
+          "answer": "Yes. Families who built the city should not be pushed to its edge.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. The line is the one thing everyone agreed on at the start.",
+          "answer": "No. City land follows the master plan, and the plan cannot bend for encroachers.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -960,18 +960,18 @@
     },
     {
       "id": "ig-in2020-051",
-      "source": "original; register per REF 8.2. An unprofitable service. The recovered pool has no question about whether to keep running something that loses money, which is the ordinary form of most state expenditure.",
+      "source": "original; register per REF 8.2. An unprofitable service. The recovered pool has no question about whether to keep running something that loses money, which is the ordinary form of most state expenditure. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should loss-making public transport be kept running or written off?",
+      "question": "Should loss-making rural bus routes keep running at public expense?",
       "sides": [
         {
-          "answer": "Yes. A bus on a losing route is the only seat some people have.",
+          "answer": "Yes. For many villages, that bus is the only road to a hospital.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "No. A service with no fare has no driver and a road has no police.",
+          "answer": "No. A strong nation spends on expressways, not on half-empty buses.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -979,18 +979,18 @@
     },
     {
       "id": "ig-in2020-052",
-      "source": "original; register per REF 8.2. The courts. REF 8.1 recovers no institutional question at all, and a deadline imposed on an institution that does not control its backlog is the register's sharpest ordinary dilemma.",
+      "source": "original; register per REF 8.2. The courts. REF 8.1 recovers no institutional question at all, and a deadline imposed on an institution that does not control its backlog is the register's sharpest ordinary dilemma. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the courts be told to clear all pending cases this year?",
+      "question": "Should each new government be free to rewrite school history textbooks?",
       "sides": [
         {
-          "answer": "Yes. Clear them, and the reason for the delay becomes visible.",
+          "answer": "No. History belongs to the evidence, not to whoever won the last election.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         },
         {
-          "answer": "No. A clearance order moves the queue and keeps the count.",
+          "answer": "Yes. Children should learn the story the nation chooses to tell.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -998,18 +998,18 @@
     },
     {
       "id": "ig-in2020-053",
-      "source": "original; register per REF 8.2. Broadcast form as a question. The recovered Showstopper questions are all about whether to say something; this one is about where it is said, which the cut decides for you.",
+      "source": "original; register per REF 8.2. Broadcast form as a question. The recovered Showstopper questions are all about whether to say something; this one is about where it is said, which the cut decides for you. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the television debate come from one studio or two?",
+      "question": "Should the national cricket team refuse matches against hostile neighbours?",
       "sides": [
         {
-          "answer": "Yes. One room, and the clip that circulates is the exchange.",
+          "answer": "No. A rivalry match draws the biggest television audience of the year.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         },
         {
-          "answer": "No. Two rooms, and no single cut can be called the debate.",
+          "answer": "Yes. No trophy is worth more than the country's honour.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "media": 1 }
         }
@@ -1017,18 +1017,18 @@
     },
     {
       "id": "ig-in2020-054",
-      "source": "original; register per REF 8.2. Internal party discipline. Extends ig-in2020-037 from the calendar advantage of the incumbent to whether its own members are countable in public, which is a different institutional question.",
+      "source": "original; register per REF 8.2. Internal party discipline. Extends ig-in2020-037 from the calendar advantage of the incumbent to whether its own members are countable in public, which is a different institutional question. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the ruling party's internal vote be shown to the public?",
+      "question": "Should the film censor board be allowed to order scene cuts?",
       "sides": [
         {
-          "answer": "Yes. Show it, and the next election is a count rather than a campaign.",
+          "answer": "No. Every cut scene becomes the clip the whole country searches for.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         },
         {
-          "answer": "No. A party that counts itself in public cannot revise a number.",
+          "answer": "Yes. Someone has to decide what the nation's screens are fit to show.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -1036,18 +1036,18 @@
     },
     {
       "id": "ig-in2020-055",
-      "source": "original; register per REF 8.2. The distribution question that every recovered card abstains from: not whether to build something but which district it goes in. The Showstopper side is the one arguing for the minister's own district, so the patronage reading is not automatically the greedy side.",
+      "source": "original; register per REF 8.2. The distribution question that every recovered card abstains from: not whether to build something but which district it goes in. The Showstopper side is the one arguing for the minister's own district, so the patronage reading is not automatically the greedy side. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the minister's own district get the new hospital?",
+      "question": "Should new government doctors be required to serve two years in villages?",
       "sides": [
         {
-          "answer": "Yes. The district asked for it and the minister has seen the file.",
+          "answer": "No. Clips of furious young doctors on strike would drown out any good news.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         },
         {
-          "answer": "No. A hospital in the minister's district is a poster with beds.",
+          "answer": "Yes. Doctors trained on public money owe the nation their service.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -1055,18 +1055,18 @@
     },
     {
       "id": "ig-in2020-056",
-      "source": "original; register per REF 8.2. A one-month bilateral concession, which is the register's preferred shape: both sides can be defended, and the disagreement is entirely about what a precedent is worth.",
+      "source": "original; register per REF 8.2. A one-month bilateral concession, which is the register's preferred shape: both sides can be defended, and the disagreement is entirely about what a precedent is worth. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the border open to pilgrims without a visa for one month?",
+      "question": "Should loudspeaker noise limits apply during religious festivals too?",
       "sides": [
         {
-          "answer": "Yes. Open it, and the month is photographed from both sides.",
+          "answer": "No. Nobody ever won a crowd by turning down a festival's music.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         },
         {
-          "answer": "No. Open it once, and it becomes the standing arrangement.",
+          "answer": "Yes. One rule for every faith keeps order on every street.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -1074,18 +1074,18 @@
     },
     {
       "id": "ig-in2020-057",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: the card's second printed face (REF 5.3) and its ideologue nameplate. Capitalist on who pays for the cold chain, Supremo on the admission a ration concedes. REF 5.1 prints no condition, no seat-relative direction and no effect clause, so none is dropped here.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: the card's second printed face (REF 5.3) and its ideologue nameplate. Capitalist on who pays for the cold chain, Supremo on the admission a ration concedes. REF 5.1 prints no condition, no seat-relative direction and no effect clause, so none is dropped here. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Is it right for the vaccine to be free at every centre?",
+      "question": "Should foreign tech companies be forced to store Indian users' data locally?",
       "sides": [
         {
-          "answer": "No. Somebody has to pay for the vials and the cold chain.",
+          "answer": "No. Local data centres raise costs and scare away foreign investment.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "Yes. A state that rations medicine admits it has a border.",
+          "answer": "Yes. Data about our citizens belongs under our own laws.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -1093,18 +1093,18 @@
     },
     {
       "id": "ig-in2020-058",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on grain that cannot move, Supremo on what trade concedes about sovereignty. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on grain that cannot move, Supremo on what trade concedes about sovereignty. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the border stay shut until the neighbouring states agree?",
+      "question": "Should investors from bordering countries need government approval to buy Indian firms?",
       "sides": [
         {
-          "answer": "No. Grain that cannot move is a famine with paperwork.",
+          "answer": "No. Startups need every rupee they can raise, whatever its passport.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Trade does not make the other side sovereign here.",
+          "answer": "Yes. Whoever owns our companies can pull our strings in a crisis.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -1112,18 +1112,18 @@
     },
     {
       "id": "ig-in2020-059",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the bed already paid for, Supremo on what an unfilled ward is evidence of. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the bed already paid for, Supremo on what an unfilled ward is evidence of. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should unused hospital beds be counted as savings or as capacity?",
+      "question": "Should cash payments above two lakh rupees be banned outright?",
       "sides": [
         {
-          "answer": "Yes. An empty bed is a bed the budget has already bought.",
+          "answer": "No. Small traders run on cash, and a ban slows the whole market.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "No. Book them as capacity and the ward fills by December.",
+          "answer": "Yes. Cash is where black money hides from the state.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "trust": 1 }
         }
@@ -1131,18 +1131,18 @@
     },
     {
       "id": "ig-in2020-060",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on arrears becoming custom, Supremo on the state naming the month it chooses to hurt. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on arrears becoming custom, Supremo on the state naming the month it chooses to hurt. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the electricity waiver cover the monsoon or the summer?",
+      "question": "Should diesel cars over ten years old be banned from Delhi?",
       "sides": [
         {
-          "answer": "No. Waive one and the other quarter's arrears become custom.",
+          "answer": "No. A ban wipes out family savings and hurts the auto industry.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Pick the month that hurts and let the state name it.",
+          "answer": "Yes. A capital choking on smoke is an embarrassment to the nation.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -1150,18 +1150,18 @@
     },
     {
       "id": "ig-in2020-061",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a party that raises its own money, Supremo on what a party that cannot is owned by. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a party that raises its own money, Supremo on what a party that cannot is owned by. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the ruling party pay for its campaign from the treasury?",
+      "question": "Should private companies reserve most jobs for residents of their state?",
       "sides": [
         {
-          "answer": "No. Let it raise the money like everyone else does.",
+          "answer": "No. Firms grow by hiring the best worker, wherever they were born.",
           "ideologue": "capitalist",
           "pays": { "funds": 1, "media": 2 }
         },
         {
-          "answer": "Yes. A party that cannot pay is a party somebody owns.",
+          "answer": "Yes. Local jobs for local youth keep the streets calm and loyal.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -1169,18 +1169,18 @@
     },
     {
       "id": "ig-in2020-062",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on scarcity clearing, Showstopper on the hour a shortage is said at. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on scarcity clearing, Showstopper on the hour a shortage is said at. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Must the oxygen shortage be announced before the cylinders run out?",
+      "question": "Should private hospital fees be capped during a pandemic?",
       "sides": [
         {
-          "answer": "No. Scarcity clears faster than a statement does.",
+          "answer": "No. Price caps push hospitals to turn away patients they cannot afford.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Say it on the hour and nobody asks twice.",
+          "answer": "Yes. Nothing looks worse than a family's hospital bill going viral.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -1188,18 +1188,18 @@
     },
     {
       "id": "ig-in2020-063",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the settled location fee, Showstopper on who is asked to watch the premiere. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the settled location fee, Showstopper on who is asked to watch the premiere. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Can a film shot at the old site be allowed to premiere?",
+      "question": "Should cinemas have to play the national anthem before every film?",
       "sides": [
         {
-          "answer": "Yes. The location fee is paid and the invoice is closed.",
+          "answer": "No. Audiences pay for the film, and theatres should sell what they pay for.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "No. Hold the premiere where nobody has to watch it.",
+          "answer": "Yes. A packed hall standing together makes a powerful picture.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -1207,18 +1207,18 @@
     },
     {
       "id": "ig-in2020-064",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what the cover price is buying, Showstopper on a paper reduced to a noticeboard. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what the cover price is buying, Showstopper on a paper reduced to a noticeboard. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Do you agree a paper should print the letters rejecting it?",
+      "question": "Should social media influencers pay income tax on free gifted products?",
       "sides": [
         {
-          "answer": "No. Readers pay for the reporting, not the rebuttal.",
+          "answer": "Yes. Brands pay in products to dodge tax, and that distorts the market.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. A paper that only agrees is a noticeboard with a masthead.",
+          "answer": "No. Influencers are the loudest voices online, and they remember who taxed them.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -1226,18 +1226,18 @@
     },
     {
       "id": "ig-in2020-065",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on an empty seat as lighting, Showstopper on where the camera is pointed. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on an empty seat as lighting, Showstopper on where the camera is pointed. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Is showing the empty seats a good idea?",
+      "question": "Should India spend billions bidding to host the Olympic Games?",
       "sides": [
         {
-          "answer": "No. Empty seats are a lighting problem, not a fact.",
+          "answer": "No. Stadiums built for two weeks become debts for twenty years.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "Yes. Point the camera at the floor and the hall fills.",
+          "answer": "Yes. The whole world would be watching our opening ceremony.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -1245,18 +1245,18 @@
     },
     {
       "id": "ig-in2020-066",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the precedent an exception sets, Showstopper on the notice reaching the parents. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the precedent an exception sets, Showstopper on the notice reaching the parents. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the exam centre move for the candidate who cannot travel?",
+      "question": "Should ride-hailing apps be banned from surge pricing at peak hours?",
       "sides": [
         {
-          "answer": "No. One exception is a precedent with a waiting room.",
+          "answer": "No. Surge pricing pulls more drivers onto the road when demand peaks.",
           "ideologue": "capitalist",
           "pays": { "funds": 1, "media": 2 }
         },
         {
-          "answer": "Yes. Move the centre and put the notice where parents read it.",
+          "answer": "Yes. Stranded commuters paying triple fares make terrible headlines.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -1264,18 +1264,18 @@
     },
     {
       "id": "ig-in2020-077",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the account a register gives him, Idealist on the single morning it is read. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the account a register gives him, Idealist on the single morning it is read. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Do you agree the state should keep a list of market visitors?",
+      "question": "Should the state track citizens' phones to enforce pandemic quarantine?",
       "sides": [
         {
-          "answer": "Yes. A state with no list has no account to correct.",
+          "answer": "Yes. In an emergency, the state must know where everyone is.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "No. The list is read once, on the morning after it mattered.",
+          "answer": "No. Emergency surveillance powers are rarely handed back once the crisis ends.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -1283,18 +1283,18 @@
     },
     {
       "id": "ig-in2020-078",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on distance as the sentence, Idealist on the family as the visiting party. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on distance as the sentence, Idealist on the family as the visiting party. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the sentence be served in the prisoner's own village?",
+      "question": "Should families with more than two children lose government benefits?",
       "sides": [
         {
-          "answer": "No. The distance is the sentence. The rest is administration.",
+          "answer": "Yes. A disciplined nation plans its numbers, and benefits should reward that discipline.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. A prison the family can reach is still a prison.",
+          "answer": "No. Children should never be punished for the size of their family.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "funds": 2 }
         }
@@ -1302,18 +1302,18 @@
     },
     {
       "id": "ig-in2020-067",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the closed register and the shelf life, Idealist on feeding the child where the child is. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the closed register and the shelf life, Idealist on feeding the child where the child is. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the school meal continue for the children sent home?",
+      "question": "Should midday school meals be delivered home when schools are shut?",
       "sides": [
         {
-          "answer": "No. The register is closed and the food has a shelf life.",
+          "answer": "No. Doorstep delivery to millions of children costs far more than it achieves.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Feed them where they are, or count them as fed.",
+          "answer": "Yes. A child's hunger does not close when the school does.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -1321,18 +1321,18 @@
     },
     {
       "id": "ig-in2020-068",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on passing the surcharge to the burner, Idealist on calling the price what it was. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on passing the surcharge to the burner, Idealist on calling the price what it was. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Must the fuel surcharge be absorbed by the seller?",
+      "question": "Should fuel taxes be cut when petrol prices hit record highs?",
       "sides": [
         {
-          "answer": "No. Pass it on; somebody burns the fuel and somebody pays.",
+          "answer": "No. Fuel taxes fund the budget, and a cut means borrowing more.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Absorb it and call the price what it was.",
+          "answer": "Yes. Soaring prices hit the poorest commuters and farmers hardest.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -1340,18 +1340,18 @@
     },
     {
       "id": "ig-in2020-069",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a subsidy it may withdraw, Idealist on restarting a list nobody ever leaves. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on a subsidy it may withdraw, Idealist on restarting a list nobody ever leaves. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the free ration continue for those who can now afford it?",
+      "question": "Should free rations stop for families whose incomes have risen?",
       "sides": [
         {
-          "answer": "Yes. The card is theirs; the subsidy is ours to withdraw.",
+          "answer": "Yes. Every subsidy spent on the comfortable is money taken from growth.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "No. Start the list again and nobody ever leaves it.",
+          "answer": "No. Strict cut-offs end up striking struggling families off the list by mistake.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -1359,18 +1359,18 @@
     },
     {
       "id": "ig-in2020-070",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what a college can be measured by, Idealist on the seat the student actually moves for. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on what a college can be measured by, Idealist on the seat the student actually moves for. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Must the scholarship follow the college rather than the student?",
+      "question": "Should private schools reserve a quarter of seats for poor children?",
       "sides": [
         {
-          "answer": "Yes. Follow the college; a college is the thing we can measure.",
+          "answer": "No. Schools lose fee income and simply pass the cost to other parents.",
           "ideologue": "capitalist",
           "pays": { "funds": 1, "media": 2 }
         },
         {
-          "answer": "No. Students move for a seat and not for a building.",
+          "answer": "Yes. Poor children deserve the same classrooms as wealthy ones.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "funds": 2 }
         }
@@ -1378,18 +1378,18 @@
     },
     {
       "id": "ig-in2020-071",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on letting the timber value decide ownership, Idealist on the paper arriving after the knowledge. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on letting the timber value decide ownership, Idealist on the paper arriving after the knowledge. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the forest rules apply to the village older than the rules?",
+      "question": "Should forests be cleared for mining if companies plant trees elsewhere?",
       "sides": [
         {
-          "answer": "No. Let the timber value decide who owns the trees.",
+          "answer": "Yes. Mines bring jobs and revenue, and new saplings replace the old trees.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. The paper arrived after the people who know the forest.",
+          "answer": "No. A plantation cannot replace a living forest or the people who depend on it.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -1397,18 +1397,18 @@
     },
     {
       "id": "ig-in2020-072",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the wall belonging to whoever holds the fort, Showstopper on a parade that can be televised from the road. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the wall belonging to whoever holds the fort, Showstopper on a parade that can be televised from the road. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Must the army camp move away from the city wall?",
+      "question": "Should Delhi's colonial-era government buildings be torn down for new ones?",
       "sides": [
         {
-          "answer": "No. Walls are for the people still holding the fort.",
+          "answer": "Yes. A nation should govern from buildings it built for itself.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Move it and the parade can be televised from the road.",
+          "answer": "No. Those landmarks draw tourists and photographers from across the world.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         }
@@ -1416,18 +1416,18 @@
     },
     {
       "id": "ig-in2020-073",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the presence being the policy, Showstopper on a cancelled visit emptying every other bulletin. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the presence being the policy, Showstopper on a cancelled visit emptying every other bulletin. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Is cancelling the visit right once a flood is announced?",
+      "question": "Should ministers give up VIP convoys and sit in ordinary traffic?",
       "sides": [
         {
-          "answer": "Yes. The presence is the policy, not the speech.",
+          "answer": "No. Leaders need protection and clear roads, not selfies in a jam.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "No. Cancel it and the flood owns every bulletin.",
+          "answer": "Yes. A minister stuck in traffic is a photo voters adore.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -1435,18 +1435,18 @@
     },
     {
       "id": "ig-in2020-074",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the count as the sovereign act, Showstopper on the queue for the count policing itself. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the count as the sovereign act, Showstopper on the queue for the count policing itself. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the press be allowed inside the counting hall?",
+      "question": "Should new sports stadiums be named after political leaders?",
       "sides": [
         {
-          "answer": "No. The count is the sovereign act and it happens behind doors.",
+          "answer": "Yes. Great stadiums should honour the leaders who built the nation.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Film the count and the queue for it does the policing.",
+          "answer": "No. Fans want their sporting heroes on the gate, not a politician.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "funds": 1 }
         }
@@ -1454,18 +1454,18 @@
     },
     {
       "id": "ig-in2020-075",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on an hour being the entire margin, Showstopper on a street that fills before the argument does. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on an hour being the entire margin, Showstopper on a street that fills before the argument does. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Do you support lifting the curfew an hour earlier for the market?",
+      "question": "Should bars and restaurants in big cities stay open all night?",
       "sides": [
         {
-          "answer": "No. An hour is the whole margin, and margins are what we won with.",
+          "answer": "No. Late nights bring late trouble, and order comes first.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "funds": 2 }
         },
         {
-          "answer": "Yes. Lift it early and the street fills before the argument does.",
+          "answer": "Yes. A city that never sleeps puts itself on the world's map.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -1473,18 +1473,18 @@
     },
     {
       "id": "ig-in2020-076",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on order preceding papers, Showstopper on a cut line writing the story overnight. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on order preceding papers, Showstopper on a cut line writing the story overnight. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the network be cut during the examination season?",
+      "question": "Should mobile internet be switched off to stop cheating in exams?",
       "sides": [
         {
-          "answer": "Yes. Order first; the papers move and the precedent does not.",
+          "answer": "Yes. Exams need order, and sometimes order means switching the network off.",
           "ideologue": "supremo",
           "pays": { "clout": 2, "funds": 1 }
         },
         {
-          "answer": "No. Cut the line and the story is written by morning.",
+          "answer": "No. Millions cut off for one exam becomes a global news story.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -1492,18 +1492,18 @@
     },
     {
       "id": "ig-in2020-079",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a budget defeated in daylight, Idealist on the arithmetic being the part that is public. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a budget defeated in daylight, Idealist on the arithmetic being the part that is public. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Must the budget be published before the house approves it?",
+      "question": "Should welfare payments go only to people with an Aadhaar number?",
       "sides": [
         {
-          "answer": "No. Published early, it is defeated early.",
+          "answer": "Yes. Every rupee should go to a person the state can identify.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Publish it early and the arithmetic gets argued in daylight.",
+          "answer": "No. The poorest are often the ones without papers to prove it.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -1511,18 +1511,18 @@
     },
     {
       "id": "ig-in2020-080",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on slowness as part of the arrangement, Idealist on idle hands as the cheapest unemployment. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on slowness as part of the arrangement, Idealist on idle hands as the cheapest unemployment. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the army build the road instead of the contractor?",
+      "question": "Should strikes be banned in essential services like railways and power?",
       "sides": [
         {
-          "answer": "No. Soldiers build badly and slowly, and that is the arrangement.",
+          "answer": "Yes. Trains and power plants cannot stop because a union is angry.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "Yes. Idle hands and a budget is the cheapest unemployment.",
+          "answer": "No. Without the right to strike, workers are left with no voice.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "funds": 2 }
         }
@@ -1530,18 +1530,18 @@
     },
     {
       "id": "ig-in2020-081",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a law kept to be cited, Idealist on a law that is only quoted. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on a law kept to be cited, Idealist on a law that is only quoted. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Do you agree the death penalty should stay for murder?",
+      "question": "Should same-sex marriages be legally recognised?",
       "sides": [
         {
-          "answer": "Yes. Some laws are there to be cited, not to be read.",
+          "answer": "No. Marriage law anchors social order and should not be redrawn lightly.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "funds": 2 }
         },
         {
-          "answer": "No. A law that is only quoted has stopped working.",
+          "answer": "Yes. Every couple deserves the same rights under the same law.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -1549,18 +1549,18 @@
     },
     {
       "id": "ig-in2020-082",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on an argument starting before the voice, Idealist on a room that can write its answer in advance. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on an argument starting before the voice, Idealist on a room that can write its answer in advance. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Is printing the speech in full beforehand a good idea?",
+      "question": "Should firecrackers be banned during Diwali to cut air pollution?",
       "sides": [
         {
-          "answer": "Yes. Print it and the argument starts before the voice does.",
+          "answer": "No. A festival sky full of fireworks is the year's most shared photo.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         },
         {
-          "answer": "No. Print it and the room can write its answer in advance.",
+          "answer": "Yes. Children with asthma need clean air more than anyone needs one loud night.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "funds": 2 }
         }
@@ -1568,18 +1568,18 @@
     },
     {
       "id": "ig-in2020-083",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on an archive that keeps, Idealist on dating what was true. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on an archive that keeps, Idealist on dating what was true. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the broadcaster's archive be deleted or kept?",
+      "question": "Should people have the right to get old news about them deleted online?",
       "sides": [
         {
-          "answer": "No. Delete nothing. An archive is ammunition and it keeps.",
+          "answer": "No. Scrubbing the internet would kill the clips people love to share.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. Keep what was true and label the rest by its date.",
+          "answer": "Yes. Nobody should be punished forever for a mistake already paid for.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -1587,18 +1587,18 @@
     },
     {
       "id": "ig-in2020-084",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the donor becoming a participant, Idealist on figures that teach a country to wait. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the donor becoming a participant, Idealist on figures that teach a country to wait. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Must the spending be published while it is being spent?",
+      "question": "Should junk food adverts be banned during children's television shows?",
       "sides": [
         {
-          "answer": "Yes. Publish it weekly and the donor becomes a participant.",
+          "answer": "No. Banning cartoon mascots makes the government look like a joyless nanny.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         },
         {
-          "answer": "No. Weekly figures teach a country to wait for the announcement.",
+          "answer": "Yes. Children cannot tell an advert from advice, so they need protecting.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -1606,18 +1606,18 @@
     },
     {
       "id": "ig-in2020-085",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on curiosity as the evening audience, Idealist on nobody being obliged to watch. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on curiosity as the evening audience, Idealist on nobody being obliged to watch. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the smallest party get the debate slot at its own hour?",
+      "question": "Should women cricketers get the same match fees as men?",
       "sides": [
         {
-          "answer": "No. Midnight, and the audience turns up out of curiosity.",
+          "answer": "No. Pay follows the audience, and the men's game still draws the crowds.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         },
         {
-          "answer": "Yes. Their own hour, and no viewer has to be told to come.",
+          "answer": "Yes. Same game, same national colours, same pay.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "media": 1 }
         }
@@ -1625,18 +1625,18 @@
     },
     {
       "id": "ig-in2020-086",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the translator becoming the story, Idealist on objections that improve under a camera. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on the translator becoming the story, Idealist on objections that improve under a camera. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the meeting be filmed in the language the objections came in?",
+      "question": "Should children under twelve be allowed on television reality shows?",
       "sides": [
         {
-          "answer": "Yes. Record every language and the translator becomes the story.",
+          "answer": "Yes. Talented kids on prime time are what whole families tune in for.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         },
         {
-          "answer": "No. Add a camera and the objections arrive better made.",
+          "answer": "No. Children need a childhood, not ratings pressure and public judgement.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "clout": 2 }
         }
@@ -1644,18 +1644,18 @@
     },
     {
       "id": "ig-in2020-087",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the tanker already invoiced, Supremo on a ward that rents its own water. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the tanker already invoiced, Supremo on a ward that rents its own water. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the ward pay the private tanker or dig its own well?",
+      "question": "Should private companies build and run highways in return for tolls?",
       "sides": [
         {
-          "answer": "Yes. The tanker is on the invoice and the well is a rumour.",
+          "answer": "Yes. Private operators build faster and maintain roads they profit from.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "clout": 1 }
         },
         {
-          "answer": "No. A ward that rents its water has rented its sovereignty.",
+          "answer": "No. National highways are strategic assets the state must control.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         }
@@ -1663,18 +1663,18 @@
     },
     {
       "id": "ig-in2020-088",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the night shift the light bills for, Showstopper on a repaired road noticing its own light. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on the night shift the light bills for, Showstopper on a repaired road noticing its own light. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the streetlight be repaired first or the road?",
+      "question": "Should online retailers be barred from deep-discount festival sales?",
       "sides": [
         {
-          "answer": "Yes. The streetlight is what the night shift and the shops bill for.",
+          "answer": "No. Discounts are competition, and competition is what lowers prices.",
           "ideologue": "capitalist",
           "pays": { "funds": 1, "media": 2 }
         },
         {
-          "answer": "No. Fix the road and the streetlight gets noticed on its own.",
+          "answer": "Yes. Defending the corner shopkeeper wins applause in every neighbourhood.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "trust": 2 }
         }
@@ -1682,18 +1682,18 @@
     },
     {
       "id": "ig-in2020-089",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on an unmeasurable return, Idealist on fencing away the people who cannot pay. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Capitalist on an unmeasurable return, Idealist on fencing away the people who cannot pay. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the public toilet keep running or be fenced?",
+      "question": "Should public toilets in cities be free to use?",
       "sides": [
         {
-          "answer": "No. It costs more than it returns and the return is not measurable.",
+          "answer": "No. A small fee pays the cleaners and keeps the toilets working.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "media": 1 }
         },
         {
-          "answer": "Yes. Fence it and the ones who need it are the ones who cannot pay.",
+          "answer": "Yes. Dignity and hygiene should never depend on having a spare coin.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "clout": 1 }
         }
@@ -1701,18 +1701,18 @@
     },
     {
       "id": "ig-in2020-090",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on somebody answering for the dark, Showstopper on a lit street making a patrol a walk. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on somebody answering for the dark, Showstopper on a lit street making a patrol a walk. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the night patrol be doubled or the street lit?",
+      "question": "Should delivery drones be allowed to fly over Indian cities?",
       "sides": [
         {
-          "answer": "Yes. Two patrols and somebody answers for the dark.",
+          "answer": "No. Unregistered machines in our skies are a security risk.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "No. Light the street and the patrol becomes a walk in a lit room.",
+          "answer": "Yes. Parcels flying over Mumbai would be the future on every screen.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         }
@@ -1720,18 +1720,18 @@
     },
     {
       "id": "ig-in2020-091",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the hour as the rule the post holds, Idealist on the queue that becomes the shop's real hours. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Supremo on the hour as the rule the post holds, Idealist on the queue that becomes the shop's real hours. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the ration shop stay open past the closing hour?",
+      "question": "Should factory shifts be extended to twelve hours to boost output?",
       "sides": [
         {
-          "answer": "Yes. The hour is a rule, and rules are what the post holds.",
+          "answer": "Yes. A nation racing to catch up cannot afford short working days.",
           "ideologue": "supremo",
           "pays": { "clout": 1, "trust": 2 }
         },
         {
-          "answer": "No. Keep it open and the queue becomes the hours the shop had.",
+          "answer": "No. Twelve-hour shifts exhaust workers and put their safety at risk.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -1739,18 +1739,18 @@
     },
     {
       "id": "ig-in2020-092",
-      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on forty children taught lateness, Idealist on the timetable having been written for one child. REF 5.1 prints no condition or effect clause, so none is dropped.",
+      "source": "original; register per REF 8.2, tone per REF 5. Dropped: second printed face (REF 5.3) and the ideologue nameplate. Showstopper on forty children taught lateness, Idealist on the timetable having been written for one child. REF 5.1 prints no condition or effect clause, so none is dropped. 2026-10-05: rewritten for clarity.",
       "provenance": "inferred",
       "campaign": "India 2020",
-      "question": "Should the school bus wait for the child who always runs late?",
+      "question": "Should schools publicly rank every student in each class?",
       "sides": [
         {
-          "answer": "No. The bus that waits teaches forty children it does not.",
+          "answer": "Yes. Parents love seeing their child's name at the top of a list.",
           "ideologue": "showstopper",
           "pays": { "media": 1, "funds": 2 }
         },
         {
-          "answer": "Yes. One child waited for is one child the timetable was written for.",
+          "answer": "No. Public rankings shame struggling children instead of helping them.",
           "ideologue": "idealist",
           "pays": { "trust": 1, "media": 2 }
         }
@@ -1788,7 +1788,7 @@
           "pays": { "funds": 2, "trust": 1 }
         },
         {
-          "answer": "Yes. A city that ignores where the water goes will move it later at four times the price.",
+          "answer": "Yes. Respecting people's living traditions makes a city feel like it belongs to them.",
           "ideologue": "idealist",
           "pays": { "trust": 2, "funds": 1 }
         }
@@ -1845,7 +1845,7 @@
           "pays": { "trust": 2, "funds": 1 }
         },
         {
-          "answer": "Yes. A banned play is a story that outlives the ban, and a staged one is only an advertisement.",
+          "answer": "Yes. A ban puts the play on every front page by morning.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         }
@@ -1859,14 +1859,774 @@
       "question": "Should the GST be abolished?",
       "sides": [
         {
-          "answer": "Yes. He called Gandhiji Simple Tax for a revision.",
+          "answer": "Yes. A tax nobody can explain is the easiest villain at any rally.",
           "ideologue": "showstopper",
           "pays": { "media": 2, "trust": 1 }
         },
         {
-          "answer": "No. Abolish it and the states will tax the same parcel twice before it crosses a line.",
+          "answer": "No. One national tax keeps goods moving and business costs predictable.",
           "ideologue": "capitalist",
           "pays": { "funds": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-099",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should beef be outlawed across the whole country?",
+      "sides": [
+        {
+          "answer": "No. Beef and leather exports earn billions and employ lakhs of workers.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. One nation deserves one rule, enforced from Kashmir to Kerala.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-100",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should idle temple gold be melted down to fund the economy?",
+      "sides": [
+        {
+          "answer": "Yes. Tonnes of locked-up gold could cut imports and steady the rupee.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. A state that raids shrines loses its people's loyalty overnight.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-101",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should police be praised for shooting suspected gangsters in encounters?",
+      "sides": [
+        {
+          "answer": "Yes. Courts take decades; a quick ending tells every gang who rules.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "No. One leaked video of a staged encounter ends every career near it.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-102",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should billionaires pay a two percent tax on their wealth every year?",
+      "sides": [
+        {
+          "answer": "No. Wealth taxes chase capital to Dubai and Singapore within a year.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Hungry children and private yachts should not share one gentle tax code.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-103",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should sedition remain a crime under Indian law?",
+      "sides": [
+        {
+          "answer": "Yes. Speech that calls for breaking the nation is an attack, not opinion.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Every sedition arrest turns an unknown student into a national celebrity.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-104",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should cannabis be legalised and sold in licensed shops?",
+      "sides": [
+        {
+          "answer": "Yes. A legal ganja market means taxes, tourists and new income for farmers.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. No campaign survives the headline that it put weed on sale.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-105",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should sex work be fully legalised and taxed like any trade?",
+      "sides": [
+        {
+          "answer": "Yes. The industry exists anyway; only legality lets the state collect its share.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Nobody wins an election smiling beside a licensed brothel.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-106",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should every state impose total prohibition on alcohol?",
+      "sides": [
+        {
+          "answer": "No. Liquor excise pays the salaries of half the state's teachers.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Smashing liquor bottles on camera wins every anti-drink voter in the state.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-107",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should betting on cricket matches be made legal?",
+      "sides": [
+        {
+          "answer": "Yes. Billions already flow to illegal bookies; tax that money instead.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. One fixing scandal with a licensed bookie and cricket loses its fans.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-108",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should paid commercial surrogacy be legal again?",
+      "sides": [
+        {
+          "answer": "Yes. Fertility tourism earned crores, and the clinics will simply move abroad.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Global headlines about rented wombs embarrass the nation every time.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-109",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should advertising for skin-whitening creams be prohibited?",
+      "sides": [
+        {
+          "answer": "No. Fairness products are a thousand-crore market that employs thousands.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Stars who sold whiteness now trend for all the wrong reasons.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-110",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should caste quotas be extended to private sector jobs?",
+      "sides": [
+        {
+          "answer": "No. Hiring by quota instead of skill sends investors to other countries.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Centuries of exclusion will not be undone by government jobs alone.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-111",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should every rape conviction carry the death penalty?",
+      "sides": [
+        {
+          "answer": "No. If rape and murder cost the same, rapists will leave no witness.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        },
+        {
+          "answer": "Yes. Nothing fills a candlelight march like promising the noose.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-112",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should marital rape be made a criminal offence?",
+      "sides": [
+        {
+          "answer": "No. Courts cannot police every bedroom without breaking the family apart.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. A wedding ring is not a lifelong surrender of consent.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-113",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should terminally ill patients be allowed doctor-assisted death?",
+      "sides": [
+        {
+          "answer": "Yes. Months of futile ICU bills bankrupt families for no recovery.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Poor patients will be quietly pushed to die so relatives save money.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-114",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should one uniform civil code replace every religious personal law?",
+      "sides": [
+        {
+          "answer": "Yes. A nation cannot run on separate rulebooks for marriage and inheritance.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        },
+        {
+          "answer": "No. Imposed uniformity tramples minorities' freedom to live by their own faith.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-115",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should same-sex couples be allowed to adopt children?",
+      "sides": [
+        {
+          "answer": "No. Voters are not ready, and the backlash would drown every rally.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. A child in an orphanage needs love, not a particular kind of parent.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-116",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Was scrapping Kashmir's special status under Article 370 the right call?",
+      "sides": [
+        {
+          "answer": "Yes. One flag, one constitution, and no state gets a separate deal.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Months of blackout made India a world headline for the wrong reasons.",
+          "ideologue": "showstopper",
+          "pays": { "media": 2, "trust": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-117",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should refugees fleeing persecution get fast-track citizenship based on their religion?",
+      "sides": [
+        {
+          "answer": "No. Citizenship should reward skill and talent, not which god you pray to.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. A nation shelters those persecuted for sharing its heritage first.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-118",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should anyone changing religion need prior permission from the district magistrate?",
+      "sides": [
+        {
+          "answer": "Yes. Conversions bought with cash or fear are a threat to public order.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Turning faith into a permit queue invites ridicule from every foreign paper.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-119",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Can police question unmarried couples sitting together in public parks?",
+      "sides": [
+        {
+          "answer": "Yes. Anti-Romeo squads draw cameras and cheering crowds on every raid.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        },
+        {
+          "answer": "No. Adults holding hands in a park have committed no crime.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-120",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Must couples living together without marriage register with the police?",
+      "sides": [
+        {
+          "answer": "Yes. Every elopement scandal on the news makes this an easy crowd-pleaser.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        },
+        {
+          "answer": "No. The love lives of consenting adults are no business of the police.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-121",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the ban on prenatal sex-determination tests be lifted?",
+      "sides": [
+        {
+          "answer": "Yes. A banned test just runs on the black market, completely untaxed.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Lifting it would quietly erase millions of girls before they are born.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-122",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should soldiers in disturbed areas stay immune from civilian prosecution?",
+      "sides": [
+        {
+          "answer": "Yes. Troops who fear courts hesitate, and hesitation gets soldiers killed.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "No. Immunity turns every fake encounter into a closed file.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-123",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should ordinary citizens be allowed to carry guns for self-defence?",
+      "sides": [
+        {
+          "answer": "Yes. A legal arms trade means factories, licence fees and thousands of jobs.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "No. Only the state holds the gun; that is what order means.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-124",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should bull-taming sports like Jallikattu stay legal?",
+      "sides": [
+        {
+          "answer": "No. Hospital bills and insurance claims outweigh a few days of festival trade.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "Yes. Nothing pulls a live television audience like a charging bull.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-125",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should state governments hand control of Hindu temples back to private trusts?",
+      "sides": [
+        {
+          "answer": "Yes. Private trusts would run temple estates far more profitably than babus.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "media": 1 }
+        },
+        {
+          "answer": "No. State boards appoint priests of every caste; private trusts may not.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-126",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should foreign-funded charities be barred from Indian protest movements?",
+      "sides": [
+        {
+          "answer": "No. Foreign donations bring dollars, jobs and services worth crores.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Foreign money behind street protests is foreign policy in disguise.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-127",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should 'hurting religious sentiments' remain a criminal offence?",
+      "sides": [
+        {
+          "answer": "Yes. Insults to faith spark riots, and the state must stop riots early.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Any offended stranger can now jail a comedian for a joke.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-128",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should India abolish capital punishment altogether?",
+      "sides": [
+        {
+          "answer": "No. Terrorists must know the state's justice can be final.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        },
+        {
+          "answer": "Yes. Courts make mistakes, and the gallows cannot issue an apology.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-129",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should repeat child sex offenders face chemical castration?",
+      "sides": [
+        {
+          "answer": "Yes. Some crimes deserve permanent consequences that the state can enforce.",
+          "ideologue": "supremo",
+          "pays": { "funds": 1, "clout": 2 }
+        },
+        {
+          "answer": "No. The state should not mutilate bodies, even guilty ones.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-130",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should wealthy families lose caste reservation benefits?",
+      "sides": [
+        {
+          "answer": "Yes. Subsidising the rich is waste; aim every rupee where it pays off.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Caste discrimination follows a Dalit officer even into a rich home.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-131",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should a third of parliamentary seats be reserved for women?",
+      "sides": [
+        {
+          "answer": "No. Proxy candidates whose husbands rule behind them make awful headlines.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        },
+        {
+          "answer": "Yes. Half the population should not keep waiting for its fair share of power.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-132",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should strategic industries like steel and telecom be nationalised?",
+      "sides": [
+        {
+          "answer": "No. State-run firms bleed money and scare investors away for decades.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Steel and signals are national security, not shareholder toys.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-133",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should teenagers accused of rape be tried as adults?",
+      "sides": [
+        {
+          "answer": "Yes. An adult's crime deserves an adult's punishment, whatever the birthday.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Children can be reformed; adult prisons only finish making criminals.",
+          "ideologue": "idealist",
+          "pays": { "funds": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-134",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should beauty pageants be outlawed as degrading to women?",
+      "sides": [
+        {
+          "answer": "No. Pageants made India famous and launched a dozen film superstars.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        },
+        {
+          "answer": "Yes. Judging women by measurements tells girls their worth is their body.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-135",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should animal sacrifice at religious festivals be prohibited?",
+      "sides": [
+        {
+          "answer": "No. Banning rituals guarantees angry crowds and terrible television.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        },
+        {
+          "answer": "Yes. Tradition is no excuse for slaughtering animals in the street.",
+          "ideologue": "idealist",
+          "pays": { "clout": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-136",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Must every school student sing Vande Mataram at assembly?",
+      "sides": [
+        {
+          "answer": "Yes. A nation that cannot make its children salute it will not last.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "trust": 1 }
+        },
+        {
+          "answer": "No. Videos of children forced to sing go viral for all the wrong reasons.",
+          "ideologue": "showstopper",
+          "pays": { "funds": 1, "media": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-137",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should all online pornography be blocked in India?",
+      "sides": [
+        {
+          "answer": "Yes. Saving the nation's morals makes a guaranteed prime-time crusade.",
+          "ideologue": "showstopper",
+          "pays": { "clout": 1, "media": 2 }
+        },
+        {
+          "answer": "No. What adults watch in private is not the state's business.",
+          "ideologue": "idealist",
+          "pays": { "media": 1, "trust": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ig-in2020-138",
+      "source": "original; REF §8.2 register. Added 2026-10-06 as part of a deliberately controversial batch: a hot-button issue with both sides argued sincerely.",
+      "provenance": "inferred",
+      "campaign": "India 2020",
+      "question": "Should the census record every citizen's caste?",
+      "sides": [
+        {
+          "answer": "No. Caste data only fuels new quota demands and less hiring on merit.",
+          "ideologue": "capitalist",
+          "pays": { "funds": 2, "clout": 1 }
+        },
+        {
+          "answer": "Yes. Whoever holds the numbers holds the power to redraw politics.",
+          "ideologue": "supremo",
+          "pays": { "clout": 2, "media": 1 }
         }
       ]
     }

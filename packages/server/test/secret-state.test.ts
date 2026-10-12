@@ -1633,6 +1633,11 @@ it('the list is COMPUTED, never cached: playing a card removes it from the next 
         for (const id of after) {
           expect(hand, `${id} is on offer to ${viewer} but is not in their hand — the list is stale`).toContain(id);
         }
+        // Counted BEFORE the freeze branch can `break outer`: a play that froze its
+        // player was still played and checked. Counting it after meant two freezing
+        // plays in a row reported "only 1 card was ever played" (seen 2026-10-06, when
+        // a larger Ideology deck reshuffled this fixture).
+        exercised += 1;
         // 3. the freeze, asserted rather than stepped around.
         const owes = settled.choices.some((c) => c.player === viewer);
         if (owes) {
@@ -1640,7 +1645,6 @@ it('the list is COMPUTED, never cached: playing a card removes it from the next 
           froze += 1;
           if (froze >= 2) break outer;
         }
-        exercised += 1;
       }
     }
     expect(exercised, 'no card was ever actually played').toBeGreaterThanOrEqual(2);
@@ -2461,9 +2465,16 @@ describe('every Choice kind is classified, and none of them may name a card that
     // secrecy merely because it was once played. The state below is one real corpus
     // state with that reshuffle's EFFECT applied by hand, which is the honest way to
     // test an unreachable instant: the mover is the fixture and the reader is the code.
-    const seeded = corpora.find((s) => s._conspiracyDiscard.length > 0);
-    if (seeded === undefined) throw new Error('no corpus state has anything on the Conspiracy discard pile');
-    const reshuffled = seeded._conspiracyDiscard[0] as string;
+    // A discarded card whose effect is still LIVE is public by design — `liveEffects`
+    // carries its `sourceCardId` because the whole table is playing under it — so it
+    // cannot stand in for a hidden card here. Pick one that is genuinely off the table.
+    // (Found 2026-10-06: a reshuffled corpus put Power Trip, a "rest of the game" card,
+    // first on the discard pile, and the test read its live effect as a leak.)
+    const offTable = (s: GameState): string | undefined =>
+      s._conspiracyDiscard.find((id) => !s.liveEffects.some((l) => l.sourceCardId === id));
+    const seeded = corpora.find((s) => offTable(s) !== undefined);
+    if (seeded === undefined) throw new Error('no corpus state has an off-table card on the Conspiracy discard pile');
+    const reshuffled = offTable(seeded) as string;
     const afterReshuffle: GameState = {
       ...seeded,
       // What `draw()` does: the discard is emptied and its cards become the draw pile.

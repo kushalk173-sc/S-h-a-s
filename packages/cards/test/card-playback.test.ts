@@ -658,7 +658,7 @@ describe('every adapted card in the corpus resolves without failing', () => {
     // One real headline, resolved through ACK_HEADLINE rather than a conspiracy play,
     // so the post-turn path is covered too.
     const s = resolveHeadline(game(), 'hl-et2040-004');
-    expect(s.log.some((l) => l.text.includes('Quietly, The Ceiling Moved'))).toBe(true);
+    expect(s.log.some((l) => l.text.includes('Austerity Drive'))).toBe(true);
   });
 });
 /**

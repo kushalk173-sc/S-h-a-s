@@ -244,7 +244,7 @@ describe('the fix is distinct keys, NOT a removed element', () => {
       />,
     );
     const runs = [...container.querySelectorAll('[data-testid="market-charge"] [data-res]')];
-    expect(runs.map((el) => el.textContent)).toEqual(['2 F', '2 T', '+2 F tax']);
+    expect(runs.map((el) => el.textContent)).toEqual(['2 Funds', '2 Trust', '+2 Funds tax']);
     // Two `funds` elements, because the money is named twice on purpose.
     expect(runs.filter((el) => el.getAttribute('data-res') === 'funds')).toHaveLength(2);
   });

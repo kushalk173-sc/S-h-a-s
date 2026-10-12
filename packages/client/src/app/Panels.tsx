@@ -35,10 +35,20 @@ import type { Link } from './store.ts';
  * top-down. So the entries render the engine's own `text` verbatim, at
  * TYPE_LOG in INK_700, with a 4px seat spine and a TYPE_LOG_META prefix.
  */
+/** The verb a log row's kind reads as, after the player's name. */
+const LOG_VERB: Readonly<Record<string, string>> = {
+  answer: 'answered',
+  gerrymander: 'gerrymandered',
+  power: 'used a power',
+};
+
 export function LogRail({ state }: { state: ClientState }) {
   const rows = logRows(state);
   return (
     <div className="shell__log" aria-label="Match log">
+      <h2 className="shell__log-title">
+        Table log <span className="shell__log-hint">newest first</span>
+      </h2>
       {rows.length === 0 ? (
         <p className="panel__note panel__note--quiet">Nothing has happened yet.</p>
       ) : (
@@ -52,6 +62,10 @@ export function LogRail({ state }: { state: ClientState }) {
               <span className="log__meta">
                 T{r.turn}
                 {r.who === null ? '' : ` · ${r.who}`}
+                {/* WHAT KIND OF ENTRY. An answer is logged as the answer's own
+                    words in quotes, so without this a row read as a stray
+                    quotation with nobody saying it. */}
+                {LOG_VERB[r.kind] === undefined ? '' : ` ${LOG_VERB[r.kind]}`}
               </span>
               <span className="log__text">{r.text}</span>
             </li>
@@ -63,6 +77,14 @@ export function LogRail({ state }: { state: ClientState }) {
 }
 
 // ─────────────────────────── the reconnect screen (§5.2) ───────────────────────────
+
+/** Where the table was when the link dropped, as a sentence rather than the engine's phase id. */
+const PHASE_WHERE: Readonly<Record<string, string>> = {
+  answer: 'An Ideology Card was being answered.',
+  actions: 'A turn was in progress.',
+  headlines: 'Headlines were being read.',
+  finished: 'The game had finished.',
+};
 
 /**
  * `REJOIN MATCH`, and the honest-failure case.
@@ -112,7 +134,7 @@ export function ReconnectScreen({
         <p className="reconnect__status">
           Seat: <strong>{name}</strong>
         </p>
-        <p className="reconnect__status">Phase you were in: {phase}</p>
+        <p className="reconnect__status">{PHASE_WHERE[phase] ?? 'The game was in progress.'}</p>
 
         <p className={`reconnect__status ${lost ? 'reconnect__status--bad' : ''}`} data-testid="reconnect-status">
           {lost
@@ -238,22 +260,19 @@ export function Scoreboard({
         {winners !== null && winners.length === 0 ? (
           <p className="sheet__body">
             Nobody held a majority voter when the game ended, so there is no winner to name. The
-            board below is the result as it stood — which is the same standing the engine records,
-            and p20 asks for no substitute.
+            scores below are the result as it stood.
           </p>
         ) : winners === null ? (
           <p className="sheet__body">
-            The game is over and the final board is below. This client was not on the wire when the
-            result was announced, so it is not going to guess who won from the scores — the server
-            sends that, and a guess is how a table gets told two different things.
+            The game is over. This screen missed the announcement of the winner, so it shows the
+            final scores without naming one — reload to fetch the result.
           </p>
         ) : null}
 
         {boardWasFull ? (
           <p className="sheet__body">
             The board filled before every majority formed, so everyone took one more turn, starting
-            with whoever filled the last slot. That is p20, and it is why the result is not simply
-            the first player to run out of room.
+            with whoever filled the last slot.
           </p>
         ) : allFormed ? (
           <p className="sheet__body">
@@ -265,7 +284,15 @@ export function Scoreboard({
         {rows.map((r) => (
           <div key={r.player} className="score__row" data-testid="score-row">
             <div className="score__head">
-              <span className={`seat seat--${r.seat}`}>
+              <span
+                className={`seat seat--${r.seat}`}
+                data-winner={winners?.includes(r.player) === true ? 'true' : undefined}
+              >
+                {winners?.includes(r.player) === true ? (
+                  <span className="score__crown" aria-label="winner">
+                    ★{' '}
+                  </span>
+                ) : null}
                 <span className="seat__name">{r.name}</span>
                 {r.isYou ? <span className="chip">you</span> : null}
               </span>
@@ -333,6 +360,13 @@ export function HeadlineDialog({
   // remaining — stated as "1 of N" counting from the front, which is the order
   // they will actually be played in.
   const remaining = state.headlineQueue.length;
+  // Which constituency the front of the queue came from, so "a Headline breaks" is
+  // anchored to something the player can see on the board.
+  const frontArea = state.headlineQueue[0]?.areaId;
+  const triggerZone =
+    frontArea === undefined
+      ? null
+      : (state.zones.find((z) => z.areas.some((ar) => ar.id === frontArea))?.name ?? null);
 
   return (
     <div className="scrim" data-testid="headline-dialog">
@@ -347,6 +381,9 @@ export function HeadlineDialog({
         </p>
         <h2 className="sheet__title">A Headline breaks</h2>
 
+        {/* The queue as a strip only when there IS a queue: a single headline drew a
+            lone red box reading "1" that meant nothing. */}
+        {remaining > 1 ? (
         <div className="zones-strip" style={{ marginBottom: 'var(--sp-3)' }} aria-hidden="true">
           {state.headlineQueue.map((q, i) => (
             <span
@@ -357,10 +394,12 @@ export function HeadlineDialog({
             </span>
           ))}
         </div>
+        ) : null}
 
         <p className="sheet__body">
-          A voter landed in a Volatile Area, so a Headline resolves at the end of the turn. Its
-          effects are applied when you resolve it, and it may ask you for a decision.
+          A voter landed in a Volatile Area
+          {triggerZone === null ? '' : ` in ${triggerZone}`}, so a Headline resolves at the end of
+          the turn. Its effects are applied when you resolve it, and it may ask you for a decision.
         </p>
 
         {/*
@@ -464,12 +503,19 @@ export type LobbyScreenProps = {
    * signal). A spectator that was given a room by `lobby:spectate`.
    */
   readonly spectator: boolean;
+  /**
+   * The room named by this page's `?room=` invite link, when it is in the open-rooms
+   * list — rendered as a one-click JOIN above everything else.
+   */
+  readonly invited?: LobbySummary | null;
 };
 
 export function LobbyScreen(props: LobbyScreenProps) {
   const { lobby } = props;
   const [seatCount, setSeatCount] = useState<SeatCount>(2);
   const [showRules, setShowRules] = useState(false);
+  const nameMissing = props.name.trim() === '';
+  const invited = props.invited ?? null;
 
   // §5.1: "player list 2–5 with seat colour, name, ready state; a JOIN button per
   // row; and the seat you will take, or the next free seat", all without
@@ -479,283 +525,219 @@ export function LobbyScreen(props: LobbyScreenProps) {
   return (
     <div className="lobby" data-testid="lobby-screen">
       <div className="lobby__sheet">
-        <div>
+        <header className="lobby__head">
           <h1 className="lobby__h1">SHASN</h1>
           {/* THE PITCH, AND IT IS THE FIRST THING THE PRODUCT SAYS.
            *
            * It used to read "...and you cannot see the card you are about to answer",
-           * which the full-information ruling made false — `FULL-INFORMATION.md` opens
-           * "The blind answer is gone", and every seat now sees the question, both
-           * answers, both Ideologues and both payouts before anybody answers. The
-           * audit's judgement was right that this is the highest-visibility stale
-           * string in the app: it is the first line a player reads.
-           *
-           * It survived because it is copy. None of the gates in the ruling can see
-           * copy — they are about what crosses the wire and what reaches the DOM — so
-           * this needed a gate of its own, and `staleWording.test.tsx` is it.
-           *
-           * WHAT THE NEW LINE PROMISES IS WHAT THE SERVER NOW SENDS, and no more: the
-           * two answers and the two payouts are on the card before the choice. It does
-           * NOT claim the payouts are knowable or that choosing is easy — the Ideologue
-           * balance still makes one side the better bet, and that is a balance problem
-           * argued in the corpus checker, not something a pitch line may paper over.
-           *
-           * AND IT SAYS "SEATS", NOT "VOTERS", because 129 is the AREA count. A
-           * headless run read the old line literally, against a board that has 129
-           * printed wells and no voters in them at the start, and filed it under
-           * the things "a human would trip over": the first sentence the product
-           * says miscounts its own board. The rules blurb lower down already said
-           * "voter areas", so the pitch did not even agree with the app. */}
+           * which the full-information ruling made false. `staleWording.test.tsx`
+           * pins the exact sentence, and it says "SEATS", not "VOTERS", because 129
+           * is the AREA count. */}
           <p className="lobby__sub">
             Four Ideologues. Nine constituencies. One hundred and twenty-nine seats, and both
             answers — with what each one pays — printed before you choose.
           </p>
-        </div>
-
-        <div className="col">
-          <label className="field__label" htmlFor="player-name">
-            YOUR NAME
-          </label>
-          <input
-            id="player-name"
-            className="field"
-            value={props.name}
-            maxLength={24}
-            onChange={(e) => props.onNameChange(e.target.value)}
-            data-testid="name-input"
-          />
-        </div>
+        </header>
 
         {lobby === null ? (
           <>
             <div className="col">
-              <span className="field__label">CREATE A ROOM</span>
-              <div className="row">
-                <span className="chip">Players</span>
-                {([2, 3, 4, 5] as const).map((n) => (
+              <label className="field__label" htmlFor="player-name">
+                Your name
+              </label>
+              <input
+                id="player-name"
+                className="field field--name"
+                value={props.name}
+                maxLength={24}
+                placeholder="What should the table call you?"
+                autoComplete="nickname"
+                onChange={(e) => props.onNameChange(e.target.value)}
+                // ENTER DOES THE OBVIOUS THING: join the room you were invited to,
+                // or create one — so the lobby can be done from the keyboard.
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' || nameMissing) return;
+                  if (invited !== null && !invited.inProgress && invited.seated < invited.maxPlayers) {
+                    props.onJoin(invited.lobbyId);
+                  } else if (invited === null) {
+                    props.onCreate(seatCount);
+                  }
+                }}
+                data-testid="name-input"
+              />
+            </div>
+
+            {invited !== null ? (
+              <section className="lobby__invite lobby__invite--hero" data-testid="invite-banner">
+                <div>
+                  <p className="lobby__invite-title">
+                    You were invited to {invited.name}&apos;s room
+                  </p>
+                  <p className="panel__note panel__note--quiet">
+                    {invited.seated} of {invited.maxPlayers} seats taken
+                    {invited.inProgress ? ' · already playing' : ''}
+                  </p>
+                </div>
+                {invited.inProgress || invited.seated >= invited.maxPlayers ? (
                   <button
-                    key={n}
                     type="button"
-                    className={`btn btn--sm ${seatCount === n ? 'btn--primary' : ''}`}
-                    onClick={() => setSeatCount(n)}
-                    aria-pressed={seatCount === n}
-                    data-testid={`seat-count-${n}`}
+                    className="btn btn--primary"
+                    onClick={() => props.onWatchRoom(invited.lobbyId)}
                   >
-                    {n}
+                    WATCH THIS GAME
                   </button>
-                ))}
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => props.onJoin(invited.lobbyId)}
+                    disabled={nameMissing}
+                    aria-disabled={nameMissing}
+                    title={nameMissing ? 'Type a name before joining a room.' : undefined}
+                  >
+                    {nameMissing ? 'TYPE A NAME TO JOIN' : 'JOIN THIS ROOM'}
+                  </button>
+                )}
+              </section>
+            ) : null}
+
+            <div className="lobby__grid">
+              <section className="lobby__card" aria-labelledby="create-h">
+                <h2 className="lobby__card-title" id="create-h">
+                  Start a new room
+                </h2>
+                <span className="field__label" id="seat-count-label">
+                  How many players?
+                </span>
+                <div className="seg" role="group" aria-labelledby="seat-count-label">
+                  {([2, 3, 4, 5] as const).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className="seg__btn"
+                      onClick={() => setSeatCount(n)}
+                      aria-pressed={seatCount === n}
+                      data-testid={`seat-count-${n}`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
-                  className="btn btn--primary"
+                  className="btn btn--primary btn--wide"
                   onClick={() => props.onCreate(seatCount)}
-                  disabled={props.name.trim() === ''}
-                  aria-disabled={props.name.trim() === ''}
+                  disabled={nameMissing}
+                  aria-disabled={nameMissing}
+                  title={nameMissing ? 'Type a name first.' : undefined}
                   data-testid="create-room"
                 >
                   CREATE ROOM
                 </button>
-              </div>
-            </div>
-
-            <div className="col">
-              <span className="field__label">OPEN ROOMS</span>
-              {props.lobbies.length === 0 ? (
                 <p className="panel__note panel__note--quiet">
-                  No rooms are open. Create one, or wait for someone to.
+                  {nameMissing
+                    ? 'Type your name above first.'
+                    : 'You will get an invite link to send to the other players.'}
                 </p>
-              ) : (
-                props.lobbies.map((l) => (
-                  <div
-                    key={l.lobbyId}
-                    className="row"
-                    data-testid="room-row"
-                    data-lobby-id={l.lobbyId}
-                  >
-                    <span className="seat seat--1">
-                      <span className="seat__name">{l.name}</span>
-                      <span className="seat__meta">
-                        {/*
-                          THE ROOM'S OWN KEY, on the row, because a room is not a
-                          NAME. Two rooms created by players who both typed "Player"
-                          rendered as two identical rows, so "press JOIN" was a guess:
-                          the harness's driver joined the wrong room twice before it
-                          gave its host a unique name, which is exactly the trap a
-                          human falls into. `lobbyId` is already on the wire and is
-                          the one field that distinguishes two rooms, so it is shown
-                          — shortened, because it is a disambiguator and not a name.
+              </section>
 
-                          The server mints it, so this client cannot make it prettier
-                          than this; making it VISIBLE is the whole of the fix.
-                        */}
-                        <span data-testid="room-key">{roomKey(l.lobbyId)}</span>
-                        {' · '}
-                        {l.seated}/{l.maxPlayers}
-                        {l.inProgress ? ' · in progress' : ''}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn--sm"
-                      onClick={() => props.onJoin(l.lobbyId)}
-                      disabled={props.name.trim() === '' || l.inProgress || l.seated >= l.maxPlayers}
-                      aria-disabled={props.name.trim() === '' || l.inProgress || l.seated >= l.maxPlayers}
-                      /* THE CONTROL NAMES ITS OWN ROW. "JOIN" on a list of identical
-                         rows is an ambiguous label under WCAG 2.1 SC 2.4.6, and the
-                         disabled case is worse: a full or running room's JOIN goes
-                         grey with no reason on the button, so a first-time player
-                         reads "JOIN is off, so this is the wrong room" — which is a
-                         claim about the WRONG room when the room next to it is the
-                         one they want. */
-                      aria-label={`Join ${l.name}'s room ${roomKey(l.lobbyId)}`}
-                      title={joinRefusalReason(props.name, l)}
-                      data-testid="join-room"
-                      data-lobby-id={l.lobbyId}
-                    >
-                      JOIN
-                    </button>
-                    {/* WATCH, AND WHY IT IS NEVER DISABLED.
-                        Watching takes no seat — `lobby:spectate` mints a session no
-                        write door accepts — so it has none of `JOIN`'s conditions. It
-                        is specifically the FULL room that needs it: a full room's JOIN
-                        is disabled, which left a finished-or-full table impossible to
-                        watch from the real client at all. */}
-                    <button
-                      type="button"
-                      className="btn btn--sm"
-                      onClick={() => props.onWatchRoom(l.lobbyId)}
-                      data-testid="watch-room"
-                      aria-label={`Watch ${l.name}'s room ${roomKey(l.lobbyId)} without taking a seat`}
-                      data-lobby-id={l.lobbyId}
-                    >
-                      WATCH
-                    </button>
-                  </div>
-                ))
-              )}
-              <button
-                type="button"
-                className="btn btn--sm"
-                onClick={props.onList}
-                data-testid="refresh-rooms"
-              >
-                REFRESH
-              </button>
-              <p className="panel__note panel__note--quiet">
-                The list keeps itself up to date; REFRESH asks again now.
-              </p>
-              <p className="panel__note panel__note--quiet">
-                WATCH takes no seat. The watcher sees the whole board and cannot act.
-              </p>
+              <section className="lobby__card" aria-labelledby="rooms-h">
+                <div className="lobby__card-head">
+                  <h2 className="lobby__card-title" id="rooms-h">
+                    Join an open room
+                  </h2>
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--ghost"
+                    onClick={props.onList}
+                    data-testid="refresh-rooms"
+                    title="The list keeps itself up to date; REFRESH asks again now."
+                  >
+                    ↻ REFRESH
+                  </button>
+                </div>
+                {props.lobbies.length === 0 ? (
+                  <p className="lobby__empty">No rooms are open. Create one, or wait for someone to.</p>
+                ) : (
+                  <ul className="rooms">
+                    {props.lobbies.map((l) => {
+                      const refusal = joinRefusalReason(props.name, l);
+                      const closed = l.inProgress || l.seated >= l.maxPlayers;
+                      return (
+                        <li
+                          key={l.lobbyId}
+                          className="room"
+                          data-testid="room-row"
+                          data-lobby-id={l.lobbyId}
+                          data-invited={invited?.lobbyId === l.lobbyId ? 'true' : undefined}
+                        >
+                          <span className="room__who">
+                            <span className="room__name">{l.name}&apos;s room</span>
+                            <span className="seat__meta room__meta">
+                              {/* THE ROOM'S OWN KEY, on the row, because a room is not a
+                                  NAME: two hosts who both typed "Player" rendered as two
+                                  identical rows. It is the disambiguator, so it is shown
+                                  small and last rather than hidden. */}
+                              {l.seated}/{l.maxPlayers} seated
+                              {l.inProgress ? ' · in progress' : ''}
+                              {l.inProgress || l.seated < l.maxPlayers ? '' : ' · full'}
+                              {' · '}
+                              <span className="room__key" data-testid="room-key">
+                                {roomKey(l.lobbyId)}
+                              </span>
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className={closed ? 'btn btn--sm' : 'btn btn--sm btn--primary'}
+                            onClick={() => props.onJoin(l.lobbyId)}
+                            disabled={refusal !== undefined}
+                            aria-disabled={refusal !== undefined}
+                            /* THE CONTROL NAMES ITS OWN ROW (WCAG 2.1 SC 2.4.6). */
+                            aria-label={`Join ${l.name}'s room ${roomKey(l.lobbyId)}`}
+                            title={refusal}
+                            data-testid="join-room"
+                            data-lobby-id={l.lobbyId}
+                          >
+                            JOIN
+                          </button>
+                          {/* WATCH is never disabled: watching takes no seat, and it is
+                              specifically the full room that needs it. */}
+                          <button
+                            type="button"
+                            className="btn btn--sm"
+                            onClick={() => props.onWatchRoom(l.lobbyId)}
+                            data-testid="watch-room"
+                            aria-label={`Watch ${l.name}'s room ${roomKey(l.lobbyId)} without taking a seat`}
+                            data-lobby-id={l.lobbyId}
+                          >
+                            WATCH
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <p className="panel__note panel__note--quiet">
+                  The list keeps itself up to date. WATCH takes no seat: you see the whole board
+                  and cannot act.
+                </p>
+              </section>
             </div>
           </>
         ) : (
-          <>
-            <div className="col">
-              <span className="field__label">SEATS · {lobby.name}</span>
-              {Array.from({ length: lobby.maxPlayers }, (_, i) => {
-                const seatNumber = (i + 1) as 1 | 2 | 3 | 4 | 5;
-                const taken = lobby.seats[i];
-                return (
-                  <div
-                    key={seatNumber}
-                    className={`seat seat--${seatNumber} ${taken?.you === true ? 'seat--active' : ''}`}
-                  >
-                    <span className="seat__name">
-                      {seatNumber}. {taken === undefined ? 'empty' : taken.name}
-                      {taken?.you === true ? ' (you)' : ''}
-                    </span>
-                    <span className="seat__meta">
-                      {/* The staggered start, stated. `RULES.staggeredStart` gives
-                          seat n exactly n resources; without the line this reads
-                          as a bug. */}
-                      {seatNumber} resource{seatNumber === 1 ? '' : 's'} to spend
-                      {taken?.ready === true ? ' · ready' : ''}
-                      {taken?.connected === false ? ' · away' : ''}
-                    </span>
-                  </div>
-                );
-              })}
-              {lobby.seats.length < 2 ? (
-                <p className="panel__note">
-                  Waiting for players — share the link. Two are needed to start.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="row">
-              {/* No seat means no READY. `lobby:ready` reaches `hub.setReady`, which
-                  throws `NOT_IN_LOBBY` for anybody who is not a member, so a READY on
-                  this screen could only ever earn a refusal toast — §9.10's dead
-                  control. Absence is the spectator signal (§5.11). */}
-              {props.spectator ? null : (
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    const me = lobby.seats.find((s) => s.you);
-                    props.onReady(me?.ready !== true);
-                  }}
-                  data-testid="ready-toggle"
-                >
-                  {lobby.seats.find((s) => s.you)?.ready === true ? 'READY ✓' : 'READY'}
-                </button>
-              )}
-              {props.isHost ? (
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={props.onStart}
-                  disabled={!props.canStart}
-                  aria-disabled={!props.canStart}
-                  data-testid="start-match"
-                >
-                  START MATCH
-                </button>
-              ) : null}
-              {/* THE LABEL NAMES BOTH HALVES, because it now does both.
-                  This used to read `WATCH INSTEAD` and sent `lobby:spectate` alone —
-                  which orphaned the seat this connection already held and hung the
-                  table. It now RELEASES the seat first (`Connection#giveUpSeatAndWatch`),
-                  and a button that quietly gives up a seat has to say so: an
-                  unreversible "instead" is not a decision a player can make by
-                  misreading a verb. */}
-              {props.spectator ? null : (
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={props.onSpectate}
-                  data-testid="give-up-seat"
-                >
-                  GIVE UP MY SEAT AND WATCH
-                </button>
-              )}
-              <button type="button" className="btn" onClick={props.onLeave} data-testid="leave-lobby">
-                LEAVE
-              </button>
-            </div>
-            {props.spectator ? (
-              <p className="panel__note panel__note--quiet" data-testid="spectating-note">
-                You are watching this room and holding no seat. You will see every card and the
-                whole board, and nothing you do here reaches the table.
-              </p>
-            ) : null}
-            {!props.isHost ? (
-              <p className="panel__note panel__note--quiet">Only the host can start the match.</p>
-            ) : !props.canStart ? (
-              <p className="panel__note panel__note--quiet">At least two players are needed.</p>
-            ) : null}
-          </>
+          <InRoom {...props} lobby={lobby} />
         )}
 
         <div className="col">
           <button
             type="button"
-            className="btn btn--sm"
+            className="btn btn--sm btn--ghost lobby__rules-toggle"
             onClick={() => setShowRules((s) => !s)}
             aria-expanded={showRules}
             data-testid="toggle-rules"
           >
-            RULES &amp; BOARD
+            {showRules ? '▾' : '▸'} HOW TO PLAY · RULES &amp; BOARD
           </button>
           {showRules ? <RulesPanel /> : null}
         </div>
@@ -764,30 +746,223 @@ export function LobbyScreen(props: LobbyScreenProps) {
   );
 }
 
+/** The room you are sitting in: seats, the invite link, and the start controls. */
+function InRoom(props: LobbyScreenProps & { readonly lobby: Lobby }) {
+  const { lobby } = props;
+  const mine = lobby.seats.find((s) => s.you);
+  const openSeats = lobby.maxPlayers - lobby.seats.length;
+  const host = lobby.seats.find((s) => s.playerId === lobby.hostId);
+  const [copied, setCopied] = useState(false);
+  const link = inviteLink(lobby.lobbyId);
+
+  const copy = () => {
+    try {
+      void navigator.clipboard.writeText(link).then(
+        () => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 2000);
+        },
+        () => undefined,
+      );
+    } catch {
+      /* No clipboard API (an insecure origin); the link is selectable text. */
+    }
+  };
+
+  // The status line answers the one question everybody in a room has: what are we
+  // waiting for?
+  const status = props.spectator
+    ? 'You are watching this room and holding no seat.'
+    : lobby.seats.length < 2
+      ? 'Waiting for players — send them the invite link. Two are needed to start.'
+      : props.isHost
+        ? openSeats > 0
+          ? `You can start now, or wait for ${openSeats} more player${openSeats === 1 ? '' : 's'}.`
+          : 'Everyone is here. Start when you are ready.'
+        : `Waiting for ${host?.name ?? 'the host'} to start the match.`;
+
+  return (
+    <>
+      <section className="lobby__card" aria-labelledby="room-h">
+        <div className="lobby__card-head">
+          <h2 className="lobby__card-title" id="room-h">
+            {lobby.name}&apos;s room
+          </h2>
+          <span className="chip">
+            {lobby.seats.length}/{lobby.maxPlayers} seated
+          </span>
+        </div>
+
+        <ol className="seats" aria-label={`SEATS · ${lobby.name}`}>
+          {Array.from({ length: lobby.maxPlayers }, (_, i) => {
+            const seatNumber = (i + 1) as 1 | 2 | 3 | 4 | 5;
+            const taken = lobby.seats[i];
+            return (
+              <li
+                key={seatNumber}
+                className={`seat seat--${seatNumber}${taken?.you === true ? ' seat--active' : ''}${taken === undefined ? ' seat--empty' : ''}`}
+              >
+                <span className="seat__name">
+                  {seatNumber}. {taken === undefined ? 'empty' : taken.name}
+                  {taken?.you === true ? ' (you)' : ''}
+                </span>
+                {taken !== undefined && taken.playerId === lobby.hostId ? (
+                  <span className="badge">host</span>
+                ) : null}
+                {taken?.ready === true ? <span className="badge badge--ok">ready</span> : null}
+                {taken?.connected === false ? <span className="badge badge--warn">away</span> : null}
+                <span className="seat__meta">
+                  {/* The staggered start, stated. `RULES.staggeredStart` gives seat n
+                      exactly n resources; without the line this reads as a bug. */}
+                  {seatNumber} resource{seatNumber === 1 ? '' : 's'} to spend
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="panel__note panel__note--quiet">
+          Later seats start with more resources, to make up for playing later in the round.
+        </p>
+      </section>
+
+      {props.spectator ? null : (
+        <section className="lobby__invite" aria-label="Invite link">
+          <div className="lobby__invite-body">
+            <span className="field__label">Invite link — send this to the other players</span>
+            <input
+              className="field field--link"
+              readOnly
+              value={link}
+              onFocus={(e) => e.currentTarget.select()}
+              data-testid="invite-link"
+              aria-label="Invite link for this room"
+            />
+          </div>
+          <button type="button" className="btn" onClick={copy} data-testid="copy-invite">
+            {copied ? 'COPIED ✓' : 'COPY LINK'}
+          </button>
+        </section>
+      )}
+
+      <p className="lobby__status" role="status" data-testid="lobby-status">
+        {status}
+      </p>
+
+      <div className="row lobby__actions">
+        {props.isHost ? (
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={props.onStart}
+            disabled={!props.canStart}
+            aria-disabled={!props.canStart}
+            title={props.canStart ? undefined : 'At least two players are needed.'}
+            data-testid="start-match"
+          >
+            START MATCH
+          </button>
+        ) : null}
+        {/* No seat means no READY: `lobby:ready` throws `NOT_IN_LOBBY` for anybody
+            who is not a member (§5.11 — the absence is the spectator signal). */}
+        {props.spectator ? null : (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => props.onReady(mine?.ready !== true)}
+            aria-pressed={mine?.ready === true}
+            data-testid="ready-toggle"
+          >
+            {mine?.ready === true ? 'READY ✓' : 'READY'}
+          </button>
+        )}
+        <span className="shell__spacer" />
+        {/* THE LABEL NAMES BOTH HALVES, because it does both: it releases the seat
+            first (`Connection#giveUpSeatAndWatch`), and a button that quietly gives
+            up a seat has to say so. */}
+        {props.spectator ? null : (
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            onClick={props.onSpectate}
+            data-testid="give-up-seat"
+          >
+            GIVE UP MY SEAT AND WATCH
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost"
+          onClick={props.onLeave}
+          data-testid="leave-lobby"
+        >
+          LEAVE
+        </button>
+      </div>
+      {props.spectator ? (
+        <p className="panel__note panel__note--quiet" data-testid="spectating-note">
+          You will see every card and the whole board, and nothing you do here reaches the table.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** The URL that drops a friend straight onto this room's JOIN. */
+export function inviteLink(lobbyId: string): string {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('room', lobbyId);
+  return url.toString();
+}
+
 /**
- * The nine constituencies with their printed fractions, inline. §5.1.
+ * How to play, then the nine constituencies with their printed fractions. §5.1.
  *
  * The names and fractions are read from the board package's own geometry rather
- * than restated here. That package is presentational, imports nothing from the
- * engine, and is already the thing the board renders — so it is the single
- * source of truth for "what does the printed board say", and a second copy in
- * the lobby would be one more thing to drift.
+ * than restated here: it is already the thing the board renders, so it is the
+ * single source of truth for "what does the printed board say".
  */
-function RulesPanel() {
+export function RulesPanel() {
   return (
-    <div className="panel" data-testid="rules-panel">
+    <div className="panel rules" data-testid="rules-panel">
+      <h3 className="rules__h">A turn</h3>
+      <ol className="rules__steps">
+        <li>
+          <strong>Answer your Ideology Card.</strong> Pick one of two answers. Each answer belongs
+          to an Ideologue and pays resources — Funds, Clout, Media or Trust.
+        </li>
+        <li>
+          <strong>Buy Voter Cards from the HQ Mat.</strong> Spend resources on one of the three
+          face-up cards. Each card gives you a group of voters to place.
+        </li>
+        <li>
+          <strong>Place those voters</strong> in empty areas on the board.
+        </li>
+        <li>
+          <strong>Use powers, trade or gerrymander</strong> if you can, then press{' '}
+          <strong>END TURN</strong>.
+        </li>
+      </ol>
+      <h3 className="rules__h">Winning</h3>
+      <p className="panel__note">
+        Hold a majority in a constituency and your voters there score. The game ends when every
+        majority has formed, and the most majority voters wins. Each answer also adds a card to
+        your Manifesto; enough cards for one Ideologue unlock its powers.
+      </p>
+      <h3 className="rules__h">The board</h3>
       <p className="panel__note">
         Nine constituencies, one hundred and twenty-nine voter areas. A majority is the printed
         fraction of that constituency&apos;s areas, held with the peg turned symbol-side up.
         Eleven areas are Volatile — the rounded squares — and a voter placed there is permanent and
         triggers a Headline at the end of the turn.
       </p>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 'var(--sp-2) 0 0' }}>
+      <ul className="rules__zones">
         {BOARD.map((z) => (
-          <li key={z.id} className="seat seat--1" style={{ marginBottom: 2 }}>
+          <li key={z.id} className="seat seat--1">
             <span className="seat__name">{z.name}</span>
             <span className="seat__meta">
-              {z.majority}/{z.capacity}
+              {z.majority}/{z.capacity} for a majority
             </span>
           </li>
         ))}
@@ -845,8 +1020,11 @@ export function ErrorToast({
   }, [message, onDismiss]);
   return (
     <div className="toast" role="alert" data-testid="error-toast">
-      {message}
-      <span className="toast__code">{code}</span>
+      <span className="toast__msg">{message}</span>
+      {code !== '' ? <span className="toast__code">{code}</span> : null}
+      <button type="button" className="toast__close" onClick={onDismiss} aria-label="Dismiss">
+        ×
+      </button>
     </div>
   );
 }
