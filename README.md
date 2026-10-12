@@ -218,4 +218,4 @@ on report.
 | [docs/AUTHENTIC-SHASN-REFERENCE.md](docs/AUTHENTIC-SHASN-REFERENCE.md) | Web research on the real game: rules, and the provenance/legal analysis. |
 | [docs/UI-SPEC.md](docs/UI-SPEC.md) | Visual and UX specification. **Partially superseded** — opens with a table of what is current and what is retired. |
 | [docs/ENGINE-AUDIT.md](docs/ENGINE-AUDIT.md) | Audit of `packages/engine`. A historical document; several of its premises are retired. |
-| [docs/rules-reference.md](docs/rules-reference.md) | The rules, for checking the engine against something. |
+| [docs/rules-reference.md](docs/rules-reference.md) | The rules, for checking the engine against something. |"# S-h-a-s" 
