@@ -4,8 +4,40 @@ import react from '@vitejs/plugin-react';
 // Vite config for the Shasn client. `@shasn/engine` is deliberately NOT aliased:
 // the board is pure presentational and imports nothing from the engine, so the dev
 // server never needs the engine to compile. See src/board/types.ts.
+/**
+ * The Hexclave client reads `process.env.HEXCLAVE_*` inside its own package.
+ * Vite does not expose those to prebundled dependencies, so the values the
+ * `hexclave dev` wrapper injects have to be written in here. Server secrets
+ * are left out: this bundle is the browser.
+ */
+function hexclaveClientDefine(): Record<string, string> {
+  const define: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined || value === '') continue;
+    if (key.includes('SECRET')) continue;
+    const clientSafe =
+      key === 'HEXCLAVE_PROJECT_ID' ||
+      key === 'VITE_HEXCLAVE_PROJECT_ID' ||
+      key === 'HEXCLAVE_PUBLISHABLE_CLIENT_KEY' ||
+      key === 'VITE_HEXCLAVE_PUBLISHABLE_CLIENT_KEY' ||
+      key.startsWith('HEXCLAVE_API_') ||
+      key.startsWith('VITE_HEXCLAVE_API_') ||
+      key.startsWith('HEXCLAVE_HOSTED_') ||
+      key.startsWith('VITE_HEXCLAVE_HOSTED_') ||
+      key === 'HEXCLAVE_IS_LOCAL_EMULATOR' ||
+      key === 'VITE_HEXCLAVE_IS_LOCAL_EMULATOR' ||
+      key === 'HEXCLAVE_PORT_PREFIX' ||
+      key === 'VITE_HEXCLAVE_PORT_PREFIX';
+    if (!clientSafe) continue;
+    define[`process.env.${key}`] = JSON.stringify(value);
+    define[`import.meta.env.${key}`] = JSON.stringify(value);
+  }
+  return define;
+}
+
 export default defineConfig({
   plugins: [react()],
+  define: hexclaveClientDefine(),
   server: {
     port: 5174,
     strictPort: true,

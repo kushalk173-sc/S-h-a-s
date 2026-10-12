@@ -15,8 +15,11 @@
  * and `Connection.connect` is written to be idempotent for that reason.
  */
 
-import { StrictMode } from 'react';
+import { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HexclaveProvider, HexclaveTheme } from '@hexclave/react';
+
+import { hexclaveClientApp } from './hexclave/client.ts';
 
 // THE THREE TYPEFACES THE TOKENS NAME, self-hosted. `tokens.css` has always asked
 // for Bitter, Inter and Roboto Mono and nothing ever loaded them, so every player saw
@@ -38,6 +41,12 @@ if (host === null) throw new Error('#root missing from index.html');
 
 createRoot(host).render(
   <StrictMode>
-    <App />
+    <Suspense fallback={<div>Loading...</div>}>
+      <HexclaveProvider app={hexclaveClientApp}>
+        <HexclaveTheme>
+          <App />
+        </HexclaveTheme>
+      </HexclaveProvider>
+    </Suspense>
   </StrictMode>,
 );

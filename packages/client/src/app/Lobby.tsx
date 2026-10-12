@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 
 import type { ClientStore, Lobby, SeatCount } from '../net/index.ts';
 
+import { AccountControl } from './AccountControl.tsx';
 import { ErrorToast, LobbyScreen } from './Panels.tsx';
 import { connection, send } from './session.ts';
 import { useApp, type Link } from './store.ts';
@@ -229,6 +230,7 @@ export function LobbyScreenHarness({ store }: LobbyScreenHarnessProps) {
   return (
     <>
     <LobbyScreen
+      account={<AccountControl />}
       lobbies={store.lobbies}
       lobby={lobby}
       name={name}

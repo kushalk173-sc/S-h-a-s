@@ -8,7 +8,7 @@
  * shell" point (§5) harder to see, which is the thing this file demonstrates.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import type { ClientState, PlayerID } from '@shasn/engine';
 
@@ -503,6 +503,8 @@ export type LobbyScreenProps = {
    * signal). A spectator that was given a room by `lobby:spectate`.
    */
   readonly spectator: boolean;
+  /** Sign-in control. Omitted by tests that render the lobby without an account. */
+  readonly account?: ReactNode;
   /**
    * The room named by this page's `?room=` invite link, when it is in the open-rooms
    * list — rendered as a one-click JOIN above everything else.
@@ -526,6 +528,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
     <div className="lobby" data-testid="lobby-screen">
       <div className="lobby__sheet">
         <header className="lobby__head">
+          {props.account}
           <h1 className="lobby__h1">SHASN</h1>
           {/* THE PITCH, AND IT IS THE FIRST THING THE PRODUCT SAYS.
            *

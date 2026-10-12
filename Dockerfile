@@ -52,6 +52,20 @@ COPY packages ./packages
 # index.html. The result is a server that boots cleanly, passes `/healthz`, and
 # 404s every page request. `scripts/start.mjs:100` exists to catch exactly this,
 # and its check is why that fallback must never be what ships.
+#
+# Hexclave passes public project values into a Dockerfile build only when the
+# file declares them. Vite inlines `VITE_*` while `npm run build` runs, so the
+# browser bundle never sees a value that arrives only at container start.
+# The secret server key is intentionally absent: it is injected at runtime.
+ARG HEXCLAVE_PROJECT_ID
+ARG HEXCLAVE_API_URL
+ARG HEXCLAVE_PUBLISHABLE_CLIENT_KEY
+ARG VITE_HEXCLAVE_PROJECT_ID
+ARG VITE_HEXCLAVE_API_URL
+ARG VITE_HEXCLAVE_PUBLISHABLE_CLIENT_KEY
+ARG NEXT_PUBLIC_HEXCLAVE_PROJECT_ID
+ARG NEXT_PUBLIC_HEXCLAVE_API_URL
+ARG NEXT_PUBLIC_HEXCLAVE_PUBLISHABLE_CLIENT_KEY
 RUN npm run build
 
 # ── run ──────────────────────────────────────────────────────────────────────

@@ -1736,6 +1736,14 @@
   overflow-y: auto;
 }
 
+.account {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
 .lobby__sheet {
   background: var(--paper-100);
   border: 1.5px solid var(--paper-300);

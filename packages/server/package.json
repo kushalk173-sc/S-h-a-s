@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hexclave/js": "^1.0.125",
     "@shasn/cards": "*",
     "@shasn/engine": "*",
     "ws": "^8.18.0"
